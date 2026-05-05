@@ -3,7 +3,7 @@
 **Projektname:** bess-ems
 **Dokumenttyp:** Architekturbeschreibung
 **Format:** Markdown
-**Version:** 0.1.1
+**Version:** 0.1.2
 **Status:** Entwurf
 **Bezug:** [`lastenheft.md`](lastenheft.md), [`idea.md`](idea.md)
 
@@ -52,7 +52,7 @@ referenzieren ihre `LH-*`-Kennung; Architekturkomponenten erhalten
    ┌───────────────────────────────────────────────────────────────┐
    │                          bess-ems                             │
    │                                                               │
-   │   API (REST/gRPC) ◄──── Operator UI / API-Client              │
+   │   API (REST/HTTP) ◄──── Operator UI / API-Client              │
    │                                                               │
    │   Worker (Regelkreis, Markt, Adapter-Orchestrierung)          │
    │                                                               │
@@ -79,7 +79,7 @@ Bezug: LH-KTX-001, LH-KTX-002, LH-PERSIST-005.
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
-│ API Layer                                                   │  HTTP/gRPC, AuthN/AuthZ
+│ API Layer                                                   │  HTTP/REST, AuthN/AuthZ
 ├─────────────────────────────────────────────────────────────┤
 │ Application / Worker Orchestration                          │  Regelzyklus, Scheduler
 ├─────────────────────────────────────────────────────────────┤
@@ -126,7 +126,7 @@ Bezug: LH-ARCH-002.
 | `BatteryEms.Protocols.OpcUa`       | OPC-UA-Adapter (nach MVP)                                    | LH-OPCUA-*           |
 | `BatteryEms.Persistence`           | Repositories, EF Core / Dapper, Migrationen, Retention       | LH-PERSIST-*         |
 | `BatteryEms.Infrastructure`        | Logging, Metriken, Tracing, Config-Loader, Validierung       | LH-MON-*, LH-CONF-*  |
-| `BatteryEms.NativeInterop`         | P/Invoke-Bindings, ABI-Check, Fallback-Routing               | LH-NATIVE-*          |
+| `BatteryEms.NativeInterop`         | P/Invoke-Bindings, ABI-Check, Fallback-Routing (nach MVP / falls Native Core eingesetzt wird) | LH-NATIVE-* |
 
 ### 5.2 Native-Core-Komponenten (optional, ab Phase 2)
 
@@ -491,15 +491,15 @@ die `.so` und deponiert sie in `/usr/local/lib` (LH-DEPLOY-004).
 
 ## 16. Testarchitektur
 
-| Stufe              | Inhalt                                                 | LH-Bezug    |
-| ------------------ | ------------------------------------------------------ | ----------- |
-| Unit               | Domain, State Machine, Limiter, Snapshot-Validierung    | LH-TEST-001 |
-| Unit (Markt)       | Day-Ahead-Logik, Zeitmodell, Sommerzeit                 | LH-TEST-002 |
-| Integration        | Modbus/MQTT-Adapter gegen Simulatoren                   | LH-TEST-003 |
-| Replay             | historische Telemetrie → reproduzierbare Commands       | LH-TEST-004 |
-| Native Interop     | Struct-Layout, ABI-Version, Fehlercodes, Werte-Parität  | LH-TEST-005 |
-| Sicherheitsfälle   | Emergency Stop, BMS-Ausfall, stale snapshot, ungültiger Command | LH-TEST-006 |
-| Container          | Image-Boot, Healthcheck; Native Library geladen, falls Native Core eingesetzt wird | LH-TEST-007 |
+| Stufe              | Inhalt                                                 | LH-Bezug    | Geltung                    |
+| ------------------ | ------------------------------------------------------ | ----------- | -------------------------- |
+| Unit               | Domain, State Machine, Limiter, Snapshot-Validierung    | LH-TEST-001 | MVP                        |
+| Unit (Markt)       | Day-Ahead-Logik, Zeitmodell, Sommerzeit                 | LH-TEST-002 | MVP                        |
+| Integration        | Modbus/MQTT-Adapter gegen Simulatoren                   | LH-TEST-003 | MVP                        |
+| Replay             | historische Telemetrie → reproduzierbare Commands       | LH-TEST-004 | nach MVP                   |
+| Native Interop     | Struct-Layout, ABI-Version, Fehlercodes, Werte-Parität  | LH-TEST-005 | nach MVP / falls eingesetzt |
+| Sicherheitsfälle   | Emergency Stop, BMS-Ausfall, stale snapshot, ungültiger Command | LH-TEST-006 | MVP                 |
+| Container          | Image-Boot, Healthcheck; Native Library geladen, falls Native Core eingesetzt wird | LH-TEST-007 | MVP / Native optional |
 
 Empfehlung: .NET-Referenzregler parallel zum Native Core pflegen und in
 Replay-Tests gegeneinander vergleichen, um ABI- und Rundungsfehler früh
@@ -531,7 +531,7 @@ zu finden.
 
 | Kennung    | Frage                                                               | Status |
 | ---------- | ------------------------------------------------------------------- | ------ |
-| AR-OPEN-001 | API-Komponente eigener Service oder im Worker integriert?         | Offen  |
+| AR-OPEN-001 | Nach welchen Kriterien wird die API nach MVP als eigener Service ausgekoppelt? | Offen |
 | AR-OPEN-002 | gRPC vs. REST-only für externe Optimierungs-Sidecars in Phase 3?  | Offen  |
 | AR-OPEN-003 | Persistenz-Stack: EF Core, Dapper oder Mischung?                  | Offen  |
 | AR-OPEN-004 | Fahrplanimport-Format (CSV, JSON, ENTSO-E, proprietär)?           | Offen  |
