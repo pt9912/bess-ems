@@ -32,6 +32,12 @@ type cliFlags struct {
 	assetIDOverride string
 }
 
+type outputs struct {
+	modbus *modbus.Server
+	mqtt   *mqtt.Publisher
+	client *mqtt.PahoClient
+}
+
 func parseFlags(args []string) (cliFlags, error) {
 	fs := flag.NewFlagSet("bess-field-sim", flag.ContinueOnError)
 	var f cliFlags
@@ -69,48 +75,55 @@ func run(args []string) error {
 	)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	var server *modbus.Server
-	var client *mqtt.PahoClient
+	var io outputs
 	defer func() {
 		// Shutdown order is intentional: cancel the orchestrator context before
 		// transport drains so in-flight publishes observe cancellation first.
 		cancel()
-		if client != nil {
-			client.Close()
+		if io.client != nil {
+			io.client.Close()
 		}
-		if server != nil {
-			server.Close()
+		if io.modbus != nil {
+			io.modbus.Close()
 		}
 	}()
 
-	var modbusApplier runtime.ModbusApplier
-	server, err = startModbus(flags)
+	io.modbus, err = startModbus(flags)
 	if err != nil {
 		return err
 	}
-	if server != nil {
-		modbusApplier = server
-	}
-
-	var publisher runtime.MqttPublisher
-	mqttPublisher, client, err := startMQTT(flags, scn.Asset.AssetID)
+	io.mqtt, io.client, err = startMQTT(flags, scn.Asset.AssetID)
 	if err != nil {
 		return err
 	}
-	if mqttPublisher != nil {
-		publisher = mqttPublisher
-	}
 
-	if modbusApplier == nil && publisher == nil {
+	if !io.hasIO() {
 		slog.Warn("no Modbus mapping and no MQTT mapping/broker — running scenario without IO")
 	}
 
-	o := runtime.NewOrchestrator(modbusApplier, publisher, runtime.SleepWithContext)
+	o := io.orchestrator()
 	if err := o.Run(ctx, scn); err != nil {
 		return fmt.Errorf("run scenario: %w", err)
 	}
 	slog.Info("scenario complete", "id", scn.ID)
 	return nil
+}
+
+func (o outputs) hasIO() bool {
+	return o.modbus != nil || o.mqtt != nil
+}
+
+func (o outputs) orchestrator() *runtime.Orchestrator {
+	switch {
+	case o.modbus != nil && o.mqtt != nil:
+		return runtime.NewOrchestrator(o.modbus, o.mqtt, runtime.SleepWithContext)
+	case o.modbus != nil:
+		return runtime.NewOrchestrator(o.modbus, nil, runtime.SleepWithContext)
+	case o.mqtt != nil:
+		return runtime.NewOrchestrator(nil, o.mqtt, runtime.SleepWithContext)
+	default:
+		return runtime.NewOrchestrator(nil, nil, runtime.SleepWithContext)
+	}
 }
 
 func startModbus(flags cliFlags) (*modbus.Server, error) {

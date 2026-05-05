@@ -33,7 +33,10 @@ func NewPahoClient(brokerURL, clientID string) (*PahoClient, error) {
 		return nil, fmt.Errorf("mqtt broker URL scheme %q is not supported; use tcp", parsedURL.Scheme)
 	}
 	// SECURITY: M1 simulator MQTT is anonymous plaintext only. Do not point
-	// this client at production brokers until TLS and credentials are wired.
+	// this client at production brokers until the M2 adapter hardening plan
+	// (docs/plan/planning/in-progress/roadmap.md) adds TLS and credentials.
+	// SetCleanSession plus AutoReconnect is intentional for replay-only test
+	// runs: reconnects should not resume stale subscriptions or queued state.
 	opts := paho.NewClientOptions().
 		AddBroker(brokerURL).
 		SetClientID(clientID).

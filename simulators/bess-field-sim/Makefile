@@ -8,7 +8,29 @@ NO_CACHE_FILTER_TEST     := --no-cache-filter test
 NO_CACHE_FILTER_LINT     := --no-cache-filter lint
 NO_CACHE_FILTER_COVERAGE := --no-cache-filter coverage
 
-.PHONY: test race lint build deps compile run coverage coverage-gate clean
+.DEFAULT_GOAL := help
+
+.PHONY: help test race lint gates build deps compile run coverage coverage-gate clean
+
+help:
+	@printf '%s\n' \
+		'bess-field-sim Makefile' \
+		'' \
+		'Targets:' \
+		'  make test           Run Go unit tests in Docker' \
+		'  make lint           Run golangci-lint in Docker' \
+		'  make race           Run race-detector tests for concurrent packages' \
+		'  make gates          Run simulator test, lint, and race gates' \
+		'  make coverage-gate  Run Go coverage gate (threshold via THRESHOLD, default 90)' \
+		'  make coverage       Alias for coverage-gate' \
+		'  make compile        Build the simulator binary stage' \
+		'  make build          Build the runtime image' \
+		'  make deps           Rebuild dependency cache stage' \
+		'  make clean          Remove simulator Docker images' \
+		'' \
+		'Variables:' \
+		'  IMAGE=$(IMAGE)' \
+		'  THRESHOLD=$(THRESHOLD)'
 
 test:
 	docker build $(NO_CACHE_FILTER_TEST) --target test -t $(IMAGE):test .
@@ -18,6 +40,9 @@ race:
 
 lint:
 	docker build $(NO_CACHE_FILTER_LINT) --target lint -t $(IMAGE):lint .
+
+gates: test lint race
+	@echo "[bess-field-sim] gates green: test, lint, race"
 
 coverage-gate:
 	docker build $(NO_CACHE_FILTER_COVERAGE) \

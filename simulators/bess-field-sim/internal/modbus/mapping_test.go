@@ -2,25 +2,16 @@ package modbus_test
 
 import (
 	"errors"
-	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/modbus"
 	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/model"
+	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/testroot"
 )
 
 func TestMain(m *testing.M) {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		os.Exit(1)
-	}
-	root := filepath.Join(filepath.Dir(file), "..", "..")
-	if err := os.Chdir(root); err != nil {
-		os.Exit(1)
-	}
-	os.Exit(m.Run())
+	testroot.Main(m)
 }
 
 func TestLoadMapping_VendorNeutralExample(t *testing.T) {
@@ -145,14 +136,36 @@ func TestValidateMapping_RejectsUnsupportedRegisterType(t *testing.T) {
 	}
 }
 
+func TestValidateMapping_RejectsMultiWordRegisterPastAddressSpace(t *testing.T) {
+	t.Parallel()
+
+	m := model.ModbusMapping{
+		ProfileName:     "p",
+		UnitIDDiscovery: "sunspec",
+		Registers:       []model.ModbusRegister{{Name: "soc_percent", Address: 65535, Type: "uint32"}},
+	}
+	if !errors.Is(modbus.ValidateMapping(m), modbus.ErrMappingRegisterOutOfRange) {
+		t.Fatal("expected ErrMappingRegisterOutOfRange")
+	}
+}
+
+func TestValidateMapping_RejectsNegativeRegisterAddress(t *testing.T) {
+	t.Parallel()
+
+	m := model.ModbusMapping{
+		ProfileName:     "p",
+		UnitIDDiscovery: "sunspec",
+		Registers:       []model.ModbusRegister{{Name: "soc_percent", Address: -1, Type: "uint16"}},
+	}
+	if !errors.Is(modbus.ValidateMapping(m), modbus.ErrMappingRegisterOutOfRange) {
+		t.Fatal("expected ErrMappingRegisterOutOfRange")
+	}
+}
+
 func TestLoadMapping_MalformedJSONOnDisk(t *testing.T) {
 	t.Parallel()
 
-	path := filepath.Join(".", "bad-modbus-mapping.json")
-	if err := os.WriteFile(path, []byte("{not json"), 0o600); err != nil {
-		t.Fatalf("write tmp: %v", err)
-	}
-	t.Cleanup(func() { _ = os.Remove(path) })
+	path := filepath.Join("testdata", "malformed", "modbus-mapping.invalid-json")
 	_, err := modbus.LoadMapping(path)
 	if err == nil {
 		t.Fatal("expected error")

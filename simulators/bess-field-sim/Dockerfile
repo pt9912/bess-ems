@@ -37,18 +37,12 @@ FROM deps AS test
 COPY . .
 RUN CGO_ENABLED=0 go test ./...
 
-# Race-detector gate. Scoped to the packages that actually spawn or
-# interact with goroutines (modbus server registers/handler split,
-# Paho Publish/cancel race) so the stage stays focused. CGO=1 is
-# required by `-race`; the default golang image ships gcc so no extra
-# install. Only this stage links libc — runtime/build stages stay
-# CGO=0 and distroless-compatible.
+# Race-detector gate. CGO=1 is required by `-race`; the default golang
+# image ships gcc so no extra install. Only this stage links libc —
+# runtime/build stages stay CGO=0 and distroless-compatible.
 FROM deps AS race
 COPY . .
-RUN CGO_ENABLED=1 go test -race -count=1 \
-    ./internal/modbus/... \
-    ./internal/mqtt/... \
-    ./internal/runtime/...
+RUN CGO_ENABLED=1 go test -race -count=1 ./...
 
 FROM deps AS coverage
 ARG COVERAGE_THRESHOLD=90

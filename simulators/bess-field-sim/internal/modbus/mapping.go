@@ -13,6 +13,8 @@ import (
 	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/safepath"
 )
 
+const holdingRegisterCount = 65536
+
 var (
 	// ErrMappingMissingProfile is returned when a mapping fixture lacks
 	// profile_name.
@@ -30,6 +32,9 @@ var (
 	// ErrMappingUnsupportedRegisterType is returned for register types the
 	// simulator encoder cannot represent.
 	ErrMappingUnsupportedRegisterType = errors.New("modbus mapping unsupported register type")
+	// ErrMappingRegisterOutOfRange is returned when a mapped register spans
+	// beyond the simulator's holding-register address space.
+	ErrMappingRegisterOutOfRange = errors.New("modbus mapping register out of range")
 )
 
 // LoadMapping reads a ModbusMapping fixture from disk and validates it.
@@ -79,6 +84,10 @@ func ValidateMapping(m model.ModbusMapping) error {
 		if !isSupportedRegisterType(reg.Type) {
 			return fmt.Errorf("%w: index %d type=%q", ErrMappingUnsupportedRegisterType, i, reg.Type)
 		}
+		words := registerWordCount(reg.Type)
+		if reg.Address < 0 || reg.Address+words > holdingRegisterCount {
+			return fmt.Errorf("%w: index %d address=%d type=%q", ErrMappingRegisterOutOfRange, i, reg.Address, reg.Type)
+		}
 	}
 	return nil
 }
@@ -101,10 +110,16 @@ func isTelemetryRegister(name string) bool {
 }
 
 func isSupportedRegisterType(typ string) bool {
+	return registerWordCount(typ) > 0
+}
+
+func registerWordCount(typ string) int {
 	switch typ {
-	case "uint16", "int16", "uint32", "int32", "float32":
-		return true
+	case "uint16", "int16":
+		return 1
+	case "uint32", "int32", "float32":
+		return 2
 	default:
-		return false
+		return 0
 	}
 }

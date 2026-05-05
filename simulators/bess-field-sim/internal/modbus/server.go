@@ -8,6 +8,8 @@ import (
 	"github.com/tbrandon/mbserver"
 )
 
+const maxReadHoldingRegisters = 125
+
 // Server is the simulator's Modbus TCP endpoint. It exposes the
 // configured mapping over TCP and refreshes the holding-register space
 // from the latest TelemetrySnapshot whenever Apply is called.
@@ -25,7 +27,7 @@ func NewServer(mapping model.ModbusMapping) *Server {
 	s := &Server{
 		mapping: mapping,
 		mb:      mb,
-		regs:    make([]uint16, len(mb.HoldingRegisters)),
+		regs:    make([]uint16, holdingRegisterCount),
 	}
 	mb.RegisterFunctionHandler(3, s.readHoldingRegisters)
 	return s
@@ -70,7 +72,7 @@ func (s *Server) readHoldingRegisters(_ *mbserver.Server, frame mbserver.Framer)
 	register := int(binary.BigEndian.Uint16(data[0:2]))
 	numRegs := int(binary.BigEndian.Uint16(data[2:4]))
 	endRegister := register + numRegs
-	if numRegs < 1 || endRegister < register || endRegister > len(s.regs) {
+	if numRegs < 1 || numRegs > maxReadHoldingRegisters || endRegister < register || endRegister > len(s.regs) {
 		return []byte{}, &mbserver.IllegalDataAddress
 	}
 

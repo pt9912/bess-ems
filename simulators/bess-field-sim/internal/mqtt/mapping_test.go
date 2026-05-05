@@ -2,25 +2,16 @@ package mqtt_test
 
 import (
 	"errors"
-	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/model"
 	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/mqtt"
+	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/testroot"
 )
 
 func TestMain(m *testing.M) {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		os.Exit(1)
-	}
-	root := filepath.Join(filepath.Dir(file), "..", "..")
-	if err := os.Chdir(root); err != nil {
-		os.Exit(1)
-	}
-	os.Exit(m.Run())
+	testroot.Main(m)
 }
 
 func TestLoadMapping_Example(t *testing.T) {
@@ -107,6 +98,16 @@ func TestParseMapping_MalformedJSON(t *testing.T) {
 	t.Parallel()
 
 	_, err := mqtt.ParseMapping([]byte("not json"))
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestLoadMapping_MalformedJSONOnDisk(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join("testdata", "malformed", "mqtt-mapping.invalid-json")
+	_, err := mqtt.LoadMapping(path)
 	if err == nil {
 		t.Fatal("expected error")
 	}

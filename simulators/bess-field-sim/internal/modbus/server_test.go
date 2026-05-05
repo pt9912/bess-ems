@@ -112,6 +112,35 @@ func TestServer_ApplyRefreshesValues(t *testing.T) {
 	}
 }
 
+func TestServer_ReadHoldingRegistersRejectsProtocolOversize(t *testing.T) {
+	t.Parallel()
+
+	addr := freeAddr(t)
+	staticID := 1
+	srv := modbus.NewServer(model.ModbusMapping{
+		ProfileName:     "test",
+		UnitIDDiscovery: "static",
+		StaticUnitID:    &staticID,
+	})
+	if err := srv.ListenTCP(addr); err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer srv.Close()
+	waitTCP(t, addr)
+
+	ctx := context.Background()
+	h := gridx.NewTCPClientHandler(addr)
+	h.SetSlave(byte(staticID))
+	if err := h.Connect(ctx); err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer func() { _ = h.Close() }()
+
+	if _, err := gridx.NewClient(h).ReadHoldingRegisters(ctx, 0, 126); err == nil {
+		t.Fatal("expected oversized FC3 read to fail")
+	}
+}
+
 func freeAddr(t *testing.T) string {
 	t.Helper()
 	l, err := net.Listen("tcp", "127.0.0.1:0")

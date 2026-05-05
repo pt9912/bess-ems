@@ -24,7 +24,9 @@ func EncodeSnapshot(snap model.TelemetrySnapshot, mapping model.ModbusMapping) m
 		if reg.ScaleFactor != 0 {
 			raw = value / reg.ScaleFactor
 		}
-		_ = writeRegister(out, reg.Address, reg.Type, raw)
+		if !writeRegister(out, reg.Address, reg.Type, raw) {
+			continue
+		}
 	}
 	return out
 }

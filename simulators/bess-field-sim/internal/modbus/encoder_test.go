@@ -149,6 +149,20 @@ func TestEncodeSnapshot_SkipsWritableAndUnknownNames(t *testing.T) {
 	}
 }
 
+func TestEncodeSnapshot_SkipsUnsupportedType(t *testing.T) {
+	t.Parallel()
+
+	mapping := model.ModbusMapping{
+		Registers: []model.ModbusRegister{
+			{Name: "soc_percent", Address: 100, Type: "string", ScaleFactor: 1},
+		},
+	}
+	got := modbus.EncodeSnapshot(model.TelemetrySnapshot{SocPercent: 50}, mapping)
+	if _, has := got[100]; has {
+		t.Error("unsupported register type must not be encoded")
+	}
+}
+
 func TestEncodeSnapshot_ZeroScaleFactorPassesThrough(t *testing.T) {
 	t.Parallel()
 
