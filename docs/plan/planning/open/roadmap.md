@@ -22,8 +22,9 @@ die spätere Verlinkung aus PRs, Issues und ADRs.
 Diese Roadmap ist die **Statusseite** des Projekts. Sie duplikiert nicht
 die Anforderungen (die stehen normativ im Lastenheft), sondern verfolgt
 *wo wir stehen, was als nächstes kommt und welche Risiken offen sind*.
-Detail-DoD-Tracking pro Meilenstein lebt nach Aktivierung in einem eigenen
-`docs/plan/planning/in-progress/plan-Mn.md` neben der aktiven Roadmap.
+Detail-DoD-Tracking pro Meilenstein lebt in einem eigenen
+`plan-RM-Mn.md`; offene Entwürfe liegen unter `open/`, aktive Pläne
+unter `in-progress/`.
 
 ### Status-Legende
 
@@ -44,8 +45,9 @@ Detail-DoD-Tracking pro Meilenstein lebt nach Aktivierung in einem eigenen
 > `spec/architecture.md`), Qualitäts-/Gate-Definition
 > (`docs/user/quality.md`) und diese Roadmap.
 > **Nächster konkreter Schritt:** Aktivierung von **M1**
-> (MVP — sichere Regelpipeline). Mit Aktivierung wird
-> `docs/plan/planning/in-progress/plan-M1.md` angelegt und diese
+> (MVP — sichere Regelpipeline). Ein offener Detailplan liegt in
+> [`plan-RM-M1.md`](plan-RM-M1.md). Mit Aktivierung wird dieser nach
+> `docs/plan/planning/in-progress/plan-RM-M1.md` verschoben und diese
 > Roadmap nach `docs/plan/planning/in-progress/roadmap.md` verschoben.
 
 ---
@@ -54,7 +56,7 @@ Detail-DoD-Tracking pro Meilenstein lebt nach Aktivierung in einem eigenen
 
 | Status | Meilenstein | Titel                              | Phase | Detailplan |
 | ------ | ----------- | ---------------------------------- | ----- | ---------- |
-| ⬜     | M1          | MVP — sichere Regelpipeline        | 1     | folgt mit Aktivierung |
+| ⬜     | M1          | MVP — sichere Regelpipeline        | 1     | [Entwurf](plan-RM-M1.md) |
 | ⬜     | M2          | Marktausbau und Optimierung        | 1 → 2 | folgt mit Aktivierung |
 | ⬜     | M3          | Native Control Core (Library)      | 2     | folgt mit Aktivierung |
 | ⬜     | M4          | Regelleistung und OPC-UA           | 2     | folgt mit Aktivierung |
@@ -98,7 +100,7 @@ AuthN/AuthZ-geschütztem Operator-Stop.
 | ⬜     | RM-M1-18   | Konfigurations-Loader, JSON-Schemas für Adapter-Mappings + Startvalidierung | LH-CONF-001..003, LH-OPS-001 |
 | ⬜     | RM-M1-19   | Dockerfile + Docker Compose (`bess-ems` mit Worker/API, Postgres, MQTT-Broker) | LH-DEPLOY-001..003, LH-NF-003/4 |
 | ⬜     | RM-M1-20   | Quality-Gates: Lint, Unit/Safety/Integration/Contract/Container, Coverage | LH-TEST-001/003/006/007, LH §4.1 |
-| ⬜     | RM-M1-21   | Makefile als Orchestrierungsschicht über die Docker-Stages aus `docs/user/quality.md`: `.DEFAULT_GOAL=help`, Override-Variablen (`COVERAGE_THRESHOLD`, `LIZARD_MAX_*`, `IMAGE`), Composite-Targets (`gates`, `ci`, `fullbuild`), `-gate`/`-report`-Trennung | LH-DEPLOY-001/002, LH-TEST-001/006/007 |
+| ⬜     | RM-M1-21   | Makefile als Orchestrierungsschicht über die Docker-Stages aus `docs/user/quality.md`: `.DEFAULT_GOAL=help`, Override-Variablen (`COVERAGE_THRESHOLD`, `LIZARD_MAX_*`, `IMAGE`), Composite-Targets (`gates`, `ci`, `runtime`, `fullbuild`), `-gate`/`-report`-Trennung | LH-DEPLOY-001/002, LH-TEST-001/006/007 |
 
 ### Abnahmekriterien
 
@@ -113,7 +115,9 @@ AuthN/AuthZ-geschütztem Operator-Stop.
   `make lint`, `make test`, `make test-safety`, `make test-integration`,
   `make test-container`, `make coverage-gate`, `make build`.
 - `make help` listet alle Targets und Override-Variablen; `make gates`
-  aggregiert die M1-Gates; `make fullbuild` läuft fresh-clone bis CI.
+  aggregiert die M1-Gates; `make ci` läuft die CI-kompatible Gate-Reihenfolge;
+  `make runtime` prüft Compose/Healthcheck; `make fullbuild` läuft
+  fresh-clone-nah bis Runtime-Smoke.
 - OpenAPI-, Adapter-Mapping-, Vorzeichen- und Startvalidierungs-Gates
   brechen den Build bei Vertragsverletzungen.
 
@@ -298,9 +302,9 @@ Kubernetes-Deployment, Edge-Anbindung. Inhalte mit hohem Diskussionsbedarf
 - Beim **Aktivieren** eines Meilensteins:
   1. Diese Datei nach `docs/plan/planning/in-progress/roadmap.md`
      verschieben.
-  2. Ein `docs/plan/planning/in-progress/plan-Mn.md` anlegen, das die
-     DoD-Tracking-Checkboxen pro Schritt enthält (analog
-     `m-trace/plan-X.Y.Z.md`).
+  2. Den Detailplan `plan-RM-Mn.md` nach
+     `docs/plan/planning/in-progress/plan-RM-Mn.md` verschieben oder dort
+     anlegen, falls noch kein offener Entwurf existiert.
   3. Aktive Phase im „Aktueller Stand"-Block eintragen und auf den aktiven
      Detailplan verweisen.
   4. Rückverweise aus anderen Dokumenten auf den neuen Roadmap-Pfad prüfen
@@ -308,7 +312,7 @@ Kubernetes-Deployment, Edge-Anbindung. Inhalte mit hohem Diskussionsbedarf
 - Beim **Abschließen** eines Meilensteins:
   1. Status in beiden Tabellen auf ✅ setzen (Übersicht und
      Liefergegenstände).
-  2. Den zugehörigen `plan-Mn.md` nach `docs/plan/planning/done/`
+  2. Den zugehörigen `plan-RM-Mn.md` nach `docs/plan/planning/done/`
      verschieben und in der „Übersicht"-Tabelle in der
      Detailplan-Spalte verlinken.
   3. „Aktueller Stand" auf den nächsten Meilenstein umstellen.
