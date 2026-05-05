@@ -22,8 +22,8 @@ die spätere Verlinkung aus PRs, Issues und ADRs.
 Diese Roadmap ist die **Statusseite** des Projekts. Sie duplikiert nicht
 die Anforderungen (die stehen normativ im Lastenheft), sondern verfolgt
 *wo wir stehen, was als nächstes kommt und welche Risiken offen sind*.
-Detail-DoD-Tracking pro Meilenstein lebt in einem eigenen
-`plan-Mn.md` neben dieser Datei, sobald der Meilenstein aktiv wird.
+Detail-DoD-Tracking pro Meilenstein lebt nach Aktivierung in einem eigenen
+`docs/plan/planning/in-progress/plan-Mn.md` neben der aktiven Roadmap.
 
 ### Status-Legende
 
@@ -44,9 +44,9 @@ Detail-DoD-Tracking pro Meilenstein lebt in einem eigenen
 > `spec/architecture.md`), Qualitäts-/Gate-Definition
 > (`docs/user/quality.md`) und diese Roadmap.
 > **Nächster konkreter Schritt:** Aktivierung von **M1**
-> (MVP — sichere Regelpipeline). Mit Aktivierung wird ein
-> `plan-M1.md` neben dieser Datei angelegt und die Datei nach
-> `docs/plan/planning/in-progress/roadmap.md` verschoben.
+> (MVP — sichere Regelpipeline). Mit Aktivierung wird
+> `docs/plan/planning/in-progress/plan-M1.md` angelegt und diese
+> Roadmap nach `docs/plan/planning/in-progress/roadmap.md` verschoben.
 
 ---
 
@@ -268,6 +268,7 @@ Kubernetes-Deployment, Edge-Anbindung. Inhalte mit hohem Diskussionsbedarf
 | RM-OPEN-04 | Authentifizierung in M1 (API-Token, OIDC)?                     | Offen  |
 | RM-OPEN-05 | Reihenfolge M3 vs. M4 — Native zuerst oder Markt-/RL zuerst?   | Offen  |
 | RM-OPEN-06 | Kriterien für spätere API-Extraktion nach dem MVP (siehe AR-OPEN-001)? | Offen  |
+| RM-OPEN-07 | Folge-ADR für Release-Pipeline-Gates vor erstem Tag `v0.1.0`?  | Offen  |
 
 ---
 
@@ -287,12 +288,15 @@ Kubernetes-Deployment, Edge-Anbindung. Inhalte mit hohem Diskussionsbedarf
   (⬜ → 🟡 → ✅). Verworfene Liefergegenstände auf ⬛ setzen statt
   zu löschen, damit die Roadmap die historische Entscheidung erhält.
 - Beim **Aktivieren** eines Meilensteins:
-  1. Ein `plan-Mn.md` neben dieser Datei anlegen, das die DoD-Tracking-
-     Checkboxen pro Schritt enthält (analog `m-trace/plan-X.Y.Z.md`).
-  2. Aktive Phase im „Aktueller Stand"-Block oben eintragen.
-  3. Sobald nicht-trivialer Fortschritt existiert: diese Datei nach
-     `docs/plan/planning/in-progress/roadmap.md` verschieben und im
-     Statusblock auf den aktiven Detailplan verweisen.
+  1. Diese Datei nach `docs/plan/planning/in-progress/roadmap.md`
+     verschieben.
+  2. Ein `docs/plan/planning/in-progress/plan-Mn.md` anlegen, das die
+     DoD-Tracking-Checkboxen pro Schritt enthält (analog
+     `m-trace/plan-X.Y.Z.md`).
+  3. Aktive Phase im „Aktueller Stand"-Block eintragen und auf den aktiven
+     Detailplan verweisen.
+  4. Rückverweise aus anderen Dokumenten auf den neuen Roadmap-Pfad prüfen
+     und bei Bedarf aktualisieren.
 - Beim **Abschließen** eines Meilensteins:
   1. Status in beiden Tabellen auf ✅ setzen (Übersicht und
      Liefergegenstände).
@@ -303,5 +307,5 @@ Kubernetes-Deployment, Edge-Anbindung. Inhalte mit hohem Diskussionsbedarf
 - „Aktueller Stand" wird nach jedem signifikanten Fortschritt neu
   geschrieben, nicht inkrementell — die Liste bleibt kurz.
 - Bei Inkonsistenz zwischen Lastenheft (`LH-*`) und Roadmap-Eintrag
-  gewinnt das Lastenheft. Korrektur erfolgt durch Lastenheft-Patch und
-  Anpassung der `LH-Bezug`-Spalten in dieser Datei.
+  gewinnt das Lastenheft. Die Roadmap wird angepasst; ein Lastenheft-Patch
+  erfolgt nur, wenn die normative Anforderung selbst falsch oder veraltet ist.

@@ -18,7 +18,9 @@ Bezug:
 - [`spec/architecture.md`](../../spec/architecture.md) §13 (Native-Core),
   §16 (Testarchitektur)
 - [`docs/plan/planning/open/roadmap.md`](../plan/planning/open/roadmap.md)
-  (Reihenfolge der Gate-Aktivierung pro Meilenstein)
+  (Reihenfolge der Gate-Aktivierung pro Meilenstein; bei Aktivierung wird
+  dieser Rückverweis auf `docs/plan/planning/in-progress/roadmap.md`
+  aktualisiert)
 
 Status: dieses Dokument fixiert die Gate-Definitionen ab Meilenstein
 **M1**. Gates, die erst mit späteren Meilensteinen aktiv werden (Native
