@@ -11,6 +11,18 @@ import (
 	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/scenario"
 )
 
+func TestMain(m *testing.M) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		os.Exit(1)
+	}
+	root := filepath.Join(filepath.Dir(file), "..", "..")
+	if err := os.Chdir(root); err != nil {
+		os.Exit(1)
+	}
+	os.Exit(m.Run())
+}
+
 func TestLoadFromFile_HappyPath(t *testing.T) {
 	t.Parallel()
 
@@ -32,20 +44,31 @@ func TestLoadFromFile_HappyPath(t *testing.T) {
 func TestLoadFromFile_NotFound(t *testing.T) {
 	t.Parallel()
 
-	_, err := scenario.LoadFromFile("/nonexistent.json")
+	_, err := scenario.LoadFromFile("nonexistent.json")
 	if err == nil {
 		t.Fatal("expected error for missing file")
+	}
+}
+
+func TestLoadFromFile_RejectsUnsafePath(t *testing.T) {
+	t.Parallel()
+
+	for _, path := range []string{"/nonexistent.json", "../scenario.json"} {
+		_, err := scenario.LoadFromFile(path)
+		if err == nil {
+			t.Fatalf("expected error for unsafe path %q", path)
+		}
 	}
 }
 
 func TestLoadFromFile_MalformedJSON(t *testing.T) {
 	t.Parallel()
 
-	tmp := t.TempDir()
-	path := filepath.Join(tmp, "bad.json")
+	path := filepath.Join(".", "bad-scenario.json")
 	if err := os.WriteFile(path, []byte("{not json"), 0o600); err != nil {
 		t.Fatalf("write tmp: %v", err)
 	}
+	t.Cleanup(func() { _ = os.Remove(path) })
 	_, err := scenario.LoadFromFile(path)
 	if err == nil {
 		t.Fatal("expected error for malformed JSON")
@@ -117,10 +140,5 @@ func TestValidate_RejectsEmptyAsset(t *testing.T) {
 
 func repoFixture(t *testing.T, name string) string {
 	t.Helper()
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("could not resolve caller")
-	}
-	root := filepath.Join(filepath.Dir(file), "..", "..")
-	return filepath.Join(root, "testdata", "scenarios", name)
+	return filepath.Join("testdata", "scenarios", name)
 }

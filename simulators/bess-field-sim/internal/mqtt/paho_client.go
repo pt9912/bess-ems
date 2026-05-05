@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"time"
 
 	paho "github.com/eclipse/paho.mqtt.golang"
@@ -24,6 +25,15 @@ func NewPahoClient(brokerURL, clientID string) (*PahoClient, error) {
 	if brokerURL == "" {
 		return nil, errors.New("mqtt broker URL required")
 	}
+	parsedURL, err := url.Parse(brokerURL)
+	if err != nil {
+		return nil, fmt.Errorf("parse mqtt broker URL: %w", err)
+	}
+	if parsedURL.Scheme != "tcp" {
+		return nil, fmt.Errorf("mqtt broker URL scheme %q is not supported; use tcp", parsedURL.Scheme)
+	}
+	// SECURITY: M1 simulator MQTT is anonymous plaintext only. Do not point
+	// this client at production brokers until TLS and credentials are wired.
 	opts := paho.NewClientOptions().
 		AddBroker(brokerURL).
 		SetClientID(clientID).
@@ -45,16 +55,14 @@ func NewPahoClient(brokerURL, clientID string) (*PahoClient, error) {
 // independently of the underlying Paho token, so a cancelled run does
 // not block on a slow broker.
 func (p *PahoClient) Publish(ctx context.Context, topic string, retained bool, payload []byte) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	token := p.client.Publish(topic, p.qos, retained, payload)
-	done := make(chan struct{})
-	go func() {
-		token.Wait()
-		close(done)
-	}()
 	select {
 	case <-ctx.Done():
-		return ctx.Err() //nolint:wrapcheck // standard cancellation contract
-	case <-done:
+		return ctx.Err()
+	case <-token.Done():
 		if err := token.Error(); err != nil {
 			return fmt.Errorf("mqtt publish %q: %w", topic, err)
 		}

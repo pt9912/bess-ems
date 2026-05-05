@@ -10,6 +10,7 @@ import (
 	"os"
 
 	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/model"
+	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/safepath"
 )
 
 var (
@@ -23,11 +24,21 @@ var (
 	// ErrStaticDiscoveryWithoutUnitID is returned when unit_id_discovery=static
 	// is set without static_unit_id.
 	ErrStaticDiscoveryWithoutUnitID = errors.New("modbus mapping unit_id_discovery=static requires static_unit_id")
+	// ErrMappingUnknownRegisterName is returned when a read-only register
+	// cannot be sourced from TelemetrySnapshot.
+	ErrMappingUnknownRegisterName = errors.New("modbus mapping unknown register name")
+	// ErrMappingUnsupportedRegisterType is returned for register types the
+	// simulator encoder cannot represent.
+	ErrMappingUnsupportedRegisterType = errors.New("modbus mapping unsupported register type")
 )
 
 // LoadMapping reads a ModbusMapping fixture from disk and validates it.
 func LoadMapping(path string) (model.ModbusMapping, error) {
-	data, err := os.ReadFile(path) //nolint:gosec // path is explicit operator input
+	cleanPath, err := safepath.CleanRelative(path)
+	if err != nil {
+		return model.ModbusMapping{}, fmt.Errorf("validate mapping path: %w", err)
+	}
+	data, err := os.ReadFile(cleanPath)
 	if err != nil {
 		return model.ModbusMapping{}, fmt.Errorf("read mapping %q: %w", path, err)
 	}
@@ -61,5 +72,39 @@ func ValidateMapping(m model.ModbusMapping) error {
 	if m.UnitIDDiscovery == "static" && m.StaticUnitID == nil {
 		return ErrStaticDiscoveryWithoutUnitID
 	}
+	for i, reg := range m.Registers {
+		if !reg.Writable && !isTelemetryRegister(reg.Name) {
+			return fmt.Errorf("%w: index %d name=%q", ErrMappingUnknownRegisterName, i, reg.Name)
+		}
+		if !isSupportedRegisterType(reg.Type) {
+			return fmt.Errorf("%w: index %d type=%q", ErrMappingUnsupportedRegisterType, i, reg.Type)
+		}
+	}
 	return nil
+}
+
+func isTelemetryRegister(name string) bool {
+	switch name {
+	case "soc_percent",
+		"soh_percent",
+		"active_power_kw",
+		"reactive_power_kvar",
+		"dc_voltage",
+		"dc_current",
+		"temperature_celsius",
+		"available",
+		"fault_status":
+		return true
+	default:
+		return false
+	}
+}
+
+func isSupportedRegisterType(typ string) bool {
+	switch typ {
+	case "uint16", "int16", "uint32", "int32", "float32":
+		return true
+	default:
+		return false
+	}
 }

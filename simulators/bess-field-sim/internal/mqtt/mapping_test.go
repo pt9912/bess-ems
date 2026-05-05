@@ -2,6 +2,7 @@ package mqtt_test
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -9,6 +10,18 @@ import (
 	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/model"
 	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/mqtt"
 )
+
+func TestMain(m *testing.M) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		os.Exit(1)
+	}
+	root := filepath.Join(filepath.Dir(file), "..", "..")
+	if err := os.Chdir(root); err != nil {
+		os.Exit(1)
+	}
+	os.Exit(m.Run())
+}
 
 func TestLoadMapping_Example(t *testing.T) {
 	t.Parallel()
@@ -28,9 +41,20 @@ func TestLoadMapping_Example(t *testing.T) {
 func TestLoadMapping_NotFound(t *testing.T) {
 	t.Parallel()
 
-	_, err := mqtt.LoadMapping("/nonexistent/mqtt.json")
+	_, err := mqtt.LoadMapping("nonexistent/mqtt.json")
 	if err == nil {
 		t.Fatal("expected error for missing file")
+	}
+}
+
+func TestLoadMapping_RejectsUnsafePath(t *testing.T) {
+	t.Parallel()
+
+	for _, path := range []string{"/nonexistent/mqtt.json", "../mqtt.json"} {
+		_, err := mqtt.LoadMapping(path)
+		if err == nil {
+			t.Fatalf("expected error for unsafe path %q", path)
+		}
 	}
 }
 
@@ -105,10 +129,5 @@ func TestValidateMapping_AcceptsSubscribeAndPublishMix(t *testing.T) {
 
 func repoMqttMapping(t *testing.T, name string) string {
 	t.Helper()
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("could not resolve caller")
-	}
-	root := filepath.Join(filepath.Dir(file), "..", "..")
-	return filepath.Join(root, "testdata", "mappings", name)
+	return filepath.Join("testdata", "mappings", name)
 }

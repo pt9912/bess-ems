@@ -122,6 +122,11 @@ Not-Aus, keine BMS-Schutztechnik und keine herstellerspezifischen
 Wechselrichter-Schutzfunktionen. Harte Echtzeit- und zertifizierungsrelevante
 Funktionen sind außerhalb des Docker-basierten EMS abzubilden.
 
+Der Go-Feldsimulator unter `simulators/bess-field-sim` ist ein M1-Testwerkzeug:
+MQTT läuft dort bewusst anonym und plaintext über `tcp://` ohne TLS oder
+Credentials. Dies ist nur für lokale Mosquitto-/CI-Simulationen gedacht und
+nicht für Produktions-Broker.
+
 ---
 
 ## MVP-Abgrenzung

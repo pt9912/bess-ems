@@ -40,7 +40,7 @@ func SleepWithContext(ctx context.Context, d time.Duration) error {
 	defer timer.Stop()
 	select {
 	case <-ctx.Done():
-		return ctx.Err() //nolint:wrapcheck // standard cancellation contract
+		return ctx.Err()
 	case <-timer.C:
 		return nil
 	}
@@ -77,7 +77,7 @@ func (o *Orchestrator) Run(ctx context.Context, scn model.Scenario) error {
 		delta := time.Duration(snap.OffsetMillis-last) * time.Millisecond
 		if i > 0 && delta > 0 {
 			if err := o.sleeper(ctx, delta); err != nil {
-				return err //nolint:wrapcheck // preserve cancellation semantics
+				return err
 			}
 		}
 

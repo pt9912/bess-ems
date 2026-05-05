@@ -11,6 +11,7 @@ import (
 	"os"
 
 	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/model"
+	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/safepath"
 )
 
 var (
@@ -28,7 +29,11 @@ var (
 
 // LoadMapping reads an MqttMapping fixture from disk and validates it.
 func LoadMapping(path string) (model.MqttMapping, error) {
-	data, err := os.ReadFile(path) //nolint:gosec // path is explicit operator input
+	cleanPath, err := safepath.CleanRelative(path)
+	if err != nil {
+		return model.MqttMapping{}, fmt.Errorf("validate mapping path: %w", err)
+	}
+	data, err := os.ReadFile(cleanPath)
 	if err != nil {
 		return model.MqttMapping{}, fmt.Errorf("read mapping %q: %w", path, err)
 	}

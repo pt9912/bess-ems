@@ -34,7 +34,7 @@ func TestEncodeSnapshot_Int16Negative(t *testing.T) {
 	}
 	got := modbus.EncodeSnapshot(model.TelemetrySnapshot{ActivePowerKw: -25}, mapping)
 	signed := int16(-250)
-	want := uint16(signed) //nolint:gosec // intentional bit-level reinterpretation
+	want := uint16(signed)
 	if got[110] != want {
 		t.Errorf("active_power_kw: want %d, got %d", want, got[110])
 	}
@@ -106,6 +106,24 @@ func TestEncodeSnapshot_AvailableBoolean(t *testing.T) {
 	}
 	if off[120] != 0 {
 		t.Errorf("available=false: want 0, got %d", off[120])
+	}
+}
+
+func TestEncodeSnapshot_FaultStatus(t *testing.T) {
+	t.Parallel()
+
+	mapping := model.ModbusMapping{
+		Registers: []model.ModbusRegister{
+			{Name: "fault_status", Address: 122, Type: "uint16", ScaleFactor: 1},
+		},
+	}
+	ok := modbus.EncodeSnapshot(model.TelemetrySnapshot{FaultStatus: "ok"}, mapping)
+	fault := modbus.EncodeSnapshot(model.TelemetrySnapshot{FaultStatus: "comm-loss"}, mapping)
+	if ok[122] != 0 {
+		t.Errorf("fault_status=ok: want 0, got %d", ok[122])
+	}
+	if fault[122] != 1 {
+		t.Errorf("fault_status=comm-loss: want 1, got %d", fault[122])
 	}
 }
 

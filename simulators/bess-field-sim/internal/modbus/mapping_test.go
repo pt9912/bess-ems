@@ -11,6 +11,18 @@ import (
 	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/model"
 )
 
+func TestMain(m *testing.M) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		os.Exit(1)
+	}
+	root := filepath.Join(filepath.Dir(file), "..", "..")
+	if err := os.Chdir(root); err != nil {
+		os.Exit(1)
+	}
+	os.Exit(m.Run())
+}
+
 func TestLoadMapping_VendorNeutralExample(t *testing.T) {
 	t.Parallel()
 
@@ -32,9 +44,20 @@ func TestLoadMapping_VendorNeutralExample(t *testing.T) {
 func TestLoadMapping_NotFound(t *testing.T) {
 	t.Parallel()
 
-	_, err := modbus.LoadMapping("/nonexistent/mapping.json")
+	_, err := modbus.LoadMapping("nonexistent/mapping.json")
 	if err == nil {
 		t.Fatal("expected error for missing file")
+	}
+}
+
+func TestLoadMapping_RejectsUnsafePath(t *testing.T) {
+	t.Parallel()
+
+	for _, path := range []string{"/nonexistent/mapping.json", "../mapping.json"} {
+		_, err := modbus.LoadMapping(path)
+		if err == nil {
+			t.Fatalf("expected error for unsafe path %q", path)
+		}
 	}
 }
 
@@ -89,21 +112,47 @@ func TestValidateMapping_AcceptsSunspecDiscoveryWithoutUnitID(t *testing.T) {
 	m := model.ModbusMapping{
 		ProfileName:     "sunspec",
 		UnitIDDiscovery: "sunspec",
-		Registers:       []model.ModbusRegister{{Name: "x", Address: 0}},
+		Registers:       []model.ModbusRegister{{Name: "soc_percent", Address: 0, Type: "uint16"}},
 	}
 	if err := modbus.ValidateMapping(m); err != nil {
 		t.Fatalf("expected nil, got %v", err)
 	}
 }
 
+func TestValidateMapping_RejectsUnknownReadOnlyRegister(t *testing.T) {
+	t.Parallel()
+
+	m := model.ModbusMapping{
+		ProfileName:     "p",
+		UnitIDDiscovery: "sunspec",
+		Registers:       []model.ModbusRegister{{Name: "soc_pct", Address: 0, Type: "uint16"}},
+	}
+	if !errors.Is(modbus.ValidateMapping(m), modbus.ErrMappingUnknownRegisterName) {
+		t.Fatal("expected ErrMappingUnknownRegisterName")
+	}
+}
+
+func TestValidateMapping_RejectsUnsupportedRegisterType(t *testing.T) {
+	t.Parallel()
+
+	m := model.ModbusMapping{
+		ProfileName:     "p",
+		UnitIDDiscovery: "sunspec",
+		Registers:       []model.ModbusRegister{{Name: "soc_percent", Address: 0, Type: "string"}},
+	}
+	if !errors.Is(modbus.ValidateMapping(m), modbus.ErrMappingUnsupportedRegisterType) {
+		t.Fatal("expected ErrMappingUnsupportedRegisterType")
+	}
+}
+
 func TestLoadMapping_MalformedJSONOnDisk(t *testing.T) {
 	t.Parallel()
 
-	tmp := t.TempDir()
-	path := filepath.Join(tmp, "bad.json")
+	path := filepath.Join(".", "bad-modbus-mapping.json")
 	if err := os.WriteFile(path, []byte("{not json"), 0o600); err != nil {
 		t.Fatalf("write tmp: %v", err)
 	}
+	t.Cleanup(func() { _ = os.Remove(path) })
 	_, err := modbus.LoadMapping(path)
 	if err == nil {
 		t.Fatal("expected error")
@@ -112,10 +161,5 @@ func TestLoadMapping_MalformedJSONOnDisk(t *testing.T) {
 
 func repoMapping(t *testing.T, name string) string {
 	t.Helper()
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("could not resolve caller")
-	}
-	root := filepath.Join(filepath.Dir(file), "..", "..")
-	return filepath.Join(root, "testdata", "mappings", name)
+	return filepath.Join("testdata", "mappings", name)
 }

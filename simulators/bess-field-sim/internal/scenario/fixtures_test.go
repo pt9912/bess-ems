@@ -2,7 +2,6 @@ package scenario_test
 
 import (
 	"path/filepath"
-	"runtime"
 	"sort"
 	"testing"
 
@@ -27,6 +26,7 @@ func TestAllFixturesLoad(t *testing.T) {
 	sort.Strings(matches)
 
 	for _, path := range matches {
+		// Go 1.22 loop-var semantics make this safe with t.Parallel.
 		t.Run(filepath.Base(path), func(t *testing.T) {
 			t.Parallel()
 
@@ -46,10 +46,5 @@ func TestAllFixturesLoad(t *testing.T) {
 
 func fixtureDir(t *testing.T) string {
 	t.Helper()
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("could not resolve caller")
-	}
-	root := filepath.Join(filepath.Dir(file), "..", "..")
-	return filepath.Join(root, "testdata", "scenarios")
+	return filepath.Join("testdata", "scenarios")
 }

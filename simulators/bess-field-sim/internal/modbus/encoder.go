@@ -24,7 +24,7 @@ func EncodeSnapshot(snap model.TelemetrySnapshot, mapping model.ModbusMapping) m
 		if reg.ScaleFactor != 0 {
 			raw = value / reg.ScaleFactor
 		}
-		writeRegister(out, reg.Address, reg.Type, raw)
+		_ = writeRegister(out, reg.Address, reg.Type, raw)
 	}
 	return out
 }
@@ -50,12 +50,17 @@ func valueFor(snap model.TelemetrySnapshot, name string) (float64, bool) {
 			return 1, true
 		}
 		return 0, true
+	case "fault_status":
+		if snap.FaultStatus == "" || snap.FaultStatus == "ok" {
+			return 0, true
+		}
+		return 1, true
 	default:
 		return 0, false
 	}
 }
 
-func writeRegister(out map[int]uint16, addr int, typ string, raw float64) {
+func writeRegister(out map[int]uint16, addr int, typ string, raw float64) bool {
 	switch typ {
 	case "uint16":
 		out[addr] = uint16(raw)
@@ -73,5 +78,8 @@ func writeRegister(out map[int]uint16, addr int, typ string, raw float64) {
 		v := math.Float32bits(float32(raw))
 		out[addr] = uint16(v >> 16)
 		out[addr+1] = uint16(v)
+	default:
+		return false
 	}
+	return true
 }

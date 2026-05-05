@@ -10,6 +10,7 @@ import (
 	"os"
 
 	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/model"
+	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/safepath"
 )
 
 var (
@@ -28,7 +29,11 @@ var (
 
 // LoadFromFile reads a scenario fixture from disk and validates it.
 func LoadFromFile(path string) (model.Scenario, error) {
-	data, err := os.ReadFile(path) //nolint:gosec // path is explicit operator input
+	cleanPath, err := safepath.CleanRelative(path)
+	if err != nil {
+		return model.Scenario{}, fmt.Errorf("validate scenario path: %w", err)
+	}
+	data, err := os.ReadFile(cleanPath)
 	if err != nil {
 		return model.Scenario{}, fmt.Errorf("read scenario %q: %w", path, err)
 	}

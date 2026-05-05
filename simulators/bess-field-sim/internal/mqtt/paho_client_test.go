@@ -72,7 +72,7 @@ func startBroker(t *testing.T) (string, *captureHook) {
 		}
 	}()
 	t.Cleanup(func() { _ = srv.Close() })
-	time.Sleep(50 * time.Millisecond)
+	waitTCP(t, addr)
 	return "tcp://" + addr, hook
 }
 
@@ -154,4 +154,18 @@ func freeMqttAddr(t *testing.T) string {
 		t.Fatalf("close: %v", err)
 	}
 	return "127.0.0.1:" + strconv.Itoa(port)
+}
+
+func waitTCP(t *testing.T, addr string) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		conn, err := net.DialTimeout("tcp", addr, 20*time.Millisecond)
+		if err == nil {
+			_ = conn.Close()
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("tcp listener %s did not become ready", addr)
 }

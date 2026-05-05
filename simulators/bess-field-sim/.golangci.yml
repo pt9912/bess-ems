@@ -103,6 +103,15 @@ linters:
               desc: "scenario loader must not import protocol packages"
             - pkg: "github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/runtime"
               desc: "scenario loader must not import runtime"
+        runtime-no-protocol:
+          list-mode: lax
+          files:
+            - "**/internal/runtime/**"
+          deny:
+            - pkg: "github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/modbus"
+              desc: "runtime must depend on protocol interfaces, not concrete Modbus packages"
+            - pkg: "github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/mqtt"
+              desc: "runtime must depend on protocol interfaces, not concrete MQTT packages"
 
   exclusions:
     rules:

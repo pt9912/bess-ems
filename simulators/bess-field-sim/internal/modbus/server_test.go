@@ -33,9 +33,9 @@ func TestServer_RoundtripSocAndPower(t *testing.T) {
 		t.Fatalf("listen: %v", err)
 	}
 	defer srv.Close()
+	waitTCP(t, addr)
 
 	srv.Apply(model.TelemetrySnapshot{SocPercent: 60.5, ActivePowerKw: -25, Available: true})
-	time.Sleep(50 * time.Millisecond)
 
 	ctx := context.Background()
 	h := gridx.NewTCPClientHandler(addr)
@@ -90,11 +90,10 @@ func TestServer_ApplyRefreshesValues(t *testing.T) {
 		t.Fatalf("listen: %v", err)
 	}
 	defer srv.Close()
+	waitTCP(t, addr)
 
 	srv.Apply(model.TelemetrySnapshot{SocPercent: 50.0})
-	time.Sleep(20 * time.Millisecond)
 	srv.Apply(model.TelemetrySnapshot{SocPercent: 75.5})
-	time.Sleep(20 * time.Millisecond)
 
 	ctx := context.Background()
 	h := gridx.NewTCPClientHandler(addr)
@@ -124,4 +123,18 @@ func freeAddr(t *testing.T) string {
 		t.Fatalf("close: %v", err)
 	}
 	return "127.0.0.1:" + strconv.Itoa(port)
+}
+
+func waitTCP(t *testing.T, addr string) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		conn, err := net.DialTimeout("tcp", addr, 20*time.Millisecond)
+		if err == nil {
+			_ = conn.Close()
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("tcp listener %s did not become ready", addr)
 }

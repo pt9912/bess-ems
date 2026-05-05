@@ -20,6 +20,8 @@ import (
 	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/scenario"
 )
 
+const defaultModbusAddr = ":5020"
+
 type cliFlags struct {
 	scenarioPath    string
 	modbusMapping   string
@@ -35,7 +37,7 @@ func parseFlags(args []string) (cliFlags, error) {
 	var f cliFlags
 	fs.StringVar(&f.scenarioPath, "scenario", "", "path to scenario fixture (required)")
 	fs.StringVar(&f.modbusMapping, "modbus-mapping", "", "path to modbus mapping JSON; enables Modbus TCP server when set")
-	fs.StringVar(&f.modbusAddr, "modbus-addr", ":5020", "Modbus TCP listen address")
+	fs.StringVar(&f.modbusAddr, "modbus-addr", defaultModbusAddr, "Modbus TCP listen address")
 	fs.StringVar(&f.mqttMapping, "mqtt-mapping", "", "path to MQTT mapping JSON; enables MQTT publishing when set together with -mqtt-broker")
 	fs.StringVar(&f.mqttBroker, "mqtt-broker", "", "MQTT broker URL (e.g. tcp://localhost:1883)")
 	fs.StringVar(&f.mqttClientID, "mqtt-client-id", "bess-field-sim", "MQTT client identifier")
@@ -47,10 +49,6 @@ func parseFlags(args []string) (cliFlags, error) {
 		return cliFlags{}, errors.New("-scenario is required")
 	}
 	return f, nil
-}
-
-func signalContext() (context.Context, context.CancelFunc) {
-	return signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 }
 
 func run(args []string) error {
@@ -70,41 +68,37 @@ func run(args []string) error {
 		"telemetry_ticks", len(scn.Telemetry),
 	)
 
-	ctx, cancel := signalContext()
-	defer cancel()
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	var server *modbus.Server
+	var client *mqtt.PahoClient
+	defer func() {
+		// Shutdown order is intentional: cancel the orchestrator context before
+		// transport drains so in-flight publishes observe cancellation first.
+		cancel()
+		if client != nil {
+			client.Close()
+		}
+		if server != nil {
+			server.Close()
+		}
+	}()
 
 	var modbusApplier runtime.ModbusApplier
-	if flags.modbusMapping != "" {
-		mapping, err := modbus.LoadMapping(flags.modbusMapping)
-		if err != nil {
-			return fmt.Errorf("load modbus mapping: %w", err)
-		}
-		server := modbus.NewServer(mapping)
-		if err := server.ListenTCP(flags.modbusAddr); err != nil {
-			return fmt.Errorf("listen modbus on %s: %w", flags.modbusAddr, err)
-		}
-		defer server.Close()
-		slog.Info("modbus server listening", "addr", flags.modbusAddr, "profile", mapping.ProfileName)
+	server, err = startModbus(flags)
+	if err != nil {
+		return err
+	}
+	if server != nil {
 		modbusApplier = server
 	}
 
 	var publisher runtime.MqttPublisher
-	if flags.mqttMapping != "" && flags.mqttBroker != "" {
-		mapping, err := mqtt.LoadMapping(flags.mqttMapping)
-		if err != nil {
-			return fmt.Errorf("load mqtt mapping: %w", err)
-		}
-		client, err := mqtt.NewPahoClient(flags.mqttBroker, flags.mqttClientID)
-		if err != nil {
-			return fmt.Errorf("connect mqtt: %w", err)
-		}
-		defer client.Close()
-		assetID := scn.Asset.AssetID
-		if flags.assetIDOverride != "" {
-			assetID = flags.assetIDOverride
-		}
-		publisher = mqtt.NewPublisher(client, assetID, mapping)
-		slog.Info("mqtt publisher ready", "broker", flags.mqttBroker, "client_id", flags.mqttClientID, "asset", assetID)
+	mqttPublisher, client, err := startMQTT(flags, scn.Asset.AssetID)
+	if err != nil {
+		return err
+	}
+	if mqttPublisher != nil {
+		publisher = mqttPublisher
 	}
 
 	if modbusApplier == nil && publisher == nil {
@@ -117,6 +111,48 @@ func run(args []string) error {
 	}
 	slog.Info("scenario complete", "id", scn.ID)
 	return nil
+}
+
+func startModbus(flags cliFlags) (*modbus.Server, error) {
+	if flags.modbusMapping == "" {
+		if flags.modbusAddr != defaultModbusAddr {
+			slog.Warn("modbus address ignored because no Modbus mapping was provided", "addr", flags.modbusAddr)
+		}
+		return nil, nil
+	}
+
+	mapping, err := modbus.LoadMapping(flags.modbusMapping)
+	if err != nil {
+		return nil, fmt.Errorf("load modbus mapping: %w", err)
+	}
+	server := modbus.NewServer(mapping)
+	if err := server.ListenTCP(flags.modbusAddr); err != nil {
+		return nil, fmt.Errorf("listen modbus on %s: %w", flags.modbusAddr, err)
+	}
+	slog.Info("modbus server listening", "addr", flags.modbusAddr, "profile", mapping.ProfileName)
+	return server, nil
+}
+
+func startMQTT(flags cliFlags, scenarioAssetID string) (*mqtt.Publisher, *mqtt.PahoClient, error) {
+	if flags.mqttMapping == "" || flags.mqttBroker == "" {
+		return nil, nil, nil
+	}
+
+	mapping, err := mqtt.LoadMapping(flags.mqttMapping)
+	if err != nil {
+		return nil, nil, fmt.Errorf("load mqtt mapping: %w", err)
+	}
+	client, err := mqtt.NewPahoClient(flags.mqttBroker, flags.mqttClientID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("connect mqtt: %w", err)
+	}
+	assetID := scenarioAssetID
+	if flags.assetIDOverride != "" {
+		assetID = flags.assetIDOverride
+	}
+	publisher := mqtt.NewPublisher(client, assetID, mapping)
+	slog.Info("mqtt publisher ready", "broker", flags.mqttBroker, "client_id", flags.mqttClientID, "asset", assetID)
+	return publisher, client, nil
 }
 
 func main() {
