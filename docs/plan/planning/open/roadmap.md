@@ -98,6 +98,7 @@ AuthN/AuthZ-geschütztem Operator-Stop.
 | ⬜     | RM-M1-18   | Konfigurations-Loader, JSON-Schemas für Adapter-Mappings + Startvalidierung | LH-CONF-001..003, LH-OPS-001 |
 | ⬜     | RM-M1-19   | Dockerfile + Docker Compose (`bess-ems` mit Worker/API, Postgres, MQTT-Broker) | LH-DEPLOY-001..003, LH-NF-003/4 |
 | ⬜     | RM-M1-20   | Quality-Gates: Lint, Unit/Safety/Integration/Contract/Container, Coverage | LH-TEST-001/003/006/007, LH §4.1 |
+| ⬜     | RM-M1-21   | Makefile als Orchestrierungsschicht über die Docker-Stages aus `docs/user/quality.md`: `.DEFAULT_GOAL=help`, Override-Variablen (`COVERAGE_THRESHOLD`, `LIZARD_MAX_*`, `IMAGE`), Composite-Targets (`gates`, `ci`, `fullbuild`), `-gate`/`-report`-Trennung | LH-DEPLOY-001/002, LH-TEST-001/006/007 |
 
 ### Abnahmekriterien
 
@@ -111,6 +112,8 @@ AuthN/AuthZ-geschütztem Operator-Stop.
 - M1-Gates aus `docs/user/quality.md` sind reproduzierbar grün:
   `make lint`, `make test`, `make test-safety`, `make test-integration`,
   `make test-container`, `make coverage-gate`, `make build`.
+- `make help` listet alle Targets und Override-Variablen; `make gates`
+  aggregiert die M1-Gates; `make fullbuild` läuft fresh-clone bis CI.
 - OpenAPI-, Adapter-Mapping-, Vorzeichen- und Startvalidierungs-Gates
   brechen den Build bei Vertragsverletzungen.
 
@@ -169,6 +172,7 @@ bleibt Fallback und Referenz.
 | ⬜     | RM-M3-08   | C++-Unit-Tests (Constraint, Ramp, NaN/Inf, Vorzeichen, neg. dt)     | LH-TEST-001                |
 | ⬜     | RM-M3-09   | Native-Quality-Gates: `native-lint`, Sanitizer, Native-Coverage     | LH-TEST-005, LH-NATIVE-*   |
 | ⬜     | RM-M3-10   | Native/.NET-Parity-Gate über Replay-Datensatz                       | LH-ARCH-006, LH-TEST-005   |
+| ⬜     | RM-M3-11   | Makefile-Erweiterung um native Targets (`native-lint`, `test-native-interop`, `test-native-parity`, `native-coverage-gate`, `native-coverage-report`, `native-coverage-exclusions`); `gates`/`ci` ziehen native Gates mit | LH-NATIVE-*, LH-TEST-005   |
 
 ### Abnahmekriterien
 
