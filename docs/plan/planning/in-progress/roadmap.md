@@ -102,6 +102,7 @@ AuthN/AuthZ-geschütztem Operator-Stop.
 | ⬜     | RM-M1-21   | Makefile als Orchestrierungsschicht über die Docker-Stages aus `docs/user/quality.md`: `.DEFAULT_GOAL=help`, Override-Variablen (`COVERAGE_THRESHOLD`, `LIZARD_MAX_*`, `IMAGE`), Composite-Targets (`gates`, `ci`, `runtime`, `fullbuild`), `-gate`/`-report`-Trennung | LH-DEPLOY-001/002, LH-TEST-001/006/007 |
 | ⬜     | RM-M1-22   | Hexagonale Verzeichnis- und Modulstruktur gemäß Architektur §4.2 (`src/hexagon/`, `src/adapters/{driving,driven}/`, `src/infrastructure/`); Driving/Driven-Klassifikation pro Modul | LH-ARCH-001..005, LH-NF-006 |
 | ⬜     | RM-M1-23   | Boundary-Test-Modul `BatteryEms.ArchitectureTests` mit Dependency Rule und Architektur-Tabus aus §4.2 (Domain frameworkfrei, Application kein Adapter, Adapter zitieren keine anderen Adapter); Verstöße brechen den Build | LH-ARCH-002, LH-NF-006 |
+| ⬜     | RM-M1-24   | Go-basierter Blackbox-Simulator `simulators/bess-field-sim` für Modbus/MQTT, Szenario-Fixtures und Runtime-Smoke | LH-TEST-003/006/007, LH-PROT-001 |
 
 ### Abnahmekriterien
 
@@ -109,7 +110,8 @@ AuthN/AuthZ-geschütztem Operator-Stop.
 - Ein simulierter BMS/Wechselrichter (Modbus/MQTT) liefert Telemetrie, das
   System publiziert Commands, ohne SOC-/Power-/Rampengrenzen zu verletzen.
   Simulatorumfang und Szenarien sind in
-  [`plan-RM-M1-simulator.md`](plan-RM-M1-simulator.md) festgelegt.
+  [`plan-RM-M1-simulator.md`](plan-RM-M1-simulator.md) festgelegt; die
+  Implementierung erfolgt als eigenstaendiger Go-Service.
 - Bei stale Snapshot, Emergency Stop oder Operator-Stop wird ein sicherer
   Zustand erreicht und ist im Audit-Log nachvollziehbar.
 - Day-Ahead-Fahrplan kann importiert, gespeichert und mit konsistentem

@@ -24,6 +24,8 @@ Test- und Entwicklungsadapter fuer die sichere M1-Regelpipeline.
 
 ## Ziele
 
+- Simulator als eigenstaendigen Go-Service betreiben, der das EMS wie ein
+  externes Feldgeraet anspricht.
 - Modbus-TCP-Lese- und Schreibpfad gegen ein herstellerneutrales BESS-Profil
   testen.
 - MQTT-Telemetrie, Command-Publish und Command-ACK gegen Mosquitto testen.
@@ -39,6 +41,7 @@ Test- und Entwicklungsadapter fuer die sichere M1-Regelpipeline.
 
 ## Nicht-Ziele
 
+- Keine zweite fachliche Domain-Implementierung neben dem C#/.NET-EMS.
 - Keine physikalisch vollstaendige Batterie-, Wechselrichter- oder Netzsimulation.
 - Keine Echtzeitgarantie unterhalb des M1-Regelzyklus von 1 Sekunde.
 - Keine produktive Herstellerzertifizierung.
@@ -56,6 +59,39 @@ Test- und Entwicklungsadapter fuer die sichere M1-Regelpipeline.
 | SunSpec-Profil | Beispielmapping fuer generische SunSpec-Discovery und Modelldaten | M1 | RM-M1-18, RM-M1-09 |
 | Szenario-Fixtures | Deterministische Zeitreihen und Fehlersequenzen | M1 | RM-M1-03, RM-M1-07, RM-M1-20 |
 | Compose-Integration | Lokaler Start mit `bess-ems`, Postgres und Mosquitto | M1 | RM-M1-19 |
+
+---
+
+## Implementierungssprache und Kopplung
+
+Der RM-M1-Simulator wird in **Go** umgesetzt. Er ist ein eigenstaendiger
+Blackbox-Service und gehoert nicht zur .NET-Solution. Das EMS kommuniziert
+mit ihm ausschliesslich ueber Modbus TCP, MQTT und die versionierten
+Fixture-/Mapping-Vertraege.
+
+Die fachliche EMS-Domain bleibt in C#/.NET normativ. Go darf schlanke
+DTOs fuer Telemetrie, Status, Commands und ACKs definieren, aber keine
+C#-Domainklassen als zweite Quelle fachlicher Regeln kopieren. Erlaubt ist,
+Feldnamen, JSON-Formate und Wertebereiche aus den dokumentierten Schemas
+und Fixtures abzuleiten. Jede Aenderung am Vertrag muss ueber Schema,
+Fixture und Adaptertest sichtbar werden.
+
+Vorgesehener Pfad:
+
+```text
+simulators/
+└── bess-field-sim/
+    ├── cmd/bess-field-sim/
+    ├── internal/model/
+    ├── internal/modbus/
+    ├── internal/mqtt/
+    ├── internal/scenario/
+    └── testdata/
+```
+
+Go-spezifische Build-/Smoke-Targets werden in M1 ueber Make und Docker
+eingebunden, z. B. `make simulator-test` fuer Unit-/Contract-Tests und
+der Simulator-Service im Compose-Profil fuer `make runtime`.
 
 ---
 
@@ -138,6 +174,7 @@ dieses Dokument im gleichen PR angepasst werden.
 
 | Gate | Mindestpruefung |
 | ---- | --------------- |
+| `make simulator-test` | Go-Simulator baut reproduzierbar, Szenario-Fixtures werden geladen und DTO-/Schema-Vertraege sind gueltig |
 | `make test-safety` | SIM-M1-03 bis SIM-M1-10 und SIM-M1-12 fuehren zu definiert sicherem Verhalten |
 | `make test-integration` | Modbus- und MQTT-Simulatorpfade laufen gegen Beispielprofile; SIM-M1-11 weist Command-ACK-Korrelation ueber `CommandId` nach |
 | Mapping-Schema-Gate | alle Simulatorprofile enthalten die Pflichtfelder aus `plan-RM-M1.md` |
@@ -151,10 +188,12 @@ ersetzt keine Szenarioabdeckung.
 ## Umsetzungshinweise
 
 - Simulatorcode gehoert nicht in Domain oder Application. Er lebt unter
-  Test-/Adapter-nahen Pfaden und darf keine Produktionsentscheidung
+  `simulators/bess-field-sim/` und darf keine Produktionsentscheidung
   beeinflussen.
 - Szenarien werden ueber Fixtures konfiguriert, nicht ueber fest verdrahtete
   Testlogik.
+- Go-DTOs sind Vertragsabbilder fuer den Simulator. Sie duerfen C#-Namen und
+  JSON-Felder spiegeln, aber keine EMS-Domainlogik duplizieren.
 - Fehlerfaelle muessen explizit benannt werden; generische Zufallsfehler sind
   fuer M1 nicht zulaessig.
 - Das SunSpec-Profil ist ein Beispiel fuer generischen Adaptercode. Es ersetzt
@@ -169,3 +208,4 @@ ersetzt keine Szenarioabdeckung.
 | SIM-OPEN-01 | Wird der Modbus-Simulator als eigener Testhost oder im Integrationstest-Prozess gestartet? | Testhost im Integrationstest-Prozess, solange Compose keinen separaten Service braucht |
 | SIM-OPEN-02 | Wird der MQTT-Simulator als eigener Prozess benoetigt? | Nein; Mosquitto plus Test-Publisher/Consumer reicht fuer M1 |
 | SIM-OPEN-03 | Braucht `make runtime` einen dedizierten Simulator-Service? | Ja; `make runtime` startet einen dedizierten Simulator-Service im Compose-Profil, damit Health/Smoke nicht von Testprozess-Fixtures abhaengt |
+| SIM-OPEN-04 | Darf der Go-Simulator C#-Domainklassen kopieren? | Nein; Go nutzt eigene DTOs und versionierte Schemas/Fixtures als Kopplungspunkt |
