@@ -41,7 +41,7 @@ Die Roadmap bleibt die Statusseite; dieser Detailplan ist die Arbeitsliste.
 | 0     | Aktivierung                 | Roadmap und Detailplan liegen unter `in-progress/`; Status ist auf M1 gesetzt.                    | Markdown-Linkcheck, `git diff --check`                                   |
 | 1     | Foundation                  | Solution, Makefile, Docker-Stages und Basis-Gates stehen.                                         | `make lint`, `make arch-check`, `make gates` (Foundation-Auswahl)        |
 | 2     | Domain und Control          | Domainmodell, Snapshot Store, State Machine, Limiter und Fallbacks sind deterministisch getestet. | `make test`, `make test-safety`, `make coverage-gate`                    |
-| 3     | Config und Adapter          | Modbus/MQTT-Mappings, Simulatorpfade und adapterseitige Schreibbegrenzung sind gate-relevant.     | `make test-integration`, Contract-Gates für Mapping und Startvalidierung |
+| 3     | Config und Adapter          | Modbus/MQTT-Mappings, Go-Simulatorpfade und adapterseitige Schreibbegrenzung sind gate-relevant.  | `make simulator-test`, `make test-integration`, Contract-Gates für Mapping und Startvalidierung |
 | 4     | Märkte, Persistenz und API  | Day-Ahead, MarketCommitments, UTC/DST-Zeitmodell, PostgreSQL und M1-API sind integriert.          | `make test-integration`, OpenAPI/AuthZ-Gates, `make coverage-gate`       |
 | 5     | Observability und Abschluss | Logs, Metriken, Compose, Contract-Gates, Coverage und Fullbuild schließen M1 ab.                  | `make ci`, `make runtime`, `make fullbuild`                              |
 
@@ -82,8 +82,8 @@ Arbeitspakete parallel laufen, solange ihre Abhängigkeiten erfüllt sind.
 | ✅      | RM-M1-08 | Optimierungsinterface                           | RM-M1-02                                 | `IDispatchOptimizer` und `NoOpDispatchOptimizer` sind austauschbar verdrahtet.                                                                                                                                                  |
 | ✅      | RM-M1-07 | Regelzyklus/Fallback                            | RM-M1-03..06, RM-M1-08                   | 1-s-Regelzyklus erzeugt bei stale/ungültigem Snapshot einen sicheren Command.                                                                                                                                                   |
 | ⬜      | RM-M1-18 | Konfiguration/Mappings                          | RM-M1-01, RM-M1-02                       | Config-Loader, JSON-Schemas, Beispiel-Mappings und Startup-Validierung sind Contract-Gates; das Adapter-Mapping-Schema trägt die Pflichtfelder aus Abschnitt „Mapping-Schema-Pflichtfelder".                                    |
-| ⬜      | RM-M1-09 | Modbus-TCP-Adapter                              | RM-M1-18                                 | Lesen, Schreiben, Mapping, Timeout und Fehlerstatus laufen gegen den Simulator aus [`plan-RM-M1-simulator.md`](plan-RM-M1-simulator.md).                                                                                         |
-| ⬜      | RM-M1-10 | MQTT-Adapter                                    | RM-M1-18                                 | Telemetrieempfang, Command-Publish, ACK-Korrelation und Topic-Konvention laufen gegen Mosquitto und die MQTT-Szenarien aus [`plan-RM-M1-simulator.md`](plan-RM-M1-simulator.md).                                                  |
+| ⬜      | RM-M1-09 | Modbus-TCP-Adapter                              | RM-M1-18                                 | Lesen, Schreiben, Mapping, Timeout und Fehlerstatus laufen gegen den Go-Simulator aus [`plan-RM-M1-simulator.md`](plan-RM-M1-simulator.md).                                                                                      |
+| ⬜      | RM-M1-10 | MQTT-Adapter                                    | RM-M1-18                                 | Telemetrieempfang, Command-Publish, ACK-Korrelation und Topic-Konvention laufen gegen Mosquitto und die Go-basierten MQTT-Szenarien aus [`plan-RM-M1-simulator.md`](plan-RM-M1-simulator.md).                                      |
 | ⬜      | RM-M1-11 | Adapter-Schreibbegrenzung                       | RM-M1-09, RM-M1-10                       | Finale Schreibbegrenzung greift unmittelbar vor Versand für Modbus und MQTT.                                                                                                                                                    |
 | ⬜      | RM-M1-12 | Fahrplan, MarketCommitment, Zeitmodell          | RM-M1-02, RM-M1-08                       | Import, Speicherung, UTC/DST-Zeitmodell und Day-Ahead-Verfolgung sind inklusive DST-Regression abgedeckt.                                                                                                                       |
 | ⬜      | RM-M1-13 | PostgreSQL-Persistenz                           | RM-M1-02, RM-M1-12                       | Telemetrie, Commands, Fahrpläne und Audit werden versioniert gespeichert.                                                                                                                                                       |
@@ -92,7 +92,7 @@ Arbeitspakete parallel laufen, solange ihre Abhängigkeiten erfüllt sind.
 | ⬜      | RM-M1-16 | AuthN/AuthZ/Audit                               | RM-M1-15                                 | Schreibende Endpunkte sind geschützt; unberechtigte Zugriffe liefern 401/403 und Audit-Einträge.                                                                                                                                |
 | ⬜      | RM-M1-17 | Observability                                   | RM-M1-07, RM-M1-13                       | JSON-Logs mit Reason-Feld und Prometheus-Metriken sind exportierbar und getestet.                                                                                                                                               |
 | ⬜      | RM-M1-19 | Container/Compose                               | RM-M1-09, RM-M1-10, RM-M1-13, RM-M1-15   | Dockerfile und Compose starten `bess-ems`, PostgreSQL und MQTT-Broker lokal reproduzierbar.                                                                                                                                     |
-| ⬜      | RM-M1-20 | Quality-Gates                                   | wächst je Welle; Abschluss nach RM-M1-19 | Lint, Unit, Safety, Integration, Contract, Container und Coverage laufen reproduzierbar grün. Jede Welle aktiviert ihre Gates sofort; fehlende Gates werden nicht bis zum M1-Ende aufgeschoben.                                 |
+| ⬜      | RM-M1-20 | Quality-Gates                                   | wächst je Welle; Abschluss nach RM-M1-19 | Lint (inkl. Code-Metriken via CA1501/1502/1505/1506 in `.editorconfig`), Unit, Safety, Integration, Contract, Container und Coverage laufen reproduzierbar grün. Jede Welle aktiviert ihre Gates sofort; fehlende Gates werden nicht bis zum M1-Ende aufgeschoben.                                 |
 
 ---
 
@@ -114,6 +114,7 @@ leben in M1 als Namespaces innerhalb von `BatteryEms.Application`.
 | `src/adapters/driven/BatteryEms.Adapters.Telemetry`    | Driven Adapter      | JSON-Logging, Prometheus-Metrikexport.                                                                                             |
 | `src/adapters/driven/BatteryEms.Adapters.Optimization` | Driven Adapter      | `NoOpDispatchOptimizer`; kein produktiver Solver in M1.                                                                            |
 | `src/infrastructure/BatteryEms.Infrastructure`         | Composition Root    | DI-Wiring, Config-Loader, Healthchecks, Startup-Validierung.                                                                       |
+| `simulators/bess-field-sim`                            | Blackbox-Simulator  | Go-Service fuer Modbus/MQTT-Feldgeraetesimulation; koppelt ueber Schemas und Fixtures, nicht ueber C#-Domainklassen.              |
 | `tests/BatteryEms.ArchitectureTests`                   | Test-Modul          | Boundary-Tests für Dependency Rule und Architektur-Tabus aus §4.2.                                                                 |
 | `config/schema/`                                       | Configuration       | JSON-Schemas für Asset, Limits, Modbus- und MQTT-Mappings.                                                                         |
 | `config/examples/`                                     | Configuration       | Validierbare Beispielkonfigurationen und Mapping-Fixtures.                                                                         |
@@ -154,10 +155,11 @@ Mappings ab. Hintergrund und Quellenlage stehen in
 
 | Gate                    | Muss prüfen                                                                       | M1-Bezug                               |
 | ----------------------- | --------------------------------------------------------------------------------- | -------------------------------------- |
-| `make lint`             | Build mit Warnungen als Fehler, Format, Roslyn-/Style-/Threading-Analyzer         | RM-M1-01, RM-M1-21                     |
+| `make lint`             | Build mit Warnungen als Fehler, Format, Roslyn-/Style-/Threading-Analyzer **plus Code-Metriken-Gate** (CA1501 Inheritance, CA1502 Cyclomatic Complexity ≤ 25, CA1505 Maintainability Index, CA1506 Class Coupling ≤ 60, alle als Errors aus `.editorconfig`) | RM-M1-01, RM-M1-20, RM-M1-21           |
 | `make arch-check`       | Dependency Rule und Architektur-Tabus aus Architektur §4.2 (Boundary-Tests)       | RM-M1-22, RM-M1-23                     |
 | `make test`             | Domain, Control, Zeitmodell, Snapshot, Vorzeichenkonvention                       | RM-M1-02..08, RM-M1-12                 |
 | `make test-safety`      | Emergency Stop, stale Snapshot, ungültige Daten, SOC-/Power-Grenzen, Schreiblimit | RM-M1-04..07, RM-M1-11                 |
+| `make simulator-test`   | Go-Simulator baut, Szenario-Fixtures und DTO-/Schema-Vertraege sind gueltig       | RM-M1-09, RM-M1-10, RM-M1-18            |
 | `make test-integration` | Modbus, MQTT, PostgreSQL, API über Testserver                                     | RM-M1-09, RM-M1-10, RM-M1-13, RM-M1-15 |
 | `make test-container`   | Runtime-Image, Compose-Start, Healthcheck                                         | RM-M1-19                               |
 | `make coverage-gate`    | 90 Prozent Line-Coverage für M1-Codebereiche                                      | RM-M1-20                               |
@@ -173,7 +175,7 @@ Mappings ab. Hintergrund und Quellenlage stehen in
 | ----- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------- |
 | 1     | `make lint`, `make arch-check`, `make gates` mit Foundation-Auswahl                | fachliche Adapter, Persistenz, API, Runtime-Smoke           |
 | 2     | `make test`, `make test-safety`, Coverage für Domain/Application                   | Adapter-Integration, OpenAPI, Container-Smoke               |
-| 3     | `make test-integration` für Modbus, MQTT und Startvalidierung; Mapping-Schema-Gate | API-Vertrag, Persistenzvollständigkeit, Runtime-Smoke       |
+| 3     | `make simulator-test`, `make test-integration` für Modbus, MQTT und Startvalidierung; Mapping-Schema-Gate | API-Vertrag, Persistenzvollständigkeit, Runtime-Smoke       |
 | 4     | API-/AuthZ-/OpenAPI-Gates, Persistenztests, Zeitmodell-/DST-Regressionsfälle       | Fullbuild und Runtime-Smoke als Abschlussgate               |
 | 5     | `make ci`, `make runtime`, `make fullbuild`, vollständiges Coverage-Gate           | nichts; offene Abweichungen brauchen ADR oder Roadmap-Patch |
 

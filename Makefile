@@ -35,7 +35,7 @@ help:
 	@echo "  DOCKER_BUILD_ARGS=$(DOCKER_BUILD_ARGS)"
 	@echo ""
 	@echo "Welle 1 (Foundation, active):"
-	@echo "  make lint        Build with -warnaserror in the lint stage"
+	@echo "  make lint        Build with -warnaserror plus code-metrics gate (CA1501/1502/1505/1506)"
 	@echo "  make arch-check  Boundary tests (Dependency Rule + tabus)"
 	@echo ""
 	@echo "Welle 2 (Domain & Control, active):"
