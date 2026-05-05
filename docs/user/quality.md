@@ -43,35 +43,39 @@ make lint   # = docker build --target lint
 
 Die Stage führt aus:
 
-| Tool                                     | Zweck                                                    |
-| ---------------------------------------- | -------------------------------------------------------- |
-| `dotnet build -warnaserror`              | Compiler- und Analyzer-Warnings als Fehler               |
-| `dotnet format --verify-no-changes`      | Style-Konformität gemäß `.editorconfig`                  |
-| Roslyn-Analyzer (`Microsoft.CodeAnalysis.NetAnalyzers`) | Standard-Analyzer-Profil          |
-| StyleCop.Analyzers                       | Style-Regeln (Naming, Doku, Layout)                      |
-| `Microsoft.VisualStudio.Threading.Analyzers` | async/await-Regeln (z. B. ConfigureAwait, Sync over Async) |
-| SonarAnalyzer (optional, ab M2)          | Bug-Patterns, Code Smells                                |
+| Tool                                                    | Zweck                                                              |
+| ------------------------------------------------------- | ------------------------------------------------------------------ |
+| `dotnet build -warnaserror`                             | Compiler- und Analyzer-Warnings als Fehler                         |
+| Roslyn-Analyzer (`Microsoft.CodeAnalysis.NetAnalyzers`) | Maintainability- und SOLID-Regeln auf `AnalysisLevel=latest-all`   |
+| `Microsoft.CodeAnalysis.Metrics` (optional)             | Erzeugt `*.Metrics.xml` über `dotnet build /t:Metrics`, Linux-CLI eingeschränkt |
 
 `#pragma warning disable` und `[SuppressMessage]` sind nur mit
 `Justification`-Attribut zulässig, das den Pfad und die Begründung
-nennt. Globaler `<NoWarn>` ist verboten.
+nennt. Globaler `<NoWarn>` ist verboten — Ausnahme: `CA1014`
+(CLSCompliant-Markierung) ist projektweit per `Directory.Build.props`
+unterdrückt, weil Bess-EMS keine NuGet-Library publiziert.
 
-**SOLID-nahe Designsignale** (Aktivierung pro Roslyn-Analyzer-Diagnose-ID
-in `.editorconfig`, schrittweise scharf gestellt ab M1):
+**SOLID-nahe Designsignale** (Aktivierung über `AnalysisLevel=latest-all`
+in `Directory.Build.props`, Severities pro Diagnose-ID in
+`.editorconfig`, scharf gestellt ab M1 RM-M1-20):
 
-| Diagnostic-ID  | Zweck                                                        |
-| -------------- | ------------------------------------------------------------ |
-| CA1062         | Argument-Null-Checks an Public-API-Grenzen                   |
-| CA1822         | Statische Member, die nicht auf Instance zugreifen           |
-| CA2007         | `ConfigureAwait` an Library-Grenzen                          |
-| CA1031         | Kein `catch (Exception)` ohne Rethrow/Log                    |
-| CA1716         | Reservierte Bezeichner (Sprache-/Framework-Konflikte)        |
-| CA1054/55/56   | URI-/Path-Typisierung statt `string`                         |
-| SA1200         | `using`-Direktiven Layout                                    |
-| VSTHRD-Reihen  | Threading-/async-Regeln aus VS Threading Analyzer            |
+| Diagnostic-ID                         | Bezug             | Zweck                                                         |
+| ------------------------------------- | ----------------- | ------------------------------------------------------------- |
+| CA1501                                | SRP               | Vererbungstiefe begrenzt                                      |
+| CA1502                                | SRP               | Cyclomatic Complexity ≤ 25 pro Methode                        |
+| CA1505                                | SRP               | Maintainability Index pro Typ/Methode                         |
+| CA1506                                | SRP               | Class Coupling pro Typ                                        |
+| CA1000                                | LSP               | Keine statischen Member auf generischen Typen                 |
+| CA1001                                | OCP               | Typen mit Disposable-Feldern müssen `IDisposable` sein        |
+| CA1012                                | DIP               | Abstrakte Typen ohne öffentliche Konstruktoren                |
+| CA1033                                | LSP / OCP / ISP   | Interface-Methoden auch in Subtypen aufrufbar                 |
+| CA1040                                | ISP               | Keine leeren Interfaces                                       |
+| CA1715                                | LSP               | Korrektes Präfix für Interfaces / Typparameter                |
 
 Die vollständige Aktivierungstabelle lebt in `.editorconfig` im
-Repository-Root und ist Teil des Lint-Gates.
+Repository-Root und ist Teil des Lint-Gates. Der Build kopiert die
+Datei explizit ins Lint-Image — fehlt sie im Container, fallen die
+Severities lautlos zurück und das Gate schweigt.
 
 ### 1.2 C/C++ Native Core
 
@@ -134,9 +138,9 @@ Verletzungen brechen den Build (LH-TEST-005-nahe).
 
 | Datei                       | Zweck                                                |
 | --------------------------- | ---------------------------------------------------- |
-| `.editorconfig`             | C#-Style + Roslyn-Diagnostic-Severities              |
-| `Directory.Build.props`     | `TreatWarningsAsErrors=true`, gemeinsame Analyzer    |
-| `.globalconfig`             | globale Roslyn-Analyzer-Severitäten                  |
+| `.editorconfig`             | C#-Style + Roslyn-Diagnostic-Severities (CA-Regeln aus §1.1)        |
+| `Directory.Build.props`     | `TreatWarningsAsErrors=true`, `AnalysisLevel=latest-all`, gemeinsame Analyzer-PackageReference |
+| `Directory.Packages.props`  | Zentrale Package-Versionen inkl. `Microsoft.CodeAnalysis.NetAnalyzers` |
 | `native/.clang-format`      | C/C++ Layout                                         |
 | `native/.clang-tidy`        | C/C++ Check-Profil                                   |
 | `native/CMakeLists.txt`     | Compiler-Flags `-Wall -Wextra -Wpedantic -Werror`    |
