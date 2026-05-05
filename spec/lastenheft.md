@@ -4,7 +4,7 @@
 **System:** Battery Energy Management System für Batteriespeicher  
 **Dokumenttyp:** Lastenheft  
 **Format:** Markdown  
-**Version:** 0.1.1
+**Version:** 0.1.2
 **Status:** Entwurf  
 **Zielplattform:** Linux, Docker, C#/.NET, C/C++ für performance-kritische Komponenten  
 **Vorgehensmodell:** V-Modell-ähnliche Anforderungsstruktur mit Kennungen und Rückverfolgbarkeit  
@@ -1645,8 +1645,10 @@ Das System soll im Container getestet werden.
 | LH-CTRL-002        | Unit Test        | MVP                        |
 | LH-CTRL-003        | Unit Test        | MVP                        |
 | LH-MKT-003         | Unit Test        | MVP                        |
+| LH-MKT-007         | Unit/Integration Test | MVP                   |
 | LH-SAFE-001        | Safety Test      | MVP                        |
 | LH-SAFE-004        | Integration Test | MVP                        |
+| LH-API-006         | API/Control Integration Test | MVP              |
 | LH-API-007         | API Security Test | MVP                       |
 | LH-RT-003          | Unit Test        | MVP                        |
 | LH-MODB-005        | Integration Test | MVP                        |
@@ -1680,6 +1682,7 @@ Das System soll im Container getestet werden.
 - Fahrplanabfrage API
 - Operator-Stop API mit Authentifizierung, Autorisierung und Audit-Log
 - strukturierte Logs
+- Dockerfile
 - Docker Compose
 - Unit Tests für Kernlogik
 
