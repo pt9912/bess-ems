@@ -30,6 +30,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Application.Test
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Infrastructure.Tests", "tests\infrastructure\BatteryEms.Infrastructure.Tests\BatteryEms.Infrastructure.Tests.csproj", "{2C64C824-A98C-4149-A759-F34B518AA0FC}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Adapters.Modbus.Tests", "tests\adapters\driven\BatteryEms.Adapters.Modbus.Tests\BatteryEms.Adapters.Modbus.Tests.csproj", "{FAC34834-7CD1-4502-80CF-A7988DCC963A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -92,6 +94,10 @@ Global
 		{2C64C824-A98C-4149-A759-F34B518AA0FC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2C64C824-A98C-4149-A759-F34B518AA0FC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2C64C824-A98C-4149-A759-F34B518AA0FC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FAC34834-7CD1-4502-80CF-A7988DCC963A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FAC34834-7CD1-4502-80CF-A7988DCC963A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FAC34834-7CD1-4502-80CF-A7988DCC963A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FAC34834-7CD1-4502-80CF-A7988DCC963A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -65,6 +65,11 @@ RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.cs
     --configuration "${BUILD_CONFIGURATION}" \
     --no-build \
     --no-restore \
+    --logger "console;verbosity=normal" \
+ && dotnet test tests/adapters/driven/BatteryEms.Adapters.Modbus.Tests/BatteryEms.Adapters.Modbus.Tests.csproj \
+    --configuration "${BUILD_CONFIGURATION}" \
+    --no-build \
+    --no-restore \
     --logger "console;verbosity=normal"
 
 # ---------------------------------------------------------------------------
@@ -120,6 +125,17 @@ RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.cs
     /p:CoverletOutputFormat=cobertura \
     /p:CoverletOutput=/src/coverage/Infrastructure/ \
     /p:Include="[BatteryEms.Infrastructure]*" \
+    /p:Threshold=90 \
+    /p:ThresholdType=line \
+    /p:ThresholdStat=total \
+ && dotnet test tests/adapters/driven/BatteryEms.Adapters.Modbus.Tests/BatteryEms.Adapters.Modbus.Tests.csproj \
+    --configuration "${BUILD_CONFIGURATION}" \
+    --no-restore \
+    /p:CollectCoverage=true \
+    /p:CoverletOutputFormat=cobertura \
+    /p:CoverletOutput=/src/coverage/Modbus/ \
+    /p:Include="[BatteryEms.Adapters.Modbus]*" \
+    /p:Exclude="[BatteryEms.Adapters.Modbus]*.FluentModbusClient" \
     /p:Threshold=90 \
     /p:ThresholdType=line \
     /p:ThresholdStat=total
