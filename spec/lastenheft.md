@@ -4,7 +4,7 @@
 **System:** Battery Energy Management System für Batteriespeicher  
 **Dokumenttyp:** Lastenheft  
 **Format:** Markdown  
-**Version:** 0.1.3
+**Version:** 0.1.4
 **Status:** Entwurf  
 **Zielplattform:** Linux, Docker, C#/.NET, C/C++ für performance-kritische Komponenten  
 **Vorgehensmodell:** V-Modell-ähnliche Anforderungsstruktur mit Kennungen und Rückverfolgbarkeit  
@@ -1610,6 +1610,9 @@ Das System soll im Container getestet werden.
 | LH-API-001         | API Specification                    | MVP                        |
 | LH-API-007         | Authentifizierungs- und Autorisierungskonzept | MVP             |
 | LH-MON-001         | Observability Design                 | MVP                        |
+| LH-MON-002         | Metrics Design                       | MVP                        |
+| LH-CONF-001        | Configuration Design                 | MVP                        |
+| LH-CONF-002        | Device Mapping Design                | MVP                        |
 | LH-CONF-003        | Configuration Validation Design      | MVP                        |
 
 ---
@@ -1637,6 +1640,10 @@ Das System soll im Container getestet werden.
 | LH-API-004         | `/markets/schedules/current`   | MVP                        |
 | LH-API-006         | `/operator/stop`               | MVP                        |
 | LH-API-007         | Schreibschutz für Operator-Endpunkte | MVP                    |
+| LH-MON-001         | `StructuredLogger`             | MVP                        |
+| LH-MON-002         | `MetricsExporter`              | MVP                        |
+| LH-CONF-001        | `ConfigurationSource`          | MVP                        |
+| LH-CONF-002        | `DeviceMappingRepository`      | MVP                        |
 | LH-CONF-003        | `ConfigurationValidator`       | MVP                        |
 
 ---
@@ -1658,6 +1665,10 @@ Das System soll im Container getestet werden.
 | LH-API-003         | API Contract Test | MVP                       |
 | LH-API-004         | API Contract Test | MVP                       |
 | LH-PERSIST-006     | Persistence/Retention Test | MVP                  |
+| LH-MON-001         | Logging Test      | MVP                        |
+| LH-MON-002         | Metrics Export Test | MVP                      |
+| LH-CONF-001        | Configuration Loading Test | MVP                  |
+| LH-CONF-002        | Device Mapping Test | MVP                       |
 | LH-CONF-003        | Startup Configuration Test | MVP                  |
 | LH-RT-003          | Unit Test        | MVP                        |
 | LH-MODB-005        | Integration Test | MVP                        |
@@ -1693,6 +1704,9 @@ Das System soll im Container getestet werden.
 - Fahrplanabfrage API
 - Operator-Stop API mit Authentifizierung, Autorisierung und Audit-Log
 - strukturierte Logs
+- technische und fachliche Metriken
+- externe Konfiguration
+- versionierte Modbus- und MQTT-Gerätemappings
 - Dockerfile
 - Docker Compose
 - Unit Tests für Kernlogik
