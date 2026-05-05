@@ -162,10 +162,11 @@ zertifizierungsnahe Regelleistungsintegration.
 ├── README.md             # dieses Dokument
 ├── LICENSE               # MIT-Lizenz
 ├── spec/
-│   ├── idea.md           # Projektidee / Hintergrund
 │   ├── lastenheft.md     # Lastenheft (V-Modell-ähnliche Anforderungsstruktur)
 │   └── architecture.md   # Architekturentwurf (Schichten, Module, Datenfluss)
 └── docs/
+    ├── archive/
+    │   └── idea.md                   # historische Ideenskizze, nicht normativ
     ├── user/
     │   └── quality.md                # verbindliche Qualitäts- und Messpfade
     └── plan/
@@ -196,12 +197,13 @@ referenzierbar.
   Abnahmekriterien, Rückverfolgbarkeitstabellen, Risiken und offene Punkte
 - [`spec/architecture.md`](spec/architecture.md) — Architekturentwurf:
   Schichten, Module, Datenfluss, Native-Core-Strategie, Rückverfolgbarkeit
-- [`spec/idea.md`](spec/idea.md) — Projektidee und Hintergrund
 - [`docs/plan/planning/open/roadmap.md`](docs/plan/planning/open/roadmap.md) —
   Meilensteine M1–M6 mit Liefergegenständen und LH-Rückverfolgbarkeit
 - [`docs/user/quality.md`](docs/user/quality.md) — verbindliche
   Qualitäts- und Messpfade (statische Analyse C#/.NET + C/C++, Tests,
   Coverage, Vertrags-Gates, Native-Parity, CI/Release)
+- [`docs/archive/idea.md`](docs/archive/idea.md) — historische Native-Core-
+  Ideenskizze, nicht normativ
 
 ---
 

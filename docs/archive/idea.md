@@ -1,3 +1,16 @@
+# Archiv: Native-Core-Ideenskizze
+
+**Status:** Archiviert / nicht normativ
+**Ursprünglicher Pfad:** `spec/idea.md`
+**Aktive Referenzen:** [`spec/lastenheft.md`](../../spec/lastenheft.md),
+[`spec/architecture.md`](../../spec/architecture.md),
+[`docs/plan/planning/open/roadmap.md`](../plan/planning/open/roadmap.md)
+
+Dieses Dokument ist eine historische Ideenskizze zur .NET-/Native-Aufteilung.
+Es ist keine aktive Spezifikation. Bei Widersprüchen gelten Lastenheft,
+Architektur, Qualitätsdokument und Roadmap.
+
+---
 
 ```text
 C#/.NET = Orchestrierung, Geschäftslogik, APIs, Persistenz, Marktintegration

@@ -5,7 +5,7 @@
 **Format:** Markdown
 **Version:** 0.2.0
 **Status:** Entwurf
-**Bezug:** [`lastenheft.md`](lastenheft.md), [`idea.md`](idea.md)
+**Bezug:** [`lastenheft.md`](lastenheft.md)
 
 ---
 
@@ -85,8 +85,10 @@ Das System wird zugleich aus zwei Sichten beschrieben:
 - **§4.2 Hexagonale Sicht** — strukturelle Trennung in fachlichen
   Hexagon-Kern und auswechselbare Adapter mit Driving/Driven-Klassifikation.
 
-Beide Sichten beschreiben dasselbe System; sie sind komplementär und
-müssen widerspruchsfrei bleiben.
+Beide Sichten beschreiben dasselbe System; sie sind komplementär. §4.1
+ordnet Verantwortlichkeiten und Datenfluss, §4.2 legt die zulässigen
+Compile-Time-Abhängigkeiten fest. Bei einer scheinbaren Kollision zwischen
+Schichtenmodell und hexagonaler Sicht gilt die Dependency Rule aus §4.2.
 
 ### 4.1 Schichtenmodell
 
@@ -112,8 +114,11 @@ müssen widerspruchsfrei bleiben.
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Abhängigkeitsregel (Schichten):** obere Schichten kennen untere; untere
-Schichten kennen nur Domain-Abstraktionen, niemals konkrete Adapter.
+**Interpretation:** Dieses Schichtenmodell ist eine logische
+Verantwortungs- und Datenflusssicht. Es erlaubt nicht automatisch, dass
+eine höher dargestellte Schicht konkrete Implementierungen tieferer
+Schichten referenziert. Konkrete Code-Abhängigkeiten werden über Ports,
+Adapter und Composition Root in §4.2 geregelt.
 
 Bezug: LH-ARCH-002.
 

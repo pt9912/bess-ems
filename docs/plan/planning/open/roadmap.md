@@ -63,8 +63,9 @@ unter `in-progress/`.
 | ⬜     | M5          | MPC, Solver-Sidecar, Replay        | 3     | folgt mit Aktivierung |
 | ⬜     | M6          | Skalierung, UI, Edge / Multi-Asset | 4     | folgt mit Aktivierung |
 
-Phase bezieht sich auf [`idea.md`](../../../../spec/idea.md) und
-[`architecture.md`](../../../../spec/architecture.md) §13.
+Phase bezieht sich auf [`architecture.md`](../../../../spec/architecture.md)
+§13. Die frühere Native-Core-Ideenskizze liegt archiviert unter
+[`docs/archive/idea.md`](../../../archive/idea.md).
 
 ---
 
@@ -163,7 +164,7 @@ LP-Optimierer (.NET-Interface, optional OR-Tools/HiGHS), Tracing und Replay.
 
 ## M3 — Native Control Core (Library)
 
-**Ziel:** Phase 2 aus `idea.md` / Architektur §13: native Bibliothek
+**Ziel:** Phase 2 aus Architektur §13: native Bibliothek
 `battery_control_core` für Constraint, Ramp, PID via P/Invoke. .NET-Variante
 bleibt Fallback und Referenz.
 
@@ -294,7 +295,7 @@ Kubernetes-Deployment, Edge-Anbindung. Inhalte mit hohem Diskussionsbedarf
 - Lastenheft-Anforderungen: [`spec/lastenheft.md`](../../../../spec/lastenheft.md)
 - Architekturentwurf: [`spec/architecture.md`](../../../../spec/architecture.md)
 - Qualitäts- und Messpfade: [`docs/user/quality.md`](../../../user/quality.md)
-- Projektidee/Hintergrund: [`spec/idea.md`](../../../../spec/idea.md)
+- Archivierte Native-Core-Ideenskizze: [`docs/archive/idea.md`](../../../archive/idea.md)
 
 ---
 
