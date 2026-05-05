@@ -159,11 +159,12 @@ zertifizierungsnahe Regelleistungsintegration.
 
 ```text
 .
-├── README.md          # dieses Dokument
-├── LICENSE            # MIT-Lizenz
+├── README.md             # dieses Dokument
+├── LICENSE               # MIT-Lizenz
 └── spec/
-    ├── idea.md        # Projektidee / Hintergrund
-    └── lastenheft.md  # Lastenheft (V-Modell-ähnliche Anforderungsstruktur)
+    ├── idea.md           # Projektidee / Hintergrund
+    ├── lastenheft.md     # Lastenheft (V-Modell-ähnliche Anforderungsstruktur)
+    └── architecture.md   # Architekturentwurf (Schichten, Module, Datenfluss)
 ```
 
 Implementierungsmodule (Worker, API, Domain, Adapter, Infrastructure, Native
@@ -184,6 +185,8 @@ referenzierbar.
 
 - [`spec/lastenheft.md`](spec/lastenheft.md) — vollständige Anforderungen,
   Abnahmekriterien, Rückverfolgbarkeitstabellen, Risiken und offene Punkte
+- [`spec/architecture.md`](spec/architecture.md) — Architekturentwurf:
+  Schichten, Module, Datenfluss, Native-Core-Strategie, Rückverfolgbarkeit
 - [`spec/idea.md`](spec/idea.md) — Projektidee und Hintergrund
 
 ---
