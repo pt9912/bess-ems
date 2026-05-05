@@ -66,10 +66,10 @@ Arbeitspakete parallel laufen, solange ihre Abhängigkeiten erfüllt sind.
 
 | Status | ID | Paket | Abhängigkeiten | DoD |
 | ------ | -- | ----- | -------------- | --- |
-| ⬜ | RM-M1-01 | Solution-Skeleton | keine | Projekte gemäß Architektur §4.2 / §5.1 (hexagonale Verzeichnisstruktur) sind angelegt, `dotnet build -warnaserror` läuft in der Lint-Stage, gemeinsame Analyzer sind eingebunden. |
-| ⬜ | RM-M1-22 | Hexagonale Verzeichnis- und Modulstruktur | RM-M1-01 | `src/hexagon/`, `src/adapters/{driving,driven}/`, `src/infrastructure/` sind angelegt; jedes Modul ist Driving/Driven/Composition-Root klassifiziert (siehe §5.1). |
-| ⬜ | RM-M1-23 | Boundary-Tests (`BatteryEms.ArchitectureTests`) | RM-M1-22 | NetArchTest- oder ArchUnitNET-Suite setzt Dependency Rule und Architektur-Tabus aus §4.2 durch (Domain frameworkfrei, Application ohne Adapter-Refs, keine Adapter-zu-Adapter); `make arch-check` bricht den Build bei Verstoß. |
-| ⬜ | RM-M1-21 | Makefile-Orchestrierung | RM-M1-01 | `make help`, `make gates`, `make ci`, `make runtime`, `make fullbuild`, Override-Variablen und Gate-/Report-Trennung sind implementiert; `make gates` zieht `make arch-check` mit. |
+| ✅ | RM-M1-01 | Solution-Skeleton | keine | Projekte gemäß Architektur §4.2 / §5.1 (hexagonale Verzeichnisstruktur) sind angelegt, `dotnet build -warnaserror` läuft in der Lint-Stage, gemeinsame Analyzer sind eingebunden. |
+| ✅ | RM-M1-22 | Hexagonale Verzeichnis- und Modulstruktur | RM-M1-01 | `src/hexagon/`, `src/adapters/{driving,driven}/`, `src/infrastructure/` sind angelegt; jedes Modul ist Driving/Driven/Composition-Root klassifiziert (siehe §5.1). |
+| ✅ | RM-M1-23 | Boundary-Tests (`BatteryEms.ArchitectureTests`) | RM-M1-22 | NetArchTest- oder ArchUnitNET-Suite setzt Dependency Rule und Architektur-Tabus aus §4.2 durch (Domain frameworkfrei, Application ohne Adapter-Refs, keine Adapter-zu-Adapter); `make arch-check` bricht den Build bei Verstoß. |
+| ✅ | RM-M1-21 | Makefile-Orchestrierung | RM-M1-01 | `make help`, `make gates`, `make ci`, `make runtime`, `make fullbuild`, Override-Variablen und Gate-/Report-Trennung sind implementiert; `make gates` zieht `make arch-check` mit. |
 | ⬜ | RM-M1-02 | Domain-Modell | RM-M1-01 | `BatteryAsset`, `BatteryTelemetry`, `BatteryCommand`, `DataQuality`, `MarketCommitment` und Vorzeichenkonvention sind unit-getestet. |
 | ⬜ | RM-M1-03 | Realtime Snapshot Store | RM-M1-02 | Datenfusion, Aging, Plausibilisierung, Snapshot-Qualität und stale-Erkennung sind unit-getestet. |
 | ⬜ | RM-M1-04 | State Machine | RM-M1-02 | `INIT`, `STANDBY`, `READY`, `IDLE`, `CHARGING`, `DISCHARGING`, `LIMITED`, `FAULT`, `EMERGENCY_STOP`, `MAINTENANCE`, Quittierung und Operator-Stop-Pfade sind abgedeckt. |
