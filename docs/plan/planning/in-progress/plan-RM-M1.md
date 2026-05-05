@@ -58,7 +58,7 @@ Arbeitspakete parallel laufen, solange ihre Abhängigkeiten erfüllt sind.
   auf den neuen Roadmap-Pfad prüfen.
 - [x] Welle 1 als ersten Umsetzungsumfang festlegen und alle übrigen
   Arbeitspakete unverändert auf ⬜ lassen.
-- [ ] Baseline-Commit für die Aktivierung erstellen, bevor Code entsteht.
+- [x] Baseline-Commit für die Aktivierung erstellen, bevor Code entsteht.
 
 ---
 
@@ -77,7 +77,7 @@ Arbeitspakete parallel laufen, solange ihre Abhängigkeiten erfüllt sind.
 | ⬜ | RM-M1-06 | Ramp Limiter | RM-M1-02 | Rampenbegrenzung ist deterministisch, vorzeichenfest und testbar. |
 | ⬜ | RM-M1-08 | Optimierungsinterface | RM-M1-02 | `IDispatchOptimizer` und `NoOpDispatchOptimizer` sind austauschbar verdrahtet. |
 | ⬜ | RM-M1-07 | Regelzyklus/Fallback | RM-M1-03..06, RM-M1-08 | 1-s-Regelzyklus erzeugt bei stale/ungültigem Snapshot einen sicheren Command. |
-| ⬜ | RM-M1-18 | Konfiguration/Mappings | RM-M1-01, RM-M1-02 | Config-Loader, JSON-Schemas, Beispiel-Mappings und Startup-Validierung sind Contract-Gates. |
+| ⬜ | RM-M1-18 | Konfiguration/Mappings | RM-M1-01, RM-M1-02 | Config-Loader, JSON-Schemas, Beispiel-Mappings und Startup-Validierung sind Contract-Gates; das Adapter-Mapping-Schema trägt die Pflichtfelder aus Abschnitt „Mapping-Schema-Pflichtfelder". |
 | ⬜ | RM-M1-09 | Modbus-TCP-Adapter | RM-M1-18 | Lesen, Schreiben, Mapping, Timeout und Fehlerstatus laufen gegen Simulator. |
 | ⬜ | RM-M1-10 | MQTT-Adapter | RM-M1-18 | Telemetrieempfang, Command-Publish und Topic-Konvention laufen gegen Mosquitto. |
 | ⬜ | RM-M1-11 | Adapter-Schreibbegrenzung | RM-M1-09, RM-M1-10 | Finale Schreibbegrenzung greift unmittelbar vor Versand für Modbus und MQTT. |
@@ -113,6 +113,35 @@ leben in M1 als Namespaces innerhalb von `BatteryEms.Application`.
 | `tests/BatteryEms.ArchitectureTests` | Test-Modul | Boundary-Tests für Dependency Rule und Architektur-Tabus aus §4.2. |
 | `config/schema/` | Configuration | JSON-Schemas für Asset, Limits, Modbus- und MQTT-Mappings. |
 | `config/examples/` | Configuration | Validierbare Beispielkonfigurationen und Mapping-Fixtures. |
+
+---
+
+## Mapping-Schema-Pflichtfelder
+
+Das Adapter-Mapping-Schema in RM-M1-18 muss die folgenden Felder pro
+Register- bzw. Topic-Eintrag tragen, damit reale Vendor-Profile post-M1
+ohne Schemabruch abbildbar sind. Die Felder werden bereits in den
+herstellerneutralen Simulatorprofilen aus M1 verlangt; Beispielprofile
+ohne diese Felder verletzen das Contract-Gate.
+
+| Feld | Pflicht | Werteform | Zweck |
+| ---- | ------- | --------- | ----- |
+| `address` | ja | int / string (für MQTT-Topic) | Adress-/Topic-Identifikation. |
+| `type` | ja | enum: `uint16 \| int16 \| uint32 \| int32 \| float32 \| string` | Decode-Layer. |
+| `scale_factor` | ja | numeric (Default 1) | Roh-zu-Engineering-Skalierung. |
+| `range` | ja | `[min, max]` | Plausibilisierung, stale-/invalid-Erkennung. |
+| `writable` | ja | bool | Trennung Lese-/Schreibpfad, AuthZ-Eingriffspunkt. |
+| `enum` | optional | Mapping `int → string` | Symbolische Zustände (z. B. State-Codes). |
+| `write_cadence` | ja | enum: `cyclic \| once_per_day \| one_shot` | Hardware-Schutz gegen unzulässig häufige Schreibvorgänge (siehe SMA-Befund in `../open/note-vendor-shortlist.md`). |
+| `auth_required` | ja | bool oder Token-Referenz | Vendor-Auth-Vorbedingung für Schreibzugriffe (z. B. SMA Grid Guard). |
+| `firmware_constraint` | optional | Min-Firmware-Filter | Firmwareabhängige Datentyp-/Skalierungswechsel (z. B. Sungrow SH-Serie). |
+| `unit_id_discovery` | ja, auf Adapter-Ebene | enum: `static \| dynamic` | Bedient feste Unit-IDs (SMA) und dynamische Zuweisung (Victron CCGX/Cerbo). |
+
+Die Pflichtfelder gehören in das JSON-Schema unter `config/schema/`. Die
+Beispielmappings unter `config/examples/adapters/` müssen alle
+Pflichtfelder befüllen; die Startup-Validierung lehnt unvollständige
+Mappings ab. Hintergrund und Quellenlage stehen in
+[`../open/note-vendor-shortlist.md`](../open/note-vendor-shortlist.md).
 
 ---
 
