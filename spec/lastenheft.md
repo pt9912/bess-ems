@@ -4,7 +4,7 @@
 **System:** Battery Energy Management System für Batteriespeicher  
 **Dokumenttyp:** Lastenheft  
 **Format:** Markdown  
-**Version:** 0.1.0  
+**Version:** 0.1.1
 **Status:** Entwurf  
 **Zielplattform:** Linux, Docker, C#/.NET, C/C++ für performance-kritische Komponenten  
 **Vorgehensmodell:** V-Modell-ähnliche Anforderungsstruktur mit Kennungen und Rückverfolgbarkeit  
