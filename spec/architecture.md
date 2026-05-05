@@ -3,7 +3,7 @@
 **Projektname:** bess-ems
 **Dokumenttyp:** Architekturbeschreibung
 **Format:** Markdown
-**Version:** 0.1.0
+**Version:** 0.1.1
 **Status:** Entwurf
 **Bezug:** [`lastenheft.md`](lastenheft.md), [`idea.md`](idea.md)
 
@@ -278,14 +278,14 @@ durch (LH-OPT-001 als Interface). Spätere Solver-Implementierungen
 
 ### 8.3 Externe API (MVP)
 
-| Endpoint                                | Methode | Schutz                | LH-Bezug   |
-| --------------------------------------- | ------- | --------------------- | ---------- |
-| `/health`                               | GET     | öffentlich            | LH-API-001 |
-| `/battery/{assetId}/status`             | GET     | öffentlich            | LH-API-002 |
-| `/battery/{assetId}/command/current`    | GET     | öffentlich            | LH-API-003 |
-| `/markets/schedules/current`            | GET     | öffentlich            | LH-API-004 |
-| `/operator/stop`                        | POST    | AuthN+AuthZ + Audit   | LH-API-006/007 |
-| `/markets/day-ahead/optimize`           | POST    | nach MVP              | LH-API-005 |
+| Endpoint                                | Methode | Schutz                                      | LH-Bezug   |
+| --------------------------------------- | ------- | ------------------------------------------- | ---------- |
+| `/health`                               | GET     | intern/lokal; produktiv via Reverse Proxy   | LH-API-001 |
+| `/battery/{assetId}/status`             | GET     | read-only intern; produktiv TLS/optional AuthN | LH-API-002 |
+| `/battery/{assetId}/command/current`    | GET     | read-only intern; produktiv TLS/optional AuthN | LH-API-003 |
+| `/markets/schedules/current`            | GET     | read-only intern; produktiv TLS/optional AuthN | LH-API-004 |
+| `/operator/stop`                        | POST    | AuthN+AuthZ + Audit                         | LH-API-006/007 |
+| `/markets/day-ahead/optimize`           | POST    | nach MVP                                    | LH-API-005 |
 
 Produktiv: TLS-Terminierung oder dokumentierter Reverse-Proxy-Betrieb
 (LH-API-008).
@@ -471,18 +471,21 @@ Export: Prometheus-Endpoint, OTLP für Traces, stdout-Log (Container-konform).
 
 ```text
 docker-compose.yml
-├─ bess-ems-worker        # .NET, ggf. mit Native Library
-├─ bess-ems-api           # .NET (oder im Worker integriert)
+├─ bess-ems               # MVP: ein eigenes OCI-Image mit Worker + API
 ├─ postgres               # PostgreSQL
 ├─ mosquitto              # MQTT-Broker (lokal/Test)
 └─ monitoring (optional)  # Prometheus, Grafana, Tempo/Jaeger
 ```
 
+Nach dem MVP kann die API bei Bedarf als eigener `bess-ems-api`-Service
+aus demselben Codebestand oder als separates Image ausgekoppelt werden
+(AR-OPEN-001).
+
 Bezug: LH-DEPLOY-001/2/3, LH-NF-003/4.
 
-Multi-Stage Dockerfile: native Build-Stage + .NET-Build-Stage + schlankes
-Runtime-Image; native `.so` wird in `/usr/local/lib` deponiert
-(LH-DEPLOY-004).
+MVP-Dockerfile: .NET-Build-Stage + schlankes Runtime-Image ohne Native Core.
+Falls Native Core aktiviert wird, ergänzt ein optionaler nativer Build-Stage
+die `.so` und deponiert sie in `/usr/local/lib` (LH-DEPLOY-004).
 
 ---
 
@@ -496,7 +499,7 @@ Runtime-Image; native `.so` wird in `/usr/local/lib` deponiert
 | Replay             | historische Telemetrie → reproduzierbare Commands       | LH-TEST-004 |
 | Native Interop     | Struct-Layout, ABI-Version, Fehlercodes, Werte-Parität  | LH-TEST-005 |
 | Sicherheitsfälle   | Emergency Stop, BMS-Ausfall, stale snapshot, ungültiger Command | LH-TEST-006 |
-| Container          | Image-Boot, Healthcheck, native lib geladen             | LH-TEST-007 |
+| Container          | Image-Boot, Healthcheck; Native Library geladen, falls Native Core eingesetzt wird | LH-TEST-007 |
 
 Empfehlung: .NET-Referenzregler parallel zum Native Core pflegen und in
 Replay-Tests gegeneinander vergleichen, um ABI- und Rundungsfehler früh
