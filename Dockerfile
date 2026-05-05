@@ -46,9 +46,19 @@ RUN dotnet test tests/BatteryEms.ArchitectureTests/BatteryEms.ArchitectureTests.
     --logger "console;verbosity=normal"
 
 # ---------------------------------------------------------------------------
+# test: domain unit tests (RM-M1-02/04/05/06)
+# ---------------------------------------------------------------------------
+FROM lint AS test
+ARG BUILD_CONFIGURATION
+RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.csproj \
+    --configuration "${BUILD_CONFIGURATION}" \
+    --no-build \
+    --no-restore \
+    --logger "console;verbosity=normal"
+
+# ---------------------------------------------------------------------------
 # Future stages (activated in later waves):
-#   FROM lint AS test            -> Welle 2: domain/control unit tests
-#   FROM lint AS test-safety     -> Welle 2: safety-path tests
+#   FROM lint AS test-safety     -> Welle 2 (RM-M1-07): safety-path tests
 #   FROM lint AS test-integration -> Welle 3: modbus/mqtt/postgres integration
 #   FROM ${DOTNET_RUNTIME_IMAGE} AS runtime -> Welle 5: runtime image
 # ---------------------------------------------------------------------------

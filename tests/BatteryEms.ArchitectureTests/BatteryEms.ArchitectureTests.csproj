@@ -5,7 +5,6 @@
     <AssemblyName>BatteryEms.ArchitectureTests</AssemblyName>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
-    <NoWarn>$(NoWarn);CA1707;CA2007</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
