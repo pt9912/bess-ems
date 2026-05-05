@@ -1,0 +1,33 @@
+# Build outputs
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Pp]ublish/
+[Rr]elease/
+[Dd]ebug/
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# IDE / editor
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Tooling caches
+.nuget/
+~$*
+
+# Local environment
+.env
+.env.local
+*.local.json

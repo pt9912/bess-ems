@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>BatteryEms.Infrastructure</RootNamespace>
+    <AssemblyName>BatteryEms.Infrastructure</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\hexagon\BatteryEms.Domain\BatteryEms.Domain.csproj" />
+    <ProjectReference Include="..\..\hexagon\BatteryEms.Application\BatteryEms.Application.csproj" />
+    <ProjectReference Include="..\..\adapters\driving\BatteryEms.Api\BatteryEms.Api.csproj" />
+    <ProjectReference Include="..\..\adapters\driving\BatteryEms.Worker\BatteryEms.Worker.csproj" />
+    <ProjectReference Include="..\..\adapters\driven\BatteryEms.Adapters.Modbus\BatteryEms.Adapters.Modbus.csproj" />
+    <ProjectReference Include="..\..\adapters\driven\BatteryEms.Adapters.Mqtt\BatteryEms.Adapters.Mqtt.csproj" />
+    <ProjectReference Include="..\..\adapters\driven\BatteryEms.Adapters.Persistence\BatteryEms.Adapters.Persistence.csproj" />
+    <ProjectReference Include="..\..\adapters\driven\BatteryEms.Adapters.Telemetry\BatteryEms.Adapters.Telemetry.csproj" />
+    <ProjectReference Include="..\..\adapters\driven\BatteryEms.Adapters.Optimization\BatteryEms.Adapters.Optimization.csproj" />
+  </ItemGroup>
+
+</Project>

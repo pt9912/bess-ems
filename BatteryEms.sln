@@ -1,0 +1,81 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.0.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Domain", "src\hexagon\BatteryEms.Domain\BatteryEms.Domain.csproj", "{208C0CF4-3E8E-4C6F-BE8C-563668873225}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Application", "src\hexagon\BatteryEms.Application\BatteryEms.Application.csproj", "{0FC50393-0F98-42C8-8DC3-8F0DABD6F65F}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Api", "src\adapters\driving\BatteryEms.Api\BatteryEms.Api.csproj", "{8B5DFF4C-5BDE-40D5-A98D-DB97DD1BBA8D}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Worker", "src\adapters\driving\BatteryEms.Worker\BatteryEms.Worker.csproj", "{A7BCC590-AF77-47B9-9C68-6F0A9557F9B2}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Adapters.Modbus", "src\adapters\driven\BatteryEms.Adapters.Modbus\BatteryEms.Adapters.Modbus.csproj", "{DD2DC981-3E80-4273-95E8-C6474A37CE7A}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Adapters.Mqtt", "src\adapters\driven\BatteryEms.Adapters.Mqtt\BatteryEms.Adapters.Mqtt.csproj", "{0DF5BDA6-076B-4E18-AA56-2AC1FB7610FA}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Adapters.Persistence", "src\adapters\driven\BatteryEms.Adapters.Persistence\BatteryEms.Adapters.Persistence.csproj", "{22B0C599-7CE2-4F4E-81A3-FF28BB4DE564}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Adapters.Telemetry", "src\adapters\driven\BatteryEms.Adapters.Telemetry\BatteryEms.Adapters.Telemetry.csproj", "{80B614FF-5A6C-4901-8F62-719426583729}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Adapters.Optimization", "src\adapters\driven\BatteryEms.Adapters.Optimization\BatteryEms.Adapters.Optimization.csproj", "{CFA594F3-07DC-45A8-BEB2-1F5937F10ADC}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Infrastructure", "src\infrastructure\BatteryEms.Infrastructure\BatteryEms.Infrastructure.csproj", "{5164A48D-9956-439E-B309-EA8375CD893C}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.ArchitectureTests", "tests\BatteryEms.ArchitectureTests\BatteryEms.ArchitectureTests.csproj", "{21858224-1560-43EB-8A0B-740560C877A0}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{208C0CF4-3E8E-4C6F-BE8C-563668873225}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{208C0CF4-3E8E-4C6F-BE8C-563668873225}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{208C0CF4-3E8E-4C6F-BE8C-563668873225}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{208C0CF4-3E8E-4C6F-BE8C-563668873225}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0FC50393-0F98-42C8-8DC3-8F0DABD6F65F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0FC50393-0F98-42C8-8DC3-8F0DABD6F65F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0FC50393-0F98-42C8-8DC3-8F0DABD6F65F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0FC50393-0F98-42C8-8DC3-8F0DABD6F65F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8B5DFF4C-5BDE-40D5-A98D-DB97DD1BBA8D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8B5DFF4C-5BDE-40D5-A98D-DB97DD1BBA8D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8B5DFF4C-5BDE-40D5-A98D-DB97DD1BBA8D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8B5DFF4C-5BDE-40D5-A98D-DB97DD1BBA8D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A7BCC590-AF77-47B9-9C68-6F0A9557F9B2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A7BCC590-AF77-47B9-9C68-6F0A9557F9B2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A7BCC590-AF77-47B9-9C68-6F0A9557F9B2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A7BCC590-AF77-47B9-9C68-6F0A9557F9B2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DD2DC981-3E80-4273-95E8-C6474A37CE7A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DD2DC981-3E80-4273-95E8-C6474A37CE7A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DD2DC981-3E80-4273-95E8-C6474A37CE7A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DD2DC981-3E80-4273-95E8-C6474A37CE7A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0DF5BDA6-076B-4E18-AA56-2AC1FB7610FA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0DF5BDA6-076B-4E18-AA56-2AC1FB7610FA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0DF5BDA6-076B-4E18-AA56-2AC1FB7610FA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0DF5BDA6-076B-4E18-AA56-2AC1FB7610FA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{22B0C599-7CE2-4F4E-81A3-FF28BB4DE564}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{22B0C599-7CE2-4F4E-81A3-FF28BB4DE564}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{22B0C599-7CE2-4F4E-81A3-FF28BB4DE564}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{22B0C599-7CE2-4F4E-81A3-FF28BB4DE564}.Release|Any CPU.Build.0 = Release|Any CPU
+		{80B614FF-5A6C-4901-8F62-719426583729}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{80B614FF-5A6C-4901-8F62-719426583729}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{80B614FF-5A6C-4901-8F62-719426583729}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{80B614FF-5A6C-4901-8F62-719426583729}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CFA594F3-07DC-45A8-BEB2-1F5937F10ADC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CFA594F3-07DC-45A8-BEB2-1F5937F10ADC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CFA594F3-07DC-45A8-BEB2-1F5937F10ADC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CFA594F3-07DC-45A8-BEB2-1F5937F10ADC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5164A48D-9956-439E-B309-EA8375CD893C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5164A48D-9956-439E-B309-EA8375CD893C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5164A48D-9956-439E-B309-EA8375CD893C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5164A48D-9956-439E-B309-EA8375CD893C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{21858224-1560-43EB-8A0B-740560C877A0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{21858224-1560-43EB-8A0B-740560C877A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{21858224-1560-43EB-8A0B-740560C877A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{21858224-1560-43EB-8A0B-740560C877A0}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
