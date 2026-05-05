@@ -20,15 +20,20 @@ indent_style = tab
 [Dockerfile]
 indent_size = 2
 
-# --- Code-metrics gate (RM-M1-20) -----------------------------------------
-# Maintainability-/SOLID-adjacent Roslyn rules elevated to errors so they
-# block the lint stage. Runs inside `make lint`; no separate tool required.
+# --- Code-metrics and SOLID-leaning rules (RM-M1-20) ----------------------
+# Activation: AnalysisLevel=latest-all in Directory.Build.props enables the
+# rules; the severities below pin them as errors regardless of SDK
+# default-severity drift across analyzer versions.
 [*.cs]
+# SRP / maintainability
 dotnet_diagnostic.CA1501.severity = error
 dotnet_diagnostic.CA1502.severity = error
 dotnet_diagnostic.CA1505.severity = error
 dotnet_diagnostic.CA1506.severity = error
-dotnet_code_quality.CA1501.inheritance_excluded_symbol_names = System.Object
-dotnet_code_quality.CA1502.cyclomatic_complexity_threshold = 25
-dotnet_code_quality.CA1506.class_coupling_threshold = 60
-dotnet_code_quality.CA1506.coupling_excluded_symbol_names = System.Object|System.Threading.CancellationToken
+# OCP / LSP / ISP / DIP
+dotnet_diagnostic.CA1000.severity = error
+dotnet_diagnostic.CA1001.severity = error
+dotnet_diagnostic.CA1012.severity = error
+dotnet_diagnostic.CA1033.severity = error
+dotnet_diagnostic.CA1040.severity = error
+dotnet_diagnostic.CA1715.severity = error

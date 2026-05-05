@@ -18,7 +18,7 @@ WORKDIR /src
 # restore: dotnet restore against central package management
 # ---------------------------------------------------------------------------
 FROM sdk-base AS restore
-COPY global.json Directory.Build.props Directory.Packages.props ./
+COPY global.json Directory.Build.props Directory.Packages.props .editorconfig ./
 COPY BatteryEms.sln ./
 COPY src/ src/
 COPY tests/ tests/

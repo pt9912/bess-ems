@@ -155,7 +155,7 @@ Mappings ab. Hintergrund und Quellenlage stehen in
 
 | Gate                    | Muss prüfen                                                                       | M1-Bezug                               |
 | ----------------------- | --------------------------------------------------------------------------------- | -------------------------------------- |
-| `make lint`             | Build mit Warnungen als Fehler, Format, Roslyn-/Style-/Threading-Analyzer **plus Code-Metriken-Gate** (CA1501 Inheritance, CA1502 Cyclomatic Complexity ≤ 25, CA1505 Maintainability Index, CA1506 Class Coupling ≤ 60, alle als Errors aus `.editorconfig`) | RM-M1-01, RM-M1-20, RM-M1-21           |
+| `make lint`             | Build mit Warnungen als Fehler plus Code-Metriken-/SOLID-Gate via `Microsoft.CodeAnalysis.NetAnalyzers` (`AnalysisLevel=latest-all` in `Directory.Build.props`, Severities in `.editorconfig`): CA1501/1502/1505/1506 (SRP/Maintainability), CA1000/1001/1012/1033/1040/1715 (OCP/LSP/ISP/DIP). | RM-M1-01, RM-M1-20, RM-M1-21           |
 | `make arch-check`       | Dependency Rule und Architektur-Tabus aus Architektur §4.2 (Boundary-Tests)       | RM-M1-22, RM-M1-23                     |
 | `make test`             | Domain, Control, Zeitmodell, Snapshot, Vorzeichenkonvention                       | RM-M1-02..08, RM-M1-12                 |
 | `make test-safety`      | Emergency Stop, stale Snapshot, ungültige Daten, SOC-/Power-Grenzen, Schreiblimit | RM-M1-04..07, RM-M1-11                 |
