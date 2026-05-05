@@ -1,0 +1,22 @@
+{
+  "id": "sim-m1-07",
+  "name": "Invalid SOC",
+  "description": "SOC liefert Werte ausserhalb [0,100]: zuerst negativ, dann ueber 100. Der Plausibilizer im EMS muss den Snapshot als Substituted markieren.",
+  "asset": {
+    "asset_id": "single-bess-1",
+    "capacity_kwh": 100,
+    "max_charge_power_kw": 50,
+    "max_discharge_power_kw": 50,
+    "min_soc_percent": 10,
+    "max_soc_percent": 90,
+    "charge_efficiency": 0.95,
+    "discharge_efficiency": 0.95,
+    "max_ramp_kw_per_second": 25,
+    "min_operating_temperature_celsius": -20,
+    "max_operating_temperature_celsius": 55
+  },
+  "telemetry": [
+    { "offset_millis": 0,    "soc_percent": -1,  "soh_percent": 99, "active_power_kw": 0, "reactive_power_kvar": 0, "dc_voltage": 800, "dc_current": 0, "temperature_celsius": 22, "available": true, "fault_status": "bms-soc-out-of-range" },
+    { "offset_millis": 1000, "soc_percent": 110, "soh_percent": 99, "active_power_kw": 0, "reactive_power_kvar": 0, "dc_voltage": 800, "dc_current": 0, "temperature_celsius": 22, "available": true, "fault_status": "bms-soc-out-of-range" }
+  ]
+}
