@@ -38,9 +38,9 @@ help:
 	@echo "  make lint        Build with -warnaserror in the lint stage"
 	@echo "  make arch-check  Boundary tests (Dependency Rule + tabus)"
 	@echo ""
-	@echo "Welle 2 (Domain & Control, partially active):"
-	@echo "  make test        Domain unit tests (RM-M1-02/04/05/06)"
-	@echo "  make test-safety pending (RM-M1-07 fallback paths)"
+	@echo "Welle 2 (Domain & Control, active):"
+	@echo "  make test        Domain + Application unit tests"
+	@echo "  make test-safety Safety-path subset (Category=Safety)"
 	@echo "  make coverage-gate pending"
 	@echo ""
 	@echo "Aggregated:"
@@ -60,21 +60,20 @@ lint:
 arch-check:
 	$(DOCKER_BUILD) --target arch-check -t $(IMAGE_PREFIX)-arch-check:latest
 
-# --- Welle 2 (active: test) ------------------------------------------------
+# --- Welle 2 (active) ------------------------------------------------------
 
 test:
 	$(DOCKER_BUILD) --target test -t $(IMAGE_PREFIX)-test:latest
 
+test-safety:
+	$(DOCKER_BUILD) --target test-safety -t $(IMAGE_PREFIX)-test-safety:latest
+
 # --- Aggregated gates ------------------------------------------------------
 
-gates: lint arch-check test
-	@echo "[gates] M1 mandatory gates green: lint, arch-check, test"
+gates: lint arch-check test test-safety
+	@echo "[gates] M1 mandatory gates green: lint, arch-check, test, test-safety"
 
 # --- Welle 2 (pending) -----------------------------------------------------
-
-test-safety:
-	@echo "make test-safety: not active. Activated with RM-M1-07 (control cycle and fallback)."
-	@exit 2
 
 coverage-gate:
 	@echo "make coverage-gate: not active. Activated incrementally from Welle 2 onwards."

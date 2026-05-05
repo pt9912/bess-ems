@@ -59,6 +59,7 @@ public sealed class StateMachineTests
     }
 
     [Theory]
+    [Trait("Category", "Safety")]
     [InlineData(OperatingState.Init)]
     [InlineData(OperatingState.Standby)]
     [InlineData(OperatingState.Ready)]
@@ -76,6 +77,7 @@ public sealed class StateMachineTests
     }
 
     [Theory]
+    [Trait("Category", "Safety")]
     [InlineData(OperatingState.Standby)]
     [InlineData(OperatingState.Ready)]
     [InlineData(OperatingState.Idle)]

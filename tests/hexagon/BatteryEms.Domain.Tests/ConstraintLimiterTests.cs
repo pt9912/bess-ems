@@ -3,6 +3,7 @@ using Xunit;
 
 namespace BatteryEms.Domain.Tests;
 
+[Trait("Category", "Safety")]
 public sealed class ConstraintLimiterTests
 {
     private static readonly BatteryAsset Asset = new(
