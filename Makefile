@@ -52,7 +52,7 @@ help:
 	@echo "  make simulator-race          Race-detector on goroutine-bearing packages (CGO=1)"
 	@echo "  make simulator-lint          golangci-lint with SOLID profile"
 	@echo "  make simulator-coverage-gate Go coverage gate (90% line)"
-	@echo "  make test-integration        pending (RM-M1-09/10/11)"
+	@echo "  make test-integration        Modbus roundtrip vs Go-Simulator via docker compose"
 	@echo ""
 	@echo "Welle 5 (Closure, pending):"
 	@echo "  make build, make test-container, make ci, make runtime, make fullbuild"
@@ -99,8 +99,11 @@ simulator-coverage-gate:
 	$(SIMULATOR_MAKE) coverage-gate
 
 test-integration:
-	@echo "make test-integration: not active. Activated in Welle 3 (Config and Adapters)."
-	@exit 2
+	$(SIMULATOR_MAKE) build
+	$(DOCKER) compose -f tests/integration/compose.yml up --build --abort-on-container-exit --exit-code-from test-runner; \
+	exit_code=$$?; \
+	$(DOCKER) compose -f tests/integration/compose.yml down -v --remove-orphans >/dev/null 2>&1; \
+	exit $$exit_code
 
 # --- Welle 5 (pending) -----------------------------------------------------
 

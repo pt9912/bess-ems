@@ -1,0 +1,28 @@
+services:
+  simulator:
+    image: bess-field-sim:latest
+    command:
+      - "-scenario=data/scenario.json"
+      - "-modbus-mapping=data/mapping.json"
+      - "-modbus-addr=:5020"
+    volumes:
+      - ./fixtures/scenario.integration.json:/data/scenario.json:ro
+      - ../../config/examples/adapters/modbus.simulator.json:/data/mapping.json:ro
+    expose:
+      - "5020"
+    networks: [intnet]
+
+  test-runner:
+    build:
+      context: ../..
+      dockerfile: tests/integration/Dockerfile
+    depends_on:
+      - simulator
+    environment:
+      - MODBUS_HOST=simulator
+      - MODBUS_PORT=5020
+    networks: [intnet]
+
+networks:
+  intnet:
+    driver: bridge

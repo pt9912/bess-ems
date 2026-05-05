@@ -65,5 +65,8 @@ RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/bess-field-sim ./cmd/bess-fi
 
 FROM gcr.io/distroless/static-debian12:nonroot AS runtime
 COPY --from=build /out/bess-field-sim /usr/local/bin/bess-field-sim
+# Pin the working directory so safepath's relative-only contract resolves
+# operator-supplied fixture paths against a known root.
+WORKDIR /
 EXPOSE 5020 1883
 ENTRYPOINT ["/usr/local/bin/bess-field-sim"]
