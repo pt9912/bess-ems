@@ -3,7 +3,7 @@
 **Projektname:** bess-ems
 **Dokumenttyp:** Architekturbeschreibung
 **Format:** Markdown
-**Version:** 0.1.2
+**Version:** 0.2.0
 **Status:** Entwurf
 **Bezug:** [`lastenheft.md`](lastenheft.md), [`idea.md`](idea.md)
 
@@ -37,6 +37,7 @@ referenzieren ihre `LH-*`-Kennung; Architekturkomponenten erhalten
 | AR-P-008  | Konfigurations-, nicht codegetriebene Geräte- und Marktparameter | LH-CONF-001  |
 | AR-P-009  | Native Core ist optional, nicht zentral; austauschbar gegen .NET | LH-ARCH-006, LH-NF-002 |
 | AR-P-010  | Containerisiert lauffähig auf Linux                             | LH-NF-003/4   |
+| AR-P-011  | Hexagonal: Driving/Driven-Trennung, Dependency Rule, Architektur-Tabus per Boundary-Test | LH-ARCH-001..005 |
 
 ---
 
@@ -75,7 +76,19 @@ Bezug: LH-KTX-001, LH-KTX-002, LH-PERSIST-005.
 
 ---
 
-## 4. Schichtenarchitektur
+## 4. Architekturstruktur
+
+Das System wird zugleich aus zwei Sichten beschrieben:
+
+- **§4.1 Schichtenmodell** — logische Schichten der Verantwortung
+  (LH-ARCH-002).
+- **§4.2 Hexagonale Sicht** — strukturelle Trennung in fachlichen
+  Hexagon-Kern und auswechselbare Adapter mit Driving/Driven-Klassifikation.
+
+Beide Sichten beschreiben dasselbe System; sie sind komplementär und
+müssen widerspruchsfrei bleiben.
+
+### 4.1 Schichtenmodell
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
@@ -99,10 +112,184 @@ Bezug: LH-KTX-001, LH-KTX-002, LH-PERSIST-005.
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Abhängigkeitsregel:** obere Schichten kennen untere; untere Schichten kennen
-nur Domain-Abstraktionen, niemals konkrete Adapter.
+**Abhängigkeitsregel (Schichten):** obere Schichten kennen untere; untere
+Schichten kennen nur Domain-Abstraktionen, niemals konkrete Adapter.
 
 Bezug: LH-ARCH-002.
+
+### 4.2 Hexagonale Sicht (Driving / Driven Ports)
+
+Der fachliche Kern (Hexagon) enthält Domain und Application; alles, was
+Außenwelt berührt — Protokolle, Persistenz, Telemetrie, Solver, Native
+Core, HTTP — lebt in Adaptern. Adapter implementieren Ports, die der
+Kern definiert. Der Regelkreis aus §6 läuft strikt **Driving Port → Use
+Case → Driven Ports → Driven Adapter**.
+
+```text
+        ┌──────────────────────────────────────────────────┐
+        │              Driving Adapters                    │
+        │  HTTP API   Worker-Loop   Operator-CLI (n. MVP)  │
+        └─────────┬─────────────┬─────────────┬────────────┘
+                  │             │             │
+        ┌─────────▼─────────────▼─────────────▼────────────┐
+        │             Driving Ports                        │
+        │  IControlCycleUseCase, IOperatorCommandUseCase,  │
+        │  IBatteryStatusQuery, IScheduleQuery, …          │
+        └─────────────────────┬────────────────────────────┘
+                              │
+        ┌─────────────────────▼────────────────────────────┐
+        │           Application Hexagon (Use Cases)        │
+        │   Regelzyklus  ·  Markt-/Fahrplanauflösung       │
+        │   Optimierung-IF  ·  Limiter-Komposition         │
+        └─────────────────────┬────────────────────────────┘
+                              │
+        ┌─────────────────────▼────────────────────────────┐
+        │             Domain (Hexagon-Kern)                │
+        │   BatteryAsset, Telemetry, Command, Schedule,    │
+        │   StateMachine, Limiter, Vorzeichenkonvention    │
+        │   — frameworkfrei                                │
+        └─────────────────────┬────────────────────────────┘
+                              │
+        ┌─────────────────────▼────────────────────────────┐
+        │             Driven Ports                         │
+        │ IBatteryTelemetrySource, IBatteryCommandSink,    │
+        │ ICommandRepository, IScheduleRepository,         │
+        │ IAuditLog, IDispatchOptimizer, IClock,           │
+        │ INativeBatteryControlKernel, ITelemetryExporter  │
+        └─────────┬───────────┬─────────────┬──────────────┘
+                  │           │             │
+        ┌─────────▼──┐ ┌──────▼──────┐ ┌────▼─────────────┐
+        │  Modbus    │ │   MQTT      │ │  Postgres /      │
+        │  OPC-UA    │ │   Mosquitto │ │  EF Core         │
+        │  Adapter   │ │   Adapter   │ │  Adapter         │
+        └────────────┘ └─────────────┘ └──────────────────┘
+                  │           │             │
+        ┌─────────▼───────────▼─────────────▼──────────────┐
+        │  Native-Interop (P/Invoke), OTel-Exporter,       │
+        │  Solver-Bindings (HiGHS/OR-Tools/gRPC-Sidecar)   │
+        └──────────────────────────────────────────────────┘
+```
+
+#### Verzeichnisstruktur (.NET-Solution)
+
+Bess-ems folgt dem **driving/driven**-Stil (analog `d-migrate`,
+`m-trace`). „Driving" markiert die Aufrufrichtung von außen in den Kern,
+„Driven" die Aufrufrichtung vom Kern nach außen. Die Verzeichnisstruktur
+ist verbindlich für den Solution-Aufbau (RM-M1-01):
+
+```text
+bess-ems/
+├── src/
+│   ├── hexagon/
+│   │   ├── BatteryEms.Domain/                # Entitäten, Value Objects, Limiter, State Machine
+│   │   └── BatteryEms.Application/           # Use Cases, Driving + Driven Port-Interfaces
+│   ├── adapters/
+│   │   ├── driving/
+│   │   │   ├── BatteryEms.Api/               # HTTP/REST, AuthN/AuthZ, Audit
+│   │   │   └── BatteryEms.Worker/            # Hosted Service: Regelzyklus
+│   │   └── driven/
+│   │       ├── BatteryEms.Adapters.Modbus/
+│   │       ├── BatteryEms.Adapters.Mqtt/
+│   │       ├── BatteryEms.Adapters.OpcUa/    # ab M4
+│   │       ├── BatteryEms.Adapters.Persistence/  # Postgres, Repositories, Migrationen
+│   │       ├── BatteryEms.Adapters.Telemetry/    # OTel, Prometheus, Logging-Exporter
+│   │       ├── BatteryEms.Adapters.Optimization/ # Solver-Bindings, NoOp im MVP
+│   │       └── BatteryEms.Adapters.NativeInterop/ # ab M3, P/Invoke + Fallback-Routing
+│   └── infrastructure/
+│       └── BatteryEms.Infrastructure/        # Cross-cutting: Config-Loader, DI-Wiring, Health
+├── native/
+│   └── battery_control_core/                 # ab M3, eigene C-ABI-Bibliothek
+└── tests/
+    ├── hexagon/
+    │   ├── BatteryEms.Domain.Tests/
+    │   └── BatteryEms.Application.Tests/
+    └── adapters/
+        ├── driving/
+        │   └── BatteryEms.Api.Tests/
+        └── driven/
+            ├── BatteryEms.Adapters.Modbus.Tests/
+            ├── BatteryEms.Adapters.Mqtt.Tests/
+            └── …
+```
+
+`BatteryEms.Infrastructure` ist bewusst kein Adapter, sondern
+Composition-Root: es kennt `hexagon/` und `adapters/`, aber kein anderer
+Pfad kennt es. DI-Wiring, Konfigurations-Loader und Healthchecks leben
+hier.
+
+#### Driving Ports (vom Kern angeboten)
+
+| Driving Port (Use Case)         | Eingang aus               | Verantwortung                                                  | LH-Bezug         |
+| ------------------------------- | ------------------------- | -------------------------------------------------------------- | ---------------- |
+| `IControlCycleUseCase`          | Worker-Loop               | Ein Regelzyklus: Snapshot lesen → State Machine → Limiter → Command | LH-CTRL-001/007 |
+| `IOperatorCommandUseCase`       | HTTP API                  | Operator-Stop, manuelle Sollwerte, Quittierung von FAULT       | LH-API-006/007, LH-OPS-004 |
+| `IBatteryStatusQuery`           | HTTP API                  | aktueller Status, letzter Command, Datenqualität               | LH-API-002/003   |
+| `IScheduleQuery`                | HTTP API                  | aktiven/historischen Fahrplan abfragen                         | LH-API-004       |
+| `IScheduleImport`               | HTTP API / Worker         | Day-Ahead-/Intraday-Fahrplan importieren                       | LH-MKT-001/002   |
+| `IDispatchOptimizationUseCase`  | HTTP API (n. MVP)         | Optimierungslauf auslösen                                      | LH-API-005       |
+| `IHealthQuery`                  | HTTP API                  | Health-Endpunkt                                                | LH-API-001       |
+
+#### Driven Ports (vom Kern aufgerufen)
+
+| Driven Port                       | Implementiert in                                | Verantwortung                                              | LH-Bezug              |
+| --------------------------------- | ----------------------------------------------- | ---------------------------------------------------------- | --------------------- |
+| `IBatteryTelemetrySource`         | Modbus / MQTT / OPC-UA                          | Telemetrie liefern, Datenqualität setzen                   | LH-RT-002, LH-PROT-001 |
+| `IBatteryCommandSink`             | Modbus / MQTT / OPC-UA                          | Commands schreiben, Schreibbegrenzung                      | LH-SAFE-007, LH-PROT-001 |
+| `ITelemetryRepository`            | Persistence                                     | Telemetrie speichern, historisch abfragen                  | LH-PERSIST-001        |
+| `ICommandRepository`              | Persistence                                     | Commands speichern, Reason erhalten                        | LH-PERSIST-002        |
+| `IScheduleRepository`             | Persistence                                     | Fahrpläne versioniert speichern                            | LH-PERSIST-003        |
+| `IOperatorAuditLog`               | Persistence                                     | Operator-Aktionen auditierbar speichern                    | LH-PERSIST-004, LH-OPS-004 |
+| `IDispatchOptimizer`              | Optimization (NoOp im MVP, LP/MILP/MPC später)  | Fahrpläne erzeugen                                         | LH-OPT-001..006       |
+| `INativeBatteryControlKernel`     | NativeInterop (ab M3)                           | Constraint/Ramp/PID schnell ausführen                      | LH-NATIVE-001/004     |
+| `IClock`                          | Infrastructure                                  | UTC-Zeit, deterministisch in Tests                         | LH-MKT-007            |
+| `ITelemetryExporter`              | Telemetry                                       | Logs/Metrics/Traces nach außen                             | LH-MON-001/002/003    |
+| `IConfigurationProvider`          | Infrastructure                                  | validierte Konfiguration bereitstellen                     | LH-CONF-001..003      |
+
+#### Dependency Rule (verbindlich)
+
+Abhängigkeiten zeigen **immer nach innen**: Driving Adapter →
+Application → Domain ← Application ← Driven Adapter. Konkret:
+
+- `BatteryEms.Domain` referenziert nichts (auch keine Application).
+- `BatteryEms.Application` referenziert nur `BatteryEms.Domain`.
+- `adapters/driven/*` und `adapters/driving/*` referenzieren beide
+  `BatteryEms.Application` (für Ports) und ggf. `BatteryEms.Domain`
+  (für Wertobjekte).
+- **Adapter referenzieren niemals andere Adapter.** Falls ein Adapter
+  Funktionalität eines anderen braucht, geht es über einen Port.
+- `BatteryEms.Infrastructure` darf alles unter `src/` referenzieren —
+  kein anderer Pfad darf `Infrastructure` referenzieren.
+
+#### Architektur-Tabus (Compile-/Build-time-Check)
+
+Pro Hexagon-Modul gilt ein hartes Import-Verbot. Diese Tabus werden in
+M1 als Boundary-Test (`BatteryEms.ArchitectureTests` mit NetArchTest oder
+ArchUnitNET) durchgesetzt; Verstöße brechen den Build (LH-NF-006,
+LH-ARCH-002).
+
+| Modul                              | Verboten                                                                |
+| ---------------------------------- | ----------------------------------------------------------------------- |
+| `BatteryEms.Domain`                | ASP.NET, EF Core, Npgsql, MQTTnet, NModbus, OPC Foundation, OTel, Serilog, gRPC, P/Invoke, `System.Net.Http`, `Microsoft.Extensions.*` außer `Logging.Abstractions`/`Options` |
+| `BatteryEms.Application`           | gleiche Verbote wie Domain; zusätzlich keine Adapter-Referenzen, kein konkreter Solver |
+| `adapters/driven/*`                | Referenzen auf `adapters/driving/*` und auf andere `adapters/driven/*`-Module |
+| `adapters/driving/*`               | Referenzen auf `adapters/driven/*` und auf andere `adapters/driving/*`-Module |
+| `BatteryEms.Adapters.NativeInterop` | direkter Zugriff auf andere Adapter; nur Application-Ports und Domain  |
+
+#### Mapping zum Schichtenmodell
+
+| Schicht (§4.1)            | Hexagonale Zuordnung                                |
+| ------------------------- | --------------------------------------------------- |
+| API Layer                 | Driving Adapter (`BatteryEms.Api`)                  |
+| Application / Worker      | Driving Adapter (`BatteryEms.Worker`) + Application (`BatteryEms.Application`) |
+| Market / Optimization     | Application Use Cases + `IDispatchOptimizer`-Driven-Port |
+| Control                   | Domain (Limiter, State Machine) + Application (Komposition) |
+| Realtime                  | Application (Snapshot Store) + Driven Adapter (Telemetrie-Quellen) |
+| Domain                    | `BatteryEms.Domain` (Hexagon-Kern)                  |
+| Protocol Adapter          | Driven Adapter (`BatteryEms.Adapters.{Modbus,Mqtt,OpcUa}`) |
+| Infrastructure            | `BatteryEms.Infrastructure` (Composition Root) + Driven Adapter (Persistence, Telemetry) |
+| Native Core               | Driven Adapter (`BatteryEms.Adapters.NativeInterop`) + native Bibliothek unter `native/` |
+
+Bezug: LH-ARCH-001..005, LH-NF-006/007/008.
 
 ---
 
@@ -110,23 +297,28 @@ Bezug: LH-ARCH-002.
 
 ### 5.1 .NET-Module
 
-| Modul                              | Verantwortung                                                | LH-Bezug             |
-| ---------------------------------- | ------------------------------------------------------------ | -------------------- |
-| `BatteryEms.Api`                   | REST-API, AuthN/AuthZ, Operator-Endpunkte, Audit             | LH-API-*             |
-| `BatteryEms.Worker`                | Hosting, Regelzyklus, Scheduler, Hosted Services             | LH-CTRL-001, LH-OPS-*|
-| `BatteryEms.Domain`                | Domain-Modell, Wertobjekte, Vorzeichenkonvention             | LH-DOM-*             |
-| `BatteryEms.Realtime`              | Snapshot Store, Datenfusion, Datenqualität, Aging            | LH-RT-*, LH-DOM-004  |
-| `BatteryEms.Control`               | State Machine, Constraint Limiter, Ramp Limiter, PID         | LH-CTRL-*, LH-SM-*   |
-| `BatteryEms.Markets`               | Day-Ahead, Intraday (n. MVP), Verpflichtungen, Zeitmodell    | LH-MKT-*             |
-| `BatteryEms.Optimization`          | Optimierungs-Interface, Solver-Abstraktion, Zielfunktion     | LH-OPT-*             |
-| `BatteryEms.Optimization.NoOp`     | Pass-Through-Optimierer für MVP                              | LH-OPT-001 (MVP)     |
-| `BatteryEms.Protocols.Abstractions`| Adapter-Interfaces, Datenqualitätsmapping                    | LH-PROT-*, LH-ARCH-005 |
-| `BatteryEms.Protocols.Modbus`      | Modbus-TCP-Adapter                                           | LH-MODB-*            |
-| `BatteryEms.Protocols.Mqtt`        | MQTT-Adapter (Telemetrie + Commands)                         | LH-MQTT-*            |
-| `BatteryEms.Protocols.OpcUa`       | OPC-UA-Adapter (nach MVP)                                    | LH-OPCUA-*           |
-| `BatteryEms.Persistence`           | Repositories, EF Core / Dapper, Migrationen, Retention       | LH-PERSIST-*         |
-| `BatteryEms.Infrastructure`        | Logging, Metriken, Tracing, Config-Loader, Validierung       | LH-MON-*, LH-CONF-*  |
-| `BatteryEms.NativeInterop`         | P/Invoke-Bindings, ABI-Check, Fallback-Routing (nach MVP / falls Native Core eingesetzt wird) | LH-NATIVE-* |
+Die Modulnamen folgen der Verzeichnisstruktur aus §4.2. Die Spalte
+„Hexagon" ordnet jedes Modul der hexagonalen Klassifikation zu.
+Application-interne Funktionsbereiche (Realtime, Control, Markets,
+Optimization-Interface) leben innerhalb von `BatteryEms.Application` als
+Namespaces; eine spätere Aufspaltung in eigene .NET-Projekte ist optional
+(siehe AR-OPEN-008).
+
+| Modul                                    | Hexagon              | Verantwortung                                                | LH-Bezug             |
+| ---------------------------------------- | -------------------- | ------------------------------------------------------------ | -------------------- |
+| `BatteryEms.Domain`                      | Hexagon-Kern         | Entitäten, Wertobjekte, Vorzeichenkonvention, State Machine, Limiter | LH-DOM-*, LH-SM-*, LH-CTRL-002/003, §4.1 |
+| `BatteryEms.Application`                 | Hexagon-Application  | Use Cases, Driving + Driven Port-Interfaces, Snapshot Store, Markt-/Fahrplanauflösung, Optimierungs-Interface | LH-CTRL-001/007, LH-RT-*, LH-MKT-*, LH-OPT-001 |
+| `BatteryEms.Api`                         | Driving Adapter      | REST-API, AuthN/AuthZ, Operator-Endpunkte, Audit             | LH-API-*             |
+| `BatteryEms.Worker`                      | Driving Adapter      | Hosted Service: Regelzyklus, Scheduler                       | LH-CTRL-001, LH-OPS-* |
+| `BatteryEms.Adapters.Modbus`             | Driven Adapter       | Modbus-TCP-Adapter (Lesen + Schreiben)                       | LH-MODB-*            |
+| `BatteryEms.Adapters.Mqtt`               | Driven Adapter       | MQTT-Telemetrie + Command-Publish                            | LH-MQTT-*            |
+| `BatteryEms.Adapters.OpcUa`              | Driven Adapter (M4)  | OPC-UA Lesen, Schreiben, Subscriptions                       | LH-OPCUA-*           |
+| `BatteryEms.Adapters.Persistence`        | Driven Adapter       | Repositories (EF Core/Dapper), Migrationen, Retention        | LH-PERSIST-*         |
+| `BatteryEms.Adapters.Telemetry`          | Driven Adapter       | OTel-Tracing, Prometheus-Metriken, Logging-Exporter          | LH-MON-*             |
+| `BatteryEms.Adapters.Optimization`       | Driven Adapter       | NoOp im MVP; Solver-Bindings (HiGHS/OR-Tools, gRPC-Sidecar) ab M2/M5 | LH-OPT-002..006 |
+| `BatteryEms.Adapters.NativeInterop`      | Driven Adapter (M3)  | P/Invoke-Bindings, ABI-Check, Fallback-Routing               | LH-NATIVE-*          |
+| `BatteryEms.Infrastructure`              | Composition Root     | DI-Wiring, Konfigurations-Loader, Health, Startvalidierung   | LH-CONF-*, LH-OPS-001 |
+| `BatteryEms.ArchitectureTests`           | Test-Modul           | Boundary-Tests für Dependency Rule und Architektur-Tabus aus §4.2 | LH-NF-006, LH-ARCH-002 |
 
 ### 5.2 Native-Core-Komponenten (optional, ab Phase 2)
 
@@ -512,6 +704,8 @@ zu finden.
 | Architekturkomponente         | LH-Anforderung(en)                            |
 | ----------------------------- | --------------------------------------------- |
 | Schichten 1–9                 | LH-ARCH-001/002                               |
+| Hexagonale Sicht (§4.2)       | LH-ARCH-001..005, LH-NF-006/007/008           |
+| Architektur-Tabus / Boundary-Tests | LH-ARCH-002, LH-NF-006                   |
 | Adapter-Interface             | LH-PROT-001, LH-ARCH-005                      |
 | Optimierungs-Interface        | LH-ARCH-004, LH-OPT-001/002/006               |
 | Snapshot Store                | LH-RT-001/002/003/005                         |
@@ -538,6 +732,8 @@ zu finden.
 | AR-OPEN-005 | Konkrete Topic-/Registerprofile für die ersten Hersteller?        | Offen, Bezug LH-OPEN-001 |
 | AR-OPEN-006 | Strategie für Multi-Asset-Hosting (Worker-pro-Asset vs. shared)?  | Offen  |
 | AR-OPEN-007 | Authentifizierungsverfahren (API-Token, OIDC, mTLS)?              | Offen  |
+| AR-OPEN-008 | Wann wird `BatteryEms.Application` in eigene Projekte (Realtime, Control, Markets, Optimization) gesplittet, oder bleibt es ein Modul mit Namespaces? | Offen  |
+| AR-OPEN-009 | Boundary-Test-Tooling: NetArchTest oder ArchUnitNET?              | Offen  |
 
 ---
 

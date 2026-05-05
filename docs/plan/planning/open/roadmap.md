@@ -80,7 +80,7 @@ AuthN/AuthZ-geschütztem Operator-Stop.
 
 | Status | ID         | Inhalt                                                              | LH-Bezug                  |
 | ------ | ---------- | ------------------------------------------------------------------- | ------------------------- |
-| ⬜     | RM-M1-01   | C#/.NET Solution-Skeleton mit Projekten gemäß Architektur §5.1      | LH-NF-001, LH-ARCH-001    |
+| ⬜     | RM-M1-01   | C#/.NET Solution-Skeleton mit Projekten gemäß Architektur §4.2 / §5.1 (hexagonale Verzeichnisstruktur) | LH-NF-001, LH-ARCH-001    |
 | ⬜     | RM-M1-02   | Domain-Modell (BatteryAsset, Telemetry, Command, DataQuality)       | LH-DOM-001..004           |
 | ⬜     | RM-M1-03   | Realtime Snapshot Store, Datenfusion, Aging                         | LH-RT-001..004            |
 | ⬜     | RM-M1-04   | State Machine (INIT…EMERGENCY_STOP) inkl. Quittierungslogik         | LH-SM-001..003            |
@@ -101,6 +101,8 @@ AuthN/AuthZ-geschütztem Operator-Stop.
 | ⬜     | RM-M1-19   | Dockerfile + Docker Compose (`bess-ems` mit Worker/API, Postgres, MQTT-Broker) | LH-DEPLOY-001..003, LH-NF-003/4 |
 | ⬜     | RM-M1-20   | Quality-Gates: Lint, Unit/Safety/Integration/Contract/Container, Coverage | LH-TEST-001/003/006/007, LH §4.1 |
 | ⬜     | RM-M1-21   | Makefile als Orchestrierungsschicht über die Docker-Stages aus `docs/user/quality.md`: `.DEFAULT_GOAL=help`, Override-Variablen (`COVERAGE_THRESHOLD`, `LIZARD_MAX_*`, `IMAGE`), Composite-Targets (`gates`, `ci`, `runtime`, `fullbuild`), `-gate`/`-report`-Trennung | LH-DEPLOY-001/002, LH-TEST-001/006/007 |
+| ⬜     | RM-M1-22   | Hexagonale Verzeichnis- und Modulstruktur gemäß Architektur §4.2 (`src/hexagon/`, `src/adapters/{driving,driven}/`, `src/infrastructure/`); Driving/Driven-Klassifikation pro Modul | LH-ARCH-001..005, LH-NF-006 |
+| ⬜     | RM-M1-23   | Boundary-Test-Modul `BatteryEms.ArchitectureTests` mit Dependency Rule und Architektur-Tabus aus §4.2 (Domain frameworkfrei, Application kein Adapter, Adapter zitieren keine anderen Adapter); Verstöße brechen den Build | LH-ARCH-002, LH-NF-006 |
 
 ### Abnahmekriterien
 
@@ -120,6 +122,9 @@ AuthN/AuthZ-geschütztem Operator-Stop.
   fresh-clone-nah bis Runtime-Smoke.
 - OpenAPI-, Adapter-Mapping-, Vorzeichen- und Startvalidierungs-Gates
   brechen den Build bei Vertragsverletzungen.
+- `BatteryEms.ArchitectureTests` setzt Dependency Rule und
+  Architektur-Tabus aus §4.2 durch (Domain frameworkfrei, Application
+  ohne Adapter-Referenzen, keine Adapter-zu-Adapter-Referenzen).
 
 ---
 

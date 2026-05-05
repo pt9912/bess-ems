@@ -49,8 +49,10 @@ Arbeitspakete parallel laufen, solange ihre Abhängigkeiten erfüllt sind.
 
 | Status | ID | Paket | Abhängigkeiten | DoD |
 | ------ | -- | ----- | -------------- | --- |
-| ⬜ | RM-M1-01 | Solution-Skeleton | keine | Projekte gemäß Architektur sind angelegt, `dotnet build -warnaserror` läuft in der Lint-Stage, gemeinsame Analyzer sind eingebunden. |
-| ⬜ | RM-M1-21 | Makefile-Orchestrierung | RM-M1-01 | `make help`, `make gates`, `make ci`, `make runtime`, `make fullbuild`, Override-Variablen und Gate-/Report-Trennung sind implementiert. |
+| ⬜ | RM-M1-01 | Solution-Skeleton | keine | Projekte gemäß Architektur §4.2 / §5.1 (hexagonale Verzeichnisstruktur) sind angelegt, `dotnet build -warnaserror` läuft in der Lint-Stage, gemeinsame Analyzer sind eingebunden. |
+| ⬜ | RM-M1-22 | Hexagonale Verzeichnis- und Modulstruktur | RM-M1-01 | `src/hexagon/`, `src/adapters/{driving,driven}/`, `src/infrastructure/` sind angelegt; jedes Modul ist Driving/Driven/Composition-Root klassifiziert (siehe §5.1). |
+| ⬜ | RM-M1-23 | Boundary-Tests (`BatteryEms.ArchitectureTests`) | RM-M1-22 | NetArchTest- oder ArchUnitNET-Suite setzt Dependency Rule und Architektur-Tabus aus §4.2 durch (Domain frameworkfrei, Application ohne Adapter-Refs, keine Adapter-zu-Adapter); `make arch-check` bricht den Build bei Verstoß. |
+| ⬜ | RM-M1-21 | Makefile-Orchestrierung | RM-M1-01 | `make help`, `make gates`, `make ci`, `make runtime`, `make fullbuild`, Override-Variablen und Gate-/Report-Trennung sind implementiert; `make gates` zieht `make arch-check` mit. |
 | ⬜ | RM-M1-02 | Domain-Modell | RM-M1-01 | `BatteryAsset`, `BatteryTelemetry`, `BatteryCommand`, `DataQuality`, `MarketCommitment` und Vorzeichenkonvention sind unit-getestet. |
 | ⬜ | RM-M1-03 | Realtime Snapshot Store | RM-M1-02 | Datenfusion, Aging, Plausibilisierung, Snapshot-Qualität und stale-Erkennung sind unit-getestet. |
 | ⬜ | RM-M1-04 | State Machine | RM-M1-02 | `INIT`, `READY`, `RUNNING`, `FAULT`, `EMERGENCY_STOP`, Quittierung und Operator-Stop-Pfade sind abgedeckt. |
@@ -75,22 +77,25 @@ Arbeitspakete parallel laufen, solange ihre Abhängigkeiten erfüllt sind.
 
 ## Modulziele
 
-| Modul / Pfad | Erwartung in M1 |
-| ------------ | --------------- |
-| `BatteryEms.Domain` | Domainobjekte, Wertebereiche, Vorzeichenkonvention und MarketCommitments. |
-| `BatteryEms.Realtime` | Snapshot Store, Aging, DataQuality und Validierung. |
-| `BatteryEms.Control` | State Machine, Constraint Limiter, Ramp Limiter und sicherer Fallback. |
-| `BatteryEms.Markets` | Day-Ahead-Import, Zeitmodell, MarketCommitment-Auswahl und aktive Fahrplanlogik. |
-| `BatteryEms.Optimization` | Interface und `NoOpDispatchOptimizer`; kein produktiver Solver. |
-| `BatteryEms.Protocols.Abstractions` | Gemeinsame Adapterinterfaces und adapterneutrales Command-Modell. |
-| `BatteryEms.Protocols.Modbus` | Modbus-TCP Lese-/Schreibpfad mit Mapping und Simulator-Tests. |
-| `BatteryEms.Protocols.Mqtt` | MQTT-Telemetrie, Command-Publish und Mosquitto-Integration. |
-| `BatteryEms.Persistence` | PostgreSQL-Schema, Repositories, Retention und Audit. |
-| `BatteryEms.Api` | M1-Endpunkte, OpenAPI, AuthZ-Negativtests und Operator-Stop. |
-| `BatteryEms.Infrastructure` | Logging, Metrics, Config Loading, JSON-Schema-Validierung. |
-| `BatteryEms.Worker` | Hosting, Regelzyklus, Adapter-Wiring und Healthcheck. |
-| `config/schema/` | JSON-Schemas für Asset, Limits, Modbus- und MQTT-Mappings. |
-| `config/examples/` | Validierbare Beispielkonfigurationen und Mapping-Fixtures. |
+Modulnamen folgen Architektur §4.2 / §5.1 (driving/driven). Application-
+interne Funktionsbereiche (Realtime, Control, Markets, Optimization-IF)
+leben in M1 als Namespaces innerhalb von `BatteryEms.Application`.
+
+| Modul / Pfad | Hexagon-Klasse | Erwartung in M1 |
+| ------------ | -------------- | --------------- |
+| `src/hexagon/BatteryEms.Domain` | Hexagon-Kern | Entitäten, Wertebereiche, Vorzeichenkonvention, MarketCommitments, Limiter, State Machine — frameworkfrei. |
+| `src/hexagon/BatteryEms.Application` | Hexagon-Application | Use Cases, Driving + Driven Ports, Snapshot Store, Aging, Markt-/Fahrplanauflösung, Optimierungs-Interface (`IDispatchOptimizer`). |
+| `src/adapters/driving/BatteryEms.Api` | Driving Adapter | M1-Endpunkte, OpenAPI 3.1, AuthZ-Negativtests, Operator-Stop. |
+| `src/adapters/driving/BatteryEms.Worker` | Driving Adapter | Hosted Service, 1-s-Regelzyklus, Adapter-Wiring über DI. |
+| `src/adapters/driven/BatteryEms.Adapters.Modbus` | Driven Adapter | Modbus-TCP Lese-/Schreibpfad mit Mapping und Simulator-Tests. |
+| `src/adapters/driven/BatteryEms.Adapters.Mqtt` | Driven Adapter | MQTT-Telemetrie, Command-Publish, Mosquitto-Integration. |
+| `src/adapters/driven/BatteryEms.Adapters.Persistence` | Driven Adapter | PostgreSQL-Schema, Repositories, Retention, Audit. |
+| `src/adapters/driven/BatteryEms.Adapters.Telemetry` | Driven Adapter | JSON-Logging, Prometheus-Metrikexport. |
+| `src/adapters/driven/BatteryEms.Adapters.Optimization` | Driven Adapter | `NoOpDispatchOptimizer`; kein produktiver Solver in M1. |
+| `src/infrastructure/BatteryEms.Infrastructure` | Composition Root | DI-Wiring, Config-Loader, Healthchecks, Startup-Validierung. |
+| `tests/BatteryEms.ArchitectureTests` | Test-Modul | Boundary-Tests für Dependency Rule und Architektur-Tabus aus §4.2. |
+| `config/schema/` | Configuration | JSON-Schemas für Asset, Limits, Modbus- und MQTT-Mappings. |
+| `config/examples/` | Configuration | Validierbare Beispielkonfigurationen und Mapping-Fixtures. |
 
 ---
 
@@ -99,6 +104,7 @@ Arbeitspakete parallel laufen, solange ihre Abhängigkeiten erfüllt sind.
 | Gate | Muss prüfen | M1-Bezug |
 | ---- | ----------- | -------- |
 | `make lint` | Build mit Warnungen als Fehler, Format, Roslyn-/Style-/Threading-Analyzer | RM-M1-01, RM-M1-21 |
+| `make arch-check` | Dependency Rule und Architektur-Tabus aus Architektur §4.2 (Boundary-Tests) | RM-M1-22, RM-M1-23 |
 | `make test` | Domain, Control, Zeitmodell, Snapshot, Vorzeichenkonvention | RM-M1-02..08, RM-M1-12 |
 | `make test-safety` | Emergency Stop, stale Snapshot, ungültige Daten, SOC-/Power-Grenzen, Schreiblimit | RM-M1-04..07, RM-M1-11 |
 | `make test-integration` | Modbus, MQTT, PostgreSQL, API über Testserver | RM-M1-09, RM-M1-10, RM-M1-13, RM-M1-15 |
@@ -118,6 +124,9 @@ Vertrags-Gates:
 - [ ] Vorzeichenkonvention ist durch dedizierte Tests abgesichert.
 - [ ] Ungültige Startkonfiguration verhindert aktiven Regelbetrieb.
 - [ ] Metrikexport ist in Tests abrufbar und enthält die M1-Pflichtmetriken.
+- [ ] Hexagonale Architektur-Tabus aus §4.2 sind durchgesetzt:
+  Domain frameworkfrei, Application ohne Adapter-Refs, keine
+  Adapter-zu-Adapter-Referenzen, Infrastructure als Composition Root.
 
 ---
 
@@ -144,6 +153,8 @@ Formate braucht, muss dieser Abschnitt mit dem jeweiligen PR angepasst werden.
 - [ ] Das System publiziert Commands ohne SOC-, Power- oder Rampengrenzen zu verletzen.
 - [ ] Stale Snapshot, Emergency Stop und Operator-Stop führen in den sicheren Zustand.
 - [ ] Audit-Log und Reason-Felder machen Stop- und Fallback-Entscheidungen nachvollziehbar.
+- [ ] `make arch-check` setzt Architektur-Tabus aus Architektur §4.2 durch
+  und bricht den Build bei Verstoß.
 - [ ] Day-Ahead-Fahrplan kann importiert, gespeichert und mit UTC/DST-Zeitmodell verfolgt werden.
 - [ ] Health, Status, Current Command, Schedules und Operator-Stop sind über API nutzbar.
 - [ ] Metriken sind exportierbar und in Tests validiert.

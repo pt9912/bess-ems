@@ -446,6 +446,35 @@ Pflicht ab M1 (LH-CONF-003, LH-OPS-001). Test prüft, dass das System
 mit unvollständiger oder ungültiger Konfiguration nicht in den aktiven
 Regelbetrieb übergeht.
 
+### 5.6 Hexagonale Architektur-Tabus
+
+Pflicht-Gate ab M1 (LH-ARCH-002, LH-NF-006, RM-M1-22/23). Setzt die
+Dependency Rule und die Architektur-Tabus aus
+[`spec/architecture.md`](../../spec/architecture.md) §4.2 durch.
+
+```bash
+make arch-check
+```
+
+Implementierung in `tests/BatteryEms.ArchitectureTests` mit NetArchTest
+oder ArchUnitNET (Tooling-Auswahl: AR-OPEN-009). Verstöße brechen den
+Build und sind nicht über Coverage- oder andere Gates kompensierbar.
+
+Verbindliche Regeln:
+
+| Regel                                                                | Bezug                  |
+| -------------------------------------------------------------------- | ---------------------- |
+| `BatteryEms.Domain` referenziert keine Adapter-Bibliothek (ASP.NET, EF Core, MQTTnet, NModbus, OPC Foundation, OTel, Npgsql, gRPC, P/Invoke); nur `Microsoft.Extensions.Logging.Abstractions`/`Options` erlaubt | Architektur §4.2, AR-P-011 |
+| `BatteryEms.Application` referenziert nur `BatteryEms.Domain`; keine Adapter-Refs, kein konkreter Solver | Architektur §4.2 |
+| `adapters/driving/*` referenzieren nicht `adapters/driven/*` und keine anderen `adapters/driving/*` | Architektur §4.2 |
+| `adapters/driven/*` referenzieren nicht `adapters/driving/*` und keine anderen `adapters/driven/*` | Architektur §4.2 |
+| `BatteryEms.Adapters.NativeInterop` (ab M3) referenziert nur Application-Ports und Domain | Architektur §4.2, LH-NATIVE-* |
+| Nur `BatteryEms.Infrastructure` referenziert sowohl `hexagon/` als auch `adapters/`; kein anderer Pfad referenziert `Infrastructure` | Architektur §4.2 |
+| Driving Adapter implementieren nur Driving-Ports (`I*UseCase`, `I*Query`); Driven Adapter implementieren nur Driven-Ports | Architektur §4.2 §5.1 |
+
+Suppressionen sind nicht zulässig. Eine bewusste Ausnahme erfordert eine
+ADR und ergänzt die Regelmenge in dieser Sektion.
+
 ---
 
 ## 6. Native-/.NET-Parity
@@ -481,14 +510,15 @@ Verbindliche Make-Targets pro Run, in dieser Reihenfolge:
 
 ```bash
 make lint
-make native-lint        # ab M3
+make native-lint          # ab M3
+make arch-check
 make test
 make test-safety
 make test-integration
 make test-native-interop  # ab M3
 make test-container
 make coverage-gate
-make build              # erzeugt Runtime-Image
+make build                # erzeugt Runtime-Image
 ```
 
 Die Targets delegieren in dieselben Docker-Stages, die lokal genutzt
