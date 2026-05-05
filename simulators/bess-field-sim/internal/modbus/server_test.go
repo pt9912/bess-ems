@@ -141,6 +141,92 @@ func TestServer_ReadHoldingRegistersRejectsProtocolOversize(t *testing.T) {
 	}
 }
 
+func TestServer_WriteSingleRegisterRoundtrip(t *testing.T) {
+	t.Parallel()
+
+	withTestClient(t, freeAddr(t), 1, func(client gridx.Client) {
+		ctx := context.Background()
+
+		if _, err := client.WriteSingleRegister(ctx, 200, 1234); err != nil {
+			t.Fatalf("write single register: %v", err)
+		}
+
+		bytes, err := client.ReadHoldingRegisters(ctx, 200, 1)
+		if err != nil {
+			t.Fatalf("read written register: %v", err)
+		}
+		if got := uint16(bytes[0])<<8 | uint16(bytes[1]); got != 1234 {
+			t.Errorf("written register: want 1234, got %d", got)
+		}
+	})
+}
+
+func TestServer_WriteMultipleRegistersRoundtrip(t *testing.T) {
+	t.Parallel()
+
+	withTestClient(t, freeAddr(t), 1, func(client gridx.Client) {
+		ctx := context.Background()
+
+		if _, err := client.WriteMultipleRegisters(ctx, 202, 2, []byte{0x12, 0x34, 0xab, 0xcd}); err != nil {
+			t.Fatalf("write multiple registers: %v", err)
+		}
+
+		bytes, err := client.ReadHoldingRegisters(ctx, 202, 2)
+		if err != nil {
+			t.Fatalf("read written registers: %v", err)
+		}
+		gotA := uint16(bytes[0])<<8 | uint16(bytes[1])
+		gotB := uint16(bytes[2])<<8 | uint16(bytes[3])
+		if gotA != 0x1234 || gotB != 0xabcd {
+			t.Errorf("written registers: want 0x1234/0xabcd, got %#04x/%#04x", gotA, gotB)
+		}
+	})
+}
+
+func TestServer_WriteMultipleRegistersRejectsProtocolOversize(t *testing.T) {
+	t.Parallel()
+
+	withTestClient(t, freeAddr(t), 1, func(client gridx.Client) {
+		_, err := client.WriteMultipleRegisters(context.Background(), 0, 124, make([]byte, 248))
+		if err == nil {
+			t.Fatal("expected oversized FC16 write to fail")
+		}
+	})
+}
+
+func TestServer_WriteMultipleRegistersRejectsOutOfRange(t *testing.T) {
+	t.Parallel()
+
+	withTestClient(t, freeAddr(t), 1, func(client gridx.Client) {
+		_, err := client.WriteMultipleRegisters(context.Background(), 65535, 2, []byte{0, 1, 0, 2})
+		if err == nil {
+			t.Fatal("expected out-of-range FC16 write to fail")
+		}
+	})
+}
+
+func withTestClient(t *testing.T, addr string, unitID int, run func(gridx.Client)) {
+	t.Helper()
+	srv := modbus.NewServer(model.ModbusMapping{
+		ProfileName:     "test",
+		UnitIDDiscovery: "static",
+		StaticUnitID:    &unitID,
+	})
+	if err := srv.ListenTCP(addr); err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	t.Cleanup(srv.Close)
+	waitTCP(t, addr)
+
+	h := gridx.NewTCPClientHandler(addr)
+	h.SetSlave(byte(unitID))
+	if err := h.Connect(context.Background()); err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	t.Cleanup(func() { _ = h.Close() })
+	run(gridx.NewClient(h))
+}
+
 func freeAddr(t *testing.T) string {
 	t.Helper()
 	l, err := net.Listen("tcp", "127.0.0.1:0")

@@ -103,6 +103,10 @@ func run(args []string) error {
 
 	o := io.orchestrator()
 	if err := o.Run(ctx, scn); err != nil {
+		if errors.Is(err, context.Canceled) {
+			slog.Info("scenario canceled", "id", scn.ID)
+			return nil
+		}
 		return fmt.Errorf("run scenario: %w", err)
 	}
 	slog.Info("scenario complete", "id", scn.ID)
