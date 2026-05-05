@@ -166,6 +166,8 @@ zertifizierungsnahe Regelleistungsintegration.
 │   ├── lastenheft.md     # Lastenheft (V-Modell-ähnliche Anforderungsstruktur)
 │   └── architecture.md   # Architekturentwurf (Schichten, Module, Datenfluss)
 └── docs/
+    ├── user/
+    │   └── quality.md                # verbindliche Qualitäts- und Messpfade
     └── plan/
         ├── adr/                      # Architecture Decision Records
         └── planning/
@@ -197,6 +199,9 @@ referenzierbar.
 - [`spec/idea.md`](spec/idea.md) — Projektidee und Hintergrund
 - [`docs/plan/planning/open/roadmap.md`](docs/plan/planning/open/roadmap.md) —
   Meilensteine M1–M6 mit Liefergegenständen und LH-Rückverfolgbarkeit
+- [`docs/user/quality.md`](docs/user/quality.md) — verbindliche
+  Qualitäts- und Messpfade (statische Analyse C#/.NET + C/C++, Tests,
+  Coverage, Vertrags-Gates, Native-Parity, CI/Release)
 
 ---
 
