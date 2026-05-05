@@ -80,6 +80,35 @@ RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.cs
     --logger "console;verbosity=normal"
 
 # ---------------------------------------------------------------------------
+# coverage-gate: line coverage threshold for M1 production assemblies (RM-M1-20)
+# Threshold 90% per project (Domain; Application + Optimization adapter).
+# Adapter skeletons (Modbus/MQTT/Persistence/Telemetry/Worker/Api/Infrastructure)
+# stay outside the gate until they carry production code.
+# ---------------------------------------------------------------------------
+FROM lint AS coverage-gate
+ARG BUILD_CONFIGURATION
+RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.csproj \
+    --configuration "${BUILD_CONFIGURATION}" \
+    --no-restore \
+    /p:CollectCoverage=true \
+    /p:CoverletOutputFormat=cobertura \
+    /p:CoverletOutput=/src/coverage/Domain/ \
+    /p:Include="[BatteryEms.Domain]*" \
+    /p:Threshold=90 \
+    /p:ThresholdType=line \
+    /p:ThresholdStat=total \
+ && dotnet test tests/hexagon/BatteryEms.Application.Tests/BatteryEms.Application.Tests.csproj \
+    --configuration "${BUILD_CONFIGURATION}" \
+    --no-restore \
+    /p:CollectCoverage=true \
+    /p:CoverletOutputFormat=cobertura \
+    /p:CoverletOutput=/src/coverage/Application/ \
+    /p:Include="[BatteryEms.Application]*%2C[BatteryEms.Adapters.Optimization]*" \
+    /p:Threshold=90 \
+    /p:ThresholdType=line \
+    /p:ThresholdStat=total
+
+# ---------------------------------------------------------------------------
 # Future stages (activated in later waves):
 #   FROM lint AS test-integration -> Welle 3: modbus/mqtt/postgres integration
 #   FROM ${DOTNET_RUNTIME_IMAGE} AS runtime -> Welle 5: runtime image

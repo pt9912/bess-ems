@@ -105,4 +105,13 @@ public sealed class BatteryAssetTests
         Assert.Equal(a.GetHashCode(), b.GetHashCode());
         Assert.NotEqual(a, c);
     }
+
+    [Fact]
+    public void Equals_is_false_against_null_and_other_types()
+    {
+        var asset = CreateValid();
+        Assert.False(asset.Equals(null));
+        Assert.False(asset.Equals("not-an-asset"));
+        Assert.False(asset.Equals(new object()));
+    }
 }

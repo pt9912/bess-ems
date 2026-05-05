@@ -117,6 +117,21 @@ public sealed class StateMachineTests
     }
 
     [Theory]
+    [InlineData(OperatingState.Standby, StateTransitionTrigger.EnterMaintenance, OperatingState.Maintenance)]
+    [InlineData(OperatingState.Ready, StateTransitionTrigger.EnterMaintenance, OperatingState.Maintenance)]
+    [InlineData(OperatingState.Ready, StateTransitionTrigger.Deactivate, OperatingState.Standby)]
+    [InlineData(OperatingState.Idle, StateTransitionTrigger.Deactivate, OperatingState.Ready)]
+    [InlineData(OperatingState.Charging, StateTransitionTrigger.Deactivate, OperatingState.Ready)]
+    [InlineData(OperatingState.Discharging, StateTransitionTrigger.Deactivate, OperatingState.Ready)]
+    public void Maintenance_entry_and_deactivation_paths_are_accepted(
+        OperatingState from, StateTransitionTrigger trigger, OperatingState expected)
+    {
+        var result = StateMachine.Apply(from, trigger);
+        Assert.True(result.Accepted);
+        Assert.Equal(expected, result.NewState);
+    }
+
+    [Theory]
     [InlineData(OperatingState.Init, StateTransitionTrigger.Activate)]
     [InlineData(OperatingState.Standby, StateTransitionTrigger.BeginCharge)]
     [InlineData(OperatingState.Fault, StateTransitionTrigger.BeginCharge)]

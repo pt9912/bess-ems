@@ -39,9 +39,9 @@ help:
 	@echo "  make arch-check  Boundary tests (Dependency Rule + tabus)"
 	@echo ""
 	@echo "Welle 2 (Domain & Control, active):"
-	@echo "  make test        Domain + Application unit tests"
-	@echo "  make test-safety Safety-path subset (Category=Safety)"
-	@echo "  make coverage-gate pending"
+	@echo "  make test          Domain + Application unit tests"
+	@echo "  make test-safety   Safety-path subset (Category=Safety)"
+	@echo "  make coverage-gate Line-coverage gate, 90% per M1 production assembly"
 	@echo ""
 	@echo "Aggregated:"
 	@echo "  make gates       Aggregated mandatory M1 gates for the current wave"
@@ -68,16 +68,13 @@ test:
 test-safety:
 	$(DOCKER_BUILD) --target test-safety -t $(IMAGE_PREFIX)-test-safety:latest
 
+coverage-gate:
+	$(DOCKER_BUILD) --target coverage-gate -t $(IMAGE_PREFIX)-coverage-gate:latest
+
 # --- Aggregated gates ------------------------------------------------------
 
-gates: lint arch-check test test-safety
-	@echo "[gates] M1 mandatory gates green: lint, arch-check, test, test-safety"
-
-# --- Welle 2 (pending) -----------------------------------------------------
-
-coverage-gate:
-	@echo "make coverage-gate: not active. Activated incrementally from Welle 2 onwards."
-	@exit 2
+gates: lint arch-check test test-safety coverage-gate
+	@echo "[gates] M1 mandatory gates green: lint, arch-check, test, test-safety, coverage-gate"
 
 # --- Welle 3 (pending) -----------------------------------------------------
 
