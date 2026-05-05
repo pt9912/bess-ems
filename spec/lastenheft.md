@@ -347,7 +347,8 @@ Jeder Messwert muss mit einer Datenqualität bewertet werden.
 Das System muss Day-Ahead-Fahrpläne verarbeiten können.
 
 **Priorität:** Muss  
-**Beschreibung:** Das System muss auf Basis von Day-Ahead-Preisen, Prognosen und technischen Grenzen einen Fahrplan für den kommenden Liefertag erzeugen oder importieren können.
+**Beschreibung:** Das System muss im MVP Day-Ahead-Fahrpläne importieren und im Regelkreis verwenden können. Die automatische Erzeugung von Day-Ahead-Fahrplänen auf Basis von Preisen, Prognosen und technischen Grenzen folgt mit dem Optimierungsmodul nach dem MVP.
+
 **Abnahmekriterium:** Ein Day-Ahead-Fahrplan kann gespeichert, gelesen und im Regelkreis verwendet werden.
 
 ---
@@ -367,6 +368,7 @@ Das System soll Intraday-Anpassungen nach dem MVP unterstützen.
 Das System muss verbindliche Marktverpflichtungen abbilden können.
 
 **Priorität:** Muss
+
 **Mindestattribute:**
 
 - Markt
@@ -412,6 +414,7 @@ Das System muss für alle im jeweiligen Release aktivierten Funktionen folgende 
 7. lokale Optimierung
 
 **Priorität:** Muss
+
 **Abnahmekriterium:** Diese Priorität ist im Regelkreis und in Tests für die aktivierten Eingangsquellen nachweisbar.
 
 ---
@@ -1130,6 +1133,7 @@ Das System muss manuelle Eingriffe speichern können.
 Das System muss im MVP PostgreSQL verwenden. TimescaleDB darf nach dem MVP als kompatible Erweiterung für Zeitreihendaten eingesetzt werden.
 
 **Priorität:** Muss
+
 **Abnahmekriterium:** Datenbankzugriff ist konfigurierbar und im MVP mit PostgreSQL containerisiert betreibbar. Eine spätere TimescaleDB-Nutzung erfordert keine Änderung der fachlichen Persistenzmodelle.
 
 ---
@@ -1139,6 +1143,7 @@ Das System muss im MVP PostgreSQL verwenden. TimescaleDB darf nach dem MVP als k
 Das System muss Aufbewahrungsregeln für historische Betriebsdaten definieren können.
 
 **Priorität:** Muss
+
 **Mindestumfang:**
 
 - getrennte Aufbewahrungsdauer für Telemetrie, Commands, Fahrpläne, Operator-Kommandos und Audit-Ereignisse
@@ -1594,6 +1599,7 @@ Das System soll im Container getestet werden.
 | LH-ARCH-001        | Systemarchitektur                    | MVP                        |
 | LH-DOM-001         | Domain Model                         | MVP                        |
 | LH-MKT-001         | Market Module                        | MVP                        |
+| LH-MKT-003         | Market Commitment Model              | MVP                        |
 | LH-OPT-001         | Optimization Interface Design        | MVP als Interface          |
 | LH-CTRL-001        | Control Loop Design                  | MVP                        |
 | LH-SM-001          | State Machine Design                 | MVP                        |
@@ -1602,6 +1608,7 @@ Das System soll im Container getestet werden.
 | LH-PERSIST-001     | Database Schema                      | MVP                        |
 | LH-PERSIST-006     | Retention- und Datenvolumenkonzept   | MVP                        |
 | LH-API-001         | API Specification                    | MVP                        |
+| LH-API-007         | Authentifizierungs- und Autorisierungskonzept | MVP             |
 | LH-MON-001         | Observability Design                 | MVP                        |
 
 ---
@@ -1613,6 +1620,7 @@ Das System soll im Container getestet werden.
 | LH-DOM-001         | `BatteryAsset`                 | MVP                        |
 | LH-DOM-002         | `BatteryTelemetry`             | MVP                        |
 | LH-DOM-003         | `BatteryCommand`               | MVP                        |
+| LH-MKT-003         | `MarketCommitment`             | MVP                        |
 | LH-CTRL-002        | `ConstraintLimiter`            | MVP                        |
 | LH-CTRL-003        | `RampLimiter`                  | MVP                        |
 | LH-SM-001          | `BatteryStateMachine`          | MVP                        |
@@ -1626,6 +1634,7 @@ Das System soll im Container getestet werden.
 | LH-API-003         | `/battery/{assetId}/command/current` | MVP                  |
 | LH-API-004         | `/markets/schedules/current`   | MVP                        |
 | LH-API-006         | `/operator/stop`               | MVP                        |
+| LH-API-007         | Schreibschutz für Operator-Endpunkte | MVP                    |
 
 ---
 
@@ -1635,8 +1644,10 @@ Das System soll im Container getestet werden.
 | ------------------ | ---------------- | -------------------------- |
 | LH-CTRL-002        | Unit Test        | MVP                        |
 | LH-CTRL-003        | Unit Test        | MVP                        |
+| LH-MKT-003         | Unit Test        | MVP                        |
 | LH-SAFE-001        | Safety Test      | MVP                        |
 | LH-SAFE-004        | Integration Test | MVP                        |
+| LH-API-007         | API Security Test | MVP                       |
 | LH-RT-003          | Unit Test        | MVP                        |
 | LH-MODB-005        | Integration Test | MVP                        |
 | LH-MQTT-005        | Integration Test | MVP                        |
@@ -1661,6 +1672,7 @@ Das System soll im Container getestet werden.
 - Modbus TCP Adapter
 - statischer Fahrplanimport
 - einfache Day-Ahead-Fahrplanverfolgung
+- Marktverpflichtungsmodell für verbindliche Fahrplanvorgaben
 - PostgreSQL-Persistenz
 - Health API
 - Batterie-Status API
