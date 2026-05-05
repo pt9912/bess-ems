@@ -153,24 +153,30 @@ Mappings ab. Hintergrund und Quellenlage stehen in
 
 ## Gate-Matrix
 
-| Gate                    | Muss prüfen                                                                       | M1-Bezug                               |
-| ----------------------- | --------------------------------------------------------------------------------- | -------------------------------------- |
-| `make lint`             | Build mit Warnungen als Fehler plus Code-Metriken-/SOLID-Gate via `Microsoft.CodeAnalysis.NetAnalyzers` (`AnalysisLevel=latest-all` in `Directory.Build.props`, Severities in `.editorconfig`): CA1501/1502/1505/1506 (SRP/Maintainability), CA1000/1001/1012/1033/1040/1715 (OCP/LSP/ISP/DIP). | RM-M1-01, RM-M1-20, RM-M1-21           |
-| `make arch-check`       | Dependency Rule und Architektur-Tabus aus Architektur §4.2 (Boundary-Tests)       | RM-M1-22, RM-M1-23                     |
-| `make test`             | Domain, Control, Zeitmodell, Snapshot, Vorzeichenkonvention                       | RM-M1-02..08, RM-M1-12                 |
-| `make test-safety`      | Emergency Stop, stale Snapshot, ungültige Daten, SOC-/Power-Grenzen, Schreiblimit | RM-M1-04..07, RM-M1-11                 |
-| `make simulator-test`   | Go-Simulator baut, Szenario-Fixtures und DTO-/Schema-Verträge sind gültig         | RM-M1-09, RM-M1-10, RM-M1-18           |
-| `make simulator-lint`   | golangci-lint v2 mit SOLID-leaning Profil + depguard-Boundary-Regeln (model/scenario halten Protokoll-/Runtime-Imports raus) | RM-M1-09, RM-M1-10, RM-M1-20           |
-| `make simulator-race`   | `go test -race` (`CGO=1`) auf den Goroutine-tragenden Paketen `internal/{modbus,mqtt,runtime}`    | RM-M1-09, RM-M1-10, RM-M1-20           |
-| `make simulator-coverage-gate` | 90 Prozent Line-Coverage für die Go-Simulator-Pakete (`internal/...`)      | RM-M1-09, RM-M1-10, RM-M1-20           |
-| `make test-integration` | Modbus, MQTT, PostgreSQL, API über Testserver                                     | RM-M1-09, RM-M1-10, RM-M1-13, RM-M1-15 |
-| `make test-container`   | Runtime-Image, Compose-Start, Healthcheck                                         | RM-M1-19                               |
-| `make coverage-gate`    | 90 Prozent Line-Coverage für die M1-.NET-Module (Domain, Application, Infrastructure, Adapter mit Produktivcode) | RM-M1-20                               |
-| `make build`            | Runtime-Image ohne SDK, nicht-root User, Port 8080, Healthcheck                   | RM-M1-19                               |
-| `make gates`            | Aggregiert alle M1-Pflichtgates ohne Report-Erzeugung                             | RM-M1-21                               |
-| `make ci`               | CI-kompatibler Lauf der verbindlichen M1-Gates in dokumentierter Reihenfolge      | RM-M1-20, RM-M1-21                     |
-| `make runtime`          | Runtime-Smoke: Compose-Start, `/health`-Prüfung und Shutdown                      | RM-M1-19, RM-M1-21                     |
-| `make fullbuild`        | Fresh-clone-naher Komplettlauf inkl. Gates, Build und Runtime-Smoke               | RM-M1-20, RM-M1-21                     |
+Die `Status`-Spalte spiegelt den **Tagesstand** (✅ aktiv, ⏳ teilweise
+scharf, ⬜ pending). Die `Muss prüfen`-Spalte beschreibt den
+**M1-Zielzustand** — sie wandert nicht mit, wenn ein Gate erst teilweise
+scharf ist; stattdessen verweist die Status-Spalte und ggf. die Detail-
+zeile selbst auf den aktuellen Scope.
+
+| Status | Gate                           | Muss prüfen                                                                                                                                                                                                                                 | M1-Bezug                                |
+| :----: | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| ✅     | `make lint`                    | Build mit Warnungen als Fehler plus Code-Metriken-/SOLID-Gate via `Microsoft.CodeAnalysis.NetAnalyzers` (`AnalysisLevel=latest-all` in `Directory.Build.props`, Severities in `.editorconfig`): CA1501/1502/1505/1506 (SRP/Maintainability), CA1000/1001/1012/1033/1040/1715 (OCP/LSP/ISP/DIP). | RM-M1-01, RM-M1-20, RM-M1-21            |
+| ✅     | `make arch-check`              | Dependency Rule und Architektur-Tabus aus Architektur §4.2 (Boundary-Tests)                                                                                                                                                                 | RM-M1-22, RM-M1-23                      |
+| ✅     | `make test`                    | Domain, Control, Zeitmodell, Snapshot, Vorzeichenkonvention                                                                                                                                                                                 | RM-M1-02..08, RM-M1-12                  |
+| ✅     | `make test-safety`             | Emergency Stop, stale Snapshot, ungültige Daten, SOC-/Power-Grenzen, Schreiblimit                                                                                                                                                           | RM-M1-04..07, RM-M1-11                  |
+| ✅     | `make simulator-test`          | Go-Simulator baut, Szenario-Fixtures und DTO-/Schema-Verträge sind gültig                                                                                                                                                                   | RM-M1-09, RM-M1-10, RM-M1-18            |
+| ✅     | `make simulator-lint`          | golangci-lint v2 mit SOLID-leaning Profil + depguard-Boundary-Regeln (model/scenario halten Protokoll-/Runtime-Imports raus)                                                                                                                | RM-M1-09, RM-M1-10, RM-M1-20            |
+| ✅     | `make simulator-race`          | `go test -race` (`CGO=1`) auf den Goroutine-tragenden Paketen `internal/{modbus,mqtt,runtime}`                                                                                                                                              | RM-M1-09, RM-M1-10, RM-M1-20            |
+| ✅     | `make simulator-coverage-gate` | 90 Prozent Line-Coverage für die Go-Simulator-Pakete (`internal/...`)                                                                                                                                                                       | RM-M1-09, RM-M1-10, RM-M1-20            |
+| ⏳     | `make test-integration`        | Modbus, MQTT, PostgreSQL, API über Testserver. Heute scharf: Modbus-Roundtrip via docker compose mit dem Go-Simulator als Sidecar (RM-M1-09). MQTT/Persistenz/API folgen mit RM-M1-10/13/15.                                                | RM-M1-09, RM-M1-10, RM-M1-13, RM-M1-15  |
+| ⬜     | `make test-container`          | Runtime-Image, Compose-Start, Healthcheck                                                                                                                                                                                                   | RM-M1-19                                |
+| ✅     | `make coverage-gate`           | 90 Prozent Line-Coverage für die M1-.NET-Module (Domain, Application, Infrastructure, Adapter mit Produktivcode)                                                                                                                            | RM-M1-20                                |
+| ⬜     | `make build`                   | Runtime-Image ohne SDK, nicht-root User, Port 8080, Healthcheck                                                                                                                                                                             | RM-M1-19                                |
+| ✅     | `make gates`                   | Aggregiert alle scharfen M1-Pflichtgates ohne Report-Erzeugung                                                                                                                                                                              | RM-M1-21                                |
+| ⬜     | `make ci`                      | CI-kompatibler Lauf der verbindlichen M1-Gates in dokumentierter Reihenfolge                                                                                                                                                                | RM-M1-20, RM-M1-21                      |
+| ⬜     | `make runtime`                 | Runtime-Smoke: Compose-Start, `/health`-Prüfung und Shutdown                                                                                                                                                                                | RM-M1-19, RM-M1-21                      |
+| ⬜     | `make fullbuild`               | Fresh-clone-naher Komplettlauf inkl. Gates, Build und Runtime-Smoke                                                                                                                                                                         | RM-M1-20, RM-M1-21                      |
 
 ### Gate-Aktivierung nach Wellen
 
