@@ -3,7 +3,11 @@
 **Dokumenttyp:** Detailplan / DoD-Tracking
 **Status:** In Arbeit
 **Meilenstein:** RM-M1
-**Bezug:** [`roadmap.md`](roadmap.md), [`spec/lastenheft.md`](../../../../spec/lastenheft.md), [`spec/architecture.md`](../../../../spec/architecture.md), [`docs/user/quality.md`](../../../user/quality.md)
+**Bezug:** [`roadmap.md`](roadmap.md),
+[`plan-RM-M1-simulator.md`](plan-RM-M1-simulator.md),
+[`spec/lastenheft.md`](../../../../spec/lastenheft.md),
+[`spec/architecture.md`](../../../../spec/architecture.md),
+[`docs/user/quality.md`](../../../user/quality.md)
 
 ---
 
@@ -78,8 +82,8 @@ Arbeitspakete parallel laufen, solange ihre Abhängigkeiten erfüllt sind.
 | ⬜      | RM-M1-08 | Optimierungsinterface                           | RM-M1-02                                 | `IDispatchOptimizer` und `NoOpDispatchOptimizer` sind austauschbar verdrahtet.                                                                                                                                                  |
 | ⬜      | RM-M1-07 | Regelzyklus/Fallback                            | RM-M1-03..06, RM-M1-08                   | 1-s-Regelzyklus erzeugt bei stale/ungültigem Snapshot einen sicheren Command.                                                                                                                                                   |
 | ⬜      | RM-M1-18 | Konfiguration/Mappings                          | RM-M1-01, RM-M1-02                       | Config-Loader, JSON-Schemas, Beispiel-Mappings und Startup-Validierung sind Contract-Gates; das Adapter-Mapping-Schema trägt die Pflichtfelder aus Abschnitt „Mapping-Schema-Pflichtfelder".                                    |
-| ⬜      | RM-M1-09 | Modbus-TCP-Adapter                              | RM-M1-18                                 | Lesen, Schreiben, Mapping, Timeout und Fehlerstatus laufen gegen Simulator.                                                                                                                                                     |
-| ⬜      | RM-M1-10 | MQTT-Adapter                                    | RM-M1-18                                 | Telemetrieempfang, Command-Publish und Topic-Konvention laufen gegen Mosquitto.                                                                                                                                                 |
+| ⬜      | RM-M1-09 | Modbus-TCP-Adapter                              | RM-M1-18                                 | Lesen, Schreiben, Mapping, Timeout und Fehlerstatus laufen gegen den Simulator aus [`plan-RM-M1-simulator.md`](plan-RM-M1-simulator.md).                                                                                         |
+| ⬜      | RM-M1-10 | MQTT-Adapter                                    | RM-M1-18                                 | Telemetrieempfang, Command-Publish, ACK-Korrelation und Topic-Konvention laufen gegen Mosquitto und die MQTT-Szenarien aus [`plan-RM-M1-simulator.md`](plan-RM-M1-simulator.md).                                                  |
 | ⬜      | RM-M1-11 | Adapter-Schreibbegrenzung                       | RM-M1-09, RM-M1-10                       | Finale Schreibbegrenzung greift unmittelbar vor Versand für Modbus und MQTT.                                                                                                                                                    |
 | ⬜      | RM-M1-12 | Fahrplan, MarketCommitment, Zeitmodell          | RM-M1-02, RM-M1-08                       | Import, Speicherung, UTC/DST-Zeitmodell und Day-Ahead-Verfolgung sind inklusive DST-Regression abgedeckt.                                                                                                                       |
 | ⬜      | RM-M1-13 | PostgreSQL-Persistenz                           | RM-M1-02, RM-M1-12                       | Telemetrie, Commands, Fahrpläne und Audit werden versioniert gespeichert.                                                                                                                                                       |
@@ -205,6 +209,8 @@ Vertrags-Gates:
 
 Die Dateinamen sind Zielkonventionen. Wenn die spätere Implementierung andere
 Formate braucht, muss dieser Abschnitt mit dem jeweiligen PR angepasst werden.
+Die Simulator-Szenarien und Protokollanforderungen sind in
+[`plan-RM-M1-simulator.md`](plan-RM-M1-simulator.md) beschrieben.
 
 ---
 

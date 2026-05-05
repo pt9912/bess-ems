@@ -108,6 +108,8 @@ AuthN/AuthZ-geschütztem Operator-Stop.
 - `docker compose up` startet das Gesamtsystem lokal.
 - Ein simulierter BMS/Wechselrichter (Modbus/MQTT) liefert Telemetrie, das
   System publiziert Commands, ohne SOC-/Power-/Rampengrenzen zu verletzen.
+  Simulatorumfang und Szenarien sind in
+  [`plan-RM-M1-simulator.md`](plan-RM-M1-simulator.md) festgelegt.
 - Bei stale Snapshot, Emergency Stop oder Operator-Stop wird ein sicherer
   Zustand erreicht und ist im Audit-Log nachvollziehbar.
 - Day-Ahead-Fahrplan kann importiert, gespeichert und mit konsistentem
