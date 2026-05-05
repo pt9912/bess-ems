@@ -159,10 +159,13 @@ Mappings ab. Hintergrund und Quellenlage stehen in
 | `make arch-check`       | Dependency Rule und Architektur-Tabus aus Architektur §4.2 (Boundary-Tests)       | RM-M1-22, RM-M1-23                     |
 | `make test`             | Domain, Control, Zeitmodell, Snapshot, Vorzeichenkonvention                       | RM-M1-02..08, RM-M1-12                 |
 | `make test-safety`      | Emergency Stop, stale Snapshot, ungültige Daten, SOC-/Power-Grenzen, Schreiblimit | RM-M1-04..07, RM-M1-11                 |
-| `make simulator-test`   | Go-Simulator baut, Szenario-Fixtures und DTO-/Schema-Vertraege sind gueltig       | RM-M1-09, RM-M1-10, RM-M1-18            |
+| `make simulator-test`   | Go-Simulator baut, Szenario-Fixtures und DTO-/Schema-Verträge sind gültig         | RM-M1-09, RM-M1-10, RM-M1-18           |
+| `make simulator-lint`   | golangci-lint v2 mit SOLID-leaning Profil + depguard-Boundary-Regeln (model/scenario halten Protokoll-/Runtime-Imports raus) | RM-M1-09, RM-M1-10, RM-M1-20           |
+| `make simulator-race`   | `go test -race` (`CGO=1`) auf den Goroutine-tragenden Paketen `internal/{modbus,mqtt,runtime}`    | RM-M1-09, RM-M1-10, RM-M1-20           |
+| `make simulator-coverage-gate` | 90 Prozent Line-Coverage für die Go-Simulator-Pakete (`internal/...`)      | RM-M1-09, RM-M1-10, RM-M1-20           |
 | `make test-integration` | Modbus, MQTT, PostgreSQL, API über Testserver                                     | RM-M1-09, RM-M1-10, RM-M1-13, RM-M1-15 |
 | `make test-container`   | Runtime-Image, Compose-Start, Healthcheck                                         | RM-M1-19                               |
-| `make coverage-gate`    | 90 Prozent Line-Coverage für M1-Codebereiche                                      | RM-M1-20                               |
+| `make coverage-gate`    | 90 Prozent Line-Coverage für die M1-.NET-Module (Domain, Application, Infrastructure, Adapter mit Produktivcode) | RM-M1-20                               |
 | `make build`            | Runtime-Image ohne SDK, nicht-root User, Port 8080, Healthcheck                   | RM-M1-19                               |
 | `make gates`            | Aggregiert alle M1-Pflichtgates ohne Report-Erzeugung                             | RM-M1-21                               |
 | `make ci`               | CI-kompatibler Lauf der verbindlichen M1-Gates in dokumentierter Reihenfolge      | RM-M1-20, RM-M1-21                     |
@@ -175,7 +178,7 @@ Mappings ab. Hintergrund und Quellenlage stehen in
 | ----- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------- |
 | 1     | `make lint`, `make arch-check`, `make gates` mit Foundation-Auswahl                | fachliche Adapter, Persistenz, API, Runtime-Smoke           |
 | 2     | `make test`, `make test-safety`, Coverage für Domain/Application                   | Adapter-Integration, OpenAPI, Container-Smoke               |
-| 3     | `make simulator-test`, `make test-integration` für Modbus, MQTT und Startvalidierung; Mapping-Schema-Gate | API-Vertrag, Persistenzvollständigkeit, Runtime-Smoke       |
+| 3     | `make simulator-{lint,test,race,coverage-gate}`, `make test-integration` für Modbus, MQTT und Startvalidierung; Mapping-Schema-Gate | API-Vertrag, Persistenzvollständigkeit, Runtime-Smoke       |
 | 4     | API-/AuthZ-/OpenAPI-Gates, Persistenztests, Zeitmodell-/DST-Regressionsfälle       | Fullbuild und Runtime-Smoke als Abschlussgate               |
 | 5     | `make ci`, `make runtime`, `make fullbuild`, vollständiges Coverage-Gate           | nichts; offene Abweichungen brauchen ADR oder Roadmap-Patch |
 
