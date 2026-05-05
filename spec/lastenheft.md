@@ -46,7 +46,7 @@ Das System muss ein modular aufgebautes Battery Energy Management System bereits
 
 **Priorität:** Muss  
 **Quelle:** Projektziel  
-**Abnahmekriterium:** Das System besitzt getrennte Module für Domain-Modell, Marktlogik, Optimierung, Echtzeitregelung, Protokolladapter, Persistenz und Monitoring.
+**Abnahmekriterium:** Das System besitzt getrennte Module für Domain-Modell, Marktlogik, Optimierung bzw. Optimierungsinterface, Echtzeitregelung, Protokolladapter, Persistenz und Monitoring.
 
 ---
 
@@ -195,7 +195,7 @@ Das System muss modular aufgebaut sein.
 
 **Priorität:** Muss  
 **Beschreibung:** Die fachlichen Komponenten müssen getrennt entwickelt, getestet und ausgetauscht werden können.  
-**Abnahmekriterium:** Es existieren getrennte Module oder Projekte für Domain, Control, Markets, Optimization, Realtime, Protocols, Infrastructure, Worker und API.
+**Abnahmekriterium:** Es existieren getrennte Module oder Projekte für Domain, Control, Markets, Optimization bzw. Optimization-Interfaces, Realtime, Protocols, Infrastructure, Worker und API. Im MVP darf das Optimization-Modul als austauschbares Interface ohne produktiven Solver umgesetzt sein.
 
 ---
 
@@ -347,7 +347,7 @@ Jeder Messwert muss mit einer Datenqualität bewertet werden.
 Das System muss Day-Ahead-Fahrpläne verarbeiten können.
 
 **Priorität:** Muss  
-**Beschreibung:** Das System soll auf Basis von Day-Ahead-Preisen, Prognosen und technischen Grenzen einen Fahrplan für den kommenden Liefertag erzeugen oder importieren können.  
+**Beschreibung:** Das System muss auf Basis von Day-Ahead-Preisen, Prognosen und technischen Grenzen einen Fahrplan für den kommenden Liefertag erzeugen oder importieren können.
 **Abnahmekriterium:** Ein Day-Ahead-Fahrplan kann gespeichert, gelesen und im Regelkreis verwendet werden.
 
 ---
@@ -366,7 +366,7 @@ Das System soll Intraday-Anpassungen nach dem MVP unterstützen.
 
 Das System muss verbindliche Marktverpflichtungen abbilden können.
 
-**Priorität:** Muss  
+**Priorität:** Muss
 **Mindestattribute:**
 
 - Markt
@@ -411,7 +411,7 @@ Das System muss für alle im jeweiligen Release aktivierten Funktionen folgende 
 6. Day-Ahead-Fahrplan
 7. lokale Optimierung
 
-**Priorität:** Muss  
+**Priorität:** Muss
 **Abnahmekriterium:** Diese Priorität ist im Regelkreis und in Tests für die aktivierten Eingangsquellen nachweisbar.
 
 ---
@@ -510,7 +510,7 @@ Die Optimierung muss, falls ein Optimierungsmodul eingesetzt wird, technische Ne
 
 ### LH-OPT-006 — Solver-Abstraktion
 
-Das System muss Solver austauschbar integrieren können.
+Das System soll Solver austauschbar integrieren können.
 
 **Priorität:** Soll  
 **Mögliche Solver:**
@@ -673,12 +673,14 @@ Für dieses Lastenheft bedeutet sicherer Zustand im MVP:
 
 Falls ein angebundenes Feldgerät einen herstellerspezifischen sicheren Zustand verlangt, muss dieser über das jeweilige Gerätemapping dokumentiert und im Adapter umgesetzt werden.
 
+Softwareseitige Stop- und Sicherheitsfunktionen des EMS ersetzen keinen hardwareseitigen Not-Aus, keine Schutztechnik des BMS und keine herstellerspezifischen Schutzfunktionen des Wechselrichters. Harte Not-Aus-Ketten und zertifizierungsrelevante Schutzfunktionen müssen außerhalb des EMS oder über dedizierte Edge-/Herstellersteuerungen realisiert und im Anlagenkonzept abgegrenzt werden.
+
 ### LH-SAFE-001 — Emergency Stop
 
-Das System muss Emergency Stop sofort priorisieren.
+Das System muss ein softwareseitiges Emergency-Stop-Signal mit höchster Priorität behandeln.
 
 **Priorität:** Muss  
-**Abnahmekriterium:** Bei aktivem Emergency Stop wird im nächsten Regelzyklus ein sicherer Stop-Command erzeugt oder die Ausgabe deaktiviert. Emergency Stop übersteuert Fahrplan-, Markt-, Optimierungs- und Operator-Zielwerte.
+**Abnahmekriterium:** Bei aktivem Emergency Stop wird spätestens im nächsten Regelzyklus ein sicherer Stop-Command erzeugt oder die Ausgabe deaktiviert. Emergency Stop übersteuert Fahrplan-, Markt-, Optimierungs- und Operator-Zielwerte. Falls eine kürzere Reaktionszeit als das konfigurierte Regelzyklusintervall erforderlich ist, muss diese Anforderung durch Hardware, BMS, Wechselrichter oder Edge-Controller erfüllt und außerhalb des Docker-basierten EMS abgegrenzt werden.
 
 ---
 
@@ -797,7 +799,7 @@ Das System muss Messdaten echtzeitnah verarbeiten.
 
 ### LH-RT-005 — Event- und Polling-Unterstützung
 
-Das System muss sowohl ereignisbasierte als auch zyklische Messdatenerfassung unterstützen.
+Das System soll sowohl ereignisbasierte als auch zyklische Messdatenerfassung unterstützen.
 
 **Priorität:** Soll  
 **Beispiele:**
@@ -993,7 +995,7 @@ Das System muss eine konfigurierbare Topic-Struktur unterstützen.
 
 ### LH-MQTT-004 — MQTT QoS
 
-Das System muss MQTT QoS konfigurieren können.
+Das System soll MQTT QoS konfigurieren können.
 
 **Priorität:** Soll  
 **Empfehlung:** QoS 1 für Commands  
@@ -1125,14 +1127,32 @@ Das System muss manuelle Eingriffe speichern können.
 
 ### LH-PERSIST-005 — Datenbank
 
-Das System soll PostgreSQL oder TimescaleDB verwenden.
+Das System muss im MVP PostgreSQL verwenden. TimescaleDB darf nach dem MVP als kompatible Erweiterung für Zeitreihendaten eingesetzt werden.
 
-**Priorität:** Soll  
-**Abnahmekriterium:** Datenbankzugriff ist konfigurierbar und containerisiert betreibbar.
+**Priorität:** Muss
+**Abnahmekriterium:** Datenbankzugriff ist konfigurierbar und im MVP mit PostgreSQL containerisiert betreibbar. Eine spätere TimescaleDB-Nutzung erfordert keine Änderung der fachlichen Persistenzmodelle.
+
+---
+
+### LH-PERSIST-006 — Aufbewahrung und Datenvolumen
+
+Das System muss Aufbewahrungsregeln für historische Betriebsdaten definieren können.
+
+**Priorität:** Muss
+**Mindestumfang:**
+
+- getrennte Aufbewahrungsdauer für Telemetrie, Commands, Fahrpläne, Operator-Kommandos und Audit-Ereignisse
+- konfigurierbare Begrenzung oder Archivierung hochfrequenter Messdaten
+- dokumentiertes Verhalten bei voller Datenbank oder fehlgeschlagenem Persistenzzugriff
+- keine automatische Löschung auditrelevanter Daten ohne explizite Konfiguration
+
+**Abnahmekriterium:** Retention- und Datenvolumenregeln sind konfigurierbar dokumentiert; Tests oder Betriebschecks weisen nach, dass ein Persistenzfehler nicht zu undefiniertem Regelverhalten führt.
 
 ---
 
 ## 20. API-Anforderungen
+
+Im MVP müssen mindestens Health, Batterie-Status, aktueller Command, Fahrplanabfrage und Operator Stop über API verfügbar sein. Schreibende Endpunkte müssen bereits im MVP authentifiziert, autorisiert und auditierbar sein. API-Endpunkte zur Optimierungsauslösung folgen mit dem Optimierungsmodul nach dem MVP.
 
 ### LH-API-001 — Health Endpoint
 
@@ -1372,7 +1392,7 @@ Das System muss wartbar und modular testbar sein.
 
 ### LH-NF-007 — Erweiterbarkeit
 
-Das System muss um weitere Protokolle, Märkte und Optimierungsverfahren erweiterbar sein.
+Das System soll um weitere Protokolle, Märkte und Optimierungsverfahren erweiterbar sein.
 
 **Priorität:** Soll  
 **Abnahmekriterium:** Neue Adapter oder Optimierer können ohne Änderung der zentralen Regelpipeline ergänzt werden.
@@ -1416,8 +1436,8 @@ Das System muss eine Docker-Compose-Umgebung für lokale Entwicklung enthalten.
 **Komponenten:**
 
 - bess-ems-worker
-- optional bess-ems-api
-- PostgreSQL oder TimescaleDB
+- API-Komponente, entweder als eigener bess-ems-api-Service oder im Worker integriert
+- PostgreSQL
 - MQTT Broker
 - optional Monitoring Stack
 
@@ -1514,7 +1534,7 @@ Das System muss Unit Tests für Markt- und Fahrplanlogik besitzen.
 Das System soll Integrationstests für Protokolladapter besitzen.
 
 **Priorität:** Soll  
-**Abnahmekriterium:** Modbus-, OPC-UA- und MQTT-Adapter können gegen Simulatoren getestet werden.
+**Abnahmekriterium:** Modbus- und MQTT-Adapter können im MVP gegen Simulatoren getestet werden. OPC-UA-Adapter sind gegen Simulatoren testbar, sobald OPC-UA umgesetzt wird.
 
 ---
 
@@ -1569,55 +1589,60 @@ Das System soll im Container getestet werden.
 
 ### 27.1 Anforderung zu Design
 
-| Lastenheft-Kennung | Design-Artefakt          |
-| ------------------ | ------------------------ |
-| LH-ARCH-001        | Systemarchitektur        |
-| LH-DOM-001         | Domain Model             |
-| LH-MKT-001         | Market Module            |
-| LH-OPT-001         | Optimization Module      |
-| LH-CTRL-001        | Control Loop Design      |
-| LH-SM-001          | State Machine Design     |
-| LH-PROT-001        | Adapter Interface Design |
-| LH-NATIVE-001      | Native Core Design       |
-| LH-PERSIST-001     | Database Schema          |
-| LH-API-001         | API Specification        |
-| LH-MON-001         | Observability Design     |
+| Lastenheft-Kennung | Design-Artefakt                      | Geltung                    |
+| ------------------ | ------------------------------------ | -------------------------- |
+| LH-ARCH-001        | Systemarchitektur                    | MVP                        |
+| LH-DOM-001         | Domain Model                         | MVP                        |
+| LH-MKT-001         | Market Module                        | MVP                        |
+| LH-OPT-001         | Optimization Interface Design        | MVP als Interface          |
+| LH-CTRL-001        | Control Loop Design                  | MVP                        |
+| LH-SM-001          | State Machine Design                 | MVP                        |
+| LH-PROT-001        | Adapter Interface Design             | MVP                        |
+| LH-NATIVE-001      | Native Core Design                   | nach MVP / falls eingesetzt |
+| LH-PERSIST-001     | Database Schema                      | MVP                        |
+| LH-PERSIST-006     | Retention- und Datenvolumenkonzept   | MVP                        |
+| LH-API-001         | API Specification                    | MVP                        |
+| LH-MON-001         | Observability Design                 | MVP                        |
 
 ---
 
 ### 27.2 Anforderung zu Implementierung
 
-| Lastenheft-Kennung | Implementierung                |
-| ------------------ | ------------------------------ |
-| LH-DOM-001         | `BatteryAsset`                 |
-| LH-DOM-002         | `BatteryTelemetry`             |
-| LH-DOM-003         | `BatteryCommand`               |
-| LH-CTRL-002        | `ConstraintLimiter`            |
-| LH-CTRL-003        | `RampLimiter`                  |
-| LH-SM-001          | `BatteryStateMachine`          |
-| LH-RT-001          | `RealtimeSnapshotStore`        |
-| LH-MODB-001        | `ModbusBatteryTelemetrySource` |
-| LH-OPCUA-001       | `OpcUaBatteryTelemetrySource`  |
-| LH-MQTT-001        | `MqttBatteryTelemetryStream`   |
-| LH-NATIVE-001      | `battery_control_core`         |
-| LH-API-001         | `/health` Endpoint             |
+| Lastenheft-Kennung | Implementierung                | Geltung                    |
+| ------------------ | ------------------------------ | -------------------------- |
+| LH-DOM-001         | `BatteryAsset`                 | MVP                        |
+| LH-DOM-002         | `BatteryTelemetry`             | MVP                        |
+| LH-DOM-003         | `BatteryCommand`               | MVP                        |
+| LH-CTRL-002        | `ConstraintLimiter`            | MVP                        |
+| LH-CTRL-003        | `RampLimiter`                  | MVP                        |
+| LH-SM-001          | `BatteryStateMachine`          | MVP                        |
+| LH-RT-001          | `RealtimeSnapshotStore`        | MVP                        |
+| LH-MODB-001        | `ModbusBatteryTelemetrySource` | MVP                        |
+| LH-MQTT-001        | `MqttBatteryTelemetryStream`   | MVP                        |
+| LH-OPCUA-001       | `OpcUaBatteryTelemetrySource`  | nach MVP                   |
+| LH-NATIVE-001      | `battery_control_core`         | nach MVP / falls eingesetzt |
+| LH-API-001         | `/health` Endpoint             | MVP                        |
+| LH-API-002         | `/battery/{assetId}/status`    | MVP                        |
+| LH-API-003         | `/battery/{assetId}/command/current` | MVP                  |
+| LH-API-004         | `/markets/schedules/current`   | MVP                        |
+| LH-API-006         | `/operator/stop`               | MVP                        |
 
 ---
 
 ### 27.3 Anforderung zu Test
 
-| Lastenheft-Kennung | Testtyp          |
-| ------------------ | ---------------- |
-| LH-CTRL-002        | Unit Test        |
-| LH-CTRL-003        | Unit Test        |
-| LH-SAFE-001        | Safety Test      |
-| LH-SAFE-004        | Integration Test |
-| LH-RT-003          | Unit Test        |
-| LH-MODB-005        | Integration Test |
-| LH-OPCUA-004       | Integration Test |
-| LH-MQTT-005        | Integration Test |
-| LH-NATIVE-002      | Interop Test     |
-| LH-DEPLOY-001      | Container Test   |
+| Lastenheft-Kennung | Testtyp          | Geltung                    |
+| ------------------ | ---------------- | -------------------------- |
+| LH-CTRL-002        | Unit Test        | MVP                        |
+| LH-CTRL-003        | Unit Test        | MVP                        |
+| LH-SAFE-001        | Safety Test      | MVP                        |
+| LH-SAFE-004        | Integration Test | MVP                        |
+| LH-RT-003          | Unit Test        | MVP                        |
+| LH-MODB-005        | Integration Test | MVP                        |
+| LH-MQTT-005        | Integration Test | MVP                        |
+| LH-OPCUA-004       | Integration Test | nach MVP                   |
+| LH-NATIVE-002      | Interop Test     | nach MVP / falls eingesetzt |
+| LH-DEPLOY-001      | Container Test   | MVP                        |
 
 ---
 
@@ -1631,12 +1656,17 @@ Das System soll im Container getestet werden.
 - State Machine
 - Constraint Limiter
 - Ramp Limiter
+- Optimization-Interface ohne produktiven Solver
 - MQTT Adapter
 - Modbus TCP Adapter
 - statischer Fahrplanimport
 - einfache Day-Ahead-Fahrplanverfolgung
 - PostgreSQL-Persistenz
 - Health API
+- Batterie-Status API
+- Aktueller-Command API
+- Fahrplanabfrage API
+- Operator-Stop API mit Authentifizierung, Autorisierung und Audit-Log
 - strukturierte Logs
 - Docker Compose
 - Unit Tests für Kernlogik
@@ -1674,10 +1704,10 @@ Das System soll im Container getestet werden.
 
 ### LH-RISK-001 — Regelleistung und Echtzeitfähigkeit
 
-Regelleistung kann regulatorisch und technisch höhere Anforderungen haben als ein Docker-basierter .NET-Regelkreis sicher erfüllen kann.
+Regelleistung, Emergency Stop und zertifizierungsrelevante Schutzfunktionen können regulatorisch und technisch höhere Anforderungen haben als ein Docker-basierter .NET-Regelkreis sicher erfüllen kann.
 
 **Bewertung:** Hoch  
-**Maßnahme:** Klare Produktabgrenzung, ggf. Edge-Controller oder Herstellersteuerung für harte Echtzeit verwenden.
+**Maßnahme:** Klare Produktabgrenzung, hardwareseitige Schutzketten und ggf. Edge-Controller oder Herstellersteuerung für harte Echtzeit verwenden.
 
 ---
 
@@ -1715,9 +1745,9 @@ Ein zu früher Fokus auf MILP/MPC kann die robuste technische Ausführung verzö
 | LH-OPEN-001 | Welche konkreten Batteriesysteme / Hersteller sollen zuerst unterstützt werden? | Offen  |
 | LH-OPEN-002 | Welche Regelleistungsprodukte sind konkret relevant?                            | Offen  |
 | LH-OPEN-003 | Welche Marktpreisquellen sollen angebunden werden?                              | Offen  |
-| LH-OPEN-004 | Welche Zykluszeit ist verbindlich?                                              | Offen  |
+| LH-OPEN-004 | Welche produktive Zykluszeit gilt je Anlagenklasse und Betriebsmodus?           | Offen  |
 | LH-OPEN-005 | Soll ein Operator UI Bestandteil des Projekts sein?                             | Offen  |
-| LH-OPEN-006 | Soll TimescaleDB direkt verwendet werden oder zunächst PostgreSQL?              | Offen  |
+| LH-OPEN-006 | Ab welchem Datenvolumen soll TimescaleDB statt reinem PostgreSQL genutzt werden? | Offen  |
 | LH-OPEN-007 | Welche Native-Core-Komponenten sollen zuerst umgesetzt werden?                  | Offen  |
 
 ---
@@ -1734,7 +1764,7 @@ Messdaten
 → Snapshot
 → State Machine
 → Markt-/Fahrplanauflösung
-→ Regelleistungspriorisierung
+→ Regelleistungspriorisierung, falls aktiviert
 → Constraint Limiter
 → Ramp Limiter
 → Command
