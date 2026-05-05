@@ -1,0 +1,126 @@
+# golangci-lint v2 configuration for bess-field-sim.
+#
+# Profile mirrors m-trace/apps/api/.golangci.yml: 5 default linters plus the
+# 24-rule SOLID-leaning extension. depguard rules are reduced to two
+# boundary checks specific to the simulator: model and scenario must stay
+# free of protocol packages and runtime, so the simulator never grows a
+# second domain implementation alongside the .NET-EMS
+# (plan-RM-M1-simulator.md §65–77).
+#
+# `//nolint`-Suppressions are not allowed; carveouts go here, scoped per file.
+
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - containedctx
+    - contextcheck
+    - cyclop
+    - depguard
+    - dupl
+    - fatcontext
+    - forbidigo
+    - funlen
+    - gochecknoglobals
+    - gochecknoinits
+    - gocognit
+    - gocyclo
+    - gomodguard_v2
+    - iface
+    - inamedparam
+    - interfacebloat
+    - ireturn
+    - maintidx
+    - nestif
+    - noctx
+    - reassign
+    - revive
+    - testpackage
+    - unparam
+
+  settings:
+    cyclop:
+      max-complexity: 15
+    funlen:
+      lines: 100
+      statements: 60
+    gocognit:
+      min-complexity: 20
+    gocyclo:
+      min-complexity: 15
+    nestif:
+      min-complexity: 5
+    dupl:
+      threshold: 150
+    maintidx:
+      under: 20
+    interfacebloat:
+      max: 10
+    ireturn:
+      allow:
+        - error
+        - empty
+        - anon
+        - stdlib
+        - generic
+    forbidigo:
+      forbid:
+        - pattern: ^fmt\.Print.*$
+          msg: "use log/slog (plan-RM-M1-simulator.md kein print-Logging)"
+    gomodguard_v2:
+      blocked:
+        modules: []
+    depguard:
+      rules:
+        model-no-protocol-or-runtime:
+          list-mode: lax
+          files:
+            - "**/internal/model/**"
+          deny:
+            - pkg: "github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/modbus"
+              desc: "model must not import protocol packages — keep it pure DTO (plan-RM-M1-simulator.md §65)"
+            - pkg: "github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/mqtt"
+              desc: "model must not import protocol packages — keep it pure DTO (plan-RM-M1-simulator.md §65)"
+            - pkg: "github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/runtime"
+              desc: "model must not import runtime — keep it pure DTO"
+        scenario-no-protocol-or-runtime:
+          list-mode: lax
+          files:
+            - "**/internal/scenario/**"
+          deny:
+            - pkg: "github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/modbus"
+              desc: "scenario loader must not import protocol packages"
+            - pkg: "github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/mqtt"
+              desc: "scenario loader must not import protocol packages"
+            - pkg: "github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/runtime"
+              desc: "scenario loader must not import runtime"
+
+  exclusions:
+    rules:
+      - path: _test\.go$
+        linters:
+          - noctx
+          - gocognit
+          - gocyclo
+          - cyclop
+          - nestif
+      - path: _test\.go$
+        text: 'always receives'
+        linters:
+          - unparam
+      - path: _test\.go$
+        text: '^unused-parameter'
+        linters:
+          - revive
+      - path: cmd/
+        linters:
+          - forbidigo

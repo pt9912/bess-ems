@@ -21,6 +21,7 @@ DOCKER_BUILD = $(DOCKER) build $(BUILD_CONTEXT) \
 .PHONY: help \
 	lint arch-check gates \
 	test test-safety test-integration test-container coverage-gate \
+	simulator-test simulator-lint simulator-coverage-gate \
 	build ci runtime fullbuild
 
 help:
@@ -46,8 +47,11 @@ help:
 	@echo "Aggregated:"
 	@echo "  make gates       Aggregated mandatory M1 gates for the current wave"
 	@echo ""
-	@echo "Welle 3 (Adapters, pending):"
-	@echo "  make test-integration"
+	@echo "Welle 3 (Simulator + Adapters, partially active):"
+	@echo "  make simulator-test          Go simulator unit tests"
+	@echo "  make simulator-lint          golangci-lint with SOLID profile"
+	@echo "  make simulator-coverage-gate Go coverage gate (90% line)"
+	@echo "  make test-integration        pending (RM-M1-09/10/11)"
 	@echo ""
 	@echo "Welle 5 (Closure, pending):"
 	@echo "  make build, make test-container, make ci, make runtime, make fullbuild"
@@ -73,17 +77,22 @@ coverage-gate:
 
 # --- Aggregated gates ------------------------------------------------------
 
-gates: lint arch-check test test-safety coverage-gate
-	@echo "[gates] M1 mandatory gates green: lint, arch-check, test, test-safety, coverage-gate"
+gates: lint arch-check test test-safety coverage-gate simulator-lint simulator-test simulator-coverage-gate
+	@echo "[gates] M1 mandatory gates green: lint, arch-check, test, test-safety, coverage-gate, simulator-{lint,test,coverage-gate}"
 
 # --- Welle 3 (partially active) --------------------------------------------
 
+SIMULATOR_DIR := simulators/bess-field-sim
+SIMULATOR_MAKE := $(MAKE) -C $(SIMULATOR_DIR)
+
 simulator-test:
-	@if [ ! -d simulators/bess-field-sim ]; then \
-		echo "make simulator-test: not active. Activates with simulators/bess-field-sim/ (RM-M1-09/10)."; \
-		exit 2; \
-	fi
-	$(DOCKER_BUILD) --target simulator-test -t $(IMAGE_PREFIX)-simulator-test:latest
+	$(SIMULATOR_MAKE) test
+
+simulator-lint:
+	$(SIMULATOR_MAKE) lint
+
+simulator-coverage-gate:
+	$(SIMULATOR_MAKE) coverage-gate
 
 test-integration:
 	@echo "make test-integration: not active. Activated in Welle 3 (Config and Adapters)."
