@@ -4,7 +4,7 @@
 **System:** Battery Energy Management System für Batteriespeicher  
 **Dokumenttyp:** Lastenheft  
 **Format:** Markdown  
-**Version:** 0.1.2
+**Version:** 0.1.3
 **Status:** Entwurf  
 **Zielplattform:** Linux, Docker, C#/.NET, C/C++ für performance-kritische Komponenten  
 **Vorgehensmodell:** V-Modell-ähnliche Anforderungsstruktur mit Kennungen und Rückverfolgbarkeit  
@@ -1610,6 +1610,7 @@ Das System soll im Container getestet werden.
 | LH-API-001         | API Specification                    | MVP                        |
 | LH-API-007         | Authentifizierungs- und Autorisierungskonzept | MVP             |
 | LH-MON-001         | Observability Design                 | MVP                        |
+| LH-CONF-003        | Configuration Validation Design      | MVP                        |
 
 ---
 
@@ -1629,12 +1630,14 @@ Das System soll im Container getestet werden.
 | LH-MQTT-001        | `MqttBatteryTelemetryStream`   | MVP                        |
 | LH-OPCUA-001       | `OpcUaBatteryTelemetrySource`  | nach MVP                   |
 | LH-NATIVE-001      | `battery_control_core`         | nach MVP / falls eingesetzt |
+| LH-PERSIST-006     | `RetentionPolicy`              | MVP                        |
 | LH-API-001         | `/health` Endpoint             | MVP                        |
 | LH-API-002         | `/battery/{assetId}/status`    | MVP                        |
 | LH-API-003         | `/battery/{assetId}/command/current` | MVP                  |
 | LH-API-004         | `/markets/schedules/current`   | MVP                        |
 | LH-API-006         | `/operator/stop`               | MVP                        |
 | LH-API-007         | Schreibschutz für Operator-Endpunkte | MVP                    |
+| LH-CONF-003        | `ConfigurationValidator`       | MVP                        |
 
 ---
 
@@ -1650,6 +1653,12 @@ Das System soll im Container getestet werden.
 | LH-SAFE-004        | Integration Test | MVP                        |
 | LH-API-006         | API/Control Integration Test | MVP              |
 | LH-API-007         | API Security Test | MVP                       |
+| LH-API-001         | API Contract Test | MVP                       |
+| LH-API-002         | API Contract Test | MVP                       |
+| LH-API-003         | API Contract Test | MVP                       |
+| LH-API-004         | API Contract Test | MVP                       |
+| LH-PERSIST-006     | Persistence/Retention Test | MVP                  |
+| LH-CONF-003        | Startup Configuration Test | MVP                  |
 | LH-RT-003          | Unit Test        | MVP                        |
 | LH-MODB-005        | Integration Test | MVP                        |
 | LH-MQTT-005        | Integration Test | MVP                        |
@@ -1676,6 +1685,8 @@ Das System soll im Container getestet werden.
 - einfache Day-Ahead-Fahrplanverfolgung
 - Marktverpflichtungsmodell für verbindliche Fahrplanvorgaben
 - PostgreSQL-Persistenz
+- Retention- und Persistenzfehler-Regeln
+- Konfigurationsvalidierung beim Start
 - Health API
 - Batterie-Status API
 - Aktueller-Command API
