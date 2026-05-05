@@ -19,18 +19,50 @@ Jeder Meilenstein listet Liefergegenstände, die zugehörigen
 Lastenheft-Kennungen und Abnahmekriterien. Kennungen `RM-Mn-xx` ermöglichen
 die spätere Verlinkung aus PRs, Issues und ADRs.
 
+Diese Roadmap ist die **Statusseite** des Projekts. Sie duplikiert nicht
+die Anforderungen (die stehen normativ im Lastenheft), sondern verfolgt
+*wo wir stehen, was als nächstes kommt und welche Risiken offen sind*.
+Detail-DoD-Tracking pro Meilenstein lebt in einem eigenen
+`plan-Mn.md` neben dieser Datei, sobald der Meilenstein aktiv wird.
+
+### Status-Legende
+
+| Symbol | Bedeutung   |
+| ------ | ----------- |
+| ✅     | abgeschlossen |
+| 🟡     | in Arbeit  |
+| ⬜     | geplant    |
+| ⬛     | obsolet / verworfen |
+
+---
+
+## Aktueller Stand
+
+> **Stand:** 2026-05-05
+> **Aktive Phase:** keine — Implementierung noch nicht begonnen.
+> Vorhanden sind Spezifikation (`spec/lastenheft.md`,
+> `spec/architecture.md`), Qualitäts-/Gate-Definition
+> (`docs/user/quality.md`) und diese Roadmap.
+> **Nächster konkreter Schritt:** Aktivierung von **M1**
+> (MVP — sichere Regelpipeline). Mit Aktivierung wird ein
+> `plan-M1.md` neben dieser Datei angelegt und die Datei nach
+> `docs/plan/planning/in-progress/roadmap.md` verschoben.
+
 ---
 
 ## Übersicht
 
-| Meilenstein | Titel                              | Phase (idea.md / architecture.md) |
-| ----------- | ---------------------------------- | ---------------------------------- |
-| M1          | MVP — sichere Regelpipeline        | Phase 1                            |
-| M2          | Marktausbau und Optimierung        | Phase 1 → 2                        |
-| M3          | Native Control Core (Library)      | Phase 2                            |
-| M4          | Regelleistung und OPC-UA           | Phase 2                            |
-| M5          | MPC, Solver-Sidecar, Replay        | Phase 3                            |
-| M6          | Skalierung, UI, Edge / Multi-Asset | Phase 4                            |
+| Status | Meilenstein | Titel                              | Phase | Detailplan |
+| ------ | ----------- | ---------------------------------- | ----- | ---------- |
+| ⬜     | M1          | MVP — sichere Regelpipeline        | 1     | folgt mit Aktivierung |
+| ⬜     | M2          | Marktausbau und Optimierung        | 1 → 2 | folgt mit Aktivierung |
+| ⬜     | M3          | Native Control Core (Library)      | 2     | folgt mit Aktivierung |
+| ⬜     | M4          | Regelleistung und OPC-UA           | 2     | folgt mit Aktivierung |
+| ⬜     | M5          | MPC, Solver-Sidecar, Replay        | 3     | folgt mit Aktivierung |
+| ⬜     | M6          | Skalierung, UI, Edge / Multi-Asset | 4     | folgt mit Aktivierung |
+
+Phase bezieht sich auf [`idea.md`](../../../../spec/idea.md) und
+[`architecture.md`](../../../../spec/architecture.md) §13.
 
 ---
 
@@ -44,28 +76,28 @@ AuthN/AuthZ-geschütztem Operator-Stop.
 
 ### Liefergegenstände
 
-| ID         | Inhalt                                                              | LH-Bezug                  |
-| ---------- | ------------------------------------------------------------------- | ------------------------- |
-| RM-M1-01   | C#/.NET Solution-Skeleton mit Projekten gemäß Architektur §5.1      | LH-NF-001, LH-ARCH-001    |
-| RM-M1-02   | Domain-Modell (BatteryAsset, Telemetry, Command, DataQuality)       | LH-DOM-001..004           |
-| RM-M1-03   | Realtime Snapshot Store, Datenfusion, Aging                         | LH-RT-001..004            |
-| RM-M1-04   | State Machine (INIT…EMERGENCY_STOP) inkl. Quittierungslogik         | LH-SM-001..003            |
-| RM-M1-05   | Constraint Limiter (.NET) mit SOC-, Power-, Verfügbarkeitsgrenzen   | LH-CTRL-002, LH-SAFE-002/3 |
-| RM-M1-06   | Ramp Limiter (.NET)                                                  | LH-CTRL-003               |
-| RM-M1-07   | Regelzyklus 1 s, sicherer Fallback bei stale/ungültigem Snapshot    | LH-CTRL-001/007, LH-RT-003 |
-| RM-M1-08   | Optimization-Interface + `NoOpDispatchOptimizer`                    | LH-OPT-001 (als Interface) |
-| RM-M1-09   | Modbus-TCP-Adapter (Lesen + Schreiben, Mapping über Config)         | LH-MODB-001..005          |
-| RM-M1-10   | MQTT-Adapter (Telemetrie-Empfang, Command-Publish, Topic-Konvention) | LH-MQTT-001..003         |
-| RM-M1-11   | Schreibbegrenzung im Adapter unmittelbar vor Versand                | LH-SAFE-007               |
-| RM-M1-12   | Statischer Fahrplanimport, `MarketCommitment`-Modell + Day-Ahead-Verfolgung | LH-MKT-001/003/006/007 |
-| RM-M1-13   | PostgreSQL-Persistenz: Telemetrie, Commands, Fahrpläne, Audit       | LH-PERSIST-001..005       |
-| RM-M1-14   | Retention-/Datenvolumen-Konfiguration (dokumentiert)                | LH-PERSIST-006            |
-| RM-M1-15   | API: Health, Status, Current Command, Schedules, Operator-Stop      | LH-API-001..004, LH-API-006 |
-| RM-M1-16   | AuthN/AuthZ + Audit-Log für schreibende Endpunkte                   | LH-API-007                |
-| RM-M1-17   | Strukturierte JSON-Logs mit Reason-Feld + Prometheus-Metrikexport   | LH-MON-001/002/004        |
-| RM-M1-18   | Konfigurations-Loader, JSON-Schemas für Adapter-Mappings + Startvalidierung | LH-CONF-001..003, LH-OPS-001 |
-| RM-M1-19   | Dockerfile + Docker Compose (`bess-ems` mit Worker/API, Postgres, MQTT-Broker) | LH-DEPLOY-001..003, LH-NF-003/4 |
-| RM-M1-20   | Quality-Gates: Lint, Unit/Safety/Integration/Contract/Container, Coverage | LH-TEST-001/003/006/007, LH §4.1 |
+| Status | ID         | Inhalt                                                              | LH-Bezug                  |
+| ------ | ---------- | ------------------------------------------------------------------- | ------------------------- |
+| ⬜     | RM-M1-01   | C#/.NET Solution-Skeleton mit Projekten gemäß Architektur §5.1      | LH-NF-001, LH-ARCH-001    |
+| ⬜     | RM-M1-02   | Domain-Modell (BatteryAsset, Telemetry, Command, DataQuality)       | LH-DOM-001..004           |
+| ⬜     | RM-M1-03   | Realtime Snapshot Store, Datenfusion, Aging                         | LH-RT-001..004            |
+| ⬜     | RM-M1-04   | State Machine (INIT…EMERGENCY_STOP) inkl. Quittierungslogik         | LH-SM-001..003            |
+| ⬜     | RM-M1-05   | Constraint Limiter (.NET) mit SOC-, Power-, Verfügbarkeitsgrenzen   | LH-CTRL-002, LH-SAFE-002/3 |
+| ⬜     | RM-M1-06   | Ramp Limiter (.NET)                                                  | LH-CTRL-003               |
+| ⬜     | RM-M1-07   | Regelzyklus 1 s, sicherer Fallback bei stale/ungültigem Snapshot    | LH-CTRL-001/007, LH-RT-003 |
+| ⬜     | RM-M1-08   | Optimization-Interface + `NoOpDispatchOptimizer`                    | LH-OPT-001 (als Interface) |
+| ⬜     | RM-M1-09   | Modbus-TCP-Adapter (Lesen + Schreiben, Mapping über Config)         | LH-MODB-001..005          |
+| ⬜     | RM-M1-10   | MQTT-Adapter (Telemetrie-Empfang, Command-Publish, Topic-Konvention) | LH-MQTT-001..003         |
+| ⬜     | RM-M1-11   | Schreibbegrenzung im Adapter unmittelbar vor Versand                | LH-SAFE-007               |
+| ⬜     | RM-M1-12   | Statischer Fahrplanimport, `MarketCommitment`-Modell + Day-Ahead-Verfolgung | LH-MKT-001/003/006/007 |
+| ⬜     | RM-M1-13   | PostgreSQL-Persistenz: Telemetrie, Commands, Fahrpläne, Audit       | LH-PERSIST-001..005       |
+| ⬜     | RM-M1-14   | Retention-/Datenvolumen-Konfiguration (dokumentiert)                | LH-PERSIST-006            |
+| ⬜     | RM-M1-15   | API: Health, Status, Current Command, Schedules, Operator-Stop      | LH-API-001..004, LH-API-006 |
+| ⬜     | RM-M1-16   | AuthN/AuthZ + Audit-Log für schreibende Endpunkte                   | LH-API-007                |
+| ⬜     | RM-M1-17   | Strukturierte JSON-Logs mit Reason-Feld + Prometheus-Metrikexport   | LH-MON-001/002/004        |
+| ⬜     | RM-M1-18   | Konfigurations-Loader, JSON-Schemas für Adapter-Mappings + Startvalidierung | LH-CONF-001..003, LH-OPS-001 |
+| ⬜     | RM-M1-19   | Dockerfile + Docker Compose (`bess-ems` mit Worker/API, Postgres, MQTT-Broker) | LH-DEPLOY-001..003, LH-NF-003/4 |
+| ⬜     | RM-M1-20   | Quality-Gates: Lint, Unit/Safety/Integration/Contract/Container, Coverage | LH-TEST-001/003/006/007, LH §4.1 |
 
 ### Abnahmekriterien
 
@@ -91,18 +123,18 @@ LP-Optimierer (.NET-Interface, optional OR-Tools/HiGHS), Tracing.
 
 ### Liefergegenstände
 
-| ID         | Inhalt                                                              | LH-Bezug                |
-| ---------- | ------------------------------------------------------------------- | ----------------------- |
-| RM-M2-01   | Erweiterte Marktcommitment-Priorisierung und Optimierungsintegration | LH-MKT-003/006          |
-| RM-M2-02   | Vollständiges Zeitmodell (UTC intern, DST-Tests)                    | LH-MKT-007              |
-| RM-M2-03   | LP-Implementierung des `IDispatchOptimizer` (Solver-Auswahl per Config) | LH-OPT-001..006     |
-| RM-M2-04   | Zielfunktion konfigurierbar (Energiebezug, Einspeise, Strafkosten)  | LH-OPT-004              |
-| RM-M2-05   | Optimierungs-API (`POST /markets/day-ahead/optimize`)               | LH-API-005              |
-| RM-M2-06   | OpenTelemetry-Tracing für Snapshot → Control → Adapter              | LH-MON-003              |
-| RM-M2-07   | Erweiterte Prometheus-Metriken für Solverzeit und Optimierungsläufe | LH-MON-002              |
-| RM-M2-08   | PID-Regler (.NET) mit Anti-Windup, Output-Clamping, Totband         | LH-CTRL-004             |
-| RM-M2-09   | Erweiterte Persistenz für Optimierungsläufe und Solverstatus        | LH-PERSIST-002/003      |
-| RM-M2-10   | Replay-Test-Harness (Telemetrie-Wiedergabe, Command-Vergleich)      | LH-TEST-004             |
+| Status | ID         | Inhalt                                                              | LH-Bezug                |
+| ------ | ---------- | ------------------------------------------------------------------- | ----------------------- |
+| ⬜     | RM-M2-01   | Erweiterte Marktcommitment-Priorisierung und Optimierungsintegration | LH-MKT-003/006          |
+| ⬜     | RM-M2-02   | Vollständiges Zeitmodell (UTC intern, DST-Tests)                    | LH-MKT-007              |
+| ⬜     | RM-M2-03   | LP-Implementierung des `IDispatchOptimizer` (Solver-Auswahl per Config) | LH-OPT-001..006     |
+| ⬜     | RM-M2-04   | Zielfunktion konfigurierbar (Energiebezug, Einspeise, Strafkosten)  | LH-OPT-004              |
+| ⬜     | RM-M2-05   | Optimierungs-API (`POST /markets/day-ahead/optimize`)               | LH-API-005              |
+| ⬜     | RM-M2-06   | OpenTelemetry-Tracing für Snapshot → Control → Adapter              | LH-MON-003              |
+| ⬜     | RM-M2-07   | Erweiterte Prometheus-Metriken für Solverzeit und Optimierungsläufe | LH-MON-002              |
+| ⬜     | RM-M2-08   | PID-Regler (.NET) mit Anti-Windup, Output-Clamping, Totband         | LH-CTRL-004             |
+| ⬜     | RM-M2-09   | Erweiterte Persistenz für Optimierungsläufe und Solverstatus        | LH-PERSIST-002/003      |
+| ⬜     | RM-M2-10   | Replay-Test-Harness (Telemetrie-Wiedergabe, Command-Vergleich)      | LH-TEST-004             |
 
 ### Abnahmekriterien
 
@@ -121,18 +153,18 @@ bleibt Fallback und Referenz.
 
 ### Liefergegenstände
 
-| ID         | Inhalt                                                              | LH-Bezug                   |
-| ---------- | ------------------------------------------------------------------- | -------------------------- |
-| RM-M3-01   | C-ABI `battery_control_core.h` (Snapshot/Limits/Command Structs)    | LH-NATIVE-002/003          |
-| RM-M3-02   | C++-Implementierung Constraint + Ramp + Statuscode-Fehlerpfade      | LH-NATIVE-001/004          |
-| RM-M3-03   | ABI-Versionsfunktion + Startup-Check in .NET                        | LH-NATIVE-005              |
-| RM-M3-04   | P/Invoke-Bindings (`BatteryEms.NativeInterop`)                      | LH-NATIVE-001              |
-| RM-M3-05   | Routing: Native bevorzugt, .NET-Fallback bei Fehler/Abwesenheit     | LH-ARCH-006, LH-NF-002     |
-| RM-M3-06   | Multi-Stage Dockerfile mit Native-Build-Stage                       | LH-DEPLOY-003/004, LH-NATIVE-006 |
-| RM-M3-07   | Interop-Tests (Struct Layout, ABI, Werte-Parität gg. .NET-Referenz) | LH-TEST-005                |
-| RM-M3-08   | C++-Unit-Tests (Constraint, Ramp, NaN/Inf, Vorzeichen, neg. dt)     | LH-TEST-001                |
-| RM-M3-09   | Native-Quality-Gates: `native-lint`, Sanitizer, Native-Coverage     | LH-TEST-005, LH-NATIVE-*   |
-| RM-M3-10   | Native/.NET-Parity-Gate über Replay-Datensatz                       | LH-ARCH-006, LH-TEST-005   |
+| Status | ID         | Inhalt                                                              | LH-Bezug                   |
+| ------ | ---------- | ------------------------------------------------------------------- | -------------------------- |
+| ⬜     | RM-M3-01   | C-ABI `battery_control_core.h` (Snapshot/Limits/Command Structs)    | LH-NATIVE-002/003          |
+| ⬜     | RM-M3-02   | C++-Implementierung Constraint + Ramp + Statuscode-Fehlerpfade      | LH-NATIVE-001/004          |
+| ⬜     | RM-M3-03   | ABI-Versionsfunktion + Startup-Check in .NET                        | LH-NATIVE-005              |
+| ⬜     | RM-M3-04   | P/Invoke-Bindings (`BatteryEms.NativeInterop`)                      | LH-NATIVE-001              |
+| ⬜     | RM-M3-05   | Routing: Native bevorzugt, .NET-Fallback bei Fehler/Abwesenheit     | LH-ARCH-006, LH-NF-002     |
+| ⬜     | RM-M3-06   | Multi-Stage Dockerfile mit Native-Build-Stage                       | LH-DEPLOY-003/004, LH-NATIVE-006 |
+| ⬜     | RM-M3-07   | Interop-Tests (Struct Layout, ABI, Werte-Parität gg. .NET-Referenz) | LH-TEST-005                |
+| ⬜     | RM-M3-08   | C++-Unit-Tests (Constraint, Ramp, NaN/Inf, Vorzeichen, neg. dt)     | LH-TEST-001                |
+| ⬜     | RM-M3-09   | Native-Quality-Gates: `native-lint`, Sanitizer, Native-Coverage     | LH-TEST-005, LH-NATIVE-*   |
+| ⬜     | RM-M3-10   | Native/.NET-Parity-Gate über Replay-Datensatz                       | LH-ARCH-006, LH-TEST-005   |
 
 ### Abnahmekriterien
 
@@ -152,16 +184,16 @@ bleibt Fallback und Referenz.
 
 ### Liefergegenstände
 
-| ID         | Inhalt                                                              | LH-Bezug                |
-| ---------- | ------------------------------------------------------------------- | ----------------------- |
-| RM-M4-01   | Intraday-Reoptimierung (Resthorizont)                               | LH-MKT-002              |
-| RM-M4-02   | Reservierungs-Modell für Regelleistung + Solver-Constraints         | LH-MKT-004              |
-| RM-M4-03   | Regelleistungs-Aktivierungssignal-Verarbeitung mit Priorisierung    | LH-MKT-005, LH-MKT-006  |
-| RM-M4-04   | OPC-UA-Adapter (Lesen, Schreiben, Subscriptions, StatusCode)        | LH-OPCUA-001..004       |
-| RM-M4-05   | OPC-UA-Security (Zertifikate, Security Mode/Policy)                 | LH-OPCUA-005            |
-| RM-M4-06   | MQTT QoS und Command-ACK-Korrelation                                | LH-MQTT-004/005         |
-| RM-M4-07   | Versionierte OPC-UA-Mappings in Config                              | LH-CONF-002             |
-| RM-M4-08   | Integrationstests OPC-UA gg. Simulator                              | LH-TEST-003 (n. MVP-Teil) |
+| Status | ID         | Inhalt                                                              | LH-Bezug                |
+| ------ | ---------- | ------------------------------------------------------------------- | ----------------------- |
+| ⬜     | RM-M4-01   | Intraday-Reoptimierung (Resthorizont)                               | LH-MKT-002              |
+| ⬜     | RM-M4-02   | Reservierungs-Modell für Regelleistung + Solver-Constraints         | LH-MKT-004              |
+| ⬜     | RM-M4-03   | Regelleistungs-Aktivierungssignal-Verarbeitung mit Priorisierung    | LH-MKT-005, LH-MKT-006  |
+| ⬜     | RM-M4-04   | OPC-UA-Adapter (Lesen, Schreiben, Subscriptions, StatusCode)        | LH-OPCUA-001..004       |
+| ⬜     | RM-M4-05   | OPC-UA-Security (Zertifikate, Security Mode/Policy)                 | LH-OPCUA-005            |
+| ⬜     | RM-M4-06   | MQTT QoS und Command-ACK-Korrelation                                | LH-MQTT-004/005         |
+| ⬜     | RM-M4-07   | Versionierte OPC-UA-Mappings in Config                              | LH-CONF-002             |
+| ⬜     | RM-M4-08   | Integrationstests OPC-UA gg. Simulator                              | LH-TEST-003 (n. MVP-Teil) |
 
 ### Abnahmekriterien
 
@@ -178,14 +210,14 @@ Solver-nahe Optimierung; ausgebaute Replay- und Vergleichsplattform.
 
 ### Liefergegenstände
 
-| ID         | Inhalt                                                              | LH-Bezug                |
-| ---------- | ------------------------------------------------------------------- | ----------------------- |
-| RM-M5-01   | gRPC-Sidecar `optimization-core` (LP/MILP/MPC)                      | LH-OPT-002/003/006      |
-| RM-M5-02   | MPC-Kernel (State-Space, Kalman, Vorhersagehorizont)                | LH-CTRL-005/006         |
-| RM-M5-03   | Hochfrequente Telemetrie-Filterung im Native Core (optional)        | LH-NATIVE-001           |
-| RM-M5-04   | Replay-Plattform mit Datensatz-Verwaltung und Sollwertvergleich     | LH-TEST-004             |
-| RM-M5-05   | Erweiterte Metriken / Solverstatus / Command-Latenz                 | LH-MON-002              |
-| RM-M5-06   | Container-Orchestrierungstests (Worker + Sidecar)                   | LH-TEST-007             |
+| Status | ID         | Inhalt                                                              | LH-Bezug                |
+| ------ | ---------- | ------------------------------------------------------------------- | ----------------------- |
+| ⬜     | RM-M5-01   | gRPC-Sidecar `optimization-core` (LP/MILP/MPC)                      | LH-OPT-002/003/006      |
+| ⬜     | RM-M5-02   | MPC-Kernel (State-Space, Kalman, Vorhersagehorizont)                | LH-CTRL-005/006         |
+| ⬜     | RM-M5-03   | Hochfrequente Telemetrie-Filterung im Native Core (optional)        | LH-NATIVE-001           |
+| ⬜     | RM-M5-04   | Replay-Plattform mit Datensatz-Verwaltung und Sollwertvergleich     | LH-TEST-004             |
+| ⬜     | RM-M5-05   | Erweiterte Metriken / Solverstatus / Command-Latenz                 | LH-MON-002              |
+| ⬜     | RM-M5-06   | Container-Orchestrierungstests (Worker + Sidecar)                   | LH-TEST-007             |
 
 ### Abnahmekriterien
 
@@ -203,14 +235,14 @@ Kubernetes-Deployment, Edge-Anbindung. Inhalte mit hohem Diskussionsbedarf
 
 ### Kandidaten
 
-| ID         | Inhalt                                                              | LH-Bezug             |
-| ---------- | ------------------------------------------------------------------- | -------------------- |
-| RM-M6-01   | Operator UI (Web)                                                   | LH-OPEN-005          |
-| RM-M6-02   | Multi-Asset-Flottensteuerung                                        | §28.3                |
-| RM-M6-03   | Kubernetes-Deployment + Helm Charts                                 | §28.3                |
-| RM-M6-04   | TimescaleDB-Integration als Persistenz-Erweiterung                  | LH-PERSIST-005, LH-OPEN-006 |
-| RM-M6-05   | Edge-Controller-Integration für harte Echtzeitkomponenten           | LH-RISK-001          |
-| RM-M6-06   | Zertifizierungsnahe Regelleistungsintegration                       | §28.3                |
+| Status | ID         | Inhalt                                                              | LH-Bezug             |
+| ------ | ---------- | ------------------------------------------------------------------- | -------------------- |
+| ⬜     | RM-M6-01   | Operator UI (Web)                                                   | LH-OPEN-005          |
+| ⬜     | RM-M6-02   | Multi-Asset-Flottensteuerung                                        | §28.3                |
+| ⬜     | RM-M6-03   | Kubernetes-Deployment + Helm Charts                                 | §28.3                |
+| ⬜     | RM-M6-04   | TimescaleDB-Integration als Persistenz-Erweiterung                  | LH-PERSIST-005, LH-OPEN-006 |
+| ⬜     | RM-M6-05   | Edge-Controller-Integration für harte Echtzeitkomponenten           | LH-RISK-001          |
+| ⬜     | RM-M6-06   | Zertifizierungsnahe Regelleistungsintegration                       | §28.3                |
 
 ---
 
@@ -245,3 +277,31 @@ Kubernetes-Deployment, Edge-Anbindung. Inhalte mit hohem Diskussionsbedarf
 - Architekturentwurf: [`spec/architecture.md`](../../../../spec/architecture.md)
 - Qualitäts- und Messpfade: [`docs/user/quality.md`](../../../user/quality.md)
 - Projektidee/Hintergrund: [`spec/idea.md`](../../../../spec/idea.md)
+
+---
+
+## Wartung dieses Dokuments
+
+- Statusspalten in „Übersicht" und in den Liefergegenstands-Tabellen pro
+  Meilenstein nach jedem abgeschlossenen Schritt aktualisieren
+  (⬜ → 🟡 → ✅). Verworfene Liefergegenstände auf ⬛ setzen statt
+  zu löschen, damit die Roadmap die historische Entscheidung erhält.
+- Beim **Aktivieren** eines Meilensteins:
+  1. Ein `plan-Mn.md` neben dieser Datei anlegen, das die DoD-Tracking-
+     Checkboxen pro Schritt enthält (analog `m-trace/plan-X.Y.Z.md`).
+  2. Aktive Phase im „Aktueller Stand"-Block oben eintragen.
+  3. Sobald nicht-trivialer Fortschritt existiert: diese Datei nach
+     `docs/plan/planning/in-progress/roadmap.md` verschieben und im
+     Statusblock auf den aktiven Detailplan verweisen.
+- Beim **Abschließen** eines Meilensteins:
+  1. Status in beiden Tabellen auf ✅ setzen (Übersicht und
+     Liefergegenstände).
+  2. Den zugehörigen `plan-Mn.md` nach `docs/plan/planning/done/`
+     verschieben und in der „Übersicht"-Tabelle in der
+     Detailplan-Spalte verlinken.
+  3. „Aktueller Stand" auf den nächsten Meilenstein umstellen.
+- „Aktueller Stand" wird nach jedem signifikanten Fortschritt neu
+  geschrieben, nicht inkrementell — die Liste bleibt kurz.
+- Bei Inkonsistenz zwischen Lastenheft (`LH-*`) und Roadmap-Eintrag
+  gewinnt das Lastenheft. Korrektur erfolgt durch Lastenheft-Patch und
+  Anpassung der `LH-Bezug`-Spalten in dieser Datei.
