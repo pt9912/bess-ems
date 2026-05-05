@@ -1,0 +1,107 @@
+{
+  "profile_name": "sunspec-simulator",
+  "unit_id_discovery": "sunspec",
+  "registers": [
+    {
+      "name": "common_sunspec_id",
+      "address": 40000,
+      "type": "uint32",
+      "scale_factor": 1,
+      "range": [0, 4294967295],
+      "writable": false,
+      "write_cadence": "cyclic",
+      "auth_required": "network",
+      "sunspec_model": 1
+    },
+    {
+      "name": "der_ac_measurement_state",
+      "address": 40070,
+      "type": "uint16",
+      "scale_factor": 1,
+      "range": [0, 99],
+      "writable": false,
+      "write_cadence": "cyclic",
+      "auth_required": "network",
+      "sunspec_model": 701
+    },
+    {
+      "name": "der_ac_active_power",
+      "address": 40072,
+      "type": "int32",
+      "scale_factor": 1,
+      "range": [-1000000, 1000000],
+      "writable": false,
+      "write_cadence": "cyclic",
+      "auth_required": "network",
+      "sunspec_model": 701
+    },
+    {
+      "name": "der_ac_controls_w_set",
+      "address": 40224,
+      "type": "int32",
+      "scale_factor": 1,
+      "range": [-1000000, 1000000],
+      "writable": true,
+      "write_cadence": "cyclic",
+      "auth_required": "network",
+      "sunspec_model": 704
+    },
+    {
+      "name": "der_ctl_op_ctl",
+      "address": 40308,
+      "type": "uint16",
+      "scale_factor": 1,
+      "range": [0, 1],
+      "writable": true,
+      "write_cadence": "cyclic",
+      "auth_required": "network",
+      "sunspec_model": 715,
+      "enum": { "0": "stop", "1": "start" }
+    },
+    {
+      "name": "der_ctl_heartbeat",
+      "address": 40310,
+      "type": "uint16",
+      "scale_factor": 1,
+      "range": [0, 65535],
+      "writable": true,
+      "write_cadence": "heartbeat",
+      "auth_required": "network",
+      "sunspec_model": 715
+    },
+    {
+      "name": "battery_set_op",
+      "address": 40450,
+      "type": "uint16",
+      "scale_factor": 1,
+      "range": [0, 2],
+      "writable": true,
+      "write_cadence": "cooldown",
+      "auth_required": "network",
+      "sunspec_model": 802,
+      "enum": { "0": "idle", "1": "connect", "2": "disconnect" }
+    },
+    {
+      "name": "battery_soc",
+      "address": 40460,
+      "type": "uint16",
+      "scale_factor": 0.01,
+      "range": [0, 100],
+      "writable": false,
+      "write_cadence": "cyclic",
+      "auth_required": "network",
+      "sunspec_model": 802
+    },
+    {
+      "name": "battery_soh",
+      "address": 40462,
+      "type": "uint16",
+      "scale_factor": 0.01,
+      "range": [0, 100],
+      "writable": false,
+      "write_cadence": "cyclic",
+      "auth_required": "network",
+      "sunspec_model": 802
+    }
+  ]
+}

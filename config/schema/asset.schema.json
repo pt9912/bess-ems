@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bess-ems.io/schema/asset.json",
+  "title": "BatteryAsset configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "asset_id",
+    "capacity_kwh",
+    "max_charge_power_kw",
+    "max_discharge_power_kw",
+    "min_soc_percent",
+    "max_soc_percent",
+    "charge_efficiency",
+    "discharge_efficiency",
+    "max_ramp_kw_per_second",
+    "min_operating_temperature_celsius",
+    "max_operating_temperature_celsius"
+  ],
+  "properties": {
+    "asset_id": { "type": "string", "minLength": 1 },
+    "capacity_kwh": { "type": "number", "exclusiveMinimum": 0 },
+    "max_charge_power_kw": { "type": "number", "minimum": 0 },
+    "max_discharge_power_kw": { "type": "number", "minimum": 0 },
+    "min_soc_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+    "max_soc_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+    "charge_efficiency": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+    "discharge_efficiency": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+    "max_ramp_kw_per_second": { "type": "number", "minimum": 0 },
+    "min_operating_temperature_celsius": { "type": "number" },
+    "max_operating_temperature_celsius": { "type": "number" }
+  }
+}

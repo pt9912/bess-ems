@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bess-ems.io/schema/mqtt-mapping.json",
+  "title": "MQTT adapter mapping",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profile_name", "topics"],
+  "properties": {
+    "profile_name": { "type": "string", "minLength": 1 },
+    "topics": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/topic" }
+    }
+  },
+  "$defs": {
+    "topic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "topic", "direction", "payload_format", "retained", "auth_required"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "topic": { "type": "string", "minLength": 1 },
+        "direction": { "type": "string", "enum": ["subscribe", "publish"] },
+        "payload_format": { "type": "string", "enum": ["json"] },
+        "retained": { "type": "boolean" },
+        "auth_required": { "type": "string", "enum": ["none", "network", "token"] }
+      }
+    }
+  }
+}

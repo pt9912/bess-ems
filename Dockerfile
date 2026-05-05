@@ -22,6 +22,7 @@ COPY global.json Directory.Build.props Directory.Packages.props .editorconfig ./
 COPY BatteryEms.sln ./
 COPY src/ src/
 COPY tests/ tests/
+COPY config/ config/
 RUN dotnet restore BatteryEms.sln
 
 # ---------------------------------------------------------------------------
@@ -56,6 +57,11 @@ RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.cs
     --no-restore \
     --logger "console;verbosity=normal" \
  && dotnet test tests/hexagon/BatteryEms.Application.Tests/BatteryEms.Application.Tests.csproj \
+    --configuration "${BUILD_CONFIGURATION}" \
+    --no-build \
+    --no-restore \
+    --logger "console;verbosity=normal" \
+ && dotnet test tests/infrastructure/BatteryEms.Infrastructure.Tests/BatteryEms.Infrastructure.Tests.csproj \
     --configuration "${BUILD_CONFIGURATION}" \
     --no-build \
     --no-restore \
@@ -104,6 +110,16 @@ RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.cs
     /p:CoverletOutputFormat=cobertura \
     /p:CoverletOutput=/src/coverage/Application/ \
     /p:Include="[BatteryEms.Application]*%2C[BatteryEms.Adapters.Optimization]*" \
+    /p:Threshold=90 \
+    /p:ThresholdType=line \
+    /p:ThresholdStat=total \
+ && dotnet test tests/infrastructure/BatteryEms.Infrastructure.Tests/BatteryEms.Infrastructure.Tests.csproj \
+    --configuration "${BUILD_CONFIGURATION}" \
+    --no-restore \
+    /p:CollectCoverage=true \
+    /p:CoverletOutputFormat=cobertura \
+    /p:CoverletOutput=/src/coverage/Infrastructure/ \
+    /p:Include="[BatteryEms.Infrastructure]*" \
     /p:Threshold=90 \
     /p:ThresholdType=line \
     /p:ThresholdStat=total

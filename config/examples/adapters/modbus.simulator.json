@@ -1,0 +1,119 @@
+{
+  "profile_name": "vendor-neutral-simulator",
+  "unit_id_discovery": "static",
+  "static_unit_id": 1,
+  "registers": [
+    {
+      "name": "soc_percent",
+      "address": 100,
+      "type": "uint16",
+      "scale_factor": 0.1,
+      "range": [0, 100],
+      "writable": false,
+      "write_cadence": "cyclic",
+      "auth_required": "none"
+    },
+    {
+      "name": "soh_percent",
+      "address": 102,
+      "type": "uint16",
+      "scale_factor": 0.1,
+      "range": [0, 100],
+      "writable": false,
+      "write_cadence": "cyclic",
+      "auth_required": "none"
+    },
+    {
+      "name": "active_power_kw",
+      "address": 110,
+      "type": "int16",
+      "scale_factor": 0.1,
+      "range": [-100, 100],
+      "writable": false,
+      "write_cadence": "cyclic",
+      "auth_required": "none"
+    },
+    {
+      "name": "reactive_power_kvar",
+      "address": 112,
+      "type": "int16",
+      "scale_factor": 0.1,
+      "range": [-100, 100],
+      "writable": false,
+      "write_cadence": "cyclic",
+      "auth_required": "none"
+    },
+    {
+      "name": "dc_voltage",
+      "address": 114,
+      "type": "uint16",
+      "scale_factor": 1,
+      "range": [0, 1500],
+      "writable": false,
+      "write_cadence": "cyclic",
+      "auth_required": "none"
+    },
+    {
+      "name": "dc_current",
+      "address": 116,
+      "type": "int16",
+      "scale_factor": 0.1,
+      "range": [-500, 500],
+      "writable": false,
+      "write_cadence": "cyclic",
+      "auth_required": "none"
+    },
+    {
+      "name": "temperature_celsius",
+      "address": 118,
+      "type": "int16",
+      "scale_factor": 0.1,
+      "range": [-40, 80],
+      "writable": false,
+      "write_cadence": "cyclic",
+      "auth_required": "none"
+    },
+    {
+      "name": "available",
+      "address": 120,
+      "type": "uint16",
+      "scale_factor": 1,
+      "range": [0, 1],
+      "writable": false,
+      "write_cadence": "cyclic",
+      "auth_required": "none",
+      "enum": { "0": "unavailable", "1": "available" }
+    },
+    {
+      "name": "fault_status",
+      "address": 122,
+      "type": "uint16",
+      "scale_factor": 1,
+      "range": [0, 65535],
+      "writable": false,
+      "write_cadence": "cyclic",
+      "auth_required": "none"
+    },
+    {
+      "name": "active_power_setpoint_kw",
+      "address": 200,
+      "type": "int16",
+      "scale_factor": 0.1,
+      "range": [-100, 100],
+      "writable": true,
+      "write_cadence": "cyclic",
+      "auth_required": "none"
+    },
+    {
+      "name": "operating_mode",
+      "address": 202,
+      "type": "uint16",
+      "scale_factor": 1,
+      "range": [0, 3],
+      "writable": true,
+      "write_cadence": "cyclic",
+      "auth_required": "none",
+      "enum": { "0": "stop", "1": "idle", "2": "charge", "3": "discharge" }
+    }
+  ]
+}

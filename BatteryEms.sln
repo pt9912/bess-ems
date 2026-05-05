@@ -28,6 +28,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Domain.Tests", "
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Application.Tests", "tests\hexagon\BatteryEms.Application.Tests\BatteryEms.Application.Tests.csproj", "{FF54F392-F70F-4A3F-878D-A63BF28AC961}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Infrastructure.Tests", "tests\infrastructure\BatteryEms.Infrastructure.Tests\BatteryEms.Infrastructure.Tests.csproj", "{2C64C824-A98C-4149-A759-F34B518AA0FC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -86,6 +88,10 @@ Global
 		{FF54F392-F70F-4A3F-878D-A63BF28AC961}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FF54F392-F70F-4A3F-878D-A63BF28AC961}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FF54F392-F70F-4A3F-878D-A63BF28AC961}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2C64C824-A98C-4149-A759-F34B518AA0FC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2C64C824-A98C-4149-A759-F34B518AA0FC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2C64C824-A98C-4149-A759-F34B518AA0FC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2C64C824-A98C-4149-A759-F34B518AA0FC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

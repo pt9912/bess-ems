@@ -1,0 +1,45 @@
+{
+  "profile_name": "mqtt-simulator",
+  "topics": [
+    {
+      "name": "telemetry",
+      "topic": "battery/{assetId}/telemetry",
+      "direction": "subscribe",
+      "payload_format": "json",
+      "retained": false,
+      "auth_required": "none"
+    },
+    {
+      "name": "status",
+      "topic": "battery/{assetId}/status",
+      "direction": "subscribe",
+      "payload_format": "json",
+      "retained": false,
+      "auth_required": "none"
+    },
+    {
+      "name": "fault",
+      "topic": "battery/{assetId}/fault",
+      "direction": "subscribe",
+      "payload_format": "json",
+      "retained": false,
+      "auth_required": "none"
+    },
+    {
+      "name": "command",
+      "topic": "battery/{assetId}/command",
+      "direction": "publish",
+      "payload_format": "json",
+      "retained": false,
+      "auth_required": "none"
+    },
+    {
+      "name": "command_ack",
+      "topic": "battery/{assetId}/command/ack",
+      "direction": "subscribe",
+      "payload_format": "json",
+      "retained": false,
+      "auth_required": "none"
+    }
+  ]
+}

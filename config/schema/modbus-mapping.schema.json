@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bess-ems.io/schema/modbus-mapping.json",
+  "title": "Modbus adapter mapping",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profile_name", "unit_id_discovery", "registers"],
+  "properties": {
+    "profile_name": { "type": "string", "minLength": 1 },
+    "unit_id_discovery": { "type": "string", "enum": ["static", "dynamic", "sunspec"] },
+    "static_unit_id": { "type": "integer", "minimum": 0, "maximum": 255 },
+    "registers": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/register" }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "unit_id_discovery": { "const": "static" } }, "required": ["unit_id_discovery"] },
+      "then": { "required": ["static_unit_id"] }
+    }
+  ],
+  "$defs": {
+    "register": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "address",
+        "type",
+        "scale_factor",
+        "range",
+        "writable",
+        "write_cadence",
+        "auth_required"
+      ],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "address": { "type": "integer", "minimum": 0 },
+        "type": { "type": "string", "enum": ["uint16", "int16", "uint32", "int32", "float32", "string"] },
+        "scale_factor": { "type": "number" },
+        "range": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "writable": { "type": "boolean" },
+        "enum": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "write_cadence": {
+          "type": "string",
+          "enum": ["cyclic", "once_per_day", "one_shot", "heartbeat", "cooldown"]
+        },
+        "auth_required": { "type": "string", "enum": ["none", "network", "token"] },
+        "firmware_constraint": { "type": "string" },
+        "sunspec_model": { "type": "integer", "minimum": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "writable": { "const": true } }, "required": ["writable"] },
+          "then": { "required": ["write_cadence", "auth_required"] }
+        }
+      ]
+    }
+  }
+}

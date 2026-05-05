@@ -1,0 +1,13 @@
+{
+  "asset_id": "single-bess-1",
+  "capacity_kwh": 100,
+  "max_charge_power_kw": 50,
+  "max_discharge_power_kw": 50,
+  "min_soc_percent": 10,
+  "max_soc_percent": 90,
+  "charge_efficiency": 0.95,
+  "discharge_efficiency": 0.95,
+  "max_ramp_kw_per_second": 25,
+  "min_operating_temperature_celsius": -20,
+  "max_operating_temperature_celsius": 55
+}

@@ -76,7 +76,14 @@ coverage-gate:
 gates: lint arch-check test test-safety coverage-gate
 	@echo "[gates] M1 mandatory gates green: lint, arch-check, test, test-safety, coverage-gate"
 
-# --- Welle 3 (pending) -----------------------------------------------------
+# --- Welle 3 (partially active) --------------------------------------------
+
+simulator-test:
+	@if [ ! -d simulators/bess-field-sim ]; then \
+		echo "make simulator-test: not active. Activates with simulators/bess-field-sim/ (RM-M1-09/10)."; \
+		exit 2; \
+	fi
+	$(DOCKER_BUILD) --target simulator-test -t $(IMAGE_PREFIX)-simulator-test:latest
 
 test-integration:
 	@echo "make test-integration: not active. Activated in Welle 3 (Config and Adapters)."
