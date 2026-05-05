@@ -4,7 +4,7 @@
 **System:** Battery Energy Management System für Batteriespeicher  
 **Dokumenttyp:** Lastenheft  
 **Format:** Markdown  
-**Version:** 0.1.4
+**Version:** 0.1.5
 **Status:** Entwurf  
 **Zielplattform:** Linux, Docker, C#/.NET, C/C++ für performance-kritische Komponenten  
 **Vorgehensmodell:** V-Modell-ähnliche Anforderungsstruktur mit Kennungen und Rückverfolgbarkeit  
@@ -1536,9 +1536,9 @@ Das System muss Unit Tests für Markt- und Fahrplanlogik besitzen.
 
 ### LH-TEST-003 — Integrationstests für Protokolladapter
 
-Das System soll Integrationstests für Protokolladapter besitzen.
+Das System muss Integrationstests für Protokolladapter besitzen.
 
-**Priorität:** Soll  
+**Priorität:** Muss
 **Abnahmekriterium:** Modbus- und MQTT-Adapter können im MVP gegen Simulatoren getestet werden. OPC-UA-Adapter sind gegen Simulatoren testbar, sobald OPC-UA umgesetzt wird.
 
 ---
@@ -1583,9 +1583,9 @@ Das System muss Sicherheitsfälle testen.
 
 ### LH-TEST-007 — Container-Tests
 
-Das System soll im Container getestet werden.
+Das System muss im Container getestet werden.
 
-**Priorität:** Soll  
+**Priorität:** Muss
 **Abnahmekriterium:** Die Anwendung startet im Container und führt Healthchecks erfolgreich aus.
 
 ---

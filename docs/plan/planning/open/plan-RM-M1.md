@@ -55,7 +55,7 @@ Arbeitspakete parallel laufen, solange ihre Abhängigkeiten erfüllt sind.
 | ⬜ | RM-M1-21 | Makefile-Orchestrierung | RM-M1-01 | `make help`, `make gates`, `make ci`, `make runtime`, `make fullbuild`, Override-Variablen und Gate-/Report-Trennung sind implementiert; `make gates` zieht `make arch-check` mit. |
 | ⬜ | RM-M1-02 | Domain-Modell | RM-M1-01 | `BatteryAsset`, `BatteryTelemetry`, `BatteryCommand`, `DataQuality`, `MarketCommitment` und Vorzeichenkonvention sind unit-getestet. |
 | ⬜ | RM-M1-03 | Realtime Snapshot Store | RM-M1-02 | Datenfusion, Aging, Plausibilisierung, Snapshot-Qualität und stale-Erkennung sind unit-getestet. |
-| ⬜ | RM-M1-04 | State Machine | RM-M1-02 | `INIT`, `READY`, `RUNNING`, `FAULT`, `EMERGENCY_STOP`, Quittierung und Operator-Stop-Pfade sind abgedeckt. |
+| ⬜ | RM-M1-04 | State Machine | RM-M1-02 | `INIT`, `STANDBY`, `READY`, `IDLE`, `CHARGING`, `DISCHARGING`, `LIMITED`, `FAULT`, `EMERGENCY_STOP`, `MAINTENANCE`, Quittierung und Operator-Stop-Pfade sind abgedeckt. |
 | ⬜ | RM-M1-05 | Constraint Limiter | RM-M1-02, RM-M1-03 | SOC-, Power-, Temperatur- und Verfügbarkeitsgrenzen begrenzen Commands deterministisch. |
 | ⬜ | RM-M1-06 | Ramp Limiter | RM-M1-02 | Rampenbegrenzung ist deterministisch, vorzeichenfest und testbar. |
 | ⬜ | RM-M1-08 | Optimierungsinterface | RM-M1-02 | `IDispatchOptimizer` und `NoOpDispatchOptimizer` sind austauschbar verdrahtet. |

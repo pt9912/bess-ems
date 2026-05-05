@@ -305,17 +305,16 @@ Gemessen wird der Code in:
 
 ```
 BatteryEms.Domain
-BatteryEms.Realtime
-BatteryEms.Control
-BatteryEms.Markets
-BatteryEms.Optimization
-BatteryEms.Protocols.Abstractions
-BatteryEms.Protocols.Modbus
-BatteryEms.Protocols.Mqtt
-BatteryEms.Protocols.OpcUa            # ab M4
-BatteryEms.Persistence
-BatteryEms.NativeInterop              # ab M3
+BatteryEms.Application
 BatteryEms.Api
+BatteryEms.Worker
+BatteryEms.Adapters.Modbus
+BatteryEms.Adapters.Mqtt
+BatteryEms.Adapters.OpcUa             # ab M4
+BatteryEms.Adapters.Persistence
+BatteryEms.Adapters.Telemetry
+BatteryEms.Adapters.Optimization
+BatteryEms.Adapters.NativeInterop     # ab M3
 ```
 
 Threshold: **90 % Line-Coverage**, Ziel **≥ 95 %**. Begründung analog
