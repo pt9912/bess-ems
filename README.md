@@ -161,10 +161,17 @@ zertifizierungsnahe Regelleistungsintegration.
 .
 ├── README.md             # dieses Dokument
 ├── LICENSE               # MIT-Lizenz
-└── spec/
-    ├── idea.md           # Projektidee / Hintergrund
-    ├── lastenheft.md     # Lastenheft (V-Modell-ähnliche Anforderungsstruktur)
-    └── architecture.md   # Architekturentwurf (Schichten, Module, Datenfluss)
+├── spec/
+│   ├── idea.md           # Projektidee / Hintergrund
+│   ├── lastenheft.md     # Lastenheft (V-Modell-ähnliche Anforderungsstruktur)
+│   └── architecture.md   # Architekturentwurf (Schichten, Module, Datenfluss)
+└── docs/
+    └── plan/
+        ├── adr/                      # Architecture Decision Records
+        └── planning/
+            ├── open/                 # noch nicht begonnen (u. a. roadmap.md)
+            ├── in-progress/          # in Umsetzung
+            └── done/                 # abgeschlossen
 ```
 
 Implementierungsmodule (Worker, API, Domain, Adapter, Infrastructure, Native
@@ -188,6 +195,8 @@ referenzierbar.
 - [`spec/architecture.md`](spec/architecture.md) — Architekturentwurf:
   Schichten, Module, Datenfluss, Native-Core-Strategie, Rückverfolgbarkeit
 - [`spec/idea.md`](spec/idea.md) — Projektidee und Hintergrund
+- [`docs/plan/planning/open/roadmap.md`](docs/plan/planning/open/roadmap.md) —
+  Meilensteine M1–M6 mit Liefergegenständen und LH-Rückverfolgbarkeit
 
 ---
 
