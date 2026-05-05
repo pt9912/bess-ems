@@ -172,8 +172,8 @@ zertifizierungsnahe Regelleistungsintegration.
     └── plan/
         ├── adr/                      # Architecture Decision Records
         └── planning/
-            ├── open/                 # noch nicht begonnen (u. a. roadmap.md)
-            ├── in-progress/          # in Umsetzung
+            ├── open/                 # noch nicht begonnene Pläne
+            ├── in-progress/          # in Umsetzung (u. a. roadmap.md)
             └── done/                 # abgeschlossen
 ```
 
@@ -197,7 +197,7 @@ referenzierbar.
   Abnahmekriterien, Rückverfolgbarkeitstabellen, Risiken und offene Punkte
 - [`spec/architecture.md`](spec/architecture.md) — Architekturentwurf:
   Schichten, Module, Datenfluss, Native-Core-Strategie, Rückverfolgbarkeit
-- [`docs/plan/planning/open/roadmap.md`](docs/plan/planning/open/roadmap.md) —
+- [`docs/plan/planning/in-progress/roadmap.md`](docs/plan/planning/in-progress/roadmap.md) —
   Meilensteine M1–M6 mit Liefergegenständen und LH-Rückverfolgbarkeit
 - [`docs/user/quality.md`](docs/user/quality.md) — verbindliche
   Qualitäts- und Messpfade (statische Analyse C#/.NET + C/C++, Tests,

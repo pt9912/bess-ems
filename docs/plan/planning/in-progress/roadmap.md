@@ -1,7 +1,7 @@
 # Roadmap: bess-ems
 
 **Dokumenttyp:** Planung / Roadmap
-**Status:** Offen
+**Status:** In Arbeit
 **Bezug:** [`spec/lastenheft.md`](../../../../spec/lastenheft.md)
 (§28 MVP-Abgrenzung), [`spec/architecture.md`](../../../../spec/architecture.md)
 (§13 Native-Core-Phasenmodell), [`docs/user/quality.md`](../../../user/quality.md)
@@ -40,15 +40,13 @@ unter `in-progress/`.
 ## Aktueller Stand
 
 > **Stand:** 2026-05-05
-> **Aktive Phase:** keine — Implementierung noch nicht begonnen.
+> **Aktive Phase:** M1 — MVP sichere Regelpipeline.
 > Vorhanden sind Spezifikation (`spec/lastenheft.md`,
 > `spec/architecture.md`), Qualitäts-/Gate-Definition
 > (`docs/user/quality.md`) und diese Roadmap.
-> **Nächster konkreter Schritt:** Aktivierung von **M1**
-> (MVP — sichere Regelpipeline). Ein offener Detailplan liegt in
-> [`plan-RM-M1.md`](plan-RM-M1.md). Mit Aktivierung wird dieser nach
-> `docs/plan/planning/in-progress/plan-RM-M1.md` verschoben und diese
-> Roadmap nach `docs/plan/planning/in-progress/roadmap.md` verschoben.
+> **Nächster konkreter Schritt:** Welle 1 aus
+> [`plan-RM-M1.md`](plan-RM-M1.md): Solution, Makefile, Docker-Stages und
+> Basis-Gates.
 
 ---
 
@@ -56,7 +54,7 @@ unter `in-progress/`.
 
 | Status | Meilenstein | Titel                              | Phase | Detailplan |
 | ------ | ----------- | ---------------------------------- | ----- | ---------- |
-| ⬜     | M1          | MVP — sichere Regelpipeline        | 1     | [Entwurf](plan-RM-M1.md) |
+| 🟡     | M1          | MVP — sichere Regelpipeline        | 1     | [Aktiv](plan-RM-M1.md) |
 | ⬜     | M2          | Marktausbau und Optimierung        | 1 → 2 | folgt mit Aktivierung |
 | ⬜     | M3          | Native Control Core (Library)      | 2     | folgt mit Aktivierung |
 | ⬜     | M4          | Regelleistung und OPC-UA           | 2     | folgt mit Aktivierung |

@@ -1,7 +1,7 @@
 # Plan RM-M1: MVP sichere Regelpipeline
 
 **Dokumenttyp:** Detailplan / DoD-Tracking
-**Status:** Offen / Entwurf
+**Status:** In Arbeit
 **Meilenstein:** RM-M1
 **Bezug:** [`roadmap.md`](roadmap.md), [`spec/lastenheft.md`](../../../../spec/lastenheft.md), [`spec/architecture.md`](../../../../spec/architecture.md), [`docs/user/quality.md`](../../../user/quality.md)
 
@@ -48,15 +48,15 @@ Arbeitspakete parallel laufen, solange ihre Abhängigkeiten erfüllt sind.
 
 ## Aktivierungs-Checkliste
 
-- [ ] `docs/plan/planning/open/roadmap.md` nach
+- [x] `docs/plan/planning/open/roadmap.md` nach
   `docs/plan/planning/in-progress/roadmap.md` verschieben.
-- [ ] `docs/plan/planning/open/plan-RM-M1.md` nach
+- [x] `docs/plan/planning/open/plan-RM-M1.md` nach
   `docs/plan/planning/in-progress/plan-RM-M1.md` verschieben.
-- [ ] Roadmap-Status auf M1 in Arbeit setzen und Detailplan-Link auf
+- [x] Roadmap-Status auf M1 in Arbeit setzen und Detailplan-Link auf
   `in-progress/plan-RM-M1.md` aktualisieren.
-- [ ] Rückverweise in `docs/user/quality.md`, README und offenen Planlinks
+- [x] Rückverweise in `docs/user/quality.md`, README und offenen Planlinks
   auf den neuen Roadmap-Pfad prüfen.
-- [ ] Welle 1 als ersten Umsetzungsumfang festlegen und alle übrigen
+- [x] Welle 1 als ersten Umsetzungsumfang festlegen und alle übrigen
   Arbeitspakete unverändert auf ⬜ lassen.
 - [ ] Baseline-Commit für die Aktivierung erstellen, bevor Code entsteht.
 
