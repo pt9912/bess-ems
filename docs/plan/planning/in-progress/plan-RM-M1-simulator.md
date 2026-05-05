@@ -139,9 +139,9 @@ dieses Dokument im gleichen PR angepasst werden.
 | Gate | Mindestpruefung |
 | ---- | --------------- |
 | `make test-safety` | SIM-M1-03 bis SIM-M1-10 und SIM-M1-12 fuehren zu definiert sicherem Verhalten |
-| `make test-integration` | Modbus- und MQTT-Simulatorpfade laufen gegen Beispielprofile |
+| `make test-integration` | Modbus- und MQTT-Simulatorpfade laufen gegen Beispielprofile; SIM-M1-11 weist Command-ACK-Korrelation ueber `CommandId` nach |
 | Mapping-Schema-Gate | alle Simulatorprofile enthalten die Pflichtfelder aus `plan-RM-M1.md` |
-| `make runtime` | Compose startet EMS, Postgres und Mosquitto; Simulatorpfad liefert Health-relevante Testdaten |
+| `make runtime` | Compose startet EMS, Postgres, Mosquitto und einen dedizierten Simulator-Service; Simulatorpfad liefert Health-relevante Testdaten |
 
 Fehlt ein Simulatorprofil oder ein Szenario, gilt das Gate als rot. Coverage
 ersetzt keine Szenarioabdeckung.
@@ -168,4 +168,4 @@ ersetzt keine Szenarioabdeckung.
 | ------- | ----- | --------------- |
 | SIM-OPEN-01 | Wird der Modbus-Simulator als eigener Testhost oder im Integrationstest-Prozess gestartet? | Testhost im Integrationstest-Prozess, solange Compose keinen separaten Service braucht |
 | SIM-OPEN-02 | Wird der MQTT-Simulator als eigener Prozess benoetigt? | Nein; Mosquitto plus Test-Publisher/Consumer reicht fuer M1 |
-| SIM-OPEN-03 | Braucht `make runtime` einen dedizierten Simulator-Service? | Nur falls Health/Smoke ohne Testfixture nicht stabil pruefbar ist |
+| SIM-OPEN-03 | Braucht `make runtime` einen dedizierten Simulator-Service? | Ja; `make runtime` startet einen dedizierten Simulator-Service im Compose-Profil, damit Health/Smoke nicht von Testprozess-Fixtures abhaengt |
