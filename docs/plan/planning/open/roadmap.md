@@ -89,7 +89,7 @@ AuthN/AuthZ-geschütztem Operator-Stop.
 | ⬜     | RM-M1-09   | Modbus-TCP-Adapter (Lesen + Schreiben, Mapping über Config)         | LH-MODB-001..005          |
 | ⬜     | RM-M1-10   | MQTT-Adapter (Telemetrie-Empfang, Command-Publish, Topic-Konvention) | LH-MQTT-001..003         |
 | ⬜     | RM-M1-11   | Schreibbegrenzung im Adapter unmittelbar vor Versand                | LH-SAFE-007               |
-| ⬜     | RM-M1-12   | Statischer Fahrplanimport, `MarketCommitment`-Modell + Day-Ahead-Verfolgung | LH-MKT-001/003/006/007 |
+| ⬜     | RM-M1-12   | Statischer Fahrplanimport, `MarketCommitment`-Modell, UTC/DST-Zeitmodell + Day-Ahead-Verfolgung | LH-MKT-001/003/006/007 |
 | ⬜     | RM-M1-13   | PostgreSQL-Persistenz: Telemetrie, Commands, Fahrpläne, Audit       | LH-PERSIST-001..005       |
 | ⬜     | RM-M1-14   | Retention-/Datenvolumen-Konfiguration (dokumentiert)                | LH-PERSIST-006            |
 | ⬜     | RM-M1-15   | API: Health, Status, Current Command, Schedules, Operator-Stop      | LH-API-001..004, LH-API-006 |
@@ -106,8 +106,8 @@ AuthN/AuthZ-geschütztem Operator-Stop.
   System publiziert Commands, ohne SOC-/Power-/Rampengrenzen zu verletzen.
 - Bei stale Snapshot, Emergency Stop oder Operator-Stop wird ein sicherer
   Zustand erreicht und ist im Audit-Log nachvollziehbar.
-- Day-Ahead-Fahrplan kann importiert, gespeichert und im Regelkreis
-  verfolgt werden.
+- Day-Ahead-Fahrplan kann importiert, gespeichert und mit konsistentem
+  UTC-/DST-Zeitmodell im Regelkreis verfolgt werden.
 - M1-Gates aus `docs/user/quality.md` sind reproduzierbar grün:
   `make lint`, `make test`, `make test-safety`, `make test-integration`,
   `make test-container`, `make coverage-gate`, `make build`.
@@ -118,15 +118,15 @@ AuthN/AuthZ-geschütztem Operator-Stop.
 
 ## M2 — Marktausbau und Optimierung (.NET)
 
-**Ziel:** Erweiterte Marktlogik, Zeitmodell mit Sommerzeit, einfacher
-LP-Optimierer (.NET-Interface, optional OR-Tools/HiGHS), Tracing.
+**Ziel:** Erweiterte Marktlogik auf dem M1-Zeitmodell, einfacher
+LP-Optimierer (.NET-Interface, optional OR-Tools/HiGHS), Tracing und Replay.
 
 ### Liefergegenstände
 
 | Status | ID         | Inhalt                                                              | LH-Bezug                |
 | ------ | ---------- | ------------------------------------------------------------------- | ----------------------- |
 | ⬜     | RM-M2-01   | Erweiterte Marktcommitment-Priorisierung und Optimierungsintegration | LH-MKT-003/006          |
-| ⬜     | RM-M2-02   | Vollständiges Zeitmodell (UTC intern, DST-Tests)                    | LH-MKT-007              |
+| ⬜     | RM-M2-02   | Erweiterte Zeitmodell-Nutzung für Optimierungshorizonte und Marktintervalle | LH-MKT-007              |
 | ⬜     | RM-M2-03   | LP-Implementierung des `IDispatchOptimizer` (Solver-Auswahl per Config) | LH-OPT-001..006     |
 | ⬜     | RM-M2-04   | Zielfunktion konfigurierbar (Energiebezug, Einspeise, Strafkosten)  | LH-OPT-004              |
 | ⬜     | RM-M2-05   | Optimierungs-API (`POST /markets/day-ahead/optimize`)               | LH-API-005              |
@@ -141,7 +141,11 @@ LP-Optimierer (.NET-Interface, optional OR-Tools/HiGHS), Tracing.
 - Optimierungslauf liefert verifizierbare Zeitreihe von Sollwerten, die
   Limiter nicht verletzt.
 - Marktverpflichtungen werden im Regelkreis priorisiert (LH-MKT-006).
-- DST-Übergangstest grün; Zeitintervalle werden konsistent interpretiert.
+- M1-DST-Regressionsfall bleibt grün; Optimierungshorizonte und
+  Marktintervalle werden konsistent interpretiert.
+- M2-Gates aus `docs/user/quality.md` sind aktiv: `make test-replay`
+  läuft gegen versionierte Goldens, und Test-, Coverage- und Lint-Reports
+  werden als CI-Artefakte veröffentlicht.
 
 ---
 
@@ -268,7 +272,7 @@ Kubernetes-Deployment, Edge-Anbindung. Inhalte mit hohem Diskussionsbedarf
 | RM-OPEN-04 | Authentifizierung in M1 (API-Token, OIDC)?                     | Offen  |
 | RM-OPEN-05 | Reihenfolge M3 vs. M4 — Native zuerst oder Markt-/RL zuerst?   | Offen  |
 | RM-OPEN-06 | Kriterien für spätere API-Extraktion nach dem MVP (siehe AR-OPEN-001)? | Offen  |
-| RM-OPEN-07 | Folge-ADR für Release-Pipeline-Gates vor erstem Tag `v0.1.0`?  | Offen  |
+| RM-OPEN-07 | Folge-ADR für Release-Pipeline-Gates; vor Abschluss von M1 und vor erstem Tag `v0.1.0` schließen? | Offen  |
 
 ---
 
