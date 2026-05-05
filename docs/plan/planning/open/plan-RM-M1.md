@@ -32,16 +32,33 @@ Die Roadmap bleibt die Statusseite; dieser Detailplan ist die Arbeitsliste.
 
 ## Sequenz
 
-| Welle | Fokus | Ergebnis |
-| ----- | ----- | -------- |
-| 1 | Foundation | Solution, Makefile, Docker-Stages und Basis-Gates stehen. |
-| 2 | Domain und Control | Domainmodell, Snapshot Store, State Machine, Limiter und Fallbacks sind deterministisch getestet. |
-| 3 | Config und Adapter | Modbus/MQTT-Mappings, Simulatorpfade und adapterseitige Schreibbegrenzung sind gate-relevant. |
-| 4 | Märkte, Persistenz und API | Day-Ahead, MarketCommitments, UTC/DST-Zeitmodell, PostgreSQL und M1-API sind integriert. |
-| 5 | Observability und Abschluss | Logs, Metriken, Compose, Contract-Gates, Coverage und Fullbuild schließen M1 ab. |
+| Welle | Fokus | Ergebnis | Abschluss-Gates |
+| ----- | ----- | -------- | --------------- |
+| 0 | Aktivierung | Roadmap und Detailplan liegen unter `in-progress/`; Status ist auf M1 gesetzt. | Markdown-Linkcheck, `git diff --check` |
+| 1 | Foundation | Solution, Makefile, Docker-Stages und Basis-Gates stehen. | `make lint`, `make arch-check`, `make gates` (Foundation-Auswahl) |
+| 2 | Domain und Control | Domainmodell, Snapshot Store, State Machine, Limiter und Fallbacks sind deterministisch getestet. | `make test`, `make test-safety`, `make coverage-gate` |
+| 3 | Config und Adapter | Modbus/MQTT-Mappings, Simulatorpfade und adapterseitige Schreibbegrenzung sind gate-relevant. | `make test-integration`, Contract-Gates für Mapping und Startvalidierung |
+| 4 | Märkte, Persistenz und API | Day-Ahead, MarketCommitments, UTC/DST-Zeitmodell, PostgreSQL und M1-API sind integriert. | `make test-integration`, OpenAPI/AuthZ-Gates, `make coverage-gate` |
+| 5 | Observability und Abschluss | Logs, Metriken, Compose, Contract-Gates, Coverage und Fullbuild schließen M1 ab. | `make ci`, `make runtime`, `make fullbuild` |
 
 Die Wellen sind eine empfohlene Reihenfolge. Innerhalb einer Welle dürfen
 Arbeitspakete parallel laufen, solange ihre Abhängigkeiten erfüllt sind.
+
+---
+
+## Aktivierungs-Checkliste
+
+- [ ] `docs/plan/planning/open/roadmap.md` nach
+  `docs/plan/planning/in-progress/roadmap.md` verschieben.
+- [ ] `docs/plan/planning/open/plan-RM-M1.md` nach
+  `docs/plan/planning/in-progress/plan-RM-M1.md` verschieben.
+- [ ] Roadmap-Status auf M1 in Arbeit setzen und Detailplan-Link auf
+  `in-progress/plan-RM-M1.md` aktualisieren.
+- [ ] Rückverweise in `docs/user/quality.md`, README und offenen Planlinks
+  auf den neuen Roadmap-Pfad prüfen.
+- [ ] Welle 1 als ersten Umsetzungsumfang festlegen und alle übrigen
+  Arbeitspakete unverändert auf ⬜ lassen.
+- [ ] Baseline-Commit für die Aktivierung erstellen, bevor Code entsteht.
 
 ---
 
@@ -71,7 +88,7 @@ Arbeitspakete parallel laufen, solange ihre Abhängigkeiten erfüllt sind.
 | ⬜ | RM-M1-16 | AuthN/AuthZ/Audit | RM-M1-15 | Schreibende Endpunkte sind geschützt; unberechtigte Zugriffe liefern 401/403 und Audit-Einträge. |
 | ⬜ | RM-M1-17 | Observability | RM-M1-07, RM-M1-13 | JSON-Logs mit Reason-Feld und Prometheus-Metriken sind exportierbar und getestet. |
 | ⬜ | RM-M1-19 | Container/Compose | RM-M1-09, RM-M1-10, RM-M1-13, RM-M1-15 | Dockerfile und Compose starten `bess-ems`, PostgreSQL und MQTT-Broker lokal reproduzierbar. |
-| ⬜ | RM-M1-20 | Quality-Gates | alle M1-Pakete | Lint, Unit, Safety, Integration, Contract, Container und Coverage laufen reproduzierbar grün. |
+| ⬜ | RM-M1-20 | Quality-Gates | wächst je Welle; Abschluss nach RM-M1-19 | Lint, Unit, Safety, Integration, Contract, Container und Coverage laufen reproduzierbar grün. Jede Welle aktiviert ihre Gates sofort; fehlende Gates werden nicht bis zum M1-Ende aufgeschoben. |
 
 ---
 
@@ -115,6 +132,20 @@ leben in M1 als Namespaces innerhalb von `BatteryEms.Application`.
 | `make ci` | CI-kompatibler Lauf der verbindlichen M1-Gates in dokumentierter Reihenfolge | RM-M1-20, RM-M1-21 |
 | `make runtime` | Runtime-Smoke: Compose-Start, `/health`-Prüfung und Shutdown | RM-M1-19, RM-M1-21 |
 | `make fullbuild` | Fresh-clone-naher Komplettlauf inkl. Gates, Build und Runtime-Smoke | RM-M1-20, RM-M1-21 |
+
+### Gate-Aktivierung nach Wellen
+
+| Welle | Neu verpflichtend | Darf noch fehlen |
+| ----- | ----------------- | ---------------- |
+| 1 | `make lint`, `make arch-check`, `make gates` mit Foundation-Auswahl | fachliche Adapter, Persistenz, API, Runtime-Smoke |
+| 2 | `make test`, `make test-safety`, Coverage für Domain/Application | Adapter-Integration, OpenAPI, Container-Smoke |
+| 3 | `make test-integration` für Modbus, MQTT und Startvalidierung; Mapping-Schema-Gate | API-Vertrag, Persistenzvollständigkeit, Runtime-Smoke |
+| 4 | API-/AuthZ-/OpenAPI-Gates, Persistenztests, Zeitmodell-/DST-Regressionsfälle | Fullbuild und Runtime-Smoke als Abschlussgate |
+| 5 | `make ci`, `make runtime`, `make fullbuild`, vollständiges Coverage-Gate | nichts; offene Abweichungen brauchen ADR oder Roadmap-Patch |
+
+Gates werden mit ihrer Aktivierungswelle in `make gates` und `make ci`
+eingehängt. Temporär nicht aktive Gates müssen im Makefile sichtbar bleiben
+und mit einer klaren Meldung auf ihre Aktivierungswelle verweisen.
 
 Vertrags-Gates:
 
@@ -165,11 +196,11 @@ Formate braucht, muss dieser Abschnitt mit dem jeweiligen PR angepasst werden.
 
 ## Blocker und Entscheidungen
 
-| Kennung | Entscheidung | Blockiert | Status |
-| ------- | ------------ | --------- | ------ |
-| RM-OPEN-02 | Erste Herstellerintegration und daraus folgende Modbus-/MQTT-Beispielprofile | finale Adapter-Fixtures | Offen |
-| RM-OPEN-04 | Authentifizierungsverfahren: API-Token, OIDC oder mTLS | RM-M1-16, OpenAPI-Security-Schema | Offen |
-| RM-OPEN-07 | Release-Pipeline-Gates vor M1-Abschluss und erstem Tag `v0.1.0` konkretisieren | Abschluss von RM-M1 | Offen |
+| Kennung | Entscheidung | Blockiert ab | Default, falls nicht entschieden | Status |
+| ------- | ------------ | ------------ | -------------------------------- | ------ |
+| RM-OPEN-02 | Erste Herstellerintegration und daraus folgende Modbus-/MQTT-Beispielprofile | RM-M1-09, RM-M1-10 | Herstellerneutrale Simulatorprofile bleiben verbindlich; reale Herstellerprofile werden nach M1 als Folgepaket geplant. | Offen |
+| RM-OPEN-04 | Authentifizierungsverfahren: API-Token, OIDC oder mTLS | RM-M1-15, spätestens RM-M1-16 | API-Token mit rollenbasierter Operator-Rolle für M1; OIDC/mTLS bleiben Erweiterung nach ADR. | Offen |
+| RM-OPEN-07 | Release-Pipeline-Gates vor M1-Abschluss und erstem Tag `v0.1.0` konkretisieren | RM-M1-20 Abschluss | Kein `v0.1.0`-Tag ohne Folge-ADR; M1 darf ohne Release-Tag abgeschlossen werden. | Offen |
 
 Ein Blocker darf nur in einen späteren Meilenstein verschoben werden, wenn
 Roadmap, Lastenheft-Bezug und betroffene Gates im gleichen PR angepasst werden.
