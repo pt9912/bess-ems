@@ -9,6 +9,7 @@
 #   compile  — fast `go build` feedback
 #   lint     — golangci-lint with the SOLID-leaning profile in .golangci.yml
 #   test     — `go test ./...`
+#   race     — `go test -race` on packages with real concurrency (CGO=1)
 #   coverage — coverage profile + threshold gate (default 90%)
 #   build    — production binary
 #   runtime  — distroless image
@@ -35,6 +36,19 @@ RUN golangci-lint run ./...
 FROM deps AS test
 COPY . .
 RUN CGO_ENABLED=0 go test ./...
+
+# Race-detector gate. Scoped to the packages that actually spawn or
+# interact with goroutines (modbus server registers/handler split,
+# Paho Publish/cancel race) so the stage stays focused. CGO=1 is
+# required by `-race`; the default golang image ships gcc so no extra
+# install. Only this stage links libc — runtime/build stages stay
+# CGO=0 and distroless-compatible.
+FROM deps AS race
+COPY . .
+RUN CGO_ENABLED=1 go test -race -count=1 \
+    ./internal/modbus/... \
+    ./internal/mqtt/... \
+    ./internal/runtime/...
 
 FROM deps AS coverage
 ARG COVERAGE_THRESHOLD=90

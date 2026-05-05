@@ -8,10 +8,13 @@ NO_CACHE_FILTER_TEST     := --no-cache-filter test
 NO_CACHE_FILTER_LINT     := --no-cache-filter lint
 NO_CACHE_FILTER_COVERAGE := --no-cache-filter coverage
 
-.PHONY: test lint build deps compile run coverage coverage-gate clean
+.PHONY: test race lint build deps compile run coverage coverage-gate clean
 
 test:
 	docker build $(NO_CACHE_FILTER_TEST) --target test -t $(IMAGE):test .
+
+race:
+	docker build --no-cache-filter race --target race -t $(IMAGE):race .
 
 lint:
 	docker build $(NO_CACHE_FILTER_LINT) --target lint -t $(IMAGE):lint .

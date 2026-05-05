@@ -21,7 +21,7 @@ DOCKER_BUILD = $(DOCKER) build $(BUILD_CONTEXT) \
 .PHONY: help \
 	lint arch-check gates \
 	test test-safety test-integration test-container coverage-gate \
-	simulator-test simulator-lint simulator-coverage-gate \
+	simulator-test simulator-race simulator-lint simulator-coverage-gate \
 	build ci runtime fullbuild
 
 help:
@@ -49,6 +49,7 @@ help:
 	@echo ""
 	@echo "Welle 3 (Simulator + Adapters, partially active):"
 	@echo "  make simulator-test          Go simulator unit tests"
+	@echo "  make simulator-race          Race-detector on goroutine-bearing packages (CGO=1)"
 	@echo "  make simulator-lint          golangci-lint with SOLID profile"
 	@echo "  make simulator-coverage-gate Go coverage gate (90% line)"
 	@echo "  make test-integration        pending (RM-M1-09/10/11)"
@@ -77,8 +78,8 @@ coverage-gate:
 
 # --- Aggregated gates ------------------------------------------------------
 
-gates: lint arch-check test test-safety coverage-gate simulator-lint simulator-test simulator-coverage-gate
-	@echo "[gates] M1 mandatory gates green: lint, arch-check, test, test-safety, coverage-gate, simulator-{lint,test,coverage-gate}"
+gates: lint arch-check test test-safety coverage-gate simulator-lint simulator-test simulator-race simulator-coverage-gate
+	@echo "[gates] M1 mandatory gates green: lint, arch-check, test, test-safety, coverage-gate, simulator-{lint,test,race,coverage-gate}"
 
 # --- Welle 3 (partially active) --------------------------------------------
 
@@ -87,6 +88,9 @@ SIMULATOR_MAKE := $(MAKE) -C $(SIMULATOR_DIR)
 
 simulator-test:
 	$(SIMULATOR_MAKE) test
+
+simulator-race:
+	$(SIMULATOR_MAKE) race
 
 simulator-lint:
 	$(SIMULATOR_MAKE) lint
