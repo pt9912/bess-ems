@@ -132,10 +132,11 @@ ohne diese Felder verletzen das Contract-Gate.
 | `range` | ja | `[min, max]` | Plausibilisierung, stale-/invalid-Erkennung. |
 | `writable` | ja | bool | Trennung Lese-/Schreibpfad, AuthZ-Eingriffspunkt. |
 | `enum` | optional | Mapping `int → string` | Symbolische Zustände (z. B. State-Codes). |
-| `write_cadence` | ja | enum: `cyclic \| once_per_day \| one_shot` | Hardware-Schutz gegen unzulässig häufige Schreibvorgänge (siehe SMA-Befund in `../open/note-vendor-shortlist.md`). |
-| `auth_required` | ja | bool oder Token-Referenz | Vendor-Auth-Vorbedingung für Schreibzugriffe (z. B. SMA Grid Guard). |
+| `write_cadence` | ja | enum: `cyclic \| once_per_day \| one_shot \| heartbeat \| cooldown` | Hardware-Schutz und Liveness-Pflichten. Belege: SMA Sunny Island (`cyclic`/`once_per_day`), Socomec SunSpec Model 715 (`heartbeat` jede Sekunde), Socomec Model 802 DISCONNECT (`cooldown` 5 Minuten). Quellen siehe `../open/note-vendor-shortlist.md`. |
+| `auth_required` | ja | enum: `none \| network \| token` | Vendor-Auth-Vorbedingung für Schreibzugriffe. Belege: Victron (`none`), Socomec (`network` — Firewall/IP-Allowlist), SMA Sunny Island (`token` — Grid Guard). |
 | `firmware_constraint` | optional | Min-Firmware-Filter | Firmwareabhängige Datentyp-/Skalierungswechsel (z. B. Sungrow SH-Serie). |
-| `unit_id_discovery` | ja, auf Adapter-Ebene | enum: `static \| dynamic` | Bedient feste Unit-IDs (SMA) und dynamische Zuweisung (Victron CCGX/Cerbo). |
+| `unit_id_discovery` | ja, auf Adapter-Ebene | enum: `static \| dynamic \| sunspec` | Bedient feste Unit-IDs (SMA), dynamische Zuweisung (Victron CCGX/Cerbo) und SunSpec-Anker-Discovery (Socomec). |
+| `sunspec_model` | optional, Pflicht bei `unit_id_discovery=sunspec` | Modell-ID (z. B. `1`, `701`, `704`, `715`, `802`, `803`) | Erlaubt einem Adapter, ein Mapping direkt gegen die SunSpec-Spezifikation aufzulösen statt gegen vendor-spezifische Adressen. |
 
 Die Pflichtfelder gehören in das JSON-Schema unter `config/schema/`. Die
 Beispielmappings unter `config/examples/adapters/` müssen alle
@@ -195,7 +196,8 @@ Vertrags-Gates:
 | Datensatz | Mindestinhalt | Zweck |
 | --------- | ------------- | ----- |
 | `config/examples/asset.single-bess.json` | Ein BatteryAsset mit SOC-, Power-, Temperatur- und Rampengrenzen | Startup- und Mapping-Validierung |
-| `config/examples/adapters/modbus.simulator.json` | Registerprofil für SOC, Power, Temperatur, Verfügbarkeit und Command-Write | Modbus-Integration |
+| `config/examples/adapters/modbus.simulator.json` | Registerprofil für SOC, Power, Temperatur, Verfügbarkeit und Command-Write; herstellerneutral, alle Pflichtfelder aus „Mapping-Schema-Pflichtfelder" befüllt | Modbus-Integration, Validierung des vendor-spezifischen Pfads |
+| `config/examples/adapters/modbus.sunspec-simulator.json` | SunSpec-konformes Profil mit `unit_id_discovery=sunspec` und mindestens den Modellen 1 (Common), 701 (DER AC Measurement), 704 (DER AC Controls), 715 (DER Ctl, inkl. `write_cadence=heartbeat`) und 802 (Battery Base, inkl. `write_cadence=cooldown` für DISCONNECT) | SunSpec-Pfad-Validierung; deckt Querschnittsstrategie aus `../open/note-vendor-shortlist.md` ab |
 | `config/examples/adapters/mqtt.simulator.json` | Topics für Telemetrie, Command und Command-ACK | MQTT-Integration |
 | `tests/fixtures/schedules/day-ahead-basic.json` | 24h-Day-Ahead-Fahrplan in UTC | Fahrplanimport und Regelkreis |
 | `tests/fixtures/schedules/day-ahead-dst-transition.json` | DST-Übergang mit eindeutigen UTC-Zeitpunkten | Zeitmodell-Regression |
