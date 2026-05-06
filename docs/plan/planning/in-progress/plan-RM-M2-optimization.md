@@ -108,3 +108,18 @@ RM-M1-13, Application-IO-Ports aus RM-M1-13a. Der Optimization-Adapter
 `NoOpDispatchOptimizer` (RM-M1-08); M2 ergänzt ihn um die
 Schedule-Optimizer-Implementierung, ohne den Single-Step-Pfad zu
 ersetzen.
+
+---
+
+## Folgewelle: HIL-Simulator (nach RM-M2-OP-05)
+
+Sobald RM-M2-OP-05 (LP-Solver-Adapter) ein Resultat liefert, zieht die
+HIL-Welle aus [`../open/HIL-simulator.md`](../open/HIL-simulator.md)
+nach `in-progress/`. HIL prüft das LP-Resultat gegen ein dynamisches
+PCS-/PQ-Capability-Modell des externen Images
+`bess-hil-simulator:local`. Die in HIL-01..05 nötigen
+Modbus-Adapter-Erweiterungen (Input Registers, Word-Order, optionaler
+Q-Setpoint) sind gleichzeitig Vorarbeit für RM-M4 (OPC-UA / Vendor-
+Profile mit MW-Skalierung). HIL bleibt **kein M2-Pflichtgate** —
+`make gates`/`make ci`/`make test-integration` bleiben auf den Go-
+`bess-field-sim` ausgerichtet.

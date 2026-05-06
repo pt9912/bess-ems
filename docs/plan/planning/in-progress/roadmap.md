@@ -142,6 +142,18 @@ ist in [`plan-RM-M2-optimization.md`](plan-RM-M2-optimization.md)
 detailliert. Der Plan ist seit M1-Abschluss in `in-progress/` und übernimmt
 die Verantwortung für die Optimization-/Run-Arbeitspakete.
 
+**Folgewelle:** Der Hardware-in-the-Loop-Pfad gegen das externe
+`bess-hil-simulator:local`-Image ist als zweite M2-Welle vorgemerkt.
+Detail-Entwurf:
+[`open/HIL-simulator.md`](../open/HIL-simulator.md). Aktivierungs-
+Trigger: nach RM-M2-OP-05 (LP-Solver-Adapter steht), damit das LP-
+Resultat gegen ein dynamisches PCS-/PQ-Capability-Modell sanity-
+geprüft werden kann. Modbus-Adapter-Erweiterungen aus dem HIL-Plan
+(Input Registers, Word-Order, Q-Setpoint) sind gleichzeitig
+Vorarbeit für RM-M4 (OPC-UA / Vendor-Profile mit MW-Skalierung).
+HIL ist und bleibt **kein M2-Pflichtgate** — `make gates` und
+`make test-integration` bleiben auf den Go-`bess-field-sim` ausgerichtet.
+
 ### Liefergegenstände
 
 | Status | ID         | Inhalt                                                              | LH-Bezug                |

@@ -1,9 +1,15 @@
 # Plan: HIL-Simulator-Integration
 
-**Dokumenttyp:** Offener Detailplan / Integrationsnotiz
-**Status:** Offen
+**Dokumenttyp:** Offener Detailplan / M2-Folgewelle
+**Status:** Vorgemerkt für RM-M2-Folgewelle nach RM-M2-OP-05; bleibt
+unter `open/`, bis der LP-Solver-Adapter aus dem aktiven M2-Plan
+([`../in-progress/plan-RM-M2-optimization.md`](../in-progress/plan-RM-M2-optimization.md))
+ein Resultat liefert, das gegen ein dynamisches PCS-/PQ-Capability-
+Modell sanity-geprüft werden soll.
 **Quelle:** `/Development/bess/bess-hil-simulator`
-**Bezug:** `docs/plan/planning/done/plan-RM-M1.md`,
+**Bezug:** [`../in-progress/roadmap.md`](../in-progress/roadmap.md)
+(M2-Folgewelle), [`../in-progress/plan-RM-M2-optimization.md`](../in-progress/plan-RM-M2-optimization.md)
+(Aktivierungs-Trigger), `docs/plan/planning/done/plan-RM-M1.md`,
 `docs/plan/planning/done/plan-RM-M1-simulator.md`,
 `docs/user/quality.md`, `spec/lastenheft.md`, `spec/architecture.md`
 
@@ -250,7 +256,7 @@ Folgetests:
 | Kennung | Frage | Default |
 | ------- | ----- | ------- |
 | HIL-OPEN-01 | Wird das HIL-Image lokal gebaut oder über Registry referenziert? | lokal bauen: `bess-hil-simulator:local` |
-| HIL-OPEN-02 | Gehört der HIL-Pfad noch zu RM-M1-Folgearbeiten oder zu RM-M2? | RM-M2/Folgegate, solange keine M1-Abnahme davon abhängt |
+| HIL-OPEN-02 | Gehört der HIL-Pfad noch zu RM-M1-Folgearbeiten oder zu RM-M2? | **Geschlossen:** RM-M2-Folgewelle. Aktivierungs-Trigger ist RM-M2-OP-05 (LP-Solver-Adapter steht); HIL bleibt optional und bricht `make gates` nicht. |
 | HIL-OPEN-03 | Wird der HIL-Simulator um SOC/SOH/Availability ergänzt oder bleibt er PCS-/Grid-orientiert? | zunächst PCS-/Grid-orientiert |
 | HIL-OPEN-04 | Soll HIL-CSV als Testartefakt persistiert werden? | nur optional für Debugging, Assertions über Modbus |
 | HIL-OPEN-05 | Ist `word_order=low_high` für HIL korrekt? | im ersten HIL-Test gegen Rohregister verifizieren |
