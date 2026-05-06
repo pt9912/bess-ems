@@ -136,6 +136,12 @@ AuthN/AuthZ-geschütztem Operator-Stop.
 **Ziel:** Erweiterte Marktlogik auf dem M1-Zeitmodell, einfacher
 LP-Optimierer (.NET-Interface, optional OR-Tools/HiGHS), Tracing und Replay.
 
+**Detailplan:** Der Schedule-Optimizer- und Run-Persistenz-Slice
+(RM-M2-03/04/05/09 und Anschluss an LH-OPT-007/008/009 + LH-PERSIST-007)
+ist in [`open/plan-RM-M2-optimization.md`](../open/plan-RM-M2-optimization.md)
+detailliert. Der Plan rückt nach M1-Abschluss in `in-progress/` und übernimmt
+dort die Verantwortung für die Optimization-/Run-Arbeitspakete.
+
 ### Liefergegenstände
 
 | Status | ID         | Inhalt                                                              | LH-Bezug                |
