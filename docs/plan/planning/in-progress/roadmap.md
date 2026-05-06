@@ -45,8 +45,20 @@ unter `in-progress/`.
 > Mosquitto + bess-field-sim) liefert `/health = ok` inkl. Postgres-Probe.
 > **Aktive Phase:** M2 — Marktausbau und Optimierung. Detailplan:
 > [`plan-RM-M2-optimization.md`](plan-RM-M2-optimization.md).
-> **Nächster konkreter Schritt:** Welle 1 aus dem M2-Plan
-> (LP/MILP-Schedule-Optimizer-Interface + `OptimizationRun`-Persistenz-Slice).
+> **M2-Welle 1 (Optimization-Slice):** Geliefert sind RM-M2-OP-01..04
+> + 07 — Domain-Records mit LH-OPT-009-Payload und Invarianten,
+> `IScheduleOptimizer`-Driven-Port mit Architektur-Tabus für die
+> Horizon-↔-Dispatch-Trennung, `IScheduleOptimizationUseCase` als
+> API-Driving-Port, `IOptimizationRunRepository`-In-Memory-Variante,
+> und `POST /markets/day-ahead/optimize` operator-policy-guarded.
+> `NoOpScheduleOptimizer` läuft als Default-Wiring (Failed/
+> no-solver-configured) bis OP-05. `make ci`, `make fullbuild`,
+> `make runtime` reproduzierbar grün; 383 Tests gesamt.
+> **Nächster konkreter Schritt:** RM-M2-OP-05 — LP-Solver-Adapter
+> mit OR-Tools NuGet (RM-M2-OP-OPEN-01 als Default geschlossen).
+> Alternativ vorziehbar: RM-M2-OP-08 (Prometheus-Metriken für
+> Solverzeit + Run-Counter), wenn der Solver zuerst beobachtbar
+> sein soll.
 
 ---
 
