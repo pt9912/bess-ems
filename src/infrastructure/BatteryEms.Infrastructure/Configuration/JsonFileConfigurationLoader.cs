@@ -344,6 +344,7 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
         return value.Value;
     }
 
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "Instantiated by JsonSerializer via reflection.")]
     private sealed record ModbusMappingDto(
         string ProfileName,
@@ -351,6 +352,7 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
         int? StaticUnitId,
         List<ModbusRegisterDto>? Registers);
 
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "Instantiated by JsonSerializer via reflection.")]
     private sealed record ModbusRegisterDto(
         string Name,
@@ -372,11 +374,13 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
         DevicePointAlarmDto? Alarm = null,
         Dictionary<string, string>? ValueExplanation = null);
 
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "Instantiated by JsonSerializer via reflection.")]
     private sealed record MqttMappingDto(
         string ProfileName,
         List<MqttTopicDto>? Topics);
 
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "Instantiated by JsonSerializer via reflection.")]
     private sealed record MqttTopicDto(
         string Name,
@@ -392,12 +396,14 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
         DevicePointAlarmDto? Alarm = null,
         Dictionary<string, string>? ValueExplanation = null);
 
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "Instantiated by JsonSerializer via reflection.")]
     private sealed record DevicePointAlarmDto(
         double? Min,
         double? Max,
         string? Severity);
 
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "Instantiated by JsonSerializer via reflection.")]
     private sealed record ScheduleDto(
         string AssetId,
@@ -406,12 +412,14 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
         int Version,
         List<ScheduleWindowDto>? Windows);
 
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "Instantiated by JsonSerializer via reflection.")]
     private sealed record ScheduleWindowDto(
         DateTimeOffset Start,
         DateTimeOffset End,
         double TargetPowerKw);
 
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "Instantiated by JsonSerializer via reflection.")]
     private sealed record RetentionPolicyDto(
         TimeSpan? TelemetryRetention,

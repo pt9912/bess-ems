@@ -1,9 +1,18 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <RootNamespace>BatteryEms.Api</RootNamespace>
     <AssemblyName>BatteryEms.Api</AssemblyName>
+    <!-- HTTP request/response DTOs and the AssemblyMarker are intentionally
+         public so OpenAPI codegen / contract test projects can pick them up.
+         CA1515 suggests internal for an "application" assembly; this is the
+         documented exception. -->
+    <NoWarn>$(NoWarn);CA1515</NoWarn>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\hexagon\BatteryEms.Application\BatteryEms.Application.csproj" />

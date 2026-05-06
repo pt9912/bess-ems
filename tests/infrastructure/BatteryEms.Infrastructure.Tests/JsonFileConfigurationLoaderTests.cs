@@ -192,6 +192,119 @@ public sealed class JsonFileConfigurationLoaderTests
     }
 
     [Fact]
+    public void Modbus_register_with_only_exportable_false_still_surfaces_device_point_metadata()
+    {
+        // Locks the BuildDevicePoint branch where every other LH-DOM-005
+        // metadata field is empty but exportable=false alone counts as
+        // "operator opted out of northbound export"; that has to surface
+        // a non-null DevicePoint so consumers can tell ignored points
+        // apart from points without metadata.
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson(
+            """
+            {
+              "profile_name": "p",
+              "unit_id_discovery": "static",
+              "static_unit_id": 1,
+              "registers": [
+                {
+                  "name": "internal_only",
+                  "exportable": false,
+                  "address": 300,
+                  "type": "uint16",
+                  "scale_factor": 1,
+                  "range": [0, 1],
+                  "writable": false,
+                  "write_cadence": "cyclic",
+                  "auth_required": "none"
+                }
+              ]
+            }
+            """);
+        try
+        {
+            var mapping = loader.LoadModbusMapping(path);
+            var register = Assert.Single(mapping.Registers);
+            Assert.NotNull(register.DevicePoint);
+            Assert.False(register.DevicePoint!.Exportable);
+            Assert.Null(register.DevicePoint.DisplayName);
+            Assert.Null(register.DevicePoint.Unit);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Theory]
+    [InlineData("intraday", BatteryEms.Domain.ScheduleType.Intraday)]
+    [InlineData("regel_leistung_reserve", BatteryEms.Domain.ScheduleType.RegelLeistungReserve)]
+    public void Schedule_loader_accepts_non_day_ahead_types(string wireType, BatteryEms.Domain.ScheduleType expected)
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson(
+            $$"""
+            {
+              "asset_id": "single-bess-1",
+              "type": "{{wireType}}",
+              "market_bid_area": "DE-LU",
+              "version": 1,
+              "windows": [
+                { "start": "2026-05-06T00:00:00Z", "end": "2026-05-06T01:00:00Z", "target_power_kw": 0 }
+              ]
+            }
+            """);
+        try
+        {
+            var schedule = loader.LoadSchedule(path);
+            Assert.Equal(expected, schedule.Type);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Modbus_loader_rejects_non_integer_enum_key()
+    {
+        // The Modbus mapping schema allows arbitrary string keys in `enum`
+        // because JSON object keys are strings; the loader is the layer
+        // that enforces "keys must be integer-parseable register values".
+        // This locks that boundary.
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson(
+            """
+            {
+              "profile_name": "p",
+              "unit_id_discovery": "static",
+              "static_unit_id": 1,
+              "registers": [
+                {
+                  "name": "operating_mode",
+                  "address": 200,
+                  "type": "uint16",
+                  "scale_factor": 1,
+                  "range": [0, 3],
+                  "writable": false,
+                  "write_cadence": "cyclic",
+                  "auth_required": "none",
+                  "enum": { "0": "stop", "running": "running" }
+                }
+              ]
+            }
+            """);
+        try
+        {
+            Assert.Throws<ConfigurationValidationException>(() => loader.LoadModbusMapping(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void Modbus_register_without_required_name_fails_schema_via_device_point_base()
     {
         // device_point_base owns the required-name rule. Without name the

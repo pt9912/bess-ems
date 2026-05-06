@@ -75,6 +75,11 @@ RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.cs
     --configuration "${BUILD_CONFIGURATION}" \
     --no-build \
     --no-restore \
+    --logger "console;verbosity=normal" \
+ && dotnet test tests/adapters/driving/BatteryEms.Api.Tests/BatteryEms.Api.Tests.csproj \
+    --configuration "${BUILD_CONFIGURATION}" \
+    --no-build \
+    --no-restore \
     --logger "console;verbosity=normal"
 
 # ---------------------------------------------------------------------------
@@ -103,6 +108,12 @@ RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.cs
 # ---------------------------------------------------------------------------
 FROM lint AS coverage-gate
 ARG BUILD_CONFIGURATION
+# ExcludeByFile drops Microsoft.AspNetCore.OpenApi-generated source files
+# (and any other source-generator output) from the report so the OpenApi
+# transformer types — which the source generator emits into every project
+# transitively reaching the Api package via central package pinning —
+# don't drag the percentage down. The generated file convention is
+# Roslyn-standard `obj/.../*.generated.cs`.
 RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.csproj \
     --configuration "${BUILD_CONFIGURATION}" \
     --no-restore \
@@ -110,6 +121,7 @@ RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.cs
     /p:CoverletOutputFormat=cobertura \
     /p:CoverletOutput=/src/coverage/Domain/ \
     /p:Include="[BatteryEms.Domain]*" \
+    /p:ExcludeByFile="**/*.generated.cs" \
     /p:Threshold=90 \
     /p:ThresholdType=line \
     /p:ThresholdStat=total \
@@ -120,6 +132,7 @@ RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.cs
     /p:CoverletOutputFormat=cobertura \
     /p:CoverletOutput=/src/coverage/Application/ \
     /p:Include="[BatteryEms.Application]*%2C[BatteryEms.Adapters.Optimization]*" \
+    /p:ExcludeByFile="**/*.generated.cs" \
     /p:Threshold=90 \
     /p:ThresholdType=line \
     /p:ThresholdStat=total \
@@ -130,6 +143,7 @@ RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.cs
     /p:CoverletOutputFormat=cobertura \
     /p:CoverletOutput=/src/coverage/Infrastructure/ \
     /p:Include="[BatteryEms.Infrastructure]*" \
+    /p:ExcludeByFile="**/*.generated.cs" \
     /p:Threshold=90 \
     /p:ThresholdType=line \
     /p:ThresholdStat=total \
@@ -141,6 +155,7 @@ RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.cs
     /p:CoverletOutput=/src/coverage/Modbus/ \
     /p:Include="[BatteryEms.Adapters.Modbus]*" \
     /p:Exclude="[BatteryEms.Adapters.Modbus]*.FluentModbusClient" \
+    /p:ExcludeByFile="**/*.generated.cs" \
     /p:Threshold=90 \
     /p:ThresholdType=line \
     /p:ThresholdStat=total
