@@ -137,3 +137,25 @@ public sealed record OperatorStopResponse(
     string Operator,
     string Reason,
     DateTimeOffset ActivatedAt);
+
+// Body for POST /markets/day-ahead/optimize. TimeStepSeconds keeps the
+// wire shape JSON-friendly (TimeSpan would force ISO-8601 round-trip);
+// the endpoint converts it to TimeSpan before handing off to the
+// application. PricesPerStep + PriceUnit are optional but, when set,
+// must align with the horizon (validated in the application layer).
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+public sealed record OptimizationRequestBody(
+    string AssetId,
+    string ScheduleType,
+    DateTimeOffset HorizonStart,
+    DateTimeOffset HorizonEnd,
+    double TimeStepSeconds,
+    IReadOnlyList<double>? PricesPerStep = null,
+    string? PriceUnit = null);
+
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+public sealed record OptimizationResponse(
+    Guid RunId,
+    OptimizationSolverStatus Status,
+    int? ProducedScheduleVersion,
+    string TerminationReason);

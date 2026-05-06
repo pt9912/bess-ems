@@ -2,6 +2,7 @@ using BatteryEms.Application.Api;
 using BatteryEms.Application.Assets;
 using BatteryEms.Application.Control;
 using BatteryEms.Application.Markets;
+using BatteryEms.Application.Optimization;
 using BatteryEms.Application.Persistence;
 using BatteryEms.Application.Realtime;
 using BatteryEms.Application.Time;
@@ -28,11 +29,22 @@ public static class ApplicationServiceRegistration
         services.AddSingleton<IOperatorStopRegistry, InMemoryOperatorStopRegistry>();
         services.AddSingleton<IOperatorAuditLog, InMemoryOperatorAuditLog>();
 
+        // Optimization-run persistence (RM-M2-OP-04). Dapper variant
+        // lands in RM-M2-OP-06 and replaces this binding via the
+        // composition root, mirroring the M1 in-memory ↔ Dapper pattern.
+        services.AddSingleton<IOptimizationRunRepository, InMemoryOptimizationRunRepository>();
+
+        // Schedule optimiser default — stays Failed/no-solver-configured
+        // until RM-M2-OP-05 plugs in the OR-Tools adapter through the
+        // Composition Root.
+        services.AddSingleton<IScheduleOptimizer, NoOpScheduleOptimizer>();
+
         // Driving-port use cases.
         services.AddSingleton<IHealthQuery, DefaultHealthQuery>();
         services.AddSingleton<IBatteryStatusQuery, DefaultBatteryStatusQuery>();
         services.AddSingleton<IScheduleQuery, DefaultScheduleQuery>();
         services.AddSingleton<IOperatorStopUseCase, DefaultOperatorStopUseCase>();
+        services.AddSingleton<IScheduleOptimizationUseCase, DefaultScheduleOptimizationUseCase>();
         return services;
     }
 

@@ -2,6 +2,8 @@ using System.Security.Claims;
 using BatteryEms.Api.Auth;
 using BatteryEms.Api.Contracts;
 using BatteryEms.Application.Api;
+using BatteryEms.Application.Assets;
+using BatteryEms.Application.Optimization;
 using BatteryEms.Application.Persistence;
 using BatteryEms.Application.Time;
 using BatteryEms.Domain;
@@ -21,6 +23,7 @@ public static class BatteryEmsEndpoints
         MapCurrentCommand(routes);
         MapCurrentSchedules(routes);
         MapOperatorStop(routes);
+        MapDayAheadOptimize(routes);
         return routes;
     }
 
@@ -175,4 +178,75 @@ public static class BatteryEmsEndpoints
             .WithName("OperatorStop")
             .WithSummary("Operator-driven safe stop for an asset (LH-API-006/007).");
     }
+
+    private static void MapDayAheadOptimize(IEndpointRouteBuilder routes)
+    {
+        // LH-API-005: triggers a day-ahead schedule optimisation. The use
+        // case persists the OptimizationRun + replaces the schedule
+        // version (RM-M2-OP-03); the response is the API-facing summary.
+        // Operator-policy guarded — schedule optimisation is a write
+        // action against the schedule repository.
+        routes.MapPost("/markets/day-ahead/optimize", async (
+                OptimizationRequestBody body,
+                IBatteryAssetRegistry assets,
+                IScheduleOptimizationUseCase useCase,
+                CancellationToken ct) =>
+            {
+                if (body is null
+                    || string.IsNullOrWhiteSpace(body.AssetId)
+                    || body.TimeStepSeconds <= 0
+                    || body.HorizonStart >= body.HorizonEnd)
+                {
+                    return Results.BadRequest(new { error = "missing-or-invalid-field" });
+                }
+
+                var asset = assets.Find(body.AssetId);
+                if (asset is null)
+                {
+                    return Results.NotFound(new { error = "asset-not-registered", asset_id = body.AssetId });
+                }
+
+                var scheduleType = ParseScheduleType(body.ScheduleType);
+                if (scheduleType is null)
+                {
+                    return Results.BadRequest(new { error = "unknown-schedule-type", value = body.ScheduleType });
+                }
+
+                ScheduleOptimizationRequest request;
+                try
+                {
+                    request = new ScheduleOptimizationRequest(
+                        assetId: body.AssetId,
+                        scheduleType: scheduleType.Value,
+                        asset: asset,
+                        horizonStart: body.HorizonStart,
+                        horizonEnd: body.HorizonEnd,
+                        timeStep: TimeSpan.FromSeconds(body.TimeStepSeconds),
+                        pricesPerStep: body.PricesPerStep,
+                        priceUnit: body.PriceUnit);
+                }
+                catch (ArgumentException ex)
+                {
+                    return Results.BadRequest(new { error = "invalid-request", detail = ex.Message });
+                }
+
+                var outcome = await useCase.ExecuteAsync(request, ct).ConfigureAwait(false);
+                return Results.Ok(new OptimizationResponse(
+                    RunId: outcome.RunId,
+                    Status: outcome.Status,
+                    ProducedScheduleVersion: outcome.ProducedScheduleVersion,
+                    TerminationReason: outcome.TerminationReason));
+            })
+            .RequireAuthorization(AuthConstants.OperatorPolicy)
+            .WithName("DayAheadOptimize")
+            .WithSummary("Trigger a day-ahead schedule optimisation (LH-API-005).");
+    }
+
+    private static ScheduleType? ParseScheduleType(string? value) => value switch
+    {
+        "day_ahead" => ScheduleType.DayAhead,
+        "intraday" => ScheduleType.Intraday,
+        "regel_leistung_reserve" => ScheduleType.RegelLeistungReserve,
+        _ => null,
+    };
 }
