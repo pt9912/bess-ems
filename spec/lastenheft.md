@@ -340,6 +340,46 @@ Jeder Messwert muss mit einer Datenqualität bewertet werden.
 
 ---
 
+### LH-DOM-005 — Gerätepunkt-Modell
+
+Das System muss Geräte- und Protokollpunkte fachlich beschreiben können.
+
+**Priorität:** Muss
+
+**Mindestattribute:**
+
+- eindeutiger Schlüssel
+- Anzeigename
+- Einheit
+- Datentyp
+- Wertebereich oder Plausibilitätsbereich
+- Skalierung und Offset, sofern protokollabhängig
+- Lese- oder Schreibrichtung
+- Exportfähigkeit
+- optionaler Alarm- oder Plausibilitätsauslöser
+- optionale Werteerklärung für Status- und Enum-Werte
+
+**Abnahmekriterium:** Modbus- und MQTT-Mappings können Punktmetadaten so beschreiben, dass Telemetrie, API, Monitoring und spätere Exportdienste dieselbe fachliche Bedeutung verwenden.
+
+---
+
+### LH-DOM-006 — Geräte-Capabilities
+
+Das System soll Batteriesysteme nicht nur als generischen Speicher, sondern über fachliche Capabilities abbilden können.
+
+**Priorität:** Soll
+
+**Mindest-Capabilities nach Bedarf:**
+
+- Battery/BMS: SOC, SOH, Zelltemperaturen, Zellspannungen, Lade-/Entladefreigaben
+- PCS/Inverter: Wirkleistung, Blindleistung, Frequenz, Betriebszustand, Setpoints
+- EnergyStore: aggregierte Speicherfähigkeit über BMS- und PCS-Daten
+- Grid/Meter: Netzbezug, Einspeisung, Leistung, Energiezähler
+
+**Abnahmekriterium:** Regler und Adapter können prüfen, ob ein Asset eine benötigte Capability unterstützt, ohne herstellerspezifische Details im Regelkreis zu kennen.
+
+---
+
 ## 8. Marktanforderungen
 
 ### LH-MKT-001 — Day-Ahead-Fahrplan
@@ -437,14 +477,57 @@ Das System muss für Fahrpläne und Marktverpflichtungen ein eindeutiges Zeitmod
 
 ---
 
+### LH-MKT-008 — Tarif- und Preiszeitfenster
+
+Das System soll Preis- und Tarifmodelle für Optimierung und lokale Strategien abbilden können.
+
+**Priorität:** Soll
+
+**Mindestumfang:**
+
+- Preiszone oder Marktgebiet
+- Preisart, z. B. Bezug, Einspeisung, Netzentgelt, Peak, Valley, Flat
+- Zeitfenster mit Minutenauflösung
+- Priorität bei überlappenden Preisregeln
+- Gültigkeitsdatum oder langfristige Gültigkeit
+- Arbeits-/Wochenend- und benutzerdefinierte Kalendertage
+- Cross-Day-Zeitfenster, z. B. 22:00 bis 06:00
+
+**Abnahmekriterium:** Für einen gegebenen Zeitpunkt kann das System eindeutig den gültigen Preis oder die gültige Tarifregel bestimmen.
+
+---
+
+### LH-MKT-009 — Marktprodukt-Differenzierung
+
+Das System soll Marktprodukte fachlich differenziert abbilden, sobald diese im jeweiligen Release verwendet werden.
+
+**Priorität:** Soll
+
+**Mindestprodukte nach Ausbau:**
+
+- Day-Ahead Energie
+- Intraday Energie
+- FCR Reservekapazität
+- aFRR positive Reservekapazität
+- aFRR negative Reservekapazität
+- aFRR positive Aktivierungsenergie
+- aFRR negative Aktivierungsenergie
+
+**Abnahmekriterium:** Marktverpflichtungen, Preise und Optimierungsinputs unterscheiden Marktprodukt, Richtung, Einheit und Zeitschritt eindeutig.
+
+---
+
 ## 9. Optimierungsanforderungen
 
 ### LH-OPT-001 — Fahrplanoptimierung
 
-Das System soll nach dem MVP Fahrpläne für Lade- und Entladeleistung optimieren können.
+Das System soll nach dem MVP Fahrpläne für Lade- und Entladeleistung über einen definierten Horizont optimieren können.
 
-**Priorität:** Soll  
-**Abnahmekriterium:** Für einen definierten Zeitraum wird eine Zeitreihe mit Leistungssollwerten und SOC-Zielwerten erzeugt.
+**Priorität:** Soll
+
+**Beschreibung:** Horizon-Optimierung erzeugt eine Zeitreihe aus Leistungssollwerten, optionalen SOC-Zielwerten und Solver-/Qualitätsinformationen. Sie ist von der zyklischen Echtzeit-Dispatch-Entscheidung im Regelkreis getrennt.
+
+**Abnahmekriterium:** Für einen definierten Zeitraum wird eine versionierbare Zeitreihe mit Leistungssollwerten, SOC-Zielwerten und Solverstatus erzeugt.
 
 ---
 
@@ -526,6 +609,59 @@ Das System soll Solver austauschbar integrieren können.
 - CPLEX
 
 **Abnahmekriterium:** Optimierer sind nicht hart an einen konkreten Solver gekoppelt.
+
+---
+
+### LH-OPT-007 — Trennung von Horizon-Optimierung und Echtzeit-Dispatch
+
+Das System muss zwischen Fahrplanoptimierung über einen Horizont und zyklischem Dispatch im Regelkreis unterscheiden.
+
+**Priorität:** Muss, falls Optimierung eingesetzt wird
+
+**Beschreibung:** Ein Horizon-Optimierer erzeugt oder aktualisiert Fahrpläne. Der Echtzeit-Dispatch wählt im Regelzyklus den aktuell gültigen Sollwert, kombiniert ihn mit aktiven Marktverpflichtungen und unterwirft ihn Sicherheits- und Rampengrenzen.
+
+**Abnahmekriterium:** Ein Optimierungsergebnis kann gespeichert werden, ohne unmittelbar ein Feldgerät anzusteuern; der Regelkreis verwendet daraus nur den jeweils gültigen Sollwert.
+
+---
+
+### LH-OPT-008 — Einheiten- und Zeitschritt-Konsistenz
+
+Optimierungsmodelle müssen Leistung, Energie, Preise und Zeitschritte eindeutig behandeln.
+
+**Priorität:** Muss, falls Optimierung eingesetzt wird
+
+**Mindestfestlegungen:**
+
+- Leistung intern in kW
+- Energie intern in kWh
+- Preise mit explizitem Nenner, z. B. EUR/MWh oder EUR/kWh
+- Zeitschritt in Stunden
+- Umrechnung von Leistung zu Energie nur über `E = P * delta_t`
+- Exportspalten mit fachlich korrekter Einheit
+
+**Abnahmekriterium:** Tests oder Modellvalidierungen weisen nach, dass ein konstanter Leistungsfahrplan über einen bekannten Zeitschritt die erwartete Energiemenge ergibt.
+
+---
+
+### LH-OPT-009 — Optimierungsergebnis und Objective Breakdown
+
+Optimierungsläufe müssen nachvollziehbare Ergebnisdaten liefern.
+
+**Priorität:** Soll
+
+**Mindestumfang:**
+
+- eindeutige RunId
+- verwendete Input-Versionen
+- Solvername und Solverstatus
+- Optimierungshorizont und Zeitschritt
+- Zielfunktionswert
+- aufgeschlüsselte Kosten- und Erlöskomponenten
+- erkannte Constraint-Verletzungen oder Unzulässigkeit
+- Laufzeit und Abbruchgrund
+- erzeugter oder aktualisierter Fahrplan
+
+**Abnahmekriterium:** Ein gespeicherter Optimierungslauf kann fachlich erklärt und bei gleichen Inputs reproduziert oder als nicht reproduzierbar begründet werden.
 
 ---
 
@@ -1155,6 +1291,27 @@ Das System muss Aufbewahrungsregeln für historische Betriebsdaten definieren k�
 
 ---
 
+### LH-PERSIST-007 — Speicherung von Optimierungsläufen
+
+Das System soll Optimierungsläufe und deren Ergebnisse speichern können, sobald Optimierung produktiv eingesetzt wird.
+
+**Priorität:** Soll
+
+**Mindestdaten:**
+
+- RunId
+- AssetId
+- Input-Versionen
+- Horizon Start/Ende und Zeitschritt
+- Solver und Solverstatus
+- Objective Breakdown
+- erzeugte Fahrplanversion
+- Laufzeit, Abbruchgrund und Warnungen
+
+**Abnahmekriterium:** Ein Optimierungslauf ist nachträglich mit seiner erzeugten Fahrplanversion und den verwendeten Inputs verknüpfbar.
+
+---
+
 ## 20. API-Anforderungen
 
 Im MVP müssen mindestens Health, Batterie-Status, aktueller Command, Fahrplanabfrage und Operator Stop über API verfügbar sein. Schreibende Endpunkte müssen bereits im MVP authentifiziert, autorisiert und auditierbar sein. API-Endpunkte zur Optimierungsauslösung folgen mit dem Optimierungsmodul nach dem MVP.
@@ -1209,7 +1366,7 @@ Das System soll Optimierungsläufe über API starten können.
 - `POST /markets/day-ahead/optimize`
 - `POST /markets/intraday/reoptimize`
 
-**Abnahmekriterium:** Ein Optimierungslauf kann ausgelöst und sein Ergebnis gespeichert werden.
+**Abnahmekriterium:** Ein Optimierungslauf kann ausgelöst werden und liefert mindestens RunId, Status, Horizon, Solverstatus und erzeugte Fahrplanversion oder Fehlergrund.
 
 ---
 
@@ -1307,6 +1464,8 @@ Das System muss über externe Konfiguration parametrierbar sein.
 **Konfigurierbar:**
 
 - Assets
+- Geräte-Capabilities
+- Gerätepunkt-Metadaten
 - Protokolladapter
 - Registermappings
 - NodeIds, falls OPC-UA eingesetzt wird
@@ -1336,6 +1495,26 @@ Das System muss Konfiguration beim Start validieren.
 
 **Priorität:** Muss  
 **Abnahmekriterium:** Ungültige oder unvollständige Konfiguration verhindert einen unsicheren Start.
+
+---
+
+### LH-CONF-004 — Export- und Northbound-Konfiguration
+
+Das System soll nach dem MVP externe Datenexporte konfigurierbar bereitstellen können.
+
+**Priorität:** Soll
+
+**Mindestumfang:**
+
+- aktivierbare Exportziele
+- exportierte Assets und Punkte
+- Protokoll, z. B. MQTT, Modbus TCP oder HTTP
+- Upload- oder Polling-Intervall
+- Authentifizierung und Transportverschlüsselung, falls vom Zielprotokoll unterstützt
+- Runtime-Reload ohne Neustart, falls sicher möglich
+- Status pro Exportziel
+
+**Abnahmekriterium:** Ein Exportziel kann aktiviert, deaktiviert und im Status abgefragt werden, ohne den internen Regelkreis zu verändern.
 
 ---
 
@@ -1598,15 +1777,23 @@ Das System muss im Container getestet werden.
 | ------------------ | ------------------------------------ | -------------------------- |
 | LH-ARCH-001        | Systemarchitektur                    | MVP                        |
 | LH-DOM-001         | Domain Model                         | MVP                        |
+| LH-DOM-005         | Device Point Model                   | MVP                        |
+| LH-DOM-006         | Capability Model                     | nach MVP                   |
 | LH-MKT-001         | Market Module                        | MVP                        |
 | LH-MKT-003         | Market Commitment Model              | MVP                        |
+| LH-MKT-008         | Tariff/Price Model                   | nach MVP                   |
+| LH-MKT-009         | Market Product Model                 | nach MVP                   |
 | LH-OPT-001         | Optimization Interface Design        | MVP als Interface          |
+| LH-OPT-007         | Schedule vs Dispatch Boundary Design | MVP als Architekturgrenze  |
+| LH-OPT-008         | Optimization Unit Convention         | nach MVP                   |
+| LH-OPT-009         | Optimization Result Model            | nach MVP                   |
 | LH-CTRL-001        | Control Loop Design                  | MVP                        |
 | LH-SM-001          | State Machine Design                 | MVP                        |
 | LH-PROT-001        | Adapter Interface Design             | MVP                        |
 | LH-NATIVE-001      | Native Core Design                   | nach MVP / falls eingesetzt |
 | LH-PERSIST-001     | Database Schema                      | MVP                        |
 | LH-PERSIST-006     | Retention- und Datenvolumenkonzept   | MVP                        |
+| LH-PERSIST-007     | Optimization Run Persistence Design  | nach MVP                   |
 | LH-API-001         | API Specification                    | MVP                        |
 | LH-API-007         | Authentifizierungs- und Autorisierungskonzept | MVP             |
 | LH-MON-001         | Observability Design                 | MVP                        |
@@ -1614,6 +1801,7 @@ Das System muss im Container getestet werden.
 | LH-CONF-001        | Configuration Design                 | MVP                        |
 | LH-CONF-002        | Device Mapping Design                | MVP                        |
 | LH-CONF-003        | Configuration Validation Design      | MVP                        |
+| LH-CONF-004        | Northbound Export Configuration Design | nach MVP                 |
 
 ---
 
@@ -1624,7 +1812,13 @@ Das System muss im Container getestet werden.
 | LH-DOM-001         | `BatteryAsset`                 | MVP                        |
 | LH-DOM-002         | `BatteryTelemetry`             | MVP                        |
 | LH-DOM-003         | `BatteryCommand`               | MVP                        |
+| LH-DOM-005         | `DevicePointDefinition`        | MVP                        |
+| LH-DOM-006         | `AssetCapability`              | nach MVP                   |
 | LH-MKT-003         | `MarketCommitment`             | MVP                        |
+| LH-MKT-008         | `TariffRule` / `MarketPrice`   | nach MVP                   |
+| LH-MKT-009         | `MarketProduct`                | nach MVP                   |
+| LH-OPT-007         | `IScheduleOptimizer` + `IDispatchOptimizer` Abgrenzung | nach MVP |
+| LH-OPT-009         | `OptimizationRunResult`        | nach MVP                   |
 | LH-CTRL-002        | `ConstraintLimiter`            | MVP                        |
 | LH-CTRL-003        | `RampLimiter`                  | MVP                        |
 | LH-SM-001          | `BatteryStateMachine`          | MVP                        |
@@ -1634,6 +1828,7 @@ Das System muss im Container getestet werden.
 | LH-OPCUA-001       | `OpcUaBatteryTelemetrySource`  | nach MVP                   |
 | LH-NATIVE-001      | `battery_control_core`         | nach MVP / falls eingesetzt |
 | LH-PERSIST-006     | `RetentionPolicy`              | MVP                        |
+| LH-PERSIST-007     | `OptimizationRunRepository`    | nach MVP                   |
 | LH-API-001         | `/health` Endpoint             | MVP                        |
 | LH-API-002         | `/battery/{assetId}/status`    | MVP                        |
 | LH-API-003         | `/battery/{assetId}/command/current` | MVP                  |
@@ -1645,6 +1840,7 @@ Das System muss im Container getestet werden.
 | LH-CONF-001        | `ConfigurationSource`          | MVP                        |
 | LH-CONF-002        | `DeviceMappingRepository`      | MVP                        |
 | LH-CONF-003        | `ConfigurationValidator`       | MVP                        |
+| LH-CONF-004        | `NorthboundExportConfiguration` | nach MVP                  |
 
 ---
 
@@ -1656,6 +1852,9 @@ Das System muss im Container getestet werden.
 | LH-CTRL-003        | Unit Test        | MVP                        |
 | LH-MKT-003         | Unit Test        | MVP                        |
 | LH-MKT-007         | Unit/Integration Test | MVP                   |
+| LH-MKT-008         | Unit Test        | nach MVP                   |
+| LH-OPT-008         | Unit/Model Test  | nach MVP                   |
+| LH-OPT-009         | Integration Test | nach MVP                   |
 | LH-SAFE-001        | Safety Test      | MVP                        |
 | LH-SAFE-004        | Integration Test | MVP                        |
 | LH-API-006         | API/Control Integration Test | MVP              |
@@ -1670,6 +1869,7 @@ Das System muss im Container getestet werden.
 | LH-CONF-001        | Configuration Loading Test | MVP                  |
 | LH-CONF-002        | Device Mapping Test | MVP                       |
 | LH-CONF-003        | Startup Configuration Test | MVP                  |
+| LH-CONF-004        | Integration Test | nach MVP                   |
 | LH-RT-003          | Unit Test        | MVP                        |
 | LH-MODB-005        | Integration Test | MVP                        |
 | LH-MQTT-005        | Integration Test | MVP                        |
@@ -1685,6 +1885,7 @@ Das System muss im Container getestet werden.
 
 - C#/.NET Worker Service
 - Domain-Modell
+- Gerätepunkt-Modell für versionierte Mappings
 - Realtime Snapshot Store
 - State Machine
 - Constraint Limiter
@@ -1719,7 +1920,11 @@ Das System muss im Container getestet werden.
 - Intraday-Reoptimierung
 - Regelleistungsreservierung
 - Regelleistungsaktivierung
+- Tarif- und Preiszeitfenster
+- differenzierte Marktprodukte für Reserve- und Aktivierungsenergie
 - MILP-Optimierung
+- Horizon-Optimierer mit gespeicherten Optimierungsläufen
+- Northbound-Exportdienste mit Runtime-Reload
 - Native C/C++ Control Core
 - OpenTelemetry Tracing
 - Replay-Testumgebung
