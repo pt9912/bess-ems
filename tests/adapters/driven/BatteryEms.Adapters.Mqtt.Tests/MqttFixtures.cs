@@ -1,12 +1,26 @@
 using BatteryEms.Adapters.Mqtt;
 using BatteryEms.Application.Configuration;
 using BatteryEms.Application.Time;
+using BatteryEms.Domain;
 
 namespace BatteryEms.Adapters.Mqtt.Tests;
 
 internal static class MqttFixtures
 {
     public static readonly DateTimeOffset Now = new(2026, 5, 6, 9, 30, 0, TimeSpan.Zero);
+
+    public static BatteryAsset SampleAsset(double maxCharge = 50, double maxDischarge = 50) => new(
+        assetId: "asset-1",
+        capacityKwh: 100,
+        maxChargePowerKw: maxCharge,
+        maxDischargePowerKw: maxDischarge,
+        minSocPercent: 10,
+        maxSocPercent: 90,
+        chargeEfficiency: 0.95,
+        dischargeEfficiency: 0.95,
+        maxRampKwPerSecond: 25,
+        minOperatingTemperatureCelsius: -20,
+        maxOperatingTemperatureCelsius: 55);
 
     public static MqttMappingConfiguration SimulatorMapping() => new(
         ProfileName: "test",

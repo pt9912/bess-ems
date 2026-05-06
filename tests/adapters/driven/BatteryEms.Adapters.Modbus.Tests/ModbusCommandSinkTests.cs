@@ -25,6 +25,7 @@ public sealed class ModbusCommandSinkTests
         var sink = new ModbusCommandSink(
             client,
             ModbusFixtures.VendorNeutralMapping(),
+            ModbusFixtures.SampleAsset(),
             ModbusFixtures.Defaults(),
             new ModbusFixtures.FixedClock());
 
@@ -49,6 +50,7 @@ public sealed class ModbusCommandSinkTests
         var sink = new ModbusCommandSink(
             new FakeModbusClient(),
             mapping,
+            ModbusFixtures.SampleAsset(),
             ModbusFixtures.Defaults(),
             new ModbusFixtures.FixedClock());
 
@@ -71,6 +73,7 @@ public sealed class ModbusCommandSinkTests
         var sink = new ModbusCommandSink(
             new FakeModbusClient(),
             mapping,
+            ModbusFixtures.SampleAsset(),
             ModbusFixtures.Defaults(),
             new ModbusFixtures.FixedClock());
 
@@ -93,6 +96,7 @@ public sealed class ModbusCommandSinkTests
         var sink = new ModbusCommandSink(
             new FakeModbusClient(),
             mapping,
+            ModbusFixtures.SampleAsset(),
             ModbusFixtures.Defaults(),
             new ModbusFixtures.FixedClock());
 
@@ -112,6 +116,7 @@ public sealed class ModbusCommandSinkTests
         var sink = new ModbusCommandSink(
             client,
             ModbusFixtures.VendorNeutralMapping(),
+            ModbusFixtures.SampleAsset(),
             ModbusFixtures.Defaults(),
             new ModbusFixtures.FixedClock());
 
@@ -128,6 +133,7 @@ public sealed class ModbusCommandSinkTests
         var sink = new ModbusCommandSink(
             client,
             ModbusFixtures.VendorNeutralMapping(),
+            ModbusFixtures.SampleAsset(),
             ModbusFixtures.Defaults(),
             new ModbusFixtures.FixedClock());
 
@@ -140,6 +146,49 @@ public sealed class ModbusCommandSinkTests
     }
 
     [Fact]
+    public async Task WriteAsync_clamps_overrange_setpoint_against_asset_limits_before_writing()
+    {
+        var client = new FakeModbusClient();
+        var sink = new ModbusCommandSink(
+            client,
+            ModbusFixtures.VendorNeutralMapping(),
+            ModbusFixtures.SampleAsset(maxDischarge: 50),
+            ModbusFixtures.Defaults(),
+            new ModbusFixtures.FixedClock());
+
+        // 200 kW request against a 50 kW MaxDischarge asset must hit the wire
+        // clamped to 50 kW (encoded as 500 with the 0.1 scale factor) and the
+        // result must surface the clamp via result.Reason so audit can see it.
+        var overrange = DischargeCommand() with { ActivePowerKw = 200 };
+        var result = await sink.WriteAsync(overrange, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal("adapter-limited:max-discharge-power", result.Reason);
+        var setpointWrite = client.Writes.First(w => w.Address == 200);
+        Assert.Equal(500, setpointWrite.Values[0]);
+    }
+
+    [Fact]
+    public async Task WriteAsync_writes_zero_setpoint_when_mode_stop_carries_non_zero_power()
+    {
+        var client = new FakeModbusClient();
+        var sink = new ModbusCommandSink(
+            client,
+            ModbusFixtures.VendorNeutralMapping(),
+            ModbusFixtures.SampleAsset(),
+            ModbusFixtures.Defaults(),
+            new ModbusFixtures.FixedClock());
+
+        var contradictory = DischargeCommand() with { Mode = CommandMode.Stop, ActivePowerKw = 25 };
+        var result = await sink.WriteAsync(contradictory, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal("adapter-limited:mode-stop-zero-power", result.Reason);
+        var setpointWrite = client.Writes.First(w => w.Address == 200);
+        Assert.Equal(0, setpointWrite.Values[0]);
+    }
+
+    [Fact]
     public void Constructor_rejects_non_static_unit_id_discovery()
     {
         var mapping = new ModbusMappingConfiguration(
@@ -149,6 +198,6 @@ public sealed class ModbusCommandSinkTests
             Registers: new List<ModbusRegisterMapping>());
 
         Assert.Throws<NotSupportedException>(() =>
-            new ModbusCommandSink(new FakeModbusClient(), mapping, ModbusFixtures.Defaults(), new ModbusFixtures.FixedClock()));
+            new ModbusCommandSink(new FakeModbusClient(), mapping, ModbusFixtures.SampleAsset(), ModbusFixtures.Defaults(), new ModbusFixtures.FixedClock()));
     }
 }

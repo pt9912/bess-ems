@@ -24,6 +24,9 @@ public sealed class MqttRoundtripTests
     private static string MappingPath =>
         Path.Combine(RepoRoot(), "config", "examples", "adapters", "mqtt.simulator.json");
 
+    private static string AssetPath =>
+        Path.Combine(RepoRoot(), "config", "examples", "asset.single-bess.json");
+
     [Fact]
     public async Task TelemetrySource_receives_first_snapshot_published_by_simulator()
     {
@@ -81,8 +84,10 @@ public sealed class MqttRoundtripTests
             // up the broker subscriptions on cold start.
             CommandAckTimeout: TimeSpan.FromSeconds(10));
 
+        var asset = loader.LoadAsset(AssetPath);
+
         await using var client = new MqttNetClient(options);
-        var sink = new MqttCommandSink(client, mapping, options, new SystemClock());
+        var sink = new MqttCommandSink(client, mapping, asset, options, new SystemClock());
 
         var command = new BatteryCommand(
             CommandId: $"integration-{Guid.NewGuid():N}",

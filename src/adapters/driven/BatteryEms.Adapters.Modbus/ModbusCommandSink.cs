@@ -9,17 +9,20 @@ public sealed class ModbusCommandSink : IBatteryCommandSink
 {
     private readonly IModbusClient _client;
     private readonly ModbusMappingConfiguration _mapping;
+    private readonly BatteryAsset _asset;
     private readonly ModbusAdapterOptions _options;
     private readonly IClock _clock;
 
     public ModbusCommandSink(
         IModbusClient client,
         ModbusMappingConfiguration mapping,
+        BatteryAsset asset,
         ModbusAdapterOptions options,
         IClock clock)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(mapping);
+        ArgumentNullException.ThrowIfNull(asset);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(clock);
 
@@ -31,6 +34,7 @@ public sealed class ModbusCommandSink : IBatteryCommandSink
 
         _client = client;
         _mapping = mapping;
+        _asset = asset;
         _options = options;
         _clock = clock;
     }
@@ -60,6 +64,13 @@ public sealed class ModbusCommandSink : IBatteryCommandSink
                 _clock.UtcNow);
         }
 
+        // Final asset-static clamp (RM-M1-11, LH-SAFE-007). Whatever the
+        // application produced, the value that crosses the wire respects
+        // the asset's MaxCharge/MaxDischarge ratings and the Mode==Stop/Idle
+        // contract that "no power" means literally 0 kW.
+        var limit = AdapterWriteLimiter.Apply(command, _asset);
+        var effective = limit.Command;
+
         try
         {
             await _client.ConnectAsync(cancellationToken).ConfigureAwait(false);
@@ -67,7 +78,7 @@ public sealed class ModbusCommandSink : IBatteryCommandSink
             cts.CancelAfter(_options.ReadTimeout);
 
             var unitId = _mapping.StaticUnitId!.Value;
-            var setpointWords = RegisterDecoder.Encode(setpoint, command.ActivePowerKw);
+            var setpointWords = RegisterDecoder.Encode(setpoint, effective.ActivePowerKw);
             await _client
                 .WriteHoldingRegistersAsync(unitId, setpoint.Address, setpointWords, cts.Token)
                 .ConfigureAwait(false);
@@ -75,13 +86,14 @@ public sealed class ModbusCommandSink : IBatteryCommandSink
             var mode = FindRegister("operating_mode");
             if (mode is not null)
             {
-                var modeWords = RegisterDecoder.Encode(mode, MapModeToValue(command.Mode));
+                var modeWords = RegisterDecoder.Encode(mode, MapModeToValue(effective.Mode));
                 await _client
                     .WriteHoldingRegistersAsync(unitId, mode.Address, modeWords, cts.Token)
                     .ConfigureAwait(false);
             }
 
-            return CommandDispatchResult.Ok(_clock.UtcNow, command.Reason);
+            var reason = limit.WasLimited ? $"adapter-limited:{limit.Reason}" : effective.Reason;
+            return CommandDispatchResult.Ok(_clock.UtcNow, reason);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

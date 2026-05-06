@@ -10,6 +10,7 @@ namespace BatteryEms.Adapters.Mqtt;
 public sealed class MqttCommandSink : IBatteryCommandSink
 {
     private readonly IMqttClient _client;
+    private readonly BatteryAsset _asset;
     private readonly MqttAdapterOptions _options;
     private readonly IClock _clock;
     private readonly string _commandTopic;
@@ -21,15 +22,18 @@ public sealed class MqttCommandSink : IBatteryCommandSink
     public MqttCommandSink(
         IMqttClient client,
         MqttMappingConfiguration mapping,
+        BatteryAsset asset,
         MqttAdapterOptions options,
         IClock clock)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(mapping);
+        ArgumentNullException.ThrowIfNull(asset);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(clock);
 
         _client = client;
+        _asset = asset;
         _options = options;
         _clock = clock;
 
@@ -44,6 +48,13 @@ public sealed class MqttCommandSink : IBatteryCommandSink
     public async Task<CommandDispatchResult> WriteAsync(BatteryCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
+
+        // Final asset-static clamp (RM-M1-11, LH-SAFE-007) before the
+        // command crosses the wire. The simulator/inverter only sees the
+        // clamped value; the limit reason surfaces in CommandDispatchResult
+        // so observability records the divergence.
+        var limit = AdapterWriteLimiter.Apply(command, _asset);
+        var effective = limit.Command;
 
         try
         {
@@ -60,14 +71,14 @@ public sealed class MqttCommandSink : IBatteryCommandSink
         }
 
         var tcs = new TaskCompletionSource<CommandAckPayload>(TaskCreationOptions.RunContinuationsAsynchronously);
-        if (!_pending.TryAdd(command.CommandId, tcs))
+        if (!_pending.TryAdd(effective.CommandId, tcs))
         {
             return CommandDispatchResult.Failed("command-id-not-unique", _clock.UtcNow);
         }
 
         try
         {
-            var payload = JsonSerializer.SerializeToUtf8Bytes(ToWire(command), MqttJson.Options);
+            var payload = JsonSerializer.SerializeToUtf8Bytes(ToWire(effective), MqttJson.Options);
             await _client.PublishAsync(_commandTopic, payload, _commandRetained, cancellationToken).ConfigureAwait(false);
 
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -91,9 +102,15 @@ public sealed class MqttCommandSink : IBatteryCommandSink
                     return CommandDispatchResult.Failed("ack-timeout", _clock.UtcNow);
                 }
 
-                return ack.Accepted
-                    ? CommandDispatchResult.Ok(_clock.UtcNow, ack.Reason ?? command.Reason)
-                    : CommandDispatchResult.Failed($"ack-rejected: {ack.Reason ?? "unknown"}", _clock.UtcNow);
+                if (!ack.Accepted)
+                {
+                    return CommandDispatchResult.Failed($"ack-rejected: {ack.Reason ?? "unknown"}", _clock.UtcNow);
+                }
+
+                var reason = limit.WasLimited
+                    ? $"adapter-limited:{limit.Reason}"
+                    : ack.Reason ?? effective.Reason;
+                return CommandDispatchResult.Ok(_clock.UtcNow, reason);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -106,7 +123,7 @@ public sealed class MqttCommandSink : IBatteryCommandSink
         }
         finally
         {
-            _pending.TryRemove(command.CommandId, out _);
+            _pending.TryRemove(effective.CommandId, out _);
         }
     }
 

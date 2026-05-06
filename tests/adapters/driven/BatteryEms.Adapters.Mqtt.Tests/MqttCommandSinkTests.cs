@@ -23,7 +23,7 @@ public sealed class MqttCommandSinkTests
     public async Task WriteAsync_publishes_command_and_returns_ok_after_matching_ack()
     {
         var client = new FakeMqttClient();
-        var sink = new MqttCommandSink(client, MqttFixtures.SimulatorMapping(), MqttFixtures.Defaults(), new MqttFixtures.FixedClock());
+        var sink = new MqttCommandSink(client, MqttFixtures.SimulatorMapping(), MqttFixtures.SampleAsset(), MqttFixtures.Defaults(), new MqttFixtures.FixedClock());
 
         var write = sink.WriteAsync(SampleCommand(), CancellationToken.None);
 
@@ -56,7 +56,7 @@ public sealed class MqttCommandSinkTests
     public async Task WriteAsync_returns_ack_timeout_when_no_ack_arrives()
     {
         var client = new FakeMqttClient();
-        var sink = new MqttCommandSink(client, MqttFixtures.SimulatorMapping(), MqttFixtures.Defaults(), new MqttFixtures.FixedClock());
+        var sink = new MqttCommandSink(client, MqttFixtures.SimulatorMapping(), MqttFixtures.SampleAsset(), MqttFixtures.Defaults(), new MqttFixtures.FixedClock());
 
         var result = await sink.WriteAsync(SampleCommand(), CancellationToken.None);
         Assert.False(result.Success);
@@ -67,7 +67,7 @@ public sealed class MqttCommandSinkTests
     public async Task WriteAsync_returns_ack_rejected_when_simulator_marks_not_accepted()
     {
         var client = new FakeMqttClient();
-        var sink = new MqttCommandSink(client, MqttFixtures.SimulatorMapping(), MqttFixtures.Defaults(), new MqttFixtures.FixedClock());
+        var sink = new MqttCommandSink(client, MqttFixtures.SimulatorMapping(), MqttFixtures.SampleAsset(), MqttFixtures.Defaults(), new MqttFixtures.FixedClock());
 
         var write = sink.WriteAsync(SampleCommand("cmd-rej"), CancellationToken.None);
 
@@ -90,7 +90,7 @@ public sealed class MqttCommandSinkTests
     {
         var client = new FakeMqttClient();
         var options = MqttFixtures.Defaults() with { CommandAckTimeout = TimeSpan.FromMilliseconds(150) };
-        var sink = new MqttCommandSink(client, MqttFixtures.SimulatorMapping(), options, new MqttFixtures.FixedClock());
+        var sink = new MqttCommandSink(client, MqttFixtures.SimulatorMapping(), MqttFixtures.SampleAsset(), options, new MqttFixtures.FixedClock());
 
         var write = sink.WriteAsync(SampleCommand("cmd-real"), CancellationToken.None);
 
@@ -112,7 +112,7 @@ public sealed class MqttCommandSinkTests
     public async Task WriteAsync_drops_malformed_ack_payloads_silently()
     {
         var client = new FakeMqttClient();
-        var sink = new MqttCommandSink(client, MqttFixtures.SimulatorMapping(), MqttFixtures.Defaults(), new MqttFixtures.FixedClock());
+        var sink = new MqttCommandSink(client, MqttFixtures.SimulatorMapping(), MqttFixtures.SampleAsset(), MqttFixtures.Defaults(), new MqttFixtures.FixedClock());
 
         var write = sink.WriteAsync(SampleCommand("cmd-mal"), CancellationToken.None);
         await TestHelpers.WaitUntil(
@@ -135,7 +135,7 @@ public sealed class MqttCommandSinkTests
         {
             OnConnect = () => throw new InvalidOperationException("broker unreachable"),
         };
-        var sink = new MqttCommandSink(client, MqttFixtures.SimulatorMapping(), MqttFixtures.Defaults(), new MqttFixtures.FixedClock());
+        var sink = new MqttCommandSink(client, MqttFixtures.SimulatorMapping(), MqttFixtures.SampleAsset(), MqttFixtures.Defaults(), new MqttFixtures.FixedClock());
 
         var result = await sink.WriteAsync(SampleCommand(), CancellationToken.None);
         Assert.False(result.Success);
@@ -149,11 +149,39 @@ public sealed class MqttCommandSinkTests
         {
             OnPublish = () => throw new InvalidOperationException("publish blew up"),
         };
-        var sink = new MqttCommandSink(client, MqttFixtures.SimulatorMapping(), MqttFixtures.Defaults(), new MqttFixtures.FixedClock());
+        var sink = new MqttCommandSink(client, MqttFixtures.SimulatorMapping(), MqttFixtures.SampleAsset(), MqttFixtures.Defaults(), new MqttFixtures.FixedClock());
 
         var result = await sink.WriteAsync(SampleCommand(), CancellationToken.None);
         Assert.False(result.Success);
         Assert.StartsWith("publish-failed", result.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task WriteAsync_publishes_clamped_active_power_when_command_exceeds_asset_limit()
+    {
+        var client = new FakeMqttClient();
+        var sink = new MqttCommandSink(client, MqttFixtures.SimulatorMapping(), MqttFixtures.SampleAsset(maxDischarge: 50), MqttFixtures.Defaults(), new MqttFixtures.FixedClock());
+
+        // 200 kW request must hit the wire clamped to 50 kW. The simulator
+        // ACK still uses the EMS-side command_id, so correlation is unaffected.
+        var overrange = SampleCommand("cmd-clamp") with { ActivePowerKw = 200 };
+        var write = sink.WriteAsync(overrange, CancellationToken.None);
+
+        await TestHelpers.WaitUntil(
+            () => client.Publishes.Count > 0 && client.SubscribedTopics.Contains("battery/asset-1/command/ack"),
+            TimeSpan.FromSeconds(1));
+
+        await client.DeliverAsync(
+            "battery/asset-1/command/ack",
+            System.Text.Encoding.UTF8.GetBytes(
+                """{"command_id":"cmd-clamp","accepted":true,"dispatched_at":"2026-05-06T09:30:00+00:00","reason":"accepted"}"""));
+
+        var result = await write;
+        Assert.True(result.Success);
+        Assert.Equal("adapter-limited:max-discharge-power", result.Reason);
+
+        using var doc = JsonDocument.Parse(client.Publishes[0].Payload);
+        Assert.Equal(50, doc.RootElement.GetProperty("active_power_kw").GetDouble());
     }
 
     [Fact]
@@ -165,7 +193,7 @@ public sealed class MqttCommandSinkTests
                 new("command_ack", "battery/{assetId}/command/ack", "subscribe", "json", false, "none"),
             });
         Assert.Throws<InvalidOperationException>(() =>
-            new MqttCommandSink(new FakeMqttClient(), mapping, MqttFixtures.Defaults(), new MqttFixtures.FixedClock()));
+            new MqttCommandSink(new FakeMqttClient(), mapping, MqttFixtures.SampleAsset(), MqttFixtures.Defaults(), new MqttFixtures.FixedClock()));
     }
 
     [Fact]
@@ -177,6 +205,6 @@ public sealed class MqttCommandSinkTests
                 new("command", "battery/{assetId}/command", "publish", "json", false, "none"),
             });
         Assert.Throws<InvalidOperationException>(() =>
-            new MqttCommandSink(new FakeMqttClient(), mapping, MqttFixtures.Defaults(), new MqttFixtures.FixedClock()));
+            new MqttCommandSink(new FakeMqttClient(), mapping, MqttFixtures.SampleAsset(), MqttFixtures.Defaults(), new MqttFixtures.FixedClock()));
     }
 }

@@ -21,6 +21,9 @@ public sealed class ModbusRoundtripTests
     private static string MappingPath =>
         Path.Combine(RepoRoot(), "tests", "integration", "fixtures", "modbus.simulator.json");
 
+    private static string AssetPath =>
+        Path.Combine(RepoRoot(), "config", "examples", "asset.single-bess.json");
+
     [Fact]
     public async Task TelemetrySource_reads_first_snapshot_from_running_simulator()
     {
@@ -67,10 +70,13 @@ public sealed class ModbusRoundtripTests
         var loader = new JsonFileConfigurationLoader(SchemaDirectory);
         var mapping = loader.LoadModbusMapping(MappingPath);
 
+        var asset = loader.LoadAsset(AssetPath);
+
         await using var client = new FluentModbusClient(SimulatorHost, SimulatorPort);
         var sink = new ModbusCommandSink(
             client,
             mapping,
+            asset,
             new ModbusAdapterOptions(
                 Host: SimulatorHost,
                 Port: SimulatorPort,
