@@ -19,7 +19,8 @@ public sealed class DependencyRuleTests
                 ProjectAssemblies.PersistenceNamespace,
                 ProjectAssemblies.TelemetryNamespace,
                 ProjectAssemblies.OptimizationNamespace,
-                ProjectAssemblies.InfrastructureNamespace)
+                ProjectAssemblies.InfrastructureNamespace,
+                ProjectAssemblies.HostNamespace)
             .GetResult();
 
         Assert.True(result.IsSuccessful, ArchitectureTestHelpers.FormatFailures(result));
@@ -38,7 +39,8 @@ public sealed class DependencyRuleTests
                 ProjectAssemblies.PersistenceNamespace,
                 ProjectAssemblies.TelemetryNamespace,
                 ProjectAssemblies.OptimizationNamespace,
-                ProjectAssemblies.InfrastructureNamespace)
+                ProjectAssemblies.InfrastructureNamespace,
+                ProjectAssemblies.HostNamespace)
             .GetResult();
 
         Assert.True(result.IsSuccessful, ArchitectureTestHelpers.FormatFailures(result));
@@ -60,6 +62,7 @@ public sealed class DependencyRuleTests
                 ProjectAssemblies.TelemetryNamespace,
                 ProjectAssemblies.OptimizationNamespace,
                 ProjectAssemblies.InfrastructureNamespace,
+                ProjectAssemblies.HostNamespace,
             }),
             nameof(ProjectAssemblies.Worker) => (ProjectAssemblies.Worker, new[]
             {
@@ -70,6 +73,7 @@ public sealed class DependencyRuleTests
                 ProjectAssemblies.TelemetryNamespace,
                 ProjectAssemblies.OptimizationNamespace,
                 ProjectAssemblies.InfrastructureNamespace,
+                ProjectAssemblies.HostNamespace,
             }),
             _ => throw new System.ArgumentOutOfRangeException(nameof(adapterName), adapterName, "Unknown driving adapter."),
         };
@@ -114,6 +118,7 @@ public sealed class DependencyRuleTests
             ProjectAssemblies.ApiNamespace,
             ProjectAssemblies.WorkerNamespace,
             ProjectAssemblies.InfrastructureNamespace,
+            ProjectAssemblies.HostNamespace,
         };
         forbidden.AddRange(System.Linq.Enumerable.Select(
             System.Linq.Enumerable.Where(allDriven, d => d.Name != adapterName),

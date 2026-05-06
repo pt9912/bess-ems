@@ -14,6 +14,7 @@ internal static class ProjectAssemblies
     public static readonly Assembly Telemetry = typeof(BatteryEms.Adapters.Telemetry.AssemblyMarker).Assembly;
     public static readonly Assembly Optimization = typeof(BatteryEms.Adapters.Optimization.AssemblyMarker).Assembly;
     public static readonly Assembly Infrastructure = typeof(BatteryEms.Infrastructure.AssemblyMarker).Assembly;
+    public static readonly Assembly Host = typeof(BatteryEms.Host.AssemblyMarker).Assembly;
 
     public const string DomainNamespace = "BatteryEms.Domain";
     public const string ApplicationNamespace = "BatteryEms.Application";
@@ -25,4 +26,5 @@ internal static class ProjectAssemblies
     public const string TelemetryNamespace = "BatteryEms.Adapters.Telemetry";
     public const string OptimizationNamespace = "BatteryEms.Adapters.Optimization";
     public const string InfrastructureNamespace = "BatteryEms.Infrastructure";
+    public const string HostNamespace = "BatteryEms.Host";
 }

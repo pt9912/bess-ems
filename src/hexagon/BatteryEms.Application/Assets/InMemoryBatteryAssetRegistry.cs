@@ -31,4 +31,6 @@ public sealed class InMemoryBatteryAssetRegistry : IBatteryAssetRegistry
         ArgumentException.ThrowIfNullOrWhiteSpace(assetId);
         return _byId.TryGetValue(assetId, out var asset) ? asset : null;
     }
+
+    public IReadOnlyList<BatteryAsset> GetAll() => _byId.Values.ToArray();
 }

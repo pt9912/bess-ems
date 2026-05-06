@@ -28,6 +28,7 @@
     <ProjectReference Include="..\..\src\adapters\driven\BatteryEms.Adapters.Telemetry\BatteryEms.Adapters.Telemetry.csproj" />
     <ProjectReference Include="..\..\src\adapters\driven\BatteryEms.Adapters.Optimization\BatteryEms.Adapters.Optimization.csproj" />
     <ProjectReference Include="..\..\src\infrastructure\BatteryEms.Infrastructure\BatteryEms.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\host\BatteryEms.Host\BatteryEms.Host.csproj" />
   </ItemGroup>
 
 </Project>
