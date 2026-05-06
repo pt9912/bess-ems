@@ -54,8 +54,11 @@ help:
 	@echo "  make simulator-coverage-gate Go coverage gate (90% line)"
 	@echo "  make test-integration        Modbus roundtrip vs Go-Simulator via docker compose"
 	@echo ""
-	@echo "Welle 5 (Closure, pending):"
-	@echo "  make build, make test-container, make ci, make runtime, make fullbuild"
+	@echo "Welle 5 (Closure, partially active):"
+	@echo "  make build           Multi-stage runtime image (non-root, /health HEALTHCHECK)"
+	@echo "  make runtime         Compose-up + /health probe + down (depends on make build)"
+	@echo "  make test-container  Runtime smoke (alias for make runtime in M1-19b)"
+	@echo "  make ci, make fullbuild  Activated with RM-M1-20"
 
 # --- Welle 1 (active) ------------------------------------------------------
 
@@ -105,24 +108,35 @@ test-integration:
 	$(DOCKER) compose -f tests/integration/compose.yml down -v --remove-orphans >/dev/null 2>&1; \
 	exit $$exit_code
 
-# --- Welle 5 (pending) -----------------------------------------------------
+# --- Welle 5 (partially active) --------------------------------------------
 
+# Runtime image: multi-stage publish + non-root aspnet image with /health
+# HEALTHCHECK (RM-M1-19b, LH-DEPLOY-001/003).
 build:
-	@echo "make build: not active. Runtime image lands in Welle 5 (RM-M1-19)."
-	@exit 2
+	$(DOCKER_BUILD) --target runtime -t $(IMAGE_PREFIX)-runtime:latest
 
-test-container:
-	@echo "make test-container: not active. Activated in Welle 5 (RM-M1-19)."
-	@exit 2
+# Compose smoke: bring the production-shaped stack up, poll /health, down.
+# Requires: `make build` (bess-ems image) and `make -C simulators/bess-field-sim build`
+# (bess-field-sim image). The target rebuilds them itself so a fresh
+# checkout reaches a healthy stack with one command.
+runtime: build
+	$(SIMULATOR_MAKE) build
+	$(DOCKER) compose -f deploy/compose.yml up -d --wait --wait-timeout 60
+	@echo "[runtime] stack is up; probing /health"
+	$(DOCKER) compose -f deploy/compose.yml exec -T bess-ems curl --fail --silent --show-error http://localhost:8080/health
+	@echo "[runtime] /health ok; tearing down"
+	$(DOCKER) compose -f deploy/compose.yml down -v --remove-orphans
+
+# Container smoke: same as `runtime` but used as a gate target — the
+# subsequent RM-M1-19c step extends this with /metrics + a regulation
+# cycle smoke.
+test-container: runtime
+	@echo "[test-container] runtime smoke green"
 
 ci:
-	@echo "make ci: not active. CI-compatible aggregator activated in Welle 5."
-	@exit 2
-
-runtime:
-	@echo "make runtime: not active. Runtime smoke activated in Welle 5."
+	@echo "make ci: not active. CI-compatible aggregator activated with RM-M1-20."
 	@exit 2
 
 fullbuild:
-	@echo "make fullbuild: not active. Activated in Welle 5."
+	@echo "make fullbuild: not active. Activated with RM-M1-20."
 	@exit 2

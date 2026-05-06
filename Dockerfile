@@ -193,7 +193,46 @@ RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.cs
     /p:ThresholdStat=total
 
 # ---------------------------------------------------------------------------
+# publish: produces self-contained framework-dependent output for the host
+# composition root. Trim is OFF for M1 — Dapper, Npgsql and the OpenAPI
+# source generator all reflect on types that trimming would strip.
+# (LH-DEPLOY-001 + LH-DEPLOY-003)
+# ---------------------------------------------------------------------------
+FROM lint AS publish
+ARG BUILD_CONFIGURATION
+RUN dotnet publish src/host/BatteryEms.Host/BatteryEms.Host.csproj \
+    --configuration "${BUILD_CONFIGURATION}" \
+    --no-restore \
+    --output /publish
+
+# ---------------------------------------------------------------------------
+# runtime: minimal aspnet-only image, non-root user, port 8080,
+# Container HEALTHCHECK against /health (LH-DEPLOY-001/002, LH-NF-004).
+# ---------------------------------------------------------------------------
+FROM ${DOTNET_RUNTIME_IMAGE} AS runtime
+ENV DOTNET_NOLOGO=true \
+    DOTNET_CLI_TELEMETRY_OPTOUT=true \
+    DOTNET_GENERATE_ASPNETCORE_CERTIFICATE=false \
+    ASPNETCORE_URLS=http://0.0.0.0:8080 \
+    ASPNETCORE_ENVIRONMENT=Production
+WORKDIR /app
+# curl is needed for the container HEALTHCHECK; aspnet:10.0 ships a
+# slim Debian base without it.
+RUN apt-get update \
+ && apt-get install --yes --no-install-recommends curl \
+ && rm -rf /var/lib/apt/lists/*
+COPY --from=publish --chown=app:app /publish /app
+COPY --chown=app:app config/ /app/config/
+# Non-root runtime: aspnet:10.0 already ships an "app" user (UID 1654)
+# precisely for this purpose; reusing it keeps the image small and
+# avoids fighting the base image's reserved UIDs.
+USER app:app
+EXPOSE 8080
+HEALTHCHECK --interval=10s --timeout=3s --start-period=15s --retries=5 \
+    CMD curl --fail --silent --show-error http://localhost:8080/health || exit 1
+ENTRYPOINT ["dotnet", "BatteryEms.Host.dll"]
+
+# ---------------------------------------------------------------------------
 # Future stages (activated in later waves):
 #   FROM lint AS test-integration -> Welle 3: modbus/mqtt/postgres integration
-#   FROM ${DOTNET_RUNTIME_IMAGE} AS runtime -> Welle 5: runtime image
 # ---------------------------------------------------------------------------

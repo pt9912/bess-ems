@@ -1,0 +1,80 @@
+# LH-DEPLOY-002 production-shaped compose for the bess-ems M1 stack.
+# Sidecars: Postgres (LH-PERSIST-005), Mosquitto (LH-PROT-002 MQTT), and
+# the Go field-simulator that stands in for real BMS / inverter hardware.
+# `make build` produces the bess-ems image consumed here; `make runtime`
+# drives a smoke-up + /health probe + down loop on top of this file.
+#
+# Tokens, asset configuration and Postgres credentials are minimal M1
+# defaults — production deployments override them via env / secret
+# stores (RM-OPEN-04, LH-API-008).
+services:
+  bess-ems:
+    image: bess-ems-runtime:latest
+    pull_policy: never
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+      simulator:
+        condition: service_started
+    environment:
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      ASPNETCORE_ENVIRONMENT: Production
+      Bess__SchemaDirectory: /app/config/schema
+      Bess__AssetConfigPath: /app/config/examples/asset.single-bess.json
+      Bess__PersistenceConnectionString: Host=postgres;Port=5432;Database=bessems;Username=bessems;Password=bessems;Include Error Detail=true
+      Worker__CycleInterval: "00:00:01"
+      ApiTokens__Tokens__0__Token: dev-operator-token
+      ApiTokens__Tokens__0__Operator: operator-1
+      ApiTokens__Tokens__0__Role: operator
+    ports:
+      - "8080:8080"
+    networks: [bessnet]
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: bessems
+      POSTGRES_USER: bessems
+      POSTGRES_PASSWORD: bessems
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bessems -d bessems"]
+      interval: 2s
+      timeout: 1s
+      retries: 10
+    networks: [bessnet]
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    healthcheck:
+      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-p", "1883", "-t", "healthcheck", "-m", "ping"]
+      interval: 2s
+      timeout: 1s
+      retries: 10
+    networks: [bessnet]
+
+  simulator:
+    image: bess-field-sim:latest
+    pull_policy: never
+    command:
+      - "-scenario=data/scenario.json"
+      - "-modbus-mapping=data/modbus.json"
+      - "-modbus-addr=:5020"
+      - "-mqtt-mapping=data/mqtt.json"
+      - "-mqtt-broker=tcp://mosquitto:1883"
+      - "-mqtt-client-id=bess-field-sim"
+    volumes:
+      - ../tests/integration/fixtures/scenario.integration.json:/data/scenario.json:ro
+      - ../config/examples/adapters/modbus.simulator.json:/data/modbus.json:ro
+      - ../config/examples/adapters/mqtt.simulator.json:/data/mqtt.json:ro
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    networks: [bessnet]
+
+networks:
+  bessnet:
+    driver: bridge

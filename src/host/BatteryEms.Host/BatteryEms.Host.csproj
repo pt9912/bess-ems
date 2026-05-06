@@ -18,6 +18,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\hexagon\BatteryEms.Domain\BatteryEms.Domain.csproj" />
     <ProjectReference Include="..\..\hexagon\BatteryEms.Application\BatteryEms.Application.csproj" />
     <ProjectReference Include="..\..\infrastructure\BatteryEms.Infrastructure\BatteryEms.Infrastructure.csproj" />
