@@ -125,6 +125,65 @@ func TestPahoClient_PublishRespectsContextCancellation(t *testing.T) {
 	}
 }
 
+func TestPahoClient_SubscribeReceivesBrokerPublish(t *testing.T) {
+	t.Parallel()
+
+	url, _ := startBroker(t)
+
+	subscriber, err := mqtt.NewPahoClient(url, "subscribe-test")
+	if err != nil {
+		t.Fatalf("connect subscriber: %v", err)
+	}
+	defer subscriber.Close()
+
+	publisher, err := mqtt.NewPahoClient(url, "subscribe-test-pub")
+	if err != nil {
+		t.Fatalf("connect publisher: %v", err)
+	}
+	defer publisher.Close()
+
+	received := make(chan []byte, 1)
+	if err := subscriber.Subscribe(context.Background(), "battery/x/command", func(_ string, payload []byte) {
+		select {
+		case received <- payload:
+		default:
+		}
+	}); err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+
+	if err := publisher.Publish(context.Background(), "battery/x/command", false, []byte(`{"command_id":"cmd-1"}`)); err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+
+	select {
+	case got := <-received:
+		if string(got) != `{"command_id":"cmd-1"}` {
+			t.Errorf("payload: got %q", got)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("subscriber never received the publish")
+	}
+}
+
+func TestPahoClient_SubscribeRespectsContextCancellation(t *testing.T) {
+	t.Parallel()
+
+	url, _ := startBroker(t)
+	c, err := mqtt.NewPahoClient(url, "subscribe-cancel-test")
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer c.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err = c.Subscribe(ctx, "battery/x/command", func(_ string, _ []byte) {})
+	if err == nil {
+		t.Fatal("expected error from cancelled context")
+	}
+}
+
 func TestNewPahoClient_RejectsEmptyBroker(t *testing.T) {
 	t.Parallel()
 

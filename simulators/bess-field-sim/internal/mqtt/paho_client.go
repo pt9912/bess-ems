@@ -73,6 +73,30 @@ func (p *PahoClient) Publish(ctx context.Context, topic string, retained bool, p
 	}
 }
 
+// Subscribe registers handler for topic and waits for SUBACK. ctx gates
+// the wait; once it returns successfully, Paho dispatches incoming
+// messages to handler from its own goroutine until Close tears down the
+// connection. SECURITY: M1 simulator MQTT is anonymous plaintext only;
+// see NewPahoClient for the same caveat.
+func (p *PahoClient) Subscribe(ctx context.Context, topic string, handler MessageHandler) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	cb := func(_ paho.Client, msg paho.Message) {
+		handler(msg.Topic(), msg.Payload())
+	}
+	token := p.client.Subscribe(topic, p.qos, cb)
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-token.Done():
+		if err := token.Error(); err != nil {
+			return fmt.Errorf("mqtt subscribe %q: %w", topic, err)
+		}
+		return nil
+	}
+}
+
 // Close disconnects from the broker, waiting up to 250ms for in-flight
 // messages to drain.
 func (p *PahoClient) Close() {

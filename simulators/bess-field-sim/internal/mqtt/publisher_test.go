@@ -11,15 +11,22 @@ import (
 )
 
 type fakeClient struct {
-	mu       sync.Mutex
-	messages []capturedMessage
-	failOn   string
+	mu              sync.Mutex
+	messages        []capturedMessage
+	subscriptions   []capturedSubscription
+	failOn          string
+	subscribeReturn error
 }
 
 type capturedMessage struct {
 	topic    string
 	retained bool
 	payload  []byte
+}
+
+type capturedSubscription struct {
+	topic   string
+	handler mqtt.MessageHandler
 }
 
 func (f *fakeClient) Publish(_ context.Context, topic string, retained bool, payload []byte) error {
@@ -32,6 +39,44 @@ func (f *fakeClient) Publish(_ context.Context, topic string, retained bool, pay
 	copy(cp, payload)
 	f.messages = append(f.messages, capturedMessage{topic: topic, retained: retained, payload: cp})
 	return nil
+}
+
+func (f *fakeClient) Subscribe(_ context.Context, topic string, handler mqtt.MessageHandler) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.subscribeReturn != nil {
+		return f.subscribeReturn
+	}
+	f.subscriptions = append(f.subscriptions, capturedSubscription{topic: topic, handler: handler})
+	return nil
+}
+
+// deliver invokes the most-recent captured handler for topic with payload.
+// Returns false if the test never registered a subscription for topic.
+func (f *fakeClient) deliver(topic string, payload []byte) bool {
+	f.mu.Lock()
+	var handler mqtt.MessageHandler
+	for i := len(f.subscriptions) - 1; i >= 0; i-- {
+		if f.subscriptions[i].topic == topic {
+			handler = f.subscriptions[i].handler
+			break
+		}
+	}
+	f.mu.Unlock()
+	if handler == nil {
+		return false
+	}
+	handler(topic, payload)
+	return true
+}
+
+// capturedMessages returns a defensive copy of every published message.
+func (f *fakeClient) capturedMessages() []capturedMessage {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]capturedMessage, len(f.messages))
+	copy(out, f.messages)
+	return out
 }
 
 func TestPublisher_PublishSnapshot_PublishesEmsSubscribeTopics(t *testing.T) {

@@ -7,10 +7,19 @@ import (
 	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/model"
 )
 
-// Client is the broker-facing publish surface the simulator depends on.
-// Production wires a Paho or similar client; tests pass a mock.
+// MessageHandler receives one MQTT message. The handler runs on the
+// transport's dispatcher goroutine; concurrent invocations for distinct
+// messages are allowed, so handlers must be safe to call concurrently.
+type MessageHandler func(topic string, payload []byte)
+
+// Client is the broker-facing publish/subscribe surface the simulator
+// depends on. Production wires a Paho or similar client; tests pass a
+// mock. Direction note: on the wire, Subscribe binds to EMS-`publish`
+// topics (e.g. command) and Publish emits EMS-`subscribe` topics (e.g.
+// telemetry, status, fault, command_ack); see the package doc.
 type Client interface {
 	Publish(ctx context.Context, topic string, retained bool, payload []byte) error
+	Subscribe(ctx context.Context, topic string, handler MessageHandler) error
 }
 
 // Publisher assembles MQTT messages from a TelemetrySnapshot and pushes

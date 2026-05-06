@@ -15,6 +15,7 @@ import (
 	"syscall"
 
 	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/modbus"
+	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/model"
 	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/mqtt"
 	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/runtime"
 	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/scenario"
@@ -33,9 +34,10 @@ type cliFlags struct {
 }
 
 type outputs struct {
-	modbus *modbus.Server
-	mqtt   *mqtt.Publisher
-	client *mqtt.PahoClient
+	modbus  *modbus.Server
+	mqtt    *mqtt.Publisher
+	client  *mqtt.PahoClient
+	cmdAck  *mqtt.CommandHandler
 }
 
 func parseFlags(args []string) (cliFlags, error) {
@@ -92,7 +94,7 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
-	io.mqtt, io.client, err = startMQTT(flags, scn.Asset.AssetID)
+	io.mqtt, io.client, io.cmdAck, err = startMQTT(ctx, flags, scn.Asset.AssetID)
 	if err != nil {
 		return err
 	}
@@ -150,18 +152,18 @@ func startModbus(flags cliFlags) (*modbus.Server, error) {
 	return server, nil
 }
 
-func startMQTT(flags cliFlags, scenarioAssetID string) (*mqtt.Publisher, *mqtt.PahoClient, error) {
+func startMQTT(ctx context.Context, flags cliFlags, scenarioAssetID string) (*mqtt.Publisher, *mqtt.PahoClient, *mqtt.CommandHandler, error) {
 	if flags.mqttMapping == "" || flags.mqttBroker == "" {
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 
 	mapping, err := mqtt.LoadMapping(flags.mqttMapping)
 	if err != nil {
-		return nil, nil, fmt.Errorf("load mqtt mapping: %w", err)
+		return nil, nil, nil, fmt.Errorf("load mqtt mapping: %w", err)
 	}
 	client, err := mqtt.NewPahoClient(flags.mqttBroker, flags.mqttClientID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("connect mqtt: %w", err)
+		return nil, nil, nil, fmt.Errorf("connect mqtt: %w", err)
 	}
 	assetID := scenarioAssetID
 	if flags.assetIDOverride != "" {
@@ -169,7 +171,33 @@ func startMQTT(flags cliFlags, scenarioAssetID string) (*mqtt.Publisher, *mqtt.P
 	}
 	publisher := mqtt.NewPublisher(client, assetID, mapping)
 	slog.Info("mqtt publisher ready", "broker", flags.mqttBroker, "client_id", flags.mqttClientID, "asset", assetID)
-	return publisher, client, nil
+
+	cmdAck, err := attachCommandHandler(ctx, client, assetID, mapping)
+	if err != nil {
+		client.Close()
+		return nil, nil, nil, err
+	}
+	return publisher, client, cmdAck, nil
+}
+
+// attachCommandHandler resolves the command/command_ack topics from the
+// mapping and subscribes the simulator side. Mappings that ship without
+// either topic disable the ACK path with a Warn log instead of failing
+// — telemetry-only profiles stay valid for replay-only smoke runs.
+func attachCommandHandler(ctx context.Context, client *mqtt.PahoClient, assetID string, mapping model.MqttMapping) (*mqtt.CommandHandler, error) {
+	handler, err := mqtt.NewCommandHandler(client, assetID, mapping, nil, slog.Default())
+	switch {
+	case errors.Is(err, mqtt.ErrMappingNoCommandTopic), errors.Is(err, mqtt.ErrMappingNoAckTopic):
+		slog.Warn("mqtt: command/ack topics absent — ACK path disabled", "error", err)
+		return nil, nil
+	case err != nil:
+		return nil, fmt.Errorf("command handler: %w", err)
+	}
+	if err := handler.Subscribe(ctx); err != nil {
+		return nil, fmt.Errorf("subscribe command topic: %w", err)
+	}
+	slog.Info("mqtt command handler ready", "command_topic", handler.CommandTopic(), "ack_topic", handler.AckTopic())
+	return handler, nil
 }
 
 func main() {
