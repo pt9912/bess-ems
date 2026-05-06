@@ -2,9 +2,11 @@ using BatteryEms.Adapters.Optimization;
 using BatteryEms.Application.Assets;
 using BatteryEms.Application.Control;
 using BatteryEms.Application.Markets;
+using BatteryEms.Application.Observability;
 using BatteryEms.Application.Optimization;
 using BatteryEms.Application.Realtime;
 using BatteryEms.Domain;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace BatteryEms.Application.Tests;
@@ -24,6 +26,8 @@ public sealed class ControlCycleTests
             new InMemoryOperatorStopRegistry(),
             optimizer ?? new NoOpDispatchOptimizer(),
             clock,
+            NoOpControlCycleMetrics.Instance,
+            NullLogger<ControlCycleUseCase>.Instance,
             ControlCycleOptions.Default);
         return (cycle, snapshots, clock, assets);
     }
@@ -67,6 +71,7 @@ public sealed class ControlCycleTests
     }
 
     [Fact]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506", Justification = "Inline ControlCycle assembly composition is the SUT — extracting helpers would obscure the intent of the schedule-flows-to-optimizer test.")]
     public async Task Cycle_passes_active_schedule_commitments_into_dispatch_request()
     {
         // Day-Ahead schedule with a window covering TestFixtures.Now must
@@ -90,6 +95,8 @@ public sealed class ControlCycleTests
             new InMemoryOperatorStopRegistry(),
             optimizer,
             clock,
+            NoOpControlCycleMetrics.Instance,
+            NullLogger<ControlCycleUseCase>.Instance,
             ControlCycleOptions.Default);
         snapshots.Update(TestFixtures.CreateTelemetry(), TestFixtures.Now);
 

@@ -1,14 +1,17 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using BatteryEms.Application.Assets;
 using BatteryEms.Application.Markets;
+using BatteryEms.Application.Observability;
 using BatteryEms.Application.Optimization;
 using BatteryEms.Application.Realtime;
 using BatteryEms.Application.Time;
 using BatteryEms.Domain;
+using Microsoft.Extensions.Logging;
 
 namespace BatteryEms.Application.Control;
 
-public sealed class ControlCycleUseCase : IControlCycleUseCase
+public sealed partial class ControlCycleUseCase : IControlCycleUseCase
 {
     private readonly IBatteryAssetRegistry _assets;
     private readonly ISnapshotStore _snapshots;
@@ -16,6 +19,8 @@ public sealed class ControlCycleUseCase : IControlCycleUseCase
     private readonly IOperatorStopRegistry _operatorStops;
     private readonly IDispatchOptimizer _optimizer;
     private readonly IClock _clock;
+    private readonly IControlCycleMetrics _metrics;
+    private readonly ILogger<ControlCycleUseCase> _logger;
     private readonly ControlCycleOptions _options;
 
     private readonly ConcurrentDictionary<string, (double Power, DateTimeOffset At)> _previous =
@@ -28,6 +33,8 @@ public sealed class ControlCycleUseCase : IControlCycleUseCase
         IOperatorStopRegistry operatorStops,
         IDispatchOptimizer optimizer,
         IClock clock,
+        IControlCycleMetrics metrics,
+        ILogger<ControlCycleUseCase> logger,
         ControlCycleOptions options)
     {
         ArgumentNullException.ThrowIfNull(assets);
@@ -36,6 +43,8 @@ public sealed class ControlCycleUseCase : IControlCycleUseCase
         ArgumentNullException.ThrowIfNull(operatorStops);
         ArgumentNullException.ThrowIfNull(optimizer);
         ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(metrics);
+        ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(options);
 
         _assets = assets;
@@ -44,6 +53,8 @@ public sealed class ControlCycleUseCase : IControlCycleUseCase
         _operatorStops = operatorStops;
         _optimizer = optimizer;
         _clock = clock;
+        _metrics = metrics;
+        _logger = logger;
         _options = options;
     }
 
@@ -51,6 +62,20 @@ public sealed class ControlCycleUseCase : IControlCycleUseCase
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(assetId);
 
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            return await ExecuteCoreAsync(assetId, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            stopwatch.Stop();
+            _metrics.RecordCycleDuration(assetId, stopwatch.Elapsed);
+        }
+    }
+
+    private async Task<BatteryCommand> ExecuteCoreAsync(string assetId, CancellationToken cancellationToken)
+    {
         var now = _clock.UtcNow;
 
         // LH-API-006 short-circuit: an active operator stop overrides
@@ -61,34 +86,32 @@ public sealed class ControlCycleUseCase : IControlCycleUseCase
         var operatorStop = _operatorStops.Find(assetId);
         if (operatorStop is not null)
         {
-            return BatteryCommand.SafeStop(
-                assetId,
-                now,
-                _options.SafeFallbackValidity,
-                $"operator-stop:{operatorStop.Reason}",
-                CommandSource.Operator);
+            var operatorStopReason = $"operator-stop:{operatorStop.Reason}";
+            return EmitSafeStop(assetId, now, operatorStopReason, CommandSource.Operator, decision: "operator-stop");
         }
 
         var asset = _assets.Find(assetId);
         if (asset is null)
         {
-            return BatteryCommand.SafeStop(assetId, now, _options.SafeFallbackValidity, "asset-not-registered", CommandSource.Fallback);
+            return EmitSafeStop(assetId, now, "asset-not-registered", CommandSource.Fallback, decision: "asset-not-registered");
         }
 
         var snapshot = _snapshots.GetLatest(assetId, now);
         if (snapshot is null)
         {
-            return BatteryCommand.SafeStop(assetId, now, _options.SafeFallbackValidity, "no-snapshot", CommandSource.Fallback);
+            _metrics.IncrementInvalidSnapshot(assetId, "no-snapshot");
+            return EmitSafeStop(assetId, now, "no-snapshot", CommandSource.Fallback, decision: "no-snapshot");
         }
 
         if (!snapshot.Quality.IsUsableForControl)
         {
-            return BatteryCommand.SafeStop(assetId, now, _options.SafeFallbackValidity, snapshot.Quality.Reason, CommandSource.Fallback);
+            _metrics.IncrementInvalidSnapshot(assetId, snapshot.Quality.Reason);
+            return EmitSafeStop(assetId, now, snapshot.Quality.Reason, CommandSource.Fallback, decision: "snapshot-unusable");
         }
 
         if (!snapshot.Telemetry.Available)
         {
-            return BatteryCommand.SafeStop(assetId, now, _options.SafeFallbackValidity, "asset-unavailable", CommandSource.Fallback);
+            return EmitSafeStop(assetId, now, "asset-unavailable", CommandSource.Fallback, decision: "asset-unavailable");
         }
 
         var commitments = _scheduleTracker.GetActiveCommitments(assetId, now);
@@ -98,7 +121,7 @@ public sealed class ControlCycleUseCase : IControlCycleUseCase
 
         if (!dispatch.IsValid)
         {
-            return BatteryCommand.SafeStop(assetId, now, _options.SafeFallbackValidity, dispatch.Reason, CommandSource.Fallback);
+            return EmitSafeStop(assetId, now, dispatch.Reason, CommandSource.Fallback, decision: "dispatch-invalid");
         }
 
         var constrained = ConstraintLimiter.Apply(asset, snapshot.Telemetry, dispatch.TargetActivePowerKw);
@@ -129,7 +152,7 @@ public sealed class ControlCycleUseCase : IControlCycleUseCase
                 ? ramped.LimitReason
                 : dispatch.Reason;
 
-        return new BatteryCommand(
+        var command = new BatteryCommand(
             CommandId: $"ctrl-{now.ToUnixTimeMilliseconds()}-{assetId}",
             Timestamp: now,
             AssetId: assetId,
@@ -139,5 +162,57 @@ public sealed class ControlCycleUseCase : IControlCycleUseCase
             ValidUntil: now + _options.SafeFallbackValidity,
             Reason: reason,
             Source: CommandSource.Optimization);
+
+        _metrics.SetActivePowerKw(assetId, command.ActivePowerKw);
+        _metrics.SetSocPercent(assetId, snapshot.Telemetry.SocPercent);
+        _metrics.RecordCommandLatency(assetId, now - snapshot.Telemetry.Timestamp);
+
+        // LH-MON-001: structured log carries the canonical observability
+        // fields (asset_id, component, decision, reason) so JSON-console
+        // consumers get one line per control cycle without parsing a
+        // free-form message string.
+        Log.CycleAcceptedCommand(_logger, assetId, mode, command.ActivePowerKw, reason);
+        return command;
+    }
+
+    private BatteryCommand EmitSafeStop(
+        string assetId,
+        DateTimeOffset now,
+        string reason,
+        CommandSource source,
+        string decision)
+    {
+        var command = BatteryCommand.SafeStop(assetId, now, _options.SafeFallbackValidity, reason, source);
+        _metrics.RecordSafeStop(assetId, reason);
+        _metrics.SetActivePowerKw(assetId, command.ActivePowerKw);
+        Log.CycleSafeStop(_logger, assetId, decision, reason);
+        return command;
+    }
+
+    // High-performance logging via LoggerMessage source generator. Keeps
+    // structured fields (asset_id, decision, reason) addressable for the
+    // JSON console formatter without per-call string allocations.
+    private static partial class Log
+    {
+        [LoggerMessage(
+            EventId = 1701,
+            Level = LogLevel.Information,
+            Message = "Control cycle emitted command {asset_id} mode={mode} power_kw={power_kw} reason={reason}")]
+        public static partial void CycleAcceptedCommand(
+            ILogger logger,
+            string asset_id,
+            CommandMode mode,
+            double power_kw,
+            string reason);
+
+        [LoggerMessage(
+            EventId = 1702,
+            Level = LogLevel.Warning,
+            Message = "Control cycle safe-stop {asset_id} decision={decision} reason={reason}")]
+        public static partial void CycleSafeStop(
+            ILogger logger,
+            string asset_id,
+            string decision,
+            string reason);
     }
 }

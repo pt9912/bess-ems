@@ -2,9 +2,11 @@ using BatteryEms.Adapters.Optimization;
 using BatteryEms.Application.Assets;
 using BatteryEms.Application.Control;
 using BatteryEms.Application.Markets;
+using BatteryEms.Application.Observability;
 using BatteryEms.Application.Optimization;
 using BatteryEms.Application.Realtime;
 using BatteryEms.Domain;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace BatteryEms.Application.Tests;
@@ -26,6 +28,8 @@ public sealed class ControlCycleSafetyTests
             stops,
             optimizer ?? new NoOpDispatchOptimizer(),
             clock,
+            NoOpControlCycleMetrics.Instance,
+            NullLogger<ControlCycleUseCase>.Instance,
             ControlCycleOptions.Default);
         return (cycle, snapshots, clock, (InMemoryBatteryAssetRegistry)assets, stops);
     }

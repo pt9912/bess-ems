@@ -42,6 +42,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Persistence.Inte
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Api.Tests", "tests\adapters\driving\BatteryEms.Api.Tests\BatteryEms.Api.Tests.csproj", "{7DE34922-0FCF-4CFA-BF8C-262CA9C887AA}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Adapters.Telemetry.Tests", "tests\adapters\driven\BatteryEms.Adapters.Telemetry.Tests\BatteryEms.Adapters.Telemetry.Tests.csproj", "{B6F19D32-9F7C-4F2B-9D7E-5B3F7B0E9A11}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -128,6 +130,10 @@ Global
 		{7DE34922-0FCF-4CFA-BF8C-262CA9C887AA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7DE34922-0FCF-4CFA-BF8C-262CA9C887AA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7DE34922-0FCF-4CFA-BF8C-262CA9C887AA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B6F19D32-9F7C-4F2B-9D7E-5B3F7B0E9A11}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B6F19D32-9F7C-4F2B-9D7E-5B3F7B0E9A11}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B6F19D32-9F7C-4F2B-9D7E-5B3F7B0E9A11}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B6F19D32-9F7C-4F2B-9D7E-5B3F7B0E9A11}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

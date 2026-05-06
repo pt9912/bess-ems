@@ -76,6 +76,11 @@ RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.cs
     --no-build \
     --no-restore \
     --logger "console;verbosity=normal" \
+ && dotnet test tests/adapters/driven/BatteryEms.Adapters.Telemetry.Tests/BatteryEms.Adapters.Telemetry.Tests.csproj \
+    --configuration "${BUILD_CONFIGURATION}" \
+    --no-build \
+    --no-restore \
+    --logger "console;verbosity=normal" \
  && dotnet test tests/adapters/driving/BatteryEms.Api.Tests/BatteryEms.Api.Tests.csproj \
     --configuration "${BUILD_CONFIGURATION}" \
     --no-build \
@@ -155,6 +160,17 @@ RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.cs
     /p:CoverletOutput=/src/coverage/Modbus/ \
     /p:Include="[BatteryEms.Adapters.Modbus]*" \
     /p:Exclude="[BatteryEms.Adapters.Modbus]*.FluentModbusClient" \
+    /p:ExcludeByFile="**/*.generated.cs" \
+    /p:Threshold=90 \
+    /p:ThresholdType=line \
+    /p:ThresholdStat=total \
+ && dotnet test tests/adapters/driven/BatteryEms.Adapters.Telemetry.Tests/BatteryEms.Adapters.Telemetry.Tests.csproj \
+    --configuration "${BUILD_CONFIGURATION}" \
+    --no-restore \
+    /p:CollectCoverage=true \
+    /p:CoverletOutputFormat=cobertura \
+    /p:CoverletOutput=/src/coverage/Telemetry/ \
+    /p:Include="[BatteryEms.Adapters.Telemetry]*" \
     /p:ExcludeByFile="**/*.generated.cs" \
     /p:Threshold=90 \
     /p:ThresholdType=line \

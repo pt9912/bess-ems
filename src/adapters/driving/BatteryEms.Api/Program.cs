@@ -1,16 +1,12 @@
 using System.Text.Json;
 using BatteryEms.Api.Auth;
+using BatteryEms.Api.Composition;
 using BatteryEms.Api.Endpoints;
-using BatteryEms.Application.Api;
-using BatteryEms.Application.Assets;
-using BatteryEms.Application.Control;
-using BatteryEms.Application.Markets;
-using BatteryEms.Application.Persistence;
-using BatteryEms.Application.Realtime;
-using BatteryEms.Application.Time;
+using BatteryEms.Api.Observability;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
+using Prometheus;
 
 namespace BatteryEms.Api;
 
@@ -33,6 +29,11 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
+        // LH-MON-001: structured stdout logs. Centralised in
+        // LoggingRegistration so the same configuration drives both the
+        // API and the Worker host (RM-M1-19).
+        builder.Host.ConfigureBessJsonLogging();
+
         builder.Services.Configure<JsonOptions>(options =>
         {
             options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
@@ -44,25 +45,12 @@ public class Program
 
         builder.Services.AddOpenApi();
 
-        // Application-side stateful in-memory stores. Single instance per
-        // process so the snapshot/command pipelines see consistent state.
-        builder.Services.AddSingleton<IClock, SystemClock>();
-        builder.Services.AddSingleton<IBatteryAssetRegistry>(_ => new InMemoryBatteryAssetRegistry());
-        builder.Services.AddSingleton<ISnapshotStore>(_ => new InMemorySnapshotStore(TimeSpan.FromSeconds(10)));
-        builder.Services.AddSingleton<ICommandRepository, InMemoryCommandRepository>();
-        builder.Services.AddSingleton<IScheduleRepository>(_ => new InMemoryScheduleRepository());
-        builder.Services.AddSingleton<IOperatorStopRegistry, InMemoryOperatorStopRegistry>();
-        builder.Services.AddSingleton<IOperatorAuditLog, InMemoryOperatorAuditLog>();
-
-        // Driving-port use cases.
-        builder.Services.AddSingleton<IHealthQuery, DefaultHealthQuery>();
-        builder.Services.AddSingleton<IBatteryStatusQuery, DefaultBatteryStatusQuery>();
-        builder.Services.AddSingleton<IScheduleQuery, DefaultScheduleQuery>();
-        builder.Services.AddSingleton<IOperatorStopUseCase, DefaultOperatorStopUseCase>();
+        // Application-side stateful in-memory stores + driving-port use
+        // cases. Bundled in ApplicationServiceRegistration to keep this
+        // method's class coupling under the CA1506 threshold.
+        builder.Services.AddBessApplicationInMemoryStores();
 
         // RM-M1-16: API-token AuthN + role-based AuthZ for write endpoints.
-        // Wiring is bundled in AuthRegistration to keep BuildApp's class
-        // coupling below the CA1506 threshold.
         builder.Services.AddApiTokenAuth(builder.Configuration);
 
         var app = builder.Build();
@@ -75,6 +63,11 @@ public class Program
         app.UseAuthorization();
         app.MapOpenApi();
         app.MapBatteryEms();
+        // LH-MON-002: Prometheus scrape endpoint. M1 exposes the default
+        // process metrics (CPU, GC, …) from the API host; RM-M1-19 wires
+        // PrometheusControlCycleMetrics in the Worker so the regulation-
+        // cycle metrics show up alongside.
+        app.MapMetrics();
         return app;
     }
 
@@ -82,12 +75,5 @@ public class Program
     {
         var app = BuildApp(args);
         app.Run();
-    }
-
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "Instantiated by the DI container via reflection.")]
-    private sealed class SystemClock : IClock
-    {
-        public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
     }
 }
