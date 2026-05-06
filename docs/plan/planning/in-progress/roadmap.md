@@ -86,12 +86,12 @@ AuthN/AuthZ-geschütztem Operator-Stop.
 | ⬜     | RM-M1-05   | Constraint Limiter (.NET) mit SOC-, Power-, Verfügbarkeitsgrenzen   | LH-CTRL-002, LH-SAFE-002/3 |
 | ⬜     | RM-M1-06   | Ramp Limiter (.NET)                                                  | LH-CTRL-003               |
 | ⬜     | RM-M1-07   | Regelzyklus 1 s, sicherer Fallback bei stale/ungültigem Snapshot    | LH-CTRL-001/007, LH-RT-003 |
-| ⬜     | RM-M1-08   | Optimization-Interface + `NoOpDispatchOptimizer`                    | LH-OPT-001 (als Interface) |
+| ⬜     | RM-M1-08   | Optimization-Interface: `IDispatchOptimizer`/`NoOpDispatchOptimizer` für Echtzeit-Single-Step-Dispatch im Regelzyklus; `IScheduleOptimizer` ist Architekturgrenze ohne M1-Implementierung | LH-OPT-001 (als Interface), LH-OPT-007 |
 | ⬜     | RM-M1-09   | Modbus-TCP-Adapter (Lesen + Schreiben, Mapping über Config)         | LH-MODB-001..005          |
 | ⬜     | RM-M1-10   | MQTT-Adapter (Telemetrie-Empfang, Command-Publish, Topic-Konvention) | LH-MQTT-001..003         |
 | ⬜     | RM-M1-11   | Schreibbegrenzung im Adapter unmittelbar vor Versand                | LH-SAFE-007               |
 | ⬜     | RM-M1-12   | Statischer Fahrplanimport, `MarketCommitment`-Modell, UTC/DST-Zeitmodell + Day-Ahead-Verfolgung | LH-MKT-001/003/006/007 |
-| ⬜     | RM-M1-13   | PostgreSQL-Persistenz: Telemetrie, Commands, Fahrpläne, Audit       | LH-PERSIST-001..005       |
+| ✅     | RM-M1-13   | PostgreSQL-Persistenz: Dapper + Npgsql 9, idempotente DDL, Repos für Telemetrie/Commands/Fahrpläne/Audit, Postgres-Sidecar im Compose-Integrationstest. DI-/Runtime-Wiring bleibt RM-M1-15/19. | LH-PERSIST-001..005       |
 | ⬜     | RM-M1-14   | Retention-/Datenvolumen-Konfiguration (dokumentiert)                | LH-PERSIST-006            |
 | ⬜     | RM-M1-15   | API: Health, Status, Current Command, Schedules, Operator-Stop      | LH-API-001..004, LH-API-006 |
 | ⬜     | RM-M1-16   | AuthN/AuthZ + Audit-Log für schreibende Endpunkte                   | LH-API-007                |
@@ -142,13 +142,13 @@ LP-Optimierer (.NET-Interface, optional OR-Tools/HiGHS), Tracing und Replay.
 | ------ | ---------- | ------------------------------------------------------------------- | ----------------------- |
 | ⬜     | RM-M2-01   | Erweiterte Marktcommitment-Priorisierung und Optimierungsintegration | LH-MKT-003/006          |
 | ⬜     | RM-M2-02   | Erweiterte Zeitmodell-Nutzung für Optimierungshorizonte und Marktintervalle | LH-MKT-007              |
-| ⬜     | RM-M2-03   | LP-Implementierung des `IDispatchOptimizer` (Solver-Auswahl per Config) | LH-OPT-001..006     |
+| ⬜     | RM-M2-03   | LP-Implementierung des `IScheduleOptimizer` für Horizon-Optimierung (Solver-Auswahl per Config) | LH-OPT-001..009     |
 | ⬜     | RM-M2-04   | Zielfunktion konfigurierbar (Energiebezug, Einspeise, Strafkosten)  | LH-OPT-004              |
 | ⬜     | RM-M2-05   | Optimierungs-API (`POST /markets/day-ahead/optimize`)               | LH-API-005              |
 | ⬜     | RM-M2-06   | OpenTelemetry-Tracing für Snapshot → Control → Adapter              | LH-MON-003              |
 | ⬜     | RM-M2-07   | Erweiterte Prometheus-Metriken für Solverzeit und Optimierungsläufe | LH-MON-002              |
 | ⬜     | RM-M2-08   | PID-Regler (.NET) mit Anti-Windup, Output-Clamping, Totband         | LH-CTRL-004             |
-| ⬜     | RM-M2-09   | Erweiterte Persistenz für Optimierungsläufe und Solverstatus        | LH-PERSIST-002/003      |
+| ⬜     | RM-M2-09   | Erweiterte Persistenz für Optimierungsläufe und Solverstatus (`IOptimizationRunRepository`, `OptimizationRun` mit Objective Breakdown) | LH-PERSIST-007          |
 | ⬜     | RM-M2-10   | Replay-Test-Harness (Telemetrie-Wiedergabe, Command-Vergleich)      | LH-TEST-004             |
 
 ### Abnahmekriterien
