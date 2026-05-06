@@ -70,6 +70,11 @@ RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.cs
     --configuration "${BUILD_CONFIGURATION}" \
     --no-build \
     --no-restore \
+    --logger "console;verbosity=normal" \
+ && dotnet test tests/adapters/driven/BatteryEms.Adapters.Mqtt.Tests/BatteryEms.Adapters.Mqtt.Tests.csproj \
+    --configuration "${BUILD_CONFIGURATION}" \
+    --no-build \
+    --no-restore \
     --logger "console;verbosity=normal"
 
 # ---------------------------------------------------------------------------
