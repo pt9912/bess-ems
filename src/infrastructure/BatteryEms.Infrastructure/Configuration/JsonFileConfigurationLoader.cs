@@ -23,6 +23,15 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
             throw new DirectoryNotFoundException($"Schema directory not found: {schemaDirectory}");
         }
 
+        // LH-DOM-005 device-point base lives in its own schema and is
+        // referenced from both the Modbus and MQTT mapping schemas. We
+        // register it once with the global schema registry so $ref to
+        // its $id resolves at evaluation time without per-loader plumbing.
+        var devicePointSchema = LoadSchema(schemaDirectory, "device-point.schema.json");
+        SchemaRegistry.Global.Register(
+            new Uri("https://bess-ems.io/schema/device-point.json"),
+            devicePointSchema);
+
         _assetSchema = LoadSchema(schemaDirectory, "asset.schema.json");
         _modbusSchema = LoadSchema(schemaDirectory, "modbus-mapping.schema.json");
         _mqttSchema = LoadSchema(schemaDirectory, "mqtt-mapping.schema.json");
@@ -93,7 +102,10 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
                 AuthRequired: r.AuthRequired,
                 Enum: r.Enum is null ? null : ConvertEnum(r.Enum, filePath, r.Name),
                 FirmwareConstraint: r.FirmwareConstraint,
-                SunspecModel: r.SunspecModel));
+                SunspecModel: r.SunspecModel)
+            {
+                DevicePoint = BuildDevicePoint(r.DisplayName, r.Unit, r.Exportable, r.Alarm, r.ValueExplanation),
+            });
         }
 
         return new ModbusMappingConfiguration(
@@ -116,7 +128,10 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
         }
 
         var topics = dto.Topics
-            .Select(t => new MqttTopicMapping(t.Name, t.Topic, t.Direction, t.PayloadFormat, t.Retained, t.AuthRequired))
+            .Select(t => new MqttTopicMapping(t.Name, t.Topic, t.Direction, t.PayloadFormat, t.Retained, t.AuthRequired)
+            {
+                DevicePoint = BuildDevicePoint(t.DisplayName, t.Unit, t.Exportable, t.Alarm, t.ValueExplanation),
+            })
             .ToList();
 
         return new MqttMappingConfiguration(dto.ProfileName, topics);
@@ -164,6 +179,39 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
             throw new ConfigurationValidationException(
                 $"Schedule {filePath} violates domain invariants: {ex.Message}", ex);
         }
+    }
+
+    // Returns null when no LH-DOM-005 device-point fields are set, so the
+    // adapter mapping doesn't carry a placeholder when the operator hasn't
+    // filled the metadata. exportable=true is the schema default, so a
+    // mapping with only that field set still counts as "no metadata" — we
+    // surface DevicePoint only when at least one human-meaningful field
+    // (display name, unit, alarm, value explanation, or an explicit
+    // exportable=false) is present.
+    private static DevicePointMetadata? BuildDevicePoint(
+        string? displayName,
+        string? unit,
+        bool exportable,
+        DevicePointAlarmDto? alarm,
+        Dictionary<string, string>? valueExplanation)
+    {
+        var hasContent = !string.IsNullOrWhiteSpace(displayName)
+            || !string.IsNullOrWhiteSpace(unit)
+            || alarm is not null
+            || valueExplanation is { Count: > 0 }
+            || !exportable;
+        if (!hasContent)
+        {
+            return null;
+        }
+
+        DevicePointAlarm? alarmRecord = alarm is null
+            ? null
+            : new DevicePointAlarm(alarm.Min, alarm.Max, alarm.Severity);
+        IReadOnlyDictionary<string, string>? explanation = valueExplanation is { Count: > 0 }
+            ? new Dictionary<string, string>(valueExplanation, StringComparer.Ordinal)
+            : null;
+        return new DevicePointMetadata(displayName, unit, exportable, alarmRecord, explanation);
     }
 
     private static Dictionary<int, string> ConvertEnum(
@@ -291,7 +339,14 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
         string AuthRequired,
         Dictionary<string, string>? Enum,
         string? FirmwareConstraint,
-        int? SunspecModel);
+        int? SunspecModel,
+        // LH-DOM-005 device-point base (optional). Default-true for
+        // Exportable matches the schema default.
+        string? DisplayName = null,
+        string? Unit = null,
+        bool Exportable = true,
+        DevicePointAlarmDto? Alarm = null,
+        Dictionary<string, string>? ValueExplanation = null);
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "Instantiated by JsonSerializer via reflection.")]
     private sealed record MqttMappingDto(
@@ -305,7 +360,19 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
         string Direction,
         string PayloadFormat,
         bool Retained,
-        string AuthRequired);
+        string AuthRequired,
+        // LH-DOM-005 device-point base (optional).
+        string? DisplayName = null,
+        string? Unit = null,
+        bool Exportable = true,
+        DevicePointAlarmDto? Alarm = null,
+        Dictionary<string, string>? ValueExplanation = null);
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "Instantiated by JsonSerializer via reflection.")]
+    private sealed record DevicePointAlarmDto(
+        double? Min,
+        double? Max,
+        string? Severity);
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "Instantiated by JsonSerializer via reflection.")]
     private sealed record ScheduleDto(

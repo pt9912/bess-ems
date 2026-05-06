@@ -7,4 +7,9 @@ public sealed record MqttTopicMapping(
     string Direction,
     string PayloadFormat,
     bool Retained,
-    string AuthRequired);
+    string AuthRequired)
+{
+    // LH-DOM-005 device-point metadata: optional, init-only so existing
+    // call sites that build the record positionally stay source-compatible.
+    public DevicePointMetadata? DevicePoint { get; init; }
+}

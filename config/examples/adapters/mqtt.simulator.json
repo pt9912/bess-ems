@@ -3,6 +3,7 @@
   "topics": [
     {
       "name": "telemetry",
+      "display_name": "Battery telemetry snapshot",
       "topic": "battery/{assetId}/telemetry",
       "direction": "subscribe",
       "payload_format": "json",

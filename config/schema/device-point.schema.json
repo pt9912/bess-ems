@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bess-ems.io/schema/device-point.json",
+  "title": "Device-point base (LH-DOM-005)",
+  "description": "Common metadata fragment for protocol-specific point definitions. Modbus register and MQTT topic items embed this via allOf+$ref so a single device point carries the same fachliche Bedeutung across protocols, telemetry, API and future export adapters (LH-DOM-005, LH-CONF-002).",
+  "$defs": {
+    "device_point_base": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Eindeutiger Schlüssel (LH-DOM-005)."
+        },
+        "display_name": {
+          "type": "string",
+          "description": "Anzeigename für UI/Telemetrie/Export. Optional, SHOULD für Punkte mit physikalischer Größe."
+        },
+        "unit": {
+          "type": "string",
+          "description": "Einheit (kW, kWh, V, A, °C, %, ...). Optional; entfällt für Boolean- oder Status-Punkte."
+        },
+        "exportable": {
+          "type": "boolean",
+          "default": true,
+          "description": "False schließt diesen Punkt aus Northbound-Exports aus (LH-CONF-004)."
+        },
+        "alarm": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "min": { "type": "number" },
+            "max": { "type": "number" },
+            "severity": { "type": "string", "enum": ["info", "warning", "critical"] }
+          },
+          "description": "Optional. Einfache Schwellwert-Plausibilität; volle Alarm-Definition lebt protokoll- bzw. controllerseitig."
+        },
+        "value_explanation": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Map raw value (string key) → human-readable label, z.B. {\"0\":\"off\",\"1\":\"running\"}. Modbus-Register dürfen weiterhin das protokollspezifische Feld `enum` nutzen — dieser Eintrag ist die protokollneutrale Form."
+        }
+      }
+    }
+  }
+}

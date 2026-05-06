@@ -105,6 +105,164 @@ public sealed class JsonFileConfigurationLoaderTests
     }
 
     [Fact]
+    public void Modbus_register_loads_device_point_metadata_when_present()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var mapping = loader.LoadModbusMapping(
+            Path.Combine(ExamplesDirectory, "adapters", "modbus.simulator.json"));
+
+        // soc_percent in the example carries display_name + unit (LH-DOM-005).
+        var soc = mapping.Registers.First(r => r.Name == "soc_percent");
+        Assert.NotNull(soc.DevicePoint);
+        Assert.Equal("State of charge", soc.DevicePoint!.DisplayName);
+        Assert.Equal("%", soc.DevicePoint.Unit);
+        Assert.True(soc.DevicePoint.Exportable);
+
+        // temperature_celsius additionally carries an alarm rule.
+        var temp = mapping.Registers.First(r => r.Name == "temperature_celsius");
+        Assert.NotNull(temp.DevicePoint?.Alarm);
+        Assert.Equal(-20, temp.DevicePoint!.Alarm!.Min);
+        Assert.Equal(55, temp.DevicePoint.Alarm.Max);
+        Assert.Equal("warning", temp.DevicePoint.Alarm.Severity);
+
+        // Registers without any device-point fields surface DevicePoint as null
+        // so call sites can quickly tell metadata-rich points from raw ones.
+        var setpoint = mapping.Registers.First(r => r.Name == "active_power_setpoint_kw");
+        Assert.Null(setpoint.DevicePoint);
+    }
+
+    [Fact]
+    public void Mqtt_topic_loads_device_point_metadata_when_present()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var mapping = loader.LoadMqttMapping(
+            Path.Combine(ExamplesDirectory, "adapters", "mqtt.simulator.json"));
+
+        var telemetry = mapping.Topics.First(t => t.Name == "telemetry");
+        Assert.NotNull(telemetry.DevicePoint);
+        Assert.Equal("Battery telemetry snapshot", telemetry.DevicePoint!.DisplayName);
+
+        // Topics without metadata stay null so the contract matches Modbus.
+        var command = mapping.Topics.First(t => t.Name == "command");
+        Assert.Null(command.DevicePoint);
+    }
+
+    [Fact]
+    public void Modbus_register_with_value_explanation_loads_into_device_point()
+    {
+        // value_explanation is the cross-protocol form of LH-DOM-005's
+        // "Werteerklärung". Modbus mappings keep the legacy `enum` field
+        // for the register-value map (still tested by the SunSpec profile);
+        // value_explanation in device_point_base lets future callers ask
+        // the same question without reaching into Modbus-specific fields.
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson(
+            """
+            {
+              "profile_name": "p",
+              "unit_id_discovery": "static",
+              "static_unit_id": 1,
+              "registers": [
+                {
+                  "name": "operating_mode",
+                  "display_name": "Inverter operating mode",
+                  "address": 200,
+                  "type": "uint16",
+                  "scale_factor": 1,
+                  "range": [0, 3],
+                  "writable": false,
+                  "write_cadence": "cyclic",
+                  "auth_required": "none",
+                  "value_explanation": { "0": "stop", "1": "idle", "2": "charge", "3": "discharge" }
+                }
+              ]
+            }
+            """);
+        try
+        {
+            var mapping = loader.LoadModbusMapping(path);
+            var register = Assert.Single(mapping.Registers);
+            Assert.NotNull(register.DevicePoint?.ValueExplanation);
+            Assert.Equal("discharge", register.DevicePoint!.ValueExplanation!["3"]);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Modbus_register_without_required_name_fails_schema_via_device_point_base()
+    {
+        // device_point_base owns the required-name rule. Without name the
+        // mapping must be rejected at schema time, not bubble up as a runtime
+        // serialisation error.
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson(
+            """
+            {
+              "profile_name": "p",
+              "unit_id_discovery": "static",
+              "static_unit_id": 1,
+              "registers": [
+                {
+                  "address": 100,
+                  "type": "uint16",
+                  "scale_factor": 1,
+                  "range": [0, 100],
+                  "writable": false,
+                  "write_cadence": "cyclic",
+                  "auth_required": "none"
+                }
+              ]
+            }
+            """);
+        try
+        {
+            var ex = Assert.Throws<ConfigurationValidationException>(() => loader.LoadModbusMapping(path));
+            Assert.Contains("Schema validation failed", ex.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Mqtt_topic_with_unknown_field_fails_schema()
+    {
+        // unevaluatedProperties:false (replacing additionalProperties:false)
+        // still rejects unknown fields once the device_point_base allOf
+        // branch is in place. This locks the contract end-to-end.
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson(
+            """
+            {
+              "profile_name": "p",
+              "topics": [
+                {
+                  "name": "telemetry",
+                  "topic": "battery/x/telemetry",
+                  "direction": "subscribe",
+                  "payload_format": "json",
+                  "retained": true,
+                  "auth_required": "none",
+                  "made_up_field": 42
+                }
+              ]
+            }
+            """);
+        try
+        {
+            Assert.Throws<ConfigurationValidationException>(() => loader.LoadMqttMapping(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void Asset_with_unknown_field_fails_schema()
     {
         var loader = new JsonFileConfigurationLoader(SchemaDirectory);

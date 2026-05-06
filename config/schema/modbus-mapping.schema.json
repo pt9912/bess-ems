@@ -24,47 +24,51 @@
   "$defs": {
     "register": {
       "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "name",
-        "address",
-        "type",
-        "scale_factor",
-        "range",
-        "writable",
-        "write_cadence",
-        "auth_required"
-      ],
-      "properties": {
-        "name": { "type": "string", "minLength": 1 },
-        "address": { "type": "integer", "minimum": 0 },
-        "type": { "type": "string", "enum": ["uint16", "int16", "uint32", "int32", "float32", "string"] },
-        "scale_factor": { "type": "number" },
-        "range": {
-          "type": "array",
-          "items": { "type": "number" },
-          "minItems": 2,
-          "maxItems": 2
-        },
-        "writable": { "type": "boolean" },
-        "enum": {
-          "type": "object",
-          "additionalProperties": { "type": "string" }
-        },
-        "write_cadence": {
-          "type": "string",
-          "enum": ["cyclic", "once_per_day", "one_shot", "heartbeat", "cooldown"]
-        },
-        "auth_required": { "type": "string", "enum": ["none", "network", "token"] },
-        "firmware_constraint": { "type": "string" },
-        "sunspec_model": { "type": "integer", "minimum": 1 }
-      },
       "allOf": [
+        { "$ref": "https://bess-ems.io/schema/device-point.json#/$defs/device_point_base" },
         {
-          "if": { "properties": { "writable": { "const": true } }, "required": ["writable"] },
-          "then": { "required": ["write_cadence", "auth_required"] }
+          "required": [
+            "address",
+            "type",
+            "scale_factor",
+            "range",
+            "writable",
+            "write_cadence",
+            "auth_required"
+          ],
+          "properties": {
+            "address": { "type": "integer", "minimum": 0 },
+            "type": { "type": "string", "enum": ["uint16", "int16", "uint32", "int32", "float32", "string"] },
+            "scale_factor": { "type": "number" },
+            "range": {
+              "type": "array",
+              "items": { "type": "number" },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "writable": { "type": "boolean" },
+            "enum": {
+              "type": "object",
+              "additionalProperties": { "type": "string" },
+              "description": "Protokollspezifische Werteerklärung (Register-Wert → Label). Funktional äquivalent zu device_point_base.value_explanation; beide Felder dürfen nebeneinander stehen, der Loader bevorzugt `enum` für Modbus."
+            },
+            "write_cadence": {
+              "type": "string",
+              "enum": ["cyclic", "once_per_day", "one_shot", "heartbeat", "cooldown"]
+            },
+            "auth_required": { "type": "string", "enum": ["none", "network", "token"] },
+            "firmware_constraint": { "type": "string" },
+            "sunspec_model": { "type": "integer", "minimum": 1 }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "writable": { "const": true } }, "required": ["writable"] },
+              "then": { "required": ["write_cadence", "auth_required"] }
+            }
+          ]
         }
-      ]
+      ],
+      "unevaluatedProperties": false
     }
   }
 }

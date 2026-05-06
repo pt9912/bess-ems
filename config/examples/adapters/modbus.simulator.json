@@ -5,6 +5,8 @@
   "registers": [
     {
       "name": "soc_percent",
+      "display_name": "State of charge",
+      "unit": "%",
       "address": 100,
       "type": "uint16",
       "scale_factor": 0.1,
@@ -15,6 +17,8 @@
     },
     {
       "name": "soh_percent",
+      "display_name": "State of health",
+      "unit": "%",
       "address": 102,
       "type": "uint16",
       "scale_factor": 0.1,
@@ -25,6 +29,8 @@
     },
     {
       "name": "active_power_kw",
+      "display_name": "Active power",
+      "unit": "kW",
       "address": 110,
       "type": "int16",
       "scale_factor": 0.1,
@@ -65,6 +71,9 @@
     },
     {
       "name": "temperature_celsius",
+      "display_name": "Cell temperature",
+      "unit": "°C",
+      "alarm": { "min": -20, "max": 55, "severity": "warning" },
       "address": 118,
       "type": "int16",
       "scale_factor": 0.1,

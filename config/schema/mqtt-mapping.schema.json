@@ -16,20 +16,24 @@
   "$defs": {
     "topic": {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["name", "topic", "direction", "payload_format", "retained", "auth_required"],
-      "properties": {
-        "name": { "type": "string", "minLength": 1 },
-        "topic": { "type": "string", "minLength": 1 },
-        "direction": {
-          "type": "string",
-          "enum": ["subscribe", "publish"],
-          "description": "Direction from the .NET-EMS adapter's perspective: 'subscribe' means the EMS subscribes (the field device publishes), 'publish' means the EMS publishes (the field device subscribes). The Go simulator inverts this perspective when binding to the broker."
-        },
-        "payload_format": { "type": "string", "enum": ["json"] },
-        "retained": { "type": "boolean" },
-        "auth_required": { "type": "string", "enum": ["none", "network", "token"] }
-      }
+      "allOf": [
+        { "$ref": "https://bess-ems.io/schema/device-point.json#/$defs/device_point_base" },
+        {
+          "required": ["topic", "direction", "payload_format", "retained", "auth_required"],
+          "properties": {
+            "topic": { "type": "string", "minLength": 1 },
+            "direction": {
+              "type": "string",
+              "enum": ["subscribe", "publish"],
+              "description": "Direction from the .NET-EMS adapter's perspective: 'subscribe' means the EMS subscribes (the field device publishes), 'publish' means the EMS publishes (the field device subscribes). The Go simulator inverts this perspective when binding to the broker."
+            },
+            "payload_format": { "type": "string", "enum": ["json"] },
+            "retained": { "type": "boolean" },
+            "auth_required": { "type": "string", "enum": ["none", "network", "token"] }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
     }
   }
 }
