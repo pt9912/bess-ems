@@ -1817,7 +1817,7 @@ Das System muss im Container getestet werden.
 | LH-MKT-003         | `MarketCommitment`             | MVP                        |
 | LH-MKT-008         | `TariffRule` / `MarketPrice`   | nach MVP                   |
 | LH-MKT-009         | `MarketProduct`                | nach MVP                   |
-| LH-OPT-007         | `IScheduleOptimizer` + `IDispatchOptimizer` Abgrenzung | nach MVP |
+| LH-OPT-007         | `IScheduleOptimizer` + `IDispatchOptimizer` Abgrenzung | MVP als Architekturgrenze; konkrete Schedule-Optimizer-Implementierung nach MVP |
 | LH-OPT-009         | `OptimizationRunResult`        | nach MVP                   |
 | LH-CTRL-002        | `ConstraintLimiter`            | MVP                        |
 | LH-CTRL-003        | `RampLimiter`                  | MVP                        |

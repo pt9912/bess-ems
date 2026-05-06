@@ -159,7 +159,8 @@ Case → Driven Ports → Driven Adapter**.
         │             Driven Ports                         │
         │ IBatteryTelemetrySource, IBatteryCommandSink,    │
         │ ICommandRepository, IScheduleRepository,         │
-        │ IAuditLog, IDispatchOptimizer, IClock,           │
+        │ IAuditLog, IScheduleOptimizer, IClock,           │
+        │ IOptimizationRunRepository, IDispatchOptimizer,  │
         │ INativeBatteryControlKernel, ITelemetryExporter  │
         └─────────┬───────────┬─────────────┬──────────────┘
                   │           │             │
@@ -288,7 +289,7 @@ LH-ARCH-002).
 | ------------------------- | --------------------------------------------------- |
 | API Layer                 | Driving Adapter (`BatteryEms.Api`)                  |
 | Application / Worker      | Driving Adapter (`BatteryEms.Worker`) + Application (`BatteryEms.Application`) |
-| Market / Optimization     | Application Use Cases + `IDispatchOptimizer`-Driven-Port |
+| Market / Optimization     | Application Use Cases + `IScheduleOptimizer`- und `IDispatchOptimizer`-Driven-Ports |
 | Control                   | Domain (Limiter, State Machine) + Application (Komposition) |
 | Realtime                  | Application (Snapshot Store) + Driven Adapter (Telemetrie-Quellen) |
 | Domain                    | `BatteryEms.Domain` (Hexagon-Kern)                  |
