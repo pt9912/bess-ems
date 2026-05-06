@@ -73,6 +73,7 @@ Arbeitspakete parallel laufen, solange ihre Abhängigkeiten erfüllt sind.
 | ✅      | RM-M1-01 | Solution-Skeleton                               | keine                                    | Projekte gemäß Architektur §4.2 / §5.1 (hexagonale Verzeichnisstruktur) sind angelegt, `dotnet build -warnaserror` läuft in der Lint-Stage, gemeinsame Analyzer sind eingebunden.                                               |
 | ✅      | RM-M1-22 | Hexagonale Verzeichnis- und Modulstruktur       | RM-M1-01                                 | `src/hexagon/`, `src/adapters/{driving,driven}/`, `src/infrastructure/` sind angelegt; jedes Modul ist Driving/Driven/Composition-Root klassifiziert (siehe §5.1).                                                              |
 | ✅      | RM-M1-23 | Boundary-Tests (`BatteryEms.ArchitectureTests`) | RM-M1-22                                 | NetArchTest- oder ArchUnitNET-Suite setzt Dependency Rule und Architektur-Tabus aus §4.2 durch (Domain frameworkfrei, Application ohne Adapter-Refs, keine Adapter-zu-Adapter); `make arch-check` bricht den Build bei Verstoß. |
+| ✅      | RM-M1-24 | Go-Blackbox-Simulator (`bess-field-sim`)        | RM-M1-09, RM-M1-10                       | `simulators/bess-field-sim/` deckt Modbus + MQTT als unabhängiger Go-Service ab; Detailplan + Szenario-Fixtures in [`plan-RM-M1-simulator.md`](plan-RM-M1-simulator.md); `make simulator-{lint,test,race,coverage-gate}` und `make test-integration` (docker compose mit Simulator-Sidecar) sind aktiv und liefern Modbus-/MQTT-Roundtrips. Coverage-Gate 90 % auf `internal/...`. |
 | ✅      | RM-M1-21 | Makefile-Orchestrierung                         | RM-M1-01                                 | `make help`, `make gates`, `make ci`, `make runtime`, `make fullbuild`, Override-Variablen und Gate-/Report-Trennung sind implementiert; `make gates` zieht `make arch-check` mit.                                              |
 | ✅      | RM-M1-02 | Domain-Modell                                   | RM-M1-01                                 | `BatteryAsset`, `BatteryTelemetry`, `BatteryCommand`, `DataQuality`, `MarketCommitment` und Vorzeichenkonvention sind unit-getestet.                                                                                            |
 | ✅      | RM-M1-03 | Realtime Snapshot Store                         | RM-M1-02                                 | Datenfusion, Aging, Plausibilisierung, Snapshot-Qualität und stale-Erkennung sind unit-getestet.                                                                                                                                |
@@ -94,7 +95,7 @@ Arbeitspakete parallel laufen, solange ihre Abhängigkeiten erfüllt sind.
 | ✅      | RM-M1-19 | Container/Compose                               | RM-M1-09, RM-M1-10, RM-M1-13, RM-M1-15   | Dockerfile und Compose starten `bess-ems`, PostgreSQL und MQTT-Broker lokal reproduzierbar. **19c (geliefert):** `Adapters.Modbus.ModbusRegistration.AddBessModbus` + `Adapters.Mqtt.MqttRegistration.AddBessMqtt` (DI-Extensions registrieren `IModbusClient`/`IMqttClient` als Singleton, `IBatteryTelemetrySource` + `IBatteryCommandSink` teilen die Connection); `BessHostBuilder` lädt Modbus-/MQTT-Mapping via `JsonFileConfigurationLoader` und wired den passenden Adapter — sonst bleibt der NoOp-Default; `BatteryEms.Worker.TelemetryIngestionHostedService` pumpt `IBatteryTelemetrySource.ReadAsync` in den `ISnapshotStore` (Backoff bei Crash, kein Loop-Stop). `IHealthQuery` erweitert um `Components`-Map; `Adapters.Persistence.DapperHealthQuery` ersetzt die Default-Probe sobald `AddBessPersistence` läuft und prüft Postgres mit `SELECT 1` (Timeout 2 s) → `/health` antwortet 503 + Component-Detail bei DB-Ausfall. `compose.yml` schaltet im Demo-Stack den MQTT-Adapter ein (Mapping + Broker-Hostname); `/health` returnt `{"status":"ok","components":{"database":"ok"}}` im Smoke-Test. Tests: 2× ModbusRegistration + 2× MqttRegistration + 2× TelemetryIngestionHostedService (Drain + Adapter-Failure-Recovery). **19b (geliefert):** Multi-Stage `Dockerfile` mit `publish`- und `runtime`-Stage (`mcr.microsoft.com/dotnet/aspnet:10.0`, non-root `USER app`, `curl`-`HEALTHCHECK` auf `/health`, Port 8080, `dotnet BatteryEms.Host.dll`-Entrypoint); `deploy/compose.yml` (Repo-Root, getrennt vom Test-Compose) startet `bess-ems` + `postgres` + `mosquitto` + `bess-field-sim` lokal reproduzierbar (LH-DEPLOY-001/002/003); `make build` baut das Runtime-Image, `make runtime` (Alias `make test-container`) fährt den Compose-Stack mit `--wait` hoch, probt `/health` und räumt wieder auf. `IScheduleTracker` wurde im DI-Wiring nachgezogen (war im InMemory-Pfad noch nicht registriert). Beispiel-`appsettings.json` im Host-Project setzt sichere Defaults (Schema-/Asset-Pfade, Worker-CycleInterval=1 s, leere Token-Liste); `compose.yml` setzt Postgres-Connection-String + Demo-Operator-Token via Environment.
 
 **19a (geliefert):** `BatteryEms.Host` (neuer Composition-Root-Project, einziger Ort mit Kreuz-Layer-Refs); `BatteryEms.Worker.ControlCycleHostedService` (1-Hz `PeriodicTimer`-Loop mit Fan-out über `IBatteryAssetRegistry.GetAll()`, Sink-Aufruf, `ICommandRepository.AppendAsync`, Communication-Error-Counter bei Adapter-/Use-Case-Fehlern; Loop läuft weiter); `WorkerOptions` (Section `Worker`, Default 1 s); `WorkerRegistration.AddBessWorker`; `Adapters.Persistence.PersistenceRegistration.AddBessPersistence` (NpgsqlDataSource + Repos + DDL-Initializer); `Adapters.Optimization.OptimizationRegistration.AddBessOptimization`; `Application.IO.NoOp{BatteryTelemetrySource,BatteryCommandSink}` als sicherer Default (`SafeStop` wegen `no-snapshot`, Sink quittiert ohne Hardware) bis 19c die echten Modbus/MQTT-Adapter wired; `BessHostBuilder.BuildApp` lädt Asset/Schedule/Retention via `JsonFileConfigurationLoader` beim Start und seedet die Registry — fehlende Pflichtkonfig bricht den Start (LH-OPS-001 + LH-CONF-003); Postgres-DDL läuft eager beim Start, wenn `Bess:PersistenceConnectionString` gesetzt ist. arch-check: neuer `HostNamespace` als verbotene Referenz für Domain/Application/Driving-/Driven-Adapter — Host darf alles. Coverage-Gate für `BatteryEms.Worker` aktiv (93.5 %). Tests: 3× Hosted-Service (Fan-out, Sink-Failure, Cycle-Exception keep-running), 3× WorkerRegistration (DI-resolve, Null-args, Default-CycleInterval), 2× NoOp-Adapter (Telemetry-Empty + Sink-Ack). **Offen für 19b:** Runtime-Image-Stage + repo-root `compose.yml` + `make build`/`make runtime`/`make test-container`. **Offen für 19c:** echte Modbus/MQTT-Wiring (Mapping-File-Loader im Host) und `/health`-Probes (DB + Adapter). **Auf RM-M1-20:** Aggregat-Gates `make ci` / `make fullbuild` (siehe Gates-Tabelle). |
-| ⬜      | RM-M1-20 | Quality-Gates                                   | wächst je Welle; Abschluss nach RM-M1-19 | Lint (inkl. Code-Metriken via CA1501/1502/1505/1506 in `.editorconfig`), Unit, Safety, Integration, Contract, Container und Coverage laufen reproduzierbar grün. Jede Welle aktiviert ihre Gates sofort; fehlende Gates werden nicht bis zum M1-Ende aufgeschoben.                                 |
+| ✅      | RM-M1-20 | Quality-Gates                                   | wächst je Welle; Abschluss nach RM-M1-19 | Lint (inkl. Code-Metriken via CA1501/1502/1505/1506 in `.editorconfig`), Unit, Safety, Integration, Contract, Container und Coverage laufen reproduzierbar grün. Jede Welle aktiviert ihre Gates sofort; fehlende Gates werden nicht bis zum M1-Ende aufgeschoben. **Aggregat-Gates aktiv:** `make ci` führt die M1-Pflichtgates in dokumentierter Reihenfolge aus (`lint` → `arch-check` → `test` → `test-safety` → `coverage-gate` → `simulator-{lint,test,race,coverage-gate}` → `test-integration`); `make fullbuild` ergänzt um `make build` + `make runtime` (Compose-Smoke), liefert den fresh-clone-nahen Komplettlauf inkl. /health-Probe gegen Postgres + MQTT-Adapter. RM-OPEN-04 ist mit RM-M1-16 geschlossen; RM-OPEN-07 (Release-Pipeline-ADR + erster `v0.1.0`-Tag) bleibt nach M1-Abschluss ausstehend wie geplant. |
 
 ---
 
@@ -192,9 +193,9 @@ zeile selbst auf den aktuellen Scope.
 | ✅     | `make coverage-gate`           | 90 Prozent Line-Coverage für die M1-.NET-Module (Domain, Application, Infrastructure, Adapter mit Produktivcode)                                                                                                                            | RM-M1-20                                |
 | ✅     | `make build`                   | Runtime-Image ohne SDK, nicht-root User, Port 8080, Healthcheck. Multi-Stage Dockerfile (`publish` + `runtime`), `mcr.microsoft.com/dotnet/aspnet:10.0`-Basis, USER `app` (1654), `curl`-basierter `HEALTHCHECK` gegen `/health`.            | RM-M1-19                                |
 | ✅     | `make gates`                   | Aggregiert alle scharfen M1-Pflichtgates ohne Report-Erzeugung                                                                                                                                                                              | RM-M1-21                                |
-| ⬜     | `make ci`                      | CI-kompatibler Lauf der verbindlichen M1-Gates in dokumentierter Reihenfolge                                                                                                                                                                | RM-M1-20, RM-M1-21                      |
+| ✅     | `make ci`                      | CI-kompatibler Lauf der verbindlichen M1-Gates in dokumentierter Reihenfolge: `lint` → `arch-check` → `test` → `test-safety` → `coverage-gate` → `simulator-{lint,test,race,coverage-gate}` → `test-integration`. Container-Smoke ist `runtime`/`fullbuild`-Sache.                                                                                                                                                                | RM-M1-20, RM-M1-21                      |
 | ✅     | `make runtime`                 | Runtime-Smoke: Compose-Start, `/health`-Prüfung und Shutdown. `deploy/compose.yml` startet `bess-ems` + `postgres` + `mosquitto` + `bess-field-sim` mit `--wait`/`--wait-timeout 60`; `curl /health` aus dem Container heraus; `down -v --remove-orphans` zum Schluss.                                                                                                                                                                                | RM-M1-19, RM-M1-21                      |
-| ⬜     | `make fullbuild`               | Fresh-clone-naher Komplettlauf inkl. Gates, Build und Runtime-Smoke                                                                                                                                                                         | RM-M1-20, RM-M1-21                      |
+| ✅     | `make fullbuild`               | Fresh-clone-naher Komplettlauf inkl. Gates, Build und Runtime-Smoke: `make ci` + `make build` + `make runtime`.                                                                                                                                                                         | RM-M1-20, RM-M1-21                      |
 
 ### Gate-Aktivierung nach Wellen
 
@@ -212,15 +213,15 @@ und mit einer klaren Meldung auf ihre Aktivierungswelle verweisen.
 
 Vertrags-Gates:
 
-- [ ] OpenAPI-Vertrag ist wohlgeformt und deckt alle M1-Endpunkte ab.
+- [x] OpenAPI-Vertrag ist wohlgeformt und deckt alle M1-Endpunkte ab.
 - [x] AuthZ-Negativtests für schreibende Endpunkte liefern 401/403.
-- [ ] Adapter-Mapping-Schemas validieren alle Beispiele unter `config/examples/`.
-- [ ] Vorzeichenkonvention ist durch dedizierte Tests abgesichert.
-- [ ] Ungültige Startkonfiguration verhindert aktiven Regelbetrieb.
-- [ ] Metrikexport ist in Tests abrufbar und enthält die M1-Pflichtmetriken.
-- [ ] Hexagonale Architektur-Tabus aus §4.2 sind durchgesetzt:
+- [x] Adapter-Mapping-Schemas validieren alle Beispiele unter `config/examples/`.
+- [x] Vorzeichenkonvention ist durch dedizierte Tests abgesichert.
+- [x] Ungültige Startkonfiguration verhindert aktiven Regelbetrieb.
+- [x] Metrikexport ist in Tests abrufbar und enthält die M1-Pflichtmetriken.
+- [x] Hexagonale Architektur-Tabus aus §4.2 sind durchgesetzt:
   Domain frameworkfrei, Application ohne Adapter-Refs, keine
-  Adapter-zu-Adapter-Referenzen, Infrastructure als Composition Root.
+  Adapter-zu-Adapter-Referenzen, Host als Composition Root.
 
 ---
 
@@ -245,18 +246,18 @@ Die Simulator-Szenarien und Protokollanforderungen sind in
 
 ## Abnahmekriterien
 
-- [ ] `docker compose up` startet das Gesamtsystem lokal.
-- [ ] Simulierter BMS/Wechselrichter liefert Modbus/MQTT-Telemetrie.
-- [ ] Das System publiziert Commands ohne SOC-, Power- oder Rampengrenzen zu verletzen.
-- [ ] Stale Snapshot, Emergency Stop und Operator-Stop führen in den sicheren Zustand.
-- [ ] Audit-Log und Reason-Felder machen Stop- und Fallback-Entscheidungen nachvollziehbar.
-- [ ] `make arch-check` setzt Architektur-Tabus aus Architektur §4.2 durch
+- [x] `docker compose up` startet das Gesamtsystem lokal.
+- [x] Simulierter BMS/Wechselrichter liefert Modbus/MQTT-Telemetrie.
+- [x] Das System publiziert Commands ohne SOC-, Power- oder Rampengrenzen zu verletzen.
+- [x] Stale Snapshot, Emergency Stop und Operator-Stop führen in den sicheren Zustand.
+- [x] Audit-Log und Reason-Felder machen Stop- und Fallback-Entscheidungen nachvollziehbar.
+- [x] `make arch-check` setzt Architektur-Tabus aus Architektur §4.2 durch
   und bricht den Build bei Verstoß.
-- [ ] Day-Ahead-Fahrplan kann importiert, gespeichert und mit UTC/DST-Zeitmodell verfolgt werden.
-- [ ] Health, Status, Current Command, Schedules und Operator-Stop sind über API nutzbar.
-- [ ] Metriken sind exportierbar und in Tests validiert.
-- [ ] `make ci` und `make runtime` laufen reproduzierbar grün.
-- [ ] Alle M1-Gates aus der Gate-Matrix sind reproduzierbar grün.
+- [x] Day-Ahead-Fahrplan kann importiert, gespeichert und mit UTC/DST-Zeitmodell verfolgt werden.
+- [x] Health, Status, Current Command, Schedules und Operator-Stop sind über API nutzbar.
+- [x] Metriken sind exportierbar und in Tests validiert.
+- [x] `make ci` und `make runtime` laufen reproduzierbar grün.
+- [x] Alle M1-Gates aus der Gate-Matrix sind reproduzierbar grün.
 
 ---
 

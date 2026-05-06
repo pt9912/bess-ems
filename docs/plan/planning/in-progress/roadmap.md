@@ -39,14 +39,14 @@ unter `in-progress/`.
 
 ## Aktueller Stand
 
-> **Stand:** 2026-05-05
-> **Aktive Phase:** M1 — MVP sichere Regelpipeline.
-> Vorhanden sind Spezifikation (`spec/lastenheft.md`,
-> `spec/architecture.md`), Qualitäts-/Gate-Definition
-> (`docs/user/quality.md`) und diese Roadmap.
-> **Nächster konkreter Schritt:** Welle 1 aus
-> [`plan-RM-M1.md`](plan-RM-M1.md): Solution, Makefile, Docker-Stages und
-> Basis-Gates.
+> **Stand:** 2026-05-06
+> **Abgeschlossen:** M1 — MVP sichere Regelpipeline (alle 24 Liefergegenstände grün).
+> Aggregat-Gates `make ci` und `make fullbuild` aktiviert; Compose-Stack
+> (bess-ems + Postgres + Mosquitto + bess-field-sim) startet mit
+> `make runtime` und liefert `/health = ok` inkl. Postgres-Probe.
+> **Nächste aktive Phase:** M2 — Marktausbau und Optimierung; Detail-
+> entwurf liegt in [`open/plan-RM-M2-optimization.md`](../open/plan-RM-M2-optimization.md)
+> und rückt mit der Aktivierung nach `in-progress/`.
 
 ---
 
@@ -54,8 +54,8 @@ unter `in-progress/`.
 
 | Status | Meilenstein | Titel                              | Phase | Detailplan |
 | ------ | ----------- | ---------------------------------- | ----- | ---------- |
-| 🟡     | M1          | MVP — sichere Regelpipeline        | 1     | [Aktiv](plan-RM-M1.md) |
-| ⬜     | M2          | Marktausbau und Optimierung        | 1 → 2 | folgt mit Aktivierung |
+| ✅     | M1          | MVP — sichere Regelpipeline        | 1     | [Abgeschlossen](../done/plan-RM-M1.md) |
+| ⬜     | M2          | Marktausbau und Optimierung        | 1 → 2 | [Entwurf](../open/plan-RM-M2-optimization.md) |
 | ⬜     | M3          | Native Control Core (Library)      | 2     | folgt mit Aktivierung |
 | ⬜     | M4          | Regelleistung und OPC-UA           | 2     | folgt mit Aktivierung |
 | ⬜     | M5          | MPC, Solver-Sidecar, Replay        | 3     | folgt mit Aktivierung |
@@ -79,30 +79,30 @@ AuthN/AuthZ-geschütztem Operator-Stop.
 
 | Status | ID         | Inhalt                                                              | LH-Bezug                  |
 | ------ | ---------- | ------------------------------------------------------------------- | ------------------------- |
-| ⬜     | RM-M1-01   | C#/.NET Solution-Skeleton mit Projekten gemäß Architektur §4.2 / §5.1 (hexagonale Verzeichnisstruktur) | LH-NF-001, LH-ARCH-001    |
-| ⬜     | RM-M1-02   | Domain-Modell (BatteryAsset, Telemetry, Command, DataQuality)       | LH-DOM-001..004           |
-| ⬜     | RM-M1-03   | Realtime Snapshot Store, Datenfusion, Aging                         | LH-RT-001..004            |
-| ⬜     | RM-M1-04   | State Machine (INIT…EMERGENCY_STOP) inkl. Quittierungslogik         | LH-SM-001..003            |
-| ⬜     | RM-M1-05   | Constraint Limiter (.NET) mit SOC-, Power-, Verfügbarkeitsgrenzen   | LH-CTRL-002, LH-SAFE-002/3 |
-| ⬜     | RM-M1-06   | Ramp Limiter (.NET)                                                  | LH-CTRL-003               |
-| ⬜     | RM-M1-07   | Regelzyklus 1 s, sicherer Fallback bei stale/ungültigem Snapshot    | LH-CTRL-001/007, LH-RT-003 |
-| ⬜     | RM-M1-08   | Optimization-Interface: `IDispatchOptimizer`/`NoOpDispatchOptimizer` für Echtzeit-Single-Step-Dispatch im Regelzyklus; `IScheduleOptimizer` ist Architekturgrenze ohne M1-Implementierung | LH-OPT-001 (als Interface), LH-OPT-007 |
-| ⬜     | RM-M1-09   | Modbus-TCP-Adapter (Lesen + Schreiben, Mapping über Config)         | LH-MODB-001..005          |
-| ⬜     | RM-M1-10   | MQTT-Adapter (Telemetrie-Empfang, Command-Publish, Topic-Konvention) | LH-MQTT-001..003         |
-| ⬜     | RM-M1-11   | Schreibbegrenzung im Adapter unmittelbar vor Versand                | LH-SAFE-007               |
-| ⬜     | RM-M1-12   | Statischer Fahrplanimport, `MarketCommitment`-Modell, UTC/DST-Zeitmodell + Day-Ahead-Verfolgung | LH-MKT-001/003/006/007 |
+| ✅     | RM-M1-01   | C#/.NET Solution-Skeleton mit Projekten gemäß Architektur §4.2 / §5.1 (hexagonale Verzeichnisstruktur) | LH-NF-001, LH-ARCH-001    |
+| ✅     | RM-M1-02   | Domain-Modell (BatteryAsset, Telemetry, Command, DataQuality)       | LH-DOM-001..004           |
+| ✅     | RM-M1-03   | Realtime Snapshot Store, Datenfusion, Aging                         | LH-RT-001..004            |
+| ✅     | RM-M1-04   | State Machine (INIT…EMERGENCY_STOP) inkl. Quittierungslogik         | LH-SM-001..003            |
+| ✅     | RM-M1-05   | Constraint Limiter (.NET) mit SOC-, Power-, Verfügbarkeitsgrenzen   | LH-CTRL-002, LH-SAFE-002/3 |
+| ✅     | RM-M1-06   | Ramp Limiter (.NET)                                                  | LH-CTRL-003               |
+| ✅     | RM-M1-07   | Regelzyklus 1 s, sicherer Fallback bei stale/ungültigem Snapshot    | LH-CTRL-001/007, LH-RT-003 |
+| ✅     | RM-M1-08   | Optimization-Interface: `IDispatchOptimizer`/`NoOpDispatchOptimizer` für Echtzeit-Single-Step-Dispatch im Regelzyklus; `IScheduleOptimizer` ist Architekturgrenze ohne M1-Implementierung | LH-OPT-001 (als Interface), LH-OPT-007 |
+| ✅     | RM-M1-09   | Modbus-TCP-Adapter (Lesen + Schreiben, Mapping über Config)         | LH-MODB-001..005          |
+| ✅     | RM-M1-10   | MQTT-Adapter (Telemetrie-Empfang, Command-Publish, Topic-Konvention) | LH-MQTT-001..003         |
+| ✅     | RM-M1-11   | Schreibbegrenzung im Adapter unmittelbar vor Versand                | LH-SAFE-007               |
+| ✅     | RM-M1-12   | Statischer Fahrplanimport, `MarketCommitment`-Modell, UTC/DST-Zeitmodell + Day-Ahead-Verfolgung | LH-MKT-001/003/006/007 |
 | ✅     | RM-M1-13   | PostgreSQL-Persistenz: Dapper + Npgsql 9, idempotente DDL, Repos für Telemetrie/Commands/Fahrpläne/Audit, Postgres-Sidecar im Compose-Integrationstest. DI-/Runtime-Wiring bleibt RM-M1-15/19. | LH-PERSIST-001..005       |
-| ⬜     | RM-M1-14   | Retention-/Datenvolumen-Konfiguration (dokumentiert)                | LH-PERSIST-006            |
-| ⬜     | RM-M1-15   | API: Health, Status, Current Command, Schedules, Operator-Stop      | LH-API-001..004, LH-API-006 |
-| ⬜     | RM-M1-16   | AuthN/AuthZ + Audit-Log für schreibende Endpunkte                   | LH-API-007                |
-| ⬜     | RM-M1-17   | Strukturierte JSON-Logs mit Reason-Feld + Prometheus-Metrikexport   | LH-MON-001/002/004        |
-| ⬜     | RM-M1-18   | Konfigurations-Loader, JSON-Schemas für Adapter-Mappings + Startvalidierung | LH-CONF-001..003, LH-OPS-001 |
-| ⬜     | RM-M1-19   | Dockerfile + Docker Compose (`bess-ems` mit Worker/API, Postgres, MQTT-Broker) | LH-DEPLOY-001..003, LH-NF-003/4 |
-| ⬜     | RM-M1-20   | Quality-Gates: Lint, Unit/Safety/Integration/Contract/Container, Coverage | LH-TEST-001/003/006/007, LH §4.1 |
-| ⬜     | RM-M1-21   | Makefile als Orchestrierungsschicht über die Docker-Stages aus `docs/user/quality.md`: `.DEFAULT_GOAL=help`, Override-Variablen (`COVERAGE_THRESHOLD`, `LIZARD_MAX_*`, `IMAGE`), Composite-Targets (`gates`, `ci`, `runtime`, `fullbuild`), `-gate`/`-report`-Trennung | LH-DEPLOY-001/002, LH-TEST-001/006/007 |
-| ⬜     | RM-M1-22   | Hexagonale Verzeichnis- und Modulstruktur gemäß Architektur §4.2 (`src/hexagon/`, `src/adapters/{driving,driven}/`, `src/infrastructure/`); Driving/Driven-Klassifikation pro Modul | LH-ARCH-001..005, LH-NF-006 |
-| ⬜     | RM-M1-23   | Boundary-Test-Modul `BatteryEms.ArchitectureTests` mit Dependency Rule und Architektur-Tabus aus §4.2 (Domain frameworkfrei, Application kein Adapter, Adapter zitieren keine anderen Adapter); Verstöße brechen den Build | LH-ARCH-002, LH-NF-006 |
-| ⬜     | RM-M1-24   | Go-basierter Blackbox-Simulator `simulators/bess-field-sim` für Modbus/MQTT, Szenario-Fixtures und Runtime-Smoke | LH-TEST-003/006/007, LH-PROT-001 |
+| ✅     | RM-M1-14   | Retention-/Datenvolumen-Konfiguration (dokumentiert)                | LH-PERSIST-006            |
+| ✅     | RM-M1-15   | API: Health, Status, Current Command, Schedules, Operator-Stop      | LH-API-001..004, LH-API-006 |
+| ✅     | RM-M1-16   | AuthN/AuthZ + Audit-Log für schreibende Endpunkte                   | LH-API-007                |
+| ✅     | RM-M1-17   | Strukturierte JSON-Logs mit Reason-Feld + Prometheus-Metrikexport   | LH-MON-001/002/004        |
+| ✅     | RM-M1-18   | Konfigurations-Loader, JSON-Schemas für Adapter-Mappings + Startvalidierung | LH-CONF-001..003, LH-OPS-001 |
+| ✅     | RM-M1-19   | Dockerfile + Docker Compose (`bess-ems` mit Worker/API, Postgres, MQTT-Broker) | LH-DEPLOY-001..003, LH-NF-003/4 |
+| ✅     | RM-M1-20   | Quality-Gates: Lint, Unit/Safety/Integration/Contract/Container, Coverage | LH-TEST-001/003/006/007, LH §4.1 |
+| ✅     | RM-M1-21   | Makefile als Orchestrierungsschicht über die Docker-Stages aus `docs/user/quality.md`: `.DEFAULT_GOAL=help`, Override-Variablen (`COVERAGE_THRESHOLD`, `LIZARD_MAX_*`, `IMAGE`), Composite-Targets (`gates`, `ci`, `runtime`, `fullbuild`), `-gate`/`-report`-Trennung | LH-DEPLOY-001/002, LH-TEST-001/006/007 |
+| ✅     | RM-M1-22   | Hexagonale Verzeichnis- und Modulstruktur gemäß Architektur §4.2 (`src/hexagon/`, `src/adapters/{driving,driven}/`, `src/infrastructure/`); Driving/Driven-Klassifikation pro Modul | LH-ARCH-001..005, LH-NF-006 |
+| ✅     | RM-M1-23   | Boundary-Test-Modul `BatteryEms.ArchitectureTests` mit Dependency Rule und Architektur-Tabus aus §4.2 (Domain frameworkfrei, Application kein Adapter, Adapter zitieren keine anderen Adapter); Verstöße brechen den Build | LH-ARCH-002, LH-NF-006 |
+| ✅     | RM-M1-24   | Go-basierter Blackbox-Simulator `simulators/bess-field-sim` für Modbus/MQTT, Szenario-Fixtures und Runtime-Smoke | LH-TEST-003/006/007, LH-PROT-001 |
 
 ### Abnahmekriterien
 
@@ -110,7 +110,7 @@ AuthN/AuthZ-geschütztem Operator-Stop.
 - Ein simulierter BMS/Wechselrichter (Modbus/MQTT) liefert Telemetrie, das
   System publiziert Commands, ohne SOC-/Power-/Rampengrenzen zu verletzen.
   Simulatorumfang und Szenarien sind in
-  [`plan-RM-M1-simulator.md`](plan-RM-M1-simulator.md) festgelegt; die
+  [`plan-RM-M1-simulator.md`](../done/plan-RM-M1-simulator.md) festgelegt; die
   Implementierung erfolgt als eigenstaendiger Go-Service.
 - Bei stale Snapshot, Emergency Stop oder Operator-Stop wird ein sicherer
   Zustand erreicht und ist im Audit-Log nachvollziehbar.
@@ -291,7 +291,7 @@ Kubernetes-Deployment, Edge-Anbindung. Inhalte mit hohem Diskussionsbedarf
 | RM-OPEN-01 | Konkrete Zeitachse / Kalenderwochen pro Meilenstein?           | Offen  |
 | RM-OPEN-02 | Welche Hersteller-Integration zuerst (siehe LH-OPEN-001)?      | Offen  |
 | RM-OPEN-03 | Solver-Auswahl für M2 (HiGHS vs. OR-Tools default)?            | Offen  |
-| RM-OPEN-04 | Authentifizierung in M1 (API-Token, OIDC)?                     | Offen  |
+| RM-OPEN-04 | Authentifizierung in M1 (API-Token, OIDC)?                     | Geschlossen mit RM-M1-16 — API-Token + Operator-Rolle live; OIDC/mTLS bleiben Folge-ADR. |
 | RM-OPEN-05 | Reihenfolge M3 vs. M4 — Native zuerst oder Markt-/RL zuerst?   | Offen  |
 | RM-OPEN-06 | Kriterien für spätere API-Extraktion nach dem MVP (siehe AR-OPEN-001)? | Offen  |
 | RM-OPEN-07 | Folge-ADR für Release-Pipeline-Gates; vor Abschluss von M1 und vor erstem Tag `v0.1.0` schließen? | Offen  |

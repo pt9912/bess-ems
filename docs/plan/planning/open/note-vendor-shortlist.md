@@ -2,7 +2,7 @@
 
 **Dokumenttyp:** Vorabklärung / Decision-Input
 **Status:** Offen
-**Bezug:** [`plan-RM-M1.md`](../in-progress/plan-RM-M1.md) (RM-OPEN-02), [`roadmap.md`](../in-progress/roadmap.md)
+**Bezug:** [`plan-RM-M1.md`](../done/plan-RM-M1.md) (RM-OPEN-02), [`roadmap.md`](../in-progress/roadmap.md)
 
 ---
 

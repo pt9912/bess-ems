@@ -54,11 +54,12 @@ help:
 	@echo "  make simulator-coverage-gate Go coverage gate (90% line)"
 	@echo "  make test-integration        Modbus roundtrip vs Go-Simulator via docker compose"
 	@echo ""
-	@echo "Welle 5 (Closure, partially active):"
+	@echo "Welle 5 (Closure, active):"
 	@echo "  make build           Multi-stage runtime image (non-root, /health HEALTHCHECK)"
 	@echo "  make runtime         Compose-up + /health probe + down (depends on make build)"
-	@echo "  make test-container  Runtime smoke (alias for make runtime in M1-19b)"
-	@echo "  make ci, make fullbuild  Activated with RM-M1-20"
+	@echo "  make test-container  Runtime smoke (alias for make runtime)"
+	@echo "  make ci              Sequential CI run of every M1 mandatory gate"
+	@echo "  make fullbuild       make ci + make build + make runtime (M1 closure)"
 
 # --- Welle 1 (active) ------------------------------------------------------
 
@@ -133,10 +134,16 @@ runtime: build
 test-container: runtime
 	@echo "[test-container] runtime smoke green"
 
-ci:
-	@echo "make ci: not active. CI-compatible aggregator activated with RM-M1-20."
-	@exit 2
+# CI-kompatibler Lauf der M1-Pflicht-Gates in dokumentierter Reihenfolge
+# (RM-M1-20). Erst .NET-Lint/-Boundary/-Tests, dann Coverage, dann
+# Simulator und zuletzt Integration — wenn ein früheres Gate kippt,
+# bricht der Lauf hier ab. Container-Smoke gehört zu `runtime`/`fullbuild`.
+ci: lint arch-check test test-safety coverage-gate \
+    simulator-lint simulator-test simulator-race simulator-coverage-gate \
+    test-integration
+	@echo "[ci] M1 mandatory gates green: lint, arch-check, test, test-safety, coverage-gate, simulator-{lint,test,race,coverage-gate}, test-integration"
 
-fullbuild:
-	@echo "make fullbuild: not active. Activated with RM-M1-20."
-	@exit 2
+# Fresh-clone-naher Komplettlauf: alle CI-Gates plus Runtime-Image und
+# Compose-Smoke. Letzte Stufe vor einem M1-Tag (RM-M1-20).
+fullbuild: ci build runtime
+	@echo "[fullbuild] M1 closure: all gates + runtime image + compose smoke green"

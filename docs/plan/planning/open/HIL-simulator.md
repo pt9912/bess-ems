@@ -3,8 +3,8 @@
 **Dokumenttyp:** Offener Detailplan / Integrationsnotiz
 **Status:** Offen
 **Quelle:** `/Development/bess/bess-hil-simulator`
-**Bezug:** `docs/plan/planning/in-progress/plan-RM-M1.md`,
-`docs/plan/planning/in-progress/plan-RM-M1-simulator.md`,
+**Bezug:** `docs/plan/planning/done/plan-RM-M1.md`,
+`docs/plan/planning/done/plan-RM-M1-simulator.md`,
 `docs/user/quality.md`, `spec/lastenheft.md`, `spec/architecture.md`
 
 ---

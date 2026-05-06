@@ -3,7 +3,7 @@
 **Dokumenttyp:** Offener Detailplan / Nach-MVP-Folgepaket
 **Status:** Offen
 **Bezug:** [`roadmap.md`](../in-progress/roadmap.md) (RM-M2-03, RM-M2-04,
-RM-M2-05, RM-M2-09), [`plan-RM-M1.md`](../in-progress/plan-RM-M1.md)
+RM-M2-05, RM-M2-09), [`plan-RM-M1.md`](../done/plan-RM-M1.md)
 (RM-M1-F04, Spezifikations-Folgepunkte),
 [`spec/lastenheft.md`](../../../../spec/lastenheft.md)
 (LH-OPT-001/007/008/009, LH-PERSIST-007, LH-API-005),
