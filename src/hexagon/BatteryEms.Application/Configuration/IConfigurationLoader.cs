@@ -9,6 +9,8 @@ public interface IConfigurationLoader
     ModbusMappingConfiguration LoadModbusMapping(string filePath);
 
     MqttMappingConfiguration LoadMqttMapping(string filePath);
+
+    Schedule LoadSchedule(string filePath);
 }
 
 [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]

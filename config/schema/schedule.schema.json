@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bess-ems.io/schema/schedule.json",
+  "title": "Schedule (Day-Ahead / Intraday / Regelleistung-Reserve)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["asset_id", "type", "market_bid_area", "version", "windows"],
+  "properties": {
+    "asset_id": { "type": "string", "minLength": 1 },
+    "type": {
+      "type": "string",
+      "enum": ["day_ahead", "intraday", "regel_leistung_reserve"],
+      "description": "Schedule type. Maps 1:1 to BatteryEms.Domain.ScheduleType."
+    },
+    "market_bid_area": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Market/bid area or price zone (e.g. 'DE-LU'). Required by LH-MKT-007 so windows are unambiguous when spanning DST or border zones."
+    },
+    "version": { "type": "integer", "minimum": 0 },
+    "windows": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/window" }
+    }
+  },
+  "$defs": {
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end", "target_power_kw"],
+      "properties": {
+        "start": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$",
+          "description": "ISO-8601 in UTC ('Z' suffix). LH-MKT-007 requires UTC storage; the loader rejects offsets so the wire shape stays unambiguous across DST."
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$"
+        },
+        "target_power_kw": {
+          "type": "number",
+          "description": "Setpoint in kW. Sign convention matches BatteryCommand: positive = discharge, negative = charge."
+        }
+      }
+    }
+  }
+}

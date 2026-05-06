@@ -207,6 +207,115 @@ public sealed class JsonFileConfigurationLoaderTests
         Assert.Contains("not valid JSON", ex.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Loads_basic_day_ahead_schedule_fixture()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var schedule = loader.LoadSchedule(Path.Combine(RepoRoot(), "tests", "fixtures", "schedules", "day-ahead-basic.json"));
+
+        Assert.Equal("single-bess-1", schedule.AssetId);
+        Assert.Equal(BatteryEms.Domain.ScheduleType.DayAhead, schedule.Type);
+        Assert.Equal("DE-LU", schedule.MarketBidArea);
+        Assert.Equal(24, schedule.Windows.Count);
+        Assert.Equal(TimeSpan.FromHours(24), schedule.HorizonEnd - schedule.HorizonStart);
+    }
+
+    [Fact]
+    public void Schedule_loader_resolves_window_at_midday_correctly()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var schedule = loader.LoadSchedule(Path.Combine(RepoRoot(), "tests", "fixtures", "schedules", "day-ahead-basic.json"));
+
+        var midday = new DateTimeOffset(2026, 5, 6, 12, 30, 0, TimeSpan.Zero);
+        var window = schedule.WindowCovering(midday);
+
+        Assert.NotNull(window);
+        Assert.Equal(30, window!.TargetPowerKw);
+    }
+
+    [Fact]
+    public void Schedule_loader_handles_dst_spring_forward_continuously_in_utc()
+    {
+        // LH-MKT-007 acceptance: tests cover at least one summer-time
+        // transition. The fixture spans the Europe spring-forward at
+        // 2026-03-29T01:00:00Z (= 02:00 CET → 03:00 CEST). UTC is linear
+        // across the jump; the loader must reflect that without inventing
+        // gaps or duplicates and without the local "missing hour" bleeding
+        // into the schedule horizon.
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var schedule = loader.LoadSchedule(Path.Combine(RepoRoot(), "tests", "fixtures", "schedules", "day-ahead-dst-transition.json"));
+
+        Assert.Equal(6, schedule.Windows.Count);
+        for (var i = 1; i < schedule.Windows.Count; i++)
+        {
+            Assert.Equal(schedule.Windows[i - 1].End, schedule.Windows[i].Start);
+        }
+
+        // Last UTC moment that maps to local CET (02:59:59 CET) — target=10
+        // from the fixture's [2026-03-29T00:00:00Z, 01:00:00Z) window.
+        var lastCet = new DateTimeOffset(2026, 3, 29, 0, 59, 59, TimeSpan.Zero);
+        Assert.Equal(10, schedule.WindowCovering(lastCet)!.TargetPowerKw);
+
+        // First UTC moment after the jump (which the wall clock skips from
+        // 02:00 CET to 03:00 CEST). UTC 01:00:00Z is unambiguous and lands
+        // in the [01:00:00Z, 02:00:00Z) window with target=20.
+        var firstCest = new DateTimeOffset(2026, 3, 29, 1, 0, 0, TimeSpan.Zero);
+        Assert.Equal(20, schedule.WindowCovering(firstCest)!.TargetPowerKw);
+    }
+
+    [Fact]
+    public void Schedule_loader_rejects_non_utc_timestamp()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson(
+            """
+            {
+              "asset_id": "single-bess-1",
+              "type": "day_ahead",
+              "market_bid_area": "DE-LU",
+              "version": 1,
+              "windows": [
+                { "start": "2026-05-06T00:00:00+02:00", "end": "2026-05-06T01:00:00+02:00", "target_power_kw": 0 }
+              ]
+            }
+            """);
+        try
+        {
+            Assert.Throws<ConfigurationValidationException>(() => loader.LoadSchedule(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Schedule_loader_rejects_overlapping_windows()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson(
+            """
+            {
+              "asset_id": "single-bess-1",
+              "type": "day_ahead",
+              "market_bid_area": "DE-LU",
+              "version": 1,
+              "windows": [
+                { "start": "2026-05-06T00:00:00Z", "end": "2026-05-06T02:00:00Z", "target_power_kw": 0 },
+                { "start": "2026-05-06T01:00:00Z", "end": "2026-05-06T03:00:00Z", "target_power_kw": 0 }
+              ]
+            }
+            """);
+        try
+        {
+            Assert.Throws<ConfigurationValidationException>(() => loader.LoadSchedule(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     private static string WriteTempJson(string content)
     {
         var path = Path.Combine(Path.GetTempPath(), $"bess-cfg-{Guid.NewGuid():N}.json");

@@ -12,6 +12,7 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
     private readonly JsonSchema _assetSchema;
     private readonly JsonSchema _modbusSchema;
     private readonly JsonSchema _mqttSchema;
+    private readonly JsonSchema _scheduleSchema;
     private readonly JsonSerializerOptions _serializerOptions;
 
     public JsonFileConfigurationLoader(string schemaDirectory)
@@ -25,6 +26,7 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
         _assetSchema = LoadSchema(schemaDirectory, "asset.schema.json");
         _modbusSchema = LoadSchema(schemaDirectory, "modbus-mapping.schema.json");
         _mqttSchema = LoadSchema(schemaDirectory, "mqtt-mapping.schema.json");
+        _scheduleSchema = LoadSchema(schemaDirectory, "schedule.schema.json");
 
         _serializerOptions = new JsonSerializerOptions
         {
@@ -118,6 +120,50 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
             .ToList();
 
         return new MqttMappingConfiguration(dto.ProfileName, topics);
+    }
+
+    public Schedule LoadSchedule(string filePath)
+    {
+        var node = LoadAndValidate(filePath, _scheduleSchema);
+
+        var dto = node.Deserialize<ScheduleDto>(_serializerOptions)
+            ?? throw new ConfigurationValidationException($"Failed to deserialize {filePath} as schedule.");
+
+        if (dto.Windows is null)
+        {
+            throw new ConfigurationValidationException($"{filePath} has no window list.");
+        }
+
+        var type = dto.Type switch
+        {
+            "day_ahead" => ScheduleType.DayAhead,
+            "intraday" => ScheduleType.Intraday,
+            "regel_leistung_reserve" => ScheduleType.RegelLeistungReserve,
+            _ => throw new ConfigurationValidationException(
+                $"{filePath} has unknown schedule type '{dto.Type}'."),
+        };
+
+        var windows = new List<ScheduleWindow>(dto.Windows.Count);
+        foreach (var w in dto.Windows)
+        {
+            // Schema enforces the trailing 'Z' so the parsed DateTimeOffset is
+            // already UTC-anchored. ToUniversalTime() is a defensive no-op
+            // here; it keeps callers safe if the schema ever loosens.
+            windows.Add(new ScheduleWindow(
+                w.Start.ToUniversalTime(),
+                w.End.ToUniversalTime(),
+                w.TargetPowerKw));
+        }
+
+        try
+        {
+            return new Schedule(dto.AssetId, type, dto.MarketBidArea, dto.Version, windows);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new ConfigurationValidationException(
+                $"Schedule {filePath} violates domain invariants: {ex.Message}", ex);
+        }
     }
 
     private static Dictionary<int, string> ConvertEnum(
@@ -260,4 +306,18 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
         string PayloadFormat,
         bool Retained,
         string AuthRequired);
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "Instantiated by JsonSerializer via reflection.")]
+    private sealed record ScheduleDto(
+        string AssetId,
+        string Type,
+        string MarketBidArea,
+        int Version,
+        List<ScheduleWindowDto>? Windows);
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "Instantiated by JsonSerializer via reflection.")]
+    private sealed record ScheduleWindowDto(
+        DateTimeOffset Start,
+        DateTimeOffset End,
+        double TargetPowerKw);
 }

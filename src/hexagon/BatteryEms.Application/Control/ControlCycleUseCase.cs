@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using BatteryEms.Application.Assets;
+using BatteryEms.Application.Markets;
 using BatteryEms.Application.Optimization;
 using BatteryEms.Application.Realtime;
 using BatteryEms.Application.Time;
@@ -11,6 +12,7 @@ public sealed class ControlCycleUseCase : IControlCycleUseCase
 {
     private readonly IBatteryAssetRegistry _assets;
     private readonly ISnapshotStore _snapshots;
+    private readonly IScheduleTracker _scheduleTracker;
     private readonly IDispatchOptimizer _optimizer;
     private readonly IClock _clock;
     private readonly ControlCycleOptions _options;
@@ -21,18 +23,21 @@ public sealed class ControlCycleUseCase : IControlCycleUseCase
     public ControlCycleUseCase(
         IBatteryAssetRegistry assets,
         ISnapshotStore snapshots,
+        IScheduleTracker scheduleTracker,
         IDispatchOptimizer optimizer,
         IClock clock,
         ControlCycleOptions options)
     {
         ArgumentNullException.ThrowIfNull(assets);
         ArgumentNullException.ThrowIfNull(snapshots);
+        ArgumentNullException.ThrowIfNull(scheduleTracker);
         ArgumentNullException.ThrowIfNull(optimizer);
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(options);
 
         _assets = assets;
         _snapshots = snapshots;
+        _scheduleTracker = scheduleTracker;
         _optimizer = optimizer;
         _clock = clock;
         _options = options;
@@ -66,8 +71,9 @@ public sealed class ControlCycleUseCase : IControlCycleUseCase
             return BatteryCommand.SafeStop(assetId, now, _options.SafeFallbackValidity, "asset-unavailable", CommandSource.Fallback);
         }
 
+        var commitments = _scheduleTracker.GetActiveCommitments(assetId, now);
         var dispatch = await _optimizer.OptimizeAsync(
-            new DispatchRequest(assetId, now, asset, snapshot.Telemetry, Array.Empty<MarketCommitment>()),
+            new DispatchRequest(assetId, now, asset, snapshot.Telemetry, commitments),
             cancellationToken).ConfigureAwait(false);
 
         if (!dispatch.IsValid)

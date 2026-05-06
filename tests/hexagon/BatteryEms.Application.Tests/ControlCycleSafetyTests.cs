@@ -1,6 +1,7 @@
 using BatteryEms.Adapters.Optimization;
 using BatteryEms.Application.Assets;
 using BatteryEms.Application.Control;
+using BatteryEms.Application.Markets;
 using BatteryEms.Application.Optimization;
 using BatteryEms.Application.Realtime;
 using BatteryEms.Domain;
@@ -20,6 +21,7 @@ public sealed class ControlCycleSafetyTests
         var cycle = new ControlCycleUseCase(
             assets,
             snapshots,
+            new DefaultScheduleTracker(new InMemoryScheduleRepository()),
             optimizer ?? new NoOpDispatchOptimizer(),
             clock,
             ControlCycleOptions.Default);
