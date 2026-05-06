@@ -1,3 +1,4 @@
+using BatteryEms.Application.Api;
 using BatteryEms.Application.Markets;
 using BatteryEms.Application.Persistence;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,6 +28,13 @@ public static class PersistenceRegistration
         services.AddSingleton<IScheduleRepository, DapperScheduleRepository>();
         services.AddSingleton<IOperatorAuditLog, DapperOperatorAuditLog>();
         services.AddSingleton<IRetentionRepository, DapperRetentionRepository>();
+        // RM-M1-19c: replace the default "ok"-only IHealthQuery with the
+        // Postgres-aware probe so /health returns 503 when the database
+        // is unreachable. Order matters: AddBessApplicationInMemoryStores
+        // registers DefaultHealthQuery first; AddBessPersistence runs
+        // afterwards in the host and the last registration wins for
+        // GetService<IHealthQuery>().
+        services.AddSingleton<IHealthQuery, DapperHealthQuery>();
         return services;
     }
 }

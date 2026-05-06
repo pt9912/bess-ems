@@ -1,13 +1,18 @@
 namespace BatteryEms.Application.Api;
 
-// LH-API-001 driving port. M1 surfaces a simple "the worker process is
-// up" answer; deeper readiness (database reachable, simulator connected,
-// last telemetry within max age) follows when the Worker materialises in
-// RM-M1-19 — the port shape is forward-compatible.
+// LH-API-001 driving port. The simple variant (RM-M1-15a) returned a
+// flat "ok" + timestamp; RM-M1-19c adds an optional Components map so
+// the Persistence-aware implementation can surface the database probe
+// alongside the overall status. Status values:
+//   "ok"        — every component is reachable
+//   "unhealthy" — at least one critical component failed
 public interface IHealthQuery
 {
     HealthStatus Probe();
 }
 
 [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-public sealed record HealthStatus(string Status, DateTimeOffset At);
+public sealed record HealthStatus(
+    string Status,
+    DateTimeOffset At,
+    IReadOnlyDictionary<string, string>? Components = null);

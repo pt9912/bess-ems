@@ -8,7 +8,10 @@ namespace BatteryEms.Api.Contracts;
 // host's JsonSerializerOptions configuration.
 
 [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-public sealed record HealthResponse(string Status, DateTimeOffset At);
+public sealed record HealthResponse(
+    string Status,
+    DateTimeOffset At,
+    IReadOnlyDictionary<string, string>? Components = null);
 
 [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
 public sealed record BatteryStatusResponse(

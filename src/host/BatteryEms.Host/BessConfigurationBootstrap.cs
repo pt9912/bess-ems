@@ -1,4 +1,5 @@
 using BatteryEms.Application.Assets;
+using BatteryEms.Application.Configuration;
 using BatteryEms.Application.Markets;
 using BatteryEms.Domain;
 using BatteryEms.Infrastructure.Configuration;
@@ -38,7 +39,19 @@ internal static class BessConfigurationBootstrap
             retention = loader.LoadRetentionPolicy(options.RetentionConfigPath);
         }
 
-        return new BessRuntimeConfiguration(asset, schedule, retention);
+        ModbusMappingConfiguration? modbus = null;
+        if (!string.IsNullOrWhiteSpace(options.ModbusMappingPath))
+        {
+            modbus = loader.LoadModbusMapping(options.ModbusMappingPath);
+        }
+
+        MqttMappingConfiguration? mqtt = null;
+        if (!string.IsNullOrWhiteSpace(options.MqttMappingPath))
+        {
+            mqtt = loader.LoadMqttMapping(options.MqttMappingPath);
+        }
+
+        return new BessRuntimeConfiguration(asset, schedule, retention, modbus, mqtt);
     }
 
     public static void SeedAssetRegistry(IBatteryAssetRegistry registry, BatteryAsset asset)
@@ -65,4 +78,6 @@ internal static class BessConfigurationBootstrap
 internal sealed record BessRuntimeConfiguration(
     BatteryAsset Asset,
     Schedule? Schedule,
-    RetentionPolicy? Retention);
+    RetentionPolicy? Retention,
+    ModbusMappingConfiguration? ModbusMapping,
+    MqttMappingConfiguration? MqttMapping);

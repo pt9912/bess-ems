@@ -23,6 +23,7 @@ public static class WorkerRegistration
         services.AddSingleton(ControlCycleOptions.Default);
         services.AddSingleton<IControlCycleUseCase, ControlCycleUseCase>();
         services.AddHostedService<ControlCycleHostedService>();
+        services.AddHostedService<TelemetryIngestionHostedService>();
         return services;
     }
 }

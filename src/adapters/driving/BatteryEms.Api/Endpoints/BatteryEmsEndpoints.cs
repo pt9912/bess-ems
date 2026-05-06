@@ -26,13 +26,19 @@ public static class BatteryEmsEndpoints
 
     private static void MapHealth(IEndpointRouteBuilder routes)
     {
-        // LH-API-001: liveness/readiness lite. The Worker will surface
-        // deeper signals (DB reachable, simulator connected) once it
-        // exists in RM-M1-19; the contract shape stays stable.
+        // LH-API-001: liveness/readiness probe. RM-M1-19c upgrades the
+        // probe to surface component statuses (database reachable etc.)
+        // and returns 503 when any critical component is unhealthy so
+        // the Docker HEALTHCHECK marks the container unhealthy.
         routes.MapGet("/health", (IHealthQuery query) =>
             {
                 var status = query.Probe();
-                return Results.Ok(new HealthResponse(status.Status, status.At));
+                var response = new HealthResponse(status.Status, status.At, status.Components);
+                if (status.Status != "ok")
+                {
+                    return Results.Json(response, statusCode: 503);
+                }
+                return Results.Ok(response);
             })
             .WithName("Health")
             .WithSummary("Liveness probe (LH-API-001).");

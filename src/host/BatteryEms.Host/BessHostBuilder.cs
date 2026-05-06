@@ -1,3 +1,5 @@
+using BatteryEms.Adapters.Modbus;
+using BatteryEms.Adapters.Mqtt;
 using BatteryEms.Adapters.Optimization;
 using BatteryEms.Adapters.Persistence;
 using BatteryEms.Adapters.Telemetry.Prometheus;
@@ -69,13 +71,40 @@ public static class BessHostBuilder
             builder.Services.AddBessPersistence(hostOptions.PersistenceConnectionString!);
         }
 
-        // Driven adapters: optimisation + telemetry. NoOp telemetry/sink
-        // keep the loop safe (SafeStop on no-snapshot) until RM-M1-19c
-        // wires the real Modbus/MQTT adapters.
+        // Driven adapters: optimisation + telemetry are always wired.
         builder.Services.AddBessOptimization();
         builder.Services.AddBessTelemetry();
-        builder.Services.AddSingleton<IBatteryTelemetrySource, NoOpBatteryTelemetrySource>();
-        builder.Services.AddSingleton<IBatteryCommandSink, NoOpBatteryCommandSink>();
+
+        // The Modbus / MQTT command sinks need the BatteryAsset; expose
+        // the loaded asset to DI so the adapter constructors resolve it.
+        builder.Services.AddSingleton(runtimeConfig.Asset);
+
+        // Modbus / MQTT wiring is opt-in: when the host configuration
+        // provides the mapping path + endpoint, the real adapter is
+        // registered as IBatteryTelemetrySource / IBatteryCommandSink.
+        // Otherwise the NoOp pair keeps the regulation loop safe.
+        if (runtimeConfig.ModbusMapping is not null
+            && !string.IsNullOrWhiteSpace(hostOptions.ModbusHost)
+            && hostOptions.ModbusPort > 0)
+        {
+            builder.Services.AddBessModbus(
+                runtimeConfig.ModbusMapping,
+                ModbusAdapterOptions.Defaults(hostOptions.ModbusHost!, hostOptions.ModbusPort, runtimeConfig.Asset.AssetId));
+        }
+        else if (runtimeConfig.MqttMapping is not null
+            && !string.IsNullOrWhiteSpace(hostOptions.MqttBrokerHost)
+            && hostOptions.MqttBrokerPort > 0
+            && !string.IsNullOrWhiteSpace(hostOptions.MqttClientId))
+        {
+            builder.Services.AddBessMqtt(
+                runtimeConfig.MqttMapping,
+                MqttAdapterOptions.Defaults(hostOptions.MqttBrokerHost!, hostOptions.MqttBrokerPort, hostOptions.MqttClientId!, runtimeConfig.Asset.AssetId));
+        }
+        else
+        {
+            builder.Services.AddSingleton<IBatteryTelemetrySource, NoOpBatteryTelemetrySource>();
+            builder.Services.AddSingleton<IBatteryCommandSink, NoOpBatteryCommandSink>();
+        }
 
         // Worker hosted-service.
         builder.Services.AddBessWorker(builder.Configuration);

@@ -30,4 +30,20 @@ public sealed class BessHostOptions
     // Dapper-backed adapters; otherwise the in-memory stores from the
     // Application layer take over so headless smoke tests can run.
     public string? PersistenceConnectionString { get; set; }
+
+    // Optional Modbus driven-adapter wiring (RM-M1-19c). When all three
+    // fields are set, the host loads the mapping JSON and registers
+    // ModbusTelemetrySource + ModbusCommandSink; otherwise the NoOp
+    // adapters from the Application layer stay in place.
+    public string? ModbusMappingPath { get; set; }
+    public string? ModbusHost { get; set; }
+    public int ModbusPort { get; set; }
+
+    // Optional MQTT driven-adapter wiring. Same semantics as the Modbus
+    // block — all four fields must be set or the host falls back to the
+    // NoOp adapters.
+    public string? MqttMappingPath { get; set; }
+    public string? MqttBrokerHost { get; set; }
+    public int MqttBrokerPort { get; set; }
+    public string? MqttClientId { get; set; }
 }
