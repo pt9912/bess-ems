@@ -151,6 +151,22 @@ Mappings ab. Hintergrund und Quellenlage stehen in
 
 ---
 
+## Spezifikations-Folgepunkte
+
+Die folgenden Punkte halten Nacharbeiten aus der geschärften Spezifikation
+fest. Bereits implementierte M1-Flächen bekommen Anpasspunkte; noch nicht
+implementierte Flächen werden als neue Folgepunkte geführt, ohne damit
+automatisch produktiven Optimierungs- oder Export-Scope in M1 zu ziehen.
+
+| Status | ID          | Scope            | Punkt                                      | Bezug                       | DoD |
+| ------ | ----------- | ---------------- | ------------------------------------------ | --------------------------- | --- |
+| ⬜      | RM-M1-F01   | M1-Anpassung     | Dispatch-Optimizer-Begriffe schärfen       | RM-M1-08, LH-OPT-007        | Plan, Modulziele und Roadmap benennen `IDispatchOptimizer`/`NoOpDispatchOptimizer` klar als Echtzeit-Dispatch im Regelzyklus; `IScheduleOptimizer` bleibt als Architekturgrenze ohne konkrete M1-Implementierung ausgewiesen. |
+| ⬜      | RM-M1-F02   | M1-Anpassung     | Persistenzstatus in Roadmap nachziehen     | RM-M1-13, LH-PERSIST-001..007 | Roadmap-Status und M1-Liefergegenstand für RM-M1-13 spiegeln den implementierten Dapper/Npgsql-Stand inklusive Integrationstest-Scope; noch offenes DI-/Runtime-Wiring bleibt RM-M1-15/19 zugeordnet. |
+| ⬜      | RM-M1-F03   | neuer M1-Punkt   | Gerätepunkt-Basis in Adapter-Mappings      | RM-M1-18, LH-DOM-005, LH-CONF-002 | Modbus- und MQTT-Mapping-Schemas enthalten eine gemeinsame Gerätepunkt-Basis oder einen klar dokumentierten M1-Subset-Vertrag für Schlüssel, Anzeigename, Einheit, Datentyp, Wertebereich, Skalierung/Offset, Richtung, Exportfähigkeit und optionale Enum-/Alarm-Erklärung. |
+| ⬜      | RM-M1-F04   | nach-MVP-Punkt   | Schedule-Optimizer und Run-Persistenz planen | LH-OPT-001/007/009, LH-PERSIST-007 | Nach-M1-Plan oder Roadmap-Folgepaket beschreibt konkrete `IScheduleOptimizer`-Implementierung, `OptimizationRun`/`IOptimizationRunRepository`, Solverstatus und Objective-Breakdown; M1 bleibt bei Import/Tracking von Fahrplänen und Echtzeit-Dispatch. |
+
+---
+
 ## Gate-Matrix
 
 Die `Status`-Spalte spiegelt den **Tagesstand** (✅ aktiv, ⏳ teilweise
