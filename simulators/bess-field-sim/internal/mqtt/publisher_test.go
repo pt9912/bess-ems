@@ -34,15 +34,17 @@ func (f *fakeClient) Publish(_ context.Context, topic string, retained bool, pay
 	return nil
 }
 
-func TestPublisher_PublishSnapshot_PublishesPublishDirectionTopics(t *testing.T) {
+func TestPublisher_PublishSnapshot_PublishesEmsSubscribeTopics(t *testing.T) {
 	t.Parallel()
 
+	// direction is EMS-perspective: simulator publishes what the EMS subscribes
+	// to (telemetry, status) and skips what the EMS publishes (command).
 	m := model.MqttMapping{
 		ProfileName: "p",
 		Topics: []model.MqttTopic{
-			{Name: "telemetry", Topic: "battery/{assetId}/telemetry", Direction: "publish", Retained: false},
-			{Name: "status", Topic: "battery/{assetId}/status", Direction: "publish", Retained: true},
-			{Name: "command", Topic: "battery/{assetId}/command", Direction: "subscribe"},
+			{Name: "telemetry", Topic: "battery/{assetId}/telemetry", Direction: "subscribe", Retained: false},
+			{Name: "status", Topic: "battery/{assetId}/status", Direction: "subscribe", Retained: true},
+			{Name: "command", Topic: "battery/{assetId}/command", Direction: "publish"},
 		},
 	}
 	client := &fakeClient{}
@@ -72,7 +74,7 @@ func TestPublisher_PublishSnapshot_SurfacesClientError(t *testing.T) {
 
 	m := model.MqttMapping{
 		Topics: []model.MqttTopic{
-			{Name: "telemetry", Topic: "battery/x/telemetry", Direction: "publish"},
+			{Name: "telemetry", Topic: "battery/x/telemetry", Direction: "subscribe"},
 		},
 	}
 	client := &fakeClient{failOn: "battery/x/telemetry"}
@@ -87,9 +89,10 @@ func TestPublisher_PublishSnapshot_SurfacesClientError(t *testing.T) {
 func TestPublisher_PublishSnapshot_NoMessagesWhenNothingPublishable(t *testing.T) {
 	t.Parallel()
 
+	// command is EMS-publish, so the simulator skips it in the telemetry path.
 	m := model.MqttMapping{
 		Topics: []model.MqttTopic{
-			{Name: "command", Topic: "battery/x/command", Direction: "subscribe"},
+			{Name: "command", Topic: "battery/x/command", Direction: "publish"},
 		},
 	}
 	client := &fakeClient{}

@@ -16,15 +16,22 @@ type Resolved struct {
 	Retained bool
 }
 
-// ResolveTelemetry returns the publish-direction Resolved messages for
+// ResolveTelemetry returns the Resolved messages the simulator emits for
 // the given snapshot, with `{assetId}` placeholders substituted. The
 // telemetry topic carries a JSON encoding of the snapshot; status and
 // fault topics use focused subsets so subscribers do not have to parse
 // every field every tick.
+//
+// The mapping's direction is from the EMS adapter's perspective (see
+// package doc): the simulator publishes EMS-`subscribe` topics here.
+// EMS-`publish` topics (e.g. `command`) are owned by the command-ACK
+// path, not by the telemetry replay loop, so they are skipped.
+// Topic names that payloadFor does not know (e.g. `command_ack`) are
+// also skipped — the ACK path emits them on its own.
 func ResolveTelemetry(snap model.TelemetrySnapshot, assetID string, mapping model.MqttMapping) ([]Resolved, error) {
 	out := make([]Resolved, 0, len(mapping.Topics))
 	for _, topic := range mapping.Topics {
-		if topic.Direction != "publish" {
+		if topic.Direction != "subscribe" {
 			continue
 		}
 		payload, err := payloadFor(topic.Name, snap)

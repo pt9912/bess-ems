@@ -2,6 +2,12 @@
 // the pure logic that turns a TelemetrySnapshot into MQTT topic payloads.
 // The actual broker connection (Paho or any other transport) is injected
 // via Client so unit tests can run without a real Mosquitto.
+//
+// Direction semantics: the topic.direction field in the mapping schema is
+// from the .NET-EMS adapter's perspective (see
+// config/schema/mqtt-mapping.schema.json). The simulator inverts that
+// perspective: it publishes EMS-`subscribe` topics (telemetry, status,
+// fault, command_ack) and subscribes to EMS-`publish` topics (command).
 package mqtt
 
 import (

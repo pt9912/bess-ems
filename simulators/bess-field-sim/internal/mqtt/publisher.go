@@ -28,9 +28,9 @@ func NewPublisher(client Client, assetID string, mapping model.MqttMapping) *Pub
 	return &Publisher{client: client, assetID: assetID, mapping: mapping}
 }
 
-// PublishSnapshot resolves and publishes every publish-direction topic
-// covered by the mapping. The first publish error short-circuits the
-// remaining topics.
+// PublishSnapshot resolves and publishes every EMS-subscribe topic
+// covered by the mapping (see package doc on direction semantics). The
+// first publish error short-circuits the remaining topics.
 func (p *Publisher) PublishSnapshot(ctx context.Context, snap model.TelemetrySnapshot) error {
 	messages, err := ResolveTelemetry(snap, p.assetID, p.mapping)
 	if err != nil {
