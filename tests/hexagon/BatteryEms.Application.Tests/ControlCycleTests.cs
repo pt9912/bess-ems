@@ -21,6 +21,7 @@ public sealed class ControlCycleTests
             assets,
             snapshots,
             new DefaultScheduleTracker(new InMemoryScheduleRepository()),
+            new InMemoryOperatorStopRegistry(),
             optimizer ?? new NoOpDispatchOptimizer(),
             clock,
             ControlCycleOptions.Default);
@@ -86,6 +87,7 @@ public sealed class ControlCycleTests
             assets,
             snapshots,
             new DefaultScheduleTracker(repo),
+            new InMemoryOperatorStopRegistry(),
             optimizer,
             clock,
             ControlCycleOptions.Default);

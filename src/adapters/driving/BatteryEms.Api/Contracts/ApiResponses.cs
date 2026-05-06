@@ -121,3 +121,13 @@ public sealed record ScheduleWindowView(
     DateTimeOffset Start,
     DateTimeOffset End,
     double TargetPowerKw);
+
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+public sealed record OperatorStopRequestBody(string AssetId, string Operator, string Reason);
+
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+public sealed record OperatorStopResponse(
+    string AssetId,
+    string Operator,
+    string Reason,
+    DateTimeOffset ActivatedAt);

@@ -13,6 +13,7 @@ public sealed class ControlCycleUseCase : IControlCycleUseCase
     private readonly IBatteryAssetRegistry _assets;
     private readonly ISnapshotStore _snapshots;
     private readonly IScheduleTracker _scheduleTracker;
+    private readonly IOperatorStopRegistry _operatorStops;
     private readonly IDispatchOptimizer _optimizer;
     private readonly IClock _clock;
     private readonly ControlCycleOptions _options;
@@ -24,6 +25,7 @@ public sealed class ControlCycleUseCase : IControlCycleUseCase
         IBatteryAssetRegistry assets,
         ISnapshotStore snapshots,
         IScheduleTracker scheduleTracker,
+        IOperatorStopRegistry operatorStops,
         IDispatchOptimizer optimizer,
         IClock clock,
         ControlCycleOptions options)
@@ -31,6 +33,7 @@ public sealed class ControlCycleUseCase : IControlCycleUseCase
         ArgumentNullException.ThrowIfNull(assets);
         ArgumentNullException.ThrowIfNull(snapshots);
         ArgumentNullException.ThrowIfNull(scheduleTracker);
+        ArgumentNullException.ThrowIfNull(operatorStops);
         ArgumentNullException.ThrowIfNull(optimizer);
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(options);
@@ -38,6 +41,7 @@ public sealed class ControlCycleUseCase : IControlCycleUseCase
         _assets = assets;
         _snapshots = snapshots;
         _scheduleTracker = scheduleTracker;
+        _operatorStops = operatorStops;
         _optimizer = optimizer;
         _clock = clock;
         _options = options;
@@ -48,6 +52,22 @@ public sealed class ControlCycleUseCase : IControlCycleUseCase
         ArgumentException.ThrowIfNullOrWhiteSpace(assetId);
 
         var now = _clock.UtcNow;
+
+        // LH-API-006 short-circuit: an active operator stop overrides
+        // every other input — telemetry, schedule and optimiser are not
+        // even consulted. Reason carries the operator's text so the
+        // audit trail stays useful, prefixed so observability can grep
+        // for operator-stop events without parsing free-form reasons.
+        var operatorStop = _operatorStops.Find(assetId);
+        if (operatorStop is not null)
+        {
+            return BatteryCommand.SafeStop(
+                assetId,
+                now,
+                _options.SafeFallbackValidity,
+                $"operator-stop:{operatorStop.Reason}",
+                CommandSource.Operator);
+        }
 
         var asset = _assets.Find(assetId);
         if (asset is null)

@@ -2,6 +2,7 @@ using System.Text.Json;
 using BatteryEms.Api.Endpoints;
 using BatteryEms.Application.Api;
 using BatteryEms.Application.Assets;
+using BatteryEms.Application.Control;
 using BatteryEms.Application.Markets;
 using BatteryEms.Application.Persistence;
 using BatteryEms.Application.Realtime;
@@ -49,11 +50,13 @@ public class Program
         builder.Services.AddSingleton<ISnapshotStore>(_ => new InMemorySnapshotStore(TimeSpan.FromSeconds(10)));
         builder.Services.AddSingleton<ICommandRepository, InMemoryCommandRepository>();
         builder.Services.AddSingleton<IScheduleRepository>(_ => new InMemoryScheduleRepository());
+        builder.Services.AddSingleton<IOperatorStopRegistry, InMemoryOperatorStopRegistry>();
 
         // Driving-port use cases.
         builder.Services.AddSingleton<IHealthQuery, DefaultHealthQuery>();
         builder.Services.AddSingleton<IBatteryStatusQuery, DefaultBatteryStatusQuery>();
         builder.Services.AddSingleton<IScheduleQuery, DefaultScheduleQuery>();
+        builder.Services.AddSingleton<IOperatorStopUseCase, DefaultOperatorStopUseCase>();
 
         var app = builder.Build();
         app.MapOpenApi();
