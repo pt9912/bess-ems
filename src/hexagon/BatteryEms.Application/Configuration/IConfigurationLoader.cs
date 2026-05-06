@@ -11,6 +11,8 @@ public interface IConfigurationLoader
     MqttMappingConfiguration LoadMqttMapping(string filePath);
 
     Schedule LoadSchedule(string filePath);
+
+    RetentionPolicy LoadRetentionPolicy(string filePath);
 }
 
 [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]

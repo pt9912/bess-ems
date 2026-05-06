@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bess-ems.io/schema/retention.json",
+  "title": "Retention policy (LH-PERSIST-006)",
+  "description": "Per-data-class retention durations. Each entry is optional: an absent field means 'retain forever' for that class. The audit class follows LH-PERSIST-006: it has no default retention; deletion is only enabled by an explicit operator_audit_retention entry.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "telemetry_retention": { "$ref": "#/$defs/duration" },
+    "commands_retention": { "$ref": "#/$defs/duration" },
+    "schedules_retention": { "$ref": "#/$defs/duration" },
+    "operator_audit_retention": { "$ref": "#/$defs/duration" }
+  },
+  "$defs": {
+    "duration": {
+      "type": "string",
+      "pattern": "^([0-9]+\\.)?[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?$",
+      "description": "C# TimeSpan format: 'D.HH:MM:SS' (with optional days prefix and optional fractional seconds). 'P30D' / ISO-8601 forms are intentionally not supported in M1 to keep the parser predictable."
+    }
+  }
+}

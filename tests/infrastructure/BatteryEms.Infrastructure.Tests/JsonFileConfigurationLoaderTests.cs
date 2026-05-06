@@ -474,6 +474,91 @@ public sealed class JsonFileConfigurationLoaderTests
         }
     }
 
+    [Fact]
+    public void Loads_example_retention_policy_with_audit_omitted()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var policy = loader.LoadRetentionPolicy(Path.Combine(ExamplesDirectory, "retention.json"));
+
+        Assert.Equal(TimeSpan.FromDays(90), policy.TelemetryRetention);
+        Assert.Equal(TimeSpan.FromDays(365), policy.CommandsRetention);
+        Assert.Equal(TimeSpan.FromDays(30), policy.SchedulesRetention);
+
+        // The example fixture deliberately omits operator_audit_retention so
+        // the LH-PERSIST-006 default ("no auto-delete of audit-relevant data
+        // without explicit configuration") is what an operator inherits from
+        // a copy-paste of the example.
+        Assert.Null(policy.OperatorAuditRetention);
+    }
+
+    [Fact]
+    public void Retention_loader_accepts_audit_when_explicitly_configured()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson(
+            """
+            {
+              "telemetry_retention": "30.00:00:00",
+              "operator_audit_retention": "1825.00:00:00"
+            }
+            """);
+        try
+        {
+            var policy = loader.LoadRetentionPolicy(path);
+            Assert.Equal(TimeSpan.FromDays(30), policy.TelemetryRetention);
+            Assert.Equal(TimeSpan.FromDays(1825), policy.OperatorAuditRetention);
+            Assert.Null(policy.CommandsRetention);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Retention_loader_rejects_unknown_field()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson(
+            """
+            {
+              "telemetry_retention": "30.00:00:00",
+              "made_up_field": "x"
+            }
+            """);
+        try
+        {
+            Assert.Throws<ConfigurationValidationException>(() => loader.LoadRetentionPolicy(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Retention_loader_rejects_malformed_duration()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson(
+            """
+            {
+              "telemetry_retention": "P30D"
+            }
+            """);
+        try
+        {
+            // The schema pattern intentionally rejects ISO-8601 durations
+            // in M1 — the loader is locked to the C# TimeSpan format so we
+            // only have one parser surface to reason about.
+            Assert.Throws<ConfigurationValidationException>(() => loader.LoadRetentionPolicy(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     private static string WriteTempJson(string content)
     {
         var path = Path.Combine(Path.GetTempPath(), $"bess-cfg-{Guid.NewGuid():N}.json");

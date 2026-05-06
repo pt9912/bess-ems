@@ -1,6 +1,8 @@
 using BatteryEms.Adapters.Persistence;
 using BatteryEms.Application.IO;
 using BatteryEms.Application.Markets;
+using BatteryEms.Application.Persistence;
+using BatteryEms.Application.Time;
 using BatteryEms.Domain;
 using Npgsql;
 using Xunit;
@@ -161,6 +163,76 @@ public sealed class PersistenceRoundtripTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Retention_run_deletes_only_rows_older_than_cutoff_and_preserves_audit_by_default()
+    {
+        var telemetry = new DapperTelemetryRepository(_dataSource!);
+        var commands = new DapperCommandRepository(_dataSource!);
+        var audit = new DapperOperatorAuditLog(_dataSource!);
+        var retention = new DapperRetentionRepository(_dataSource!);
+
+        // Seed two telemetry samples and two audit events on either side
+        // of a 30-day-old cutoff. The retention run must wipe the old
+        // telemetry but leave both audit rows untouched as long as the
+        // policy keeps OperatorAuditRetention=null.
+        var oldTimestamp = Now - TimeSpan.FromDays(60);
+        var newTimestamp = Now - TimeSpan.FromDays(10);
+
+        await telemetry.AppendAsync(SampleTelemetry(oldTimestamp), CancellationToken.None);
+        await telemetry.AppendAsync(SampleTelemetry(newTimestamp), CancellationToken.None);
+
+        await commands.AppendAsync(
+            SampleCommand("ret-old", oldTimestamp),
+            CommandDispatchResult.Ok(oldTimestamp, "ok"),
+            CancellationToken.None);
+        await commands.AppendAsync(
+            SampleCommand("ret-new", newTimestamp),
+            CommandDispatchResult.Ok(newTimestamp, "ok"),
+            CancellationToken.None);
+
+        await audit.AppendAsync(
+            new AuditEvent(oldTimestamp, "operator-1", "old-action", "single-bess-1", "test", "ok"),
+            CancellationToken.None);
+        await audit.AppendAsync(
+            new AuditEvent(newTimestamp, "operator-1", "new-action", "single-bess-1", "test", "ok"),
+            CancellationToken.None);
+
+        var clock = new FixedClock(Now);
+        var useCase = new RetentionRunUseCase(retention, clock);
+
+        // Policy: retain only data within the last 30 days for telemetry +
+        // commands. Audit retention left null so LH-PERSIST-006's default
+        // "no auto-delete of audit-relevant data" applies.
+        var policy = new RetentionPolicy(
+            TelemetryRetention: TimeSpan.FromDays(30),
+            CommandsRetention: TimeSpan.FromDays(30),
+            SchedulesRetention: null,
+            OperatorAuditRetention: null);
+
+        var result = await useCase.ExecuteAsync(policy, CancellationToken.None);
+
+        Assert.Equal(1, result.TelemetryDeleted);
+        Assert.Equal(1, result.CommandsDeleted);
+        Assert.Equal(0, result.SchedulesDeleted);
+        Assert.Equal(0, result.OperatorAuditDeleted);
+        Assert.True(result.OperatorAuditPreserved);
+
+        // The newer telemetry / command is still queryable; the older one
+        // is gone.
+        var remainingTelemetry = await telemetry.QueryAsync(
+            "single-bess-1", Now - TimeSpan.FromDays(365), Now + TimeSpan.FromDays(1), CancellationToken.None);
+        Assert.Single(remainingTelemetry);
+        Assert.Equal(newTimestamp, remainingTelemetry[0].Timestamp);
+
+        Assert.Null(await commands.FindByCommandIdAsync("ret-old", CancellationToken.None));
+        Assert.NotNull(await commands.FindByCommandIdAsync("ret-new", CancellationToken.None));
+
+        // Audit was preserved because the policy kept retention null.
+        var auditRows = await audit.QueryAsync(
+            Now - TimeSpan.FromDays(365), Now + TimeSpan.FromDays(1), CancellationToken.None);
+        Assert.Equal(2, auditRows.Count);
+    }
+
+    [Fact]
     public async Task Initializer_is_idempotent_on_re_application()
     {
         // Calling InitializeAsync twice must not throw and must not break
@@ -176,6 +248,37 @@ public sealed class PersistenceRoundtripTests : IAsyncLifetime
             CancellationToken.None);
         Assert.Single(afterReinit);
         Assert.Equal("first-run", afterReinit[0].Action);
+    }
+
+    private static BatteryTelemetry SampleTelemetry(DateTimeOffset timestamp) => new(
+        Timestamp: timestamp,
+        AssetId: "single-bess-1",
+        SocPercent: 50,
+        SohPercent: 99,
+        ActivePowerKw: 0,
+        ReactivePowerKvar: 0,
+        DcVoltage: 800,
+        DcCurrent: 0,
+        TemperatureCelsius: 22,
+        Available: true,
+        FaultStatus: "ok",
+        DataQuality: DataQuality.Valid);
+
+    private static BatteryCommand SampleCommand(string id, DateTimeOffset timestamp) => new(
+        CommandId: id,
+        Timestamp: timestamp,
+        AssetId: "single-bess-1",
+        Mode: CommandMode.Idle,
+        ActivePowerKw: 0,
+        ReactivePowerKvar: 0,
+        ValidUntil: timestamp + TimeSpan.FromMinutes(1),
+        Reason: "test",
+        Source: CommandSource.Optimization);
+
+    private sealed class FixedClock : IClock
+    {
+        public FixedClock(DateTimeOffset now) { UtcNow = now; }
+        public DateTimeOffset UtcNow { get; }
     }
 
     private static async Task TruncateAllAsync(NpgsqlDataSource dataSource)

@@ -13,6 +13,7 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
     private readonly JsonSchema _modbusSchema;
     private readonly JsonSchema _mqttSchema;
     private readonly JsonSchema _scheduleSchema;
+    private readonly JsonSchema _retentionSchema;
     private readonly JsonSerializerOptions _serializerOptions;
 
     public JsonFileConfigurationLoader(string schemaDirectory)
@@ -36,6 +37,7 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
         _modbusSchema = LoadSchema(schemaDirectory, "modbus-mapping.schema.json");
         _mqttSchema = LoadSchema(schemaDirectory, "mqtt-mapping.schema.json");
         _scheduleSchema = LoadSchema(schemaDirectory, "schedule.schema.json");
+        _retentionSchema = LoadSchema(schemaDirectory, "retention.schema.json");
 
         _serializerOptions = new JsonSerializerOptions
         {
@@ -135,6 +137,28 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
             .ToList();
 
         return new MqttMappingConfiguration(dto.ProfileName, topics);
+    }
+
+    public RetentionPolicy LoadRetentionPolicy(string filePath)
+    {
+        var node = LoadAndValidate(filePath, _retentionSchema);
+
+        var dto = node.Deserialize<RetentionPolicyDto>(_serializerOptions)
+            ?? throw new ConfigurationValidationException($"Failed to deserialize {filePath} as retention policy.");
+
+        try
+        {
+            return new RetentionPolicy(
+                TelemetryRetention: dto.TelemetryRetention,
+                CommandsRetention: dto.CommandsRetention,
+                SchedulesRetention: dto.SchedulesRetention,
+                OperatorAuditRetention: dto.OperatorAuditRetention).EnsureValid();
+        }
+        catch (ArgumentException ex)
+        {
+            throw new ConfigurationValidationException(
+                $"Retention policy {filePath} violates domain invariants: {ex.Message}", ex);
+        }
     }
 
     public Schedule LoadSchedule(string filePath)
@@ -387,4 +411,11 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
         DateTimeOffset Start,
         DateTimeOffset End,
         double TargetPowerKw);
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "Instantiated by JsonSerializer via reflection.")]
+    private sealed record RetentionPolicyDto(
+        TimeSpan? TelemetryRetention,
+        TimeSpan? CommandsRetention,
+        TimeSpan? SchedulesRetention,
+        TimeSpan? OperatorAuditRetention);
 }
