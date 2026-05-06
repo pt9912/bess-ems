@@ -122,8 +122,11 @@ public sealed record ScheduleWindowView(
     DateTimeOffset End,
     double TargetPowerKw);
 
+// Body for POST /operator/stop. The operator identity is taken from the
+// authenticated principal (LH-API-007) rather than the body so a caller
+// cannot impersonate another operator just by editing the JSON.
 [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-public sealed record OperatorStopRequestBody(string AssetId, string Operator, string Reason);
+public sealed record OperatorStopRequestBody(string AssetId, string Reason);
 
 [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
 public sealed record OperatorStopResponse(

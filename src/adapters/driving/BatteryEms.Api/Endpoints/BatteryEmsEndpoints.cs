@@ -1,6 +1,10 @@
+using System.Security.Claims;
+using BatteryEms.Api.Auth;
 using BatteryEms.Api.Contracts;
 using BatteryEms.Application.Api;
+using BatteryEms.Application.Persistence;
 using BatteryEms.Application.Time;
+using BatteryEms.Domain;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -110,29 +114,59 @@ public static class BatteryEmsEndpoints
 
     private static void MapOperatorStop(IEndpointRouteBuilder routes)
     {
-        // LH-API-006: operator-stop sets a flag the control loop reads
-        // on every cycle, short-circuiting to a safe stop until the
-        // process restarts (the M1 in-memory registry has no clear
-        // endpoint by design; see Application.Control.IOperatorStopRegistry).
-        // The endpoint is open for now — RM-M1-16 layers AuthN/AuthZ +
-        // audit on top without changing this contract.
-        routes.MapPost("/operator/stop", (OperatorStopRequestBody body, IOperatorStopUseCase useCase) =>
+        // LH-API-006/007: operator-stop sets a flag the control loop reads
+        // on every cycle (Application.Control.IOperatorStopRegistry) and
+        // every attempt — accepted, invalid, unauthorized, forbidden —
+        // lands in the audit log. The operator identity comes from the
+        // authenticated principal so a caller can't impersonate someone
+        // else by editing the body. AuthN/AuthZ rejection is audited from
+        // ApiTokenAuthenticationHandler; this delegate handles accepted +
+        // invalid because it owns the request body.
+        routes.MapPost("/operator/stop", async (
+                OperatorStopRequestBody body,
+                ClaimsPrincipal user,
+                IOperatorStopUseCase useCase,
+                IOperatorAuditLog auditLog,
+                IClock clock,
+                CancellationToken ct) =>
             {
+                var operatorId = user.FindFirstValue(ClaimTypes.NameIdentifier)
+                    ?? AuthConstants.AnonymousOperator;
+
                 if (body is null
                     || string.IsNullOrWhiteSpace(body.AssetId)
-                    || string.IsNullOrWhiteSpace(body.Operator)
                     || string.IsNullOrWhiteSpace(body.Reason))
                 {
+                    await auditLog.AppendAsync(
+                        new AuditEvent(
+                            clock.UtcNow,
+                            operatorId,
+                            AuthConstants.OperatorStopAction,
+                            TargetAssetId: body?.AssetId,
+                            Reason: "missing-required-field",
+                            Outcome: AuthConstants.OutcomeInvalid),
+                        ct).ConfigureAwait(false);
                     return Results.BadRequest(new { error = "missing-required-field" });
                 }
-                var state = useCase.Execute(new OperatorStopRequest(body.AssetId, body.Operator, body.Reason));
+
+                var state = useCase.Execute(new OperatorStopRequest(body.AssetId, operatorId, body.Reason));
+                await auditLog.AppendAsync(
+                    new AuditEvent(
+                        clock.UtcNow,
+                        operatorId,
+                        AuthConstants.OperatorStopAction,
+                        TargetAssetId: state.AssetId,
+                        Reason: state.Reason,
+                        Outcome: AuthConstants.OutcomeAccepted),
+                    ct).ConfigureAwait(false);
                 return Results.Ok(new OperatorStopResponse(
                     AssetId: state.AssetId,
                     Operator: state.Operator,
                     Reason: state.Reason,
                     ActivatedAt: state.ActivatedAt));
             })
+            .RequireAuthorization(AuthConstants.OperatorPolicy)
             .WithName("OperatorStop")
-            .WithSummary("Operator-driven safe stop for an asset (LH-API-006).");
+            .WithSummary("Operator-driven safe stop for an asset (LH-API-006/007).");
     }
 }

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using BatteryEms.Api.Auth;
 using BatteryEms.Api.Endpoints;
 using BatteryEms.Application.Api;
 using BatteryEms.Application.Assets;
@@ -51,6 +52,7 @@ public class Program
         builder.Services.AddSingleton<ICommandRepository, InMemoryCommandRepository>();
         builder.Services.AddSingleton<IScheduleRepository>(_ => new InMemoryScheduleRepository());
         builder.Services.AddSingleton<IOperatorStopRegistry, InMemoryOperatorStopRegistry>();
+        builder.Services.AddSingleton<IOperatorAuditLog, InMemoryOperatorAuditLog>();
 
         // Driving-port use cases.
         builder.Services.AddSingleton<IHealthQuery, DefaultHealthQuery>();
@@ -58,7 +60,19 @@ public class Program
         builder.Services.AddSingleton<IScheduleQuery, DefaultScheduleQuery>();
         builder.Services.AddSingleton<IOperatorStopUseCase, DefaultOperatorStopUseCase>();
 
+        // RM-M1-16: API-token AuthN + role-based AuthZ for write endpoints.
+        // Wiring is bundled in AuthRegistration to keep BuildApp's class
+        // coupling below the CA1506 threshold.
+        builder.Services.AddApiTokenAuth(builder.Configuration);
+
         var app = builder.Build();
+        // Force eager validation of ApiTokens at startup — surfaces a
+        // misconfigured token list before the first request hits the
+        // pipeline rather than at the first 401 challenge.
+        _ = app.Services.GetRequiredService<ApiTokenRegistry>();
+
+        app.UseAuthentication();
+        app.UseAuthorization();
         app.MapOpenApi();
         app.MapBatteryEms();
         return app;

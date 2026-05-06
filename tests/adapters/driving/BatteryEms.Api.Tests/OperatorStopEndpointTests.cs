@@ -1,6 +1,8 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using BatteryEms.Application.Control;
+using BatteryEms.Application.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -16,41 +18,115 @@ public sealed class OperatorStopEndpointTests : IClassFixture<BatteryEmsApiFacto
     }
 
     [Fact]
-    public async Task Operator_stop_writes_state_into_the_registry_and_returns_acknowledgment()
+    public async Task Operator_stop_writes_state_and_audit_when_called_with_operator_token()
     {
         using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", BatteryEmsApiFactory.OperatorToken);
 
-        var body = new { asset_id = "asset-stop-1", @operator = "operator-1", reason = "manual-shutdown" };
+        var body = new { asset_id = "asset-stop-1", reason = "manual-shutdown" };
         var response = await client.PostAsJsonAsync("/operator/stop", body, TestJson.Options);
 
         response.EnsureSuccessStatusCode();
         var ack = await response.Content.ReadFromJsonAsync<OperatorStopDto>(TestJson.Options);
         Assert.NotNull(ack);
         Assert.Equal("asset-stop-1", ack!.AssetId);
-        Assert.Equal("operator-1", ack.Operator);
+        Assert.Equal(BatteryEmsApiFactory.OperatorId, ack.Operator);
         Assert.Equal("manual-shutdown", ack.Reason);
         Assert.True(ack.ActivatedAt > DateTimeOffset.MinValue);
 
-        // The registry singleton the API wires must now report the stop.
+        // Registry sees the activation with the token-derived operator id.
         var registry = _factory.Services.GetRequiredService<IOperatorStopRegistry>();
         var state = registry.Find("asset-stop-1");
         Assert.NotNull(state);
-        Assert.Equal("operator-1", state!.Operator);
+        Assert.Equal(BatteryEmsApiFactory.OperatorId, state!.Operator);
         Assert.Equal("manual-shutdown", state.Reason);
+
+        // Audit log records the accepted attempt.
+        var audit = await ReadAuditAsync();
+        Assert.Contains(audit, e =>
+            e.Operator == BatteryEmsApiFactory.OperatorId
+            && e.Action == "operator-stop"
+            && e.TargetAssetId == "asset-stop-1"
+            && e.Outcome == "accepted");
     }
 
     [Theory]
-    [InlineData("", "op", "reason")]
-    [InlineData("asset", "", "reason")]
-    [InlineData("asset", "op", "")]
-    public async Task Operator_stop_returns_400_when_required_field_is_blank(string assetId, string @operator, string reason)
+    [InlineData("", "reason")]
+    [InlineData("asset", "")]
+    public async Task Operator_stop_returns_400_and_invalid_audit_for_blank_field(string assetId, string reason)
     {
         using var client = _factory.CreateClient();
-        var body = new { asset_id = assetId, @operator, reason };
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", BatteryEmsApiFactory.OperatorToken);
+        var body = new { asset_id = assetId, reason };
 
         var response = await client.PostAsJsonAsync("/operator/stop", body, TestJson.Options);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var audit = await ReadAuditAsync();
+        Assert.Contains(audit, e =>
+            e.Operator == BatteryEmsApiFactory.OperatorId
+            && e.Action == "operator-stop"
+            && e.Outcome == "invalid"
+            && e.Reason == "missing-required-field");
+    }
+
+    [Fact]
+    public async Task Operator_stop_returns_401_and_unauthorized_audit_when_no_token_is_present()
+    {
+        using var client = _factory.CreateClient();
+        var body = new { asset_id = "asset-x", reason = "manual" };
+
+        var response = await client.PostAsJsonAsync("/operator/stop", body, TestJson.Options);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var audit = await ReadAuditAsync();
+        Assert.Contains(audit, e =>
+            e.Operator == "anonymous"
+            && e.Action == "operator-stop"
+            && e.Outcome == "unauthorized");
+    }
+
+    [Fact]
+    public async Task Operator_stop_returns_401_and_unauthorized_audit_when_token_is_unknown()
+    {
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "no-such-token");
+        var body = new { asset_id = "asset-x", reason = "manual" };
+
+        var response = await client.PostAsJsonAsync("/operator/stop", body, TestJson.Options);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var audit = await ReadAuditAsync();
+        Assert.Contains(audit, e =>
+            e.Operator == "anonymous"
+            && e.Action == "operator-stop"
+            && e.Outcome == "unauthorized");
+    }
+
+    [Fact]
+    public async Task Operator_stop_returns_403_and_forbidden_audit_when_token_role_is_not_operator()
+    {
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", BatteryEmsApiFactory.ViewerToken);
+        var body = new { asset_id = "asset-x", reason = "manual" };
+
+        var response = await client.PostAsJsonAsync("/operator/stop", body, TestJson.Options);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var audit = await ReadAuditAsync();
+        Assert.Contains(audit, e =>
+            e.Operator == BatteryEmsApiFactory.ViewerId
+            && e.Action == "operator-stop"
+            && e.Outcome == "forbidden");
+    }
+
+    private async Task<IReadOnlyList<BatteryEms.Domain.AuditEvent>> ReadAuditAsync()
+    {
+        var auditLog = _factory.Services.GetRequiredService<IOperatorAuditLog>();
+        return await auditLog.QueryAsync(DateTimeOffset.MinValue, DateTimeOffset.MaxValue, CancellationToken.None);
     }
 
     private sealed record OperatorStopDto(string AssetId, string Operator, string Reason, DateTimeOffset ActivatedAt);
