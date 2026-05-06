@@ -1,8 +1,8 @@
 # Plan RM-M2 Optimization: Schedule-Optimizer + Run-Persistenz
 
-**Dokumenttyp:** Offener Detailplan / Nach-MVP-Folgepaket
-**Status:** Offen
-**Bezug:** [`roadmap.md`](../in-progress/roadmap.md) (RM-M2-03, RM-M2-04,
+**Dokumenttyp:** Aktiver Detailplan / M2
+**Status:** In Arbeit (aktiviert nach M1-Abschluss)
+**Bezug:** [`roadmap.md`](roadmap.md) (RM-M2-03, RM-M2-04,
 RM-M2-05, RM-M2-09), [`plan-RM-M1.md`](../done/plan-RM-M1.md)
 (RM-M1-F04, Spezifikations-Folgepunkte),
 [`spec/lastenheft.md`](../../../../spec/lastenheft.md)

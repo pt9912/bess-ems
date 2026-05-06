@@ -40,13 +40,13 @@ unter `in-progress/`.
 ## Aktueller Stand
 
 > **Stand:** 2026-05-06
-> **Abgeschlossen:** M1 — MVP sichere Regelpipeline (alle 24 Liefergegenstände grün).
-> Aggregat-Gates `make ci` und `make fullbuild` aktiviert; Compose-Stack
-> (bess-ems + Postgres + Mosquitto + bess-field-sim) startet mit
-> `make runtime` und liefert `/health = ok` inkl. Postgres-Probe.
-> **Nächste aktive Phase:** M2 — Marktausbau und Optimierung; Detail-
-> entwurf liegt in [`open/plan-RM-M2-optimization.md`](../open/plan-RM-M2-optimization.md)
-> und rückt mit der Aktivierung nach `in-progress/`.
+> **Abgeschlossen:** M1 — MVP sichere Regelpipeline (alle 24 Liefergegenstände grün);
+> `make fullbuild` reproduzierbar grün, Compose-Stack (bess-ems + Postgres +
+> Mosquitto + bess-field-sim) liefert `/health = ok` inkl. Postgres-Probe.
+> **Aktive Phase:** M2 — Marktausbau und Optimierung. Detailplan:
+> [`plan-RM-M2-optimization.md`](plan-RM-M2-optimization.md).
+> **Nächster konkreter Schritt:** Welle 1 aus dem M2-Plan
+> (LP/MILP-Schedule-Optimizer-Interface + `OptimizationRun`-Persistenz-Slice).
 
 ---
 
@@ -55,7 +55,7 @@ unter `in-progress/`.
 | Status | Meilenstein | Titel                              | Phase | Detailplan |
 | ------ | ----------- | ---------------------------------- | ----- | ---------- |
 | ✅     | M1          | MVP — sichere Regelpipeline        | 1     | [Abgeschlossen](../done/plan-RM-M1.md) |
-| ⬜     | M2          | Marktausbau und Optimierung        | 1 → 2 | [Entwurf](../open/plan-RM-M2-optimization.md) |
+| 🟡     | M2          | Marktausbau und Optimierung        | 1 → 2 | [Aktiv](plan-RM-M2-optimization.md) |
 | ⬜     | M3          | Native Control Core (Library)      | 2     | folgt mit Aktivierung |
 | ⬜     | M4          | Regelleistung und OPC-UA           | 2     | folgt mit Aktivierung |
 | ⬜     | M5          | MPC, Solver-Sidecar, Replay        | 3     | folgt mit Aktivierung |
@@ -138,9 +138,9 @@ LP-Optimierer (.NET-Interface, optional OR-Tools/HiGHS), Tracing und Replay.
 
 **Detailplan:** Der Schedule-Optimizer- und Run-Persistenz-Slice
 (RM-M2-03/04/05/09 und Anschluss an LH-OPT-007/008/009 + LH-PERSIST-007)
-ist in [`open/plan-RM-M2-optimization.md`](../open/plan-RM-M2-optimization.md)
-detailliert. Der Plan rückt nach M1-Abschluss in `in-progress/` und übernimmt
-dort die Verantwortung für die Optimization-/Run-Arbeitspakete.
+ist in [`plan-RM-M2-optimization.md`](plan-RM-M2-optimization.md)
+detailliert. Der Plan ist seit M1-Abschluss in `in-progress/` und übernimmt
+die Verantwortung für die Optimization-/Run-Arbeitspakete.
 
 ### Liefergegenstände
 
