@@ -13,8 +13,10 @@
     <PackageVersion Include="coverlet.msbuild" Version="6.0.2" />
     <PackageVersion Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.203" />
     <PackageVersion Include="JsonSchema.Net" Version="7.3.4" />
+    <PackageVersion Include="Dapper" Version="2.1.66" />
     <PackageVersion Include="FluentModbus" Version="5.3.2" />
     <PackageVersion Include="MQTTnet" Version="4.3.7.1207" />
+    <PackageVersion Include="Npgsql" Version="9.0.4" />
     <PackageVersion Include="NSubstitute" Version="5.3.0" />
   </ItemGroup>
 

@@ -1,4 +1,19 @@
 services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: bessems
+      POSTGRES_USER: bessems
+      POSTGRES_PASSWORD: bessems
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bessems -d bessems"]
+      interval: 2s
+      timeout: 1s
+      retries: 10
+    networks: [intnet]
+
   mosquitto:
     image: eclipse-mosquitto:2
     volumes:
@@ -37,13 +52,21 @@ services:
       context: ../..
       dockerfile: tests/integration/Dockerfile
     depends_on:
-      - simulator
+      simulator:
+        condition: service_started
+      postgres:
+        condition: service_healthy
     environment:
       - MODBUS_HOST=simulator
       - MODBUS_PORT=5020
       - MQTT_BROKER_HOST=mosquitto
       - MQTT_BROKER_PORT=1883
       - MQTT_ASSET_ID=single-bess-1
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=bessems
+      - POSTGRES_USER=bessems
+      - POSTGRES_PASSWORD=bessems
     networks: [intnet]
 
 networks:
