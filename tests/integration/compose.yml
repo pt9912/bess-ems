@@ -1,15 +1,35 @@
 services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    expose:
+      - "1883"
+    healthcheck:
+      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-p", "1883", "-t", "healthcheck", "-m", "ping"]
+      interval: 2s
+      timeout: 1s
+      retries: 10
+    networks: [intnet]
+
   simulator:
     image: bess-field-sim:latest
     command:
       - "-scenario=data/scenario.json"
-      - "-modbus-mapping=data/mapping.json"
+      - "-modbus-mapping=data/modbus.json"
       - "-modbus-addr=:5020"
+      - "-mqtt-mapping=data/mqtt.json"
+      - "-mqtt-broker=tcp://mosquitto:1883"
+      - "-mqtt-client-id=integration-sim"
     volumes:
       - ./fixtures/scenario.integration.json:/data/scenario.json:ro
-      - ../../config/examples/adapters/modbus.simulator.json:/data/mapping.json:ro
+      - ../../config/examples/adapters/modbus.simulator.json:/data/modbus.json:ro
+      - ../../config/examples/adapters/mqtt.simulator.json:/data/mqtt.json:ro
     expose:
       - "5020"
+    depends_on:
+      mosquitto:
+        condition: service_healthy
     networks: [intnet]
 
   test-runner:
@@ -21,6 +41,9 @@ services:
     environment:
       - MODBUS_HOST=simulator
       - MODBUS_PORT=5020
+      - MQTT_BROKER_HOST=mosquitto
+      - MQTT_BROKER_PORT=1883
+      - MQTT_ASSET_ID=single-bess-1
     networks: [intnet]
 
 networks:

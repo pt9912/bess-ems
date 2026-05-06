@@ -36,6 +36,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Modbus.Integrati
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Adapters.Mqtt.Tests", "tests\adapters\driven\BatteryEms.Adapters.Mqtt.Tests\BatteryEms.Adapters.Mqtt.Tests.csproj", "{2CD4042A-502B-4B74-B444-D2ECB9098E5E}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Mqtt.IntegrationTests", "tests\integration\BatteryEms.Mqtt.IntegrationTests\BatteryEms.Mqtt.IntegrationTests.csproj", "{464DB15B-45C9-4207-B771-C1E38CBE912E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -110,6 +112,10 @@ Global
 		{2CD4042A-502B-4B74-B444-D2ECB9098E5E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2CD4042A-502B-4B74-B444-D2ECB9098E5E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2CD4042A-502B-4B74-B444-D2ECB9098E5E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{464DB15B-45C9-4207-B771-C1E38CBE912E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{464DB15B-45C9-4207-B771-C1E38CBE912E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{464DB15B-45C9-4207-B771-C1E38CBE912E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{464DB15B-45C9-4207-B771-C1E38CBE912E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

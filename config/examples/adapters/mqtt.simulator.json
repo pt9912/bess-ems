@@ -6,7 +6,7 @@
       "topic": "battery/{assetId}/telemetry",
       "direction": "subscribe",
       "payload_format": "json",
-      "retained": false,
+      "retained": true,
       "auth_required": "none"
     },
     {
@@ -14,7 +14,7 @@
       "topic": "battery/{assetId}/status",
       "direction": "subscribe",
       "payload_format": "json",
-      "retained": false,
+      "retained": true,
       "auth_required": "none"
     },
     {
