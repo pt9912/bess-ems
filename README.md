@@ -8,8 +8,12 @@ Sicherheitsanforderungen. Das System ist modular aufgebaut, containerisiert und
 so konzipiert, dass Marktoptimierung und technische Regelung strikt getrennt
 sind.
 
-> **Status:** Entwurf — derzeit nur Spezifikation, noch keine Implementierung.
-> Maßgebliches Dokument: [`spec/lastenheft.md`](spec/lastenheft.md).
+> **Status:** M1 in Umsetzung — Spezifikation, Architektur, .NET-Solution,
+> Kernlogik, Adapter, Persistenz, API-Anfänge, Simulator und Tests sind
+> vorhanden. Der MVP ist noch nicht vollständig abgeschlossen.
+> Maßgebliche Dokumente: [`spec/lastenheft.md`](spec/lastenheft.md),
+> [`spec/architecture.md`](spec/architecture.md) und
+> [`docs/plan/planning/in-progress/roadmap.md`](docs/plan/planning/in-progress/roadmap.md).
 
 ---
 
@@ -57,12 +61,14 @@ Das System adressiert unter anderem:
 
 | Bereich                        | Technologie                                     |
 | ------------------------------ | ----------------------------------------------- |
-| Hauptplattform                 | C# / .NET                                       |
+| Hauptplattform                 | C# / .NET 10                                    |
+| API                            | ASP.NET Core Minimal API                        |
 | Performance-kritischer Kern    | C / C++ (optionaler Native Core über C-ABI)     |
-| Persistenz (MVP)               | PostgreSQL (TimescaleDB nach MVP)               |
-| Messaging                      | MQTT, Modbus TCP, OPC-UA (nach MVP)             |
-| Betrieb                        | Linux, Docker, Docker Compose                   |
-| Observability                  | Strukturierte Logs, Metriken, OpenTelemetry     |
+| Persistenz (MVP)               | PostgreSQL über Dapper + Npgsql                 |
+| Messaging / Feldbus            | MQTTnet, FluentModbus; OPC-UA nach MVP          |
+| Simulator                      | Go-Feldsimulator für Modbus/MQTT                |
+| Betrieb / Gates                | Linux, Docker, Dockerfile-Stages, Makefile      |
+| Observability                  | Strukturierte Logs; Prometheus/OTel schrittweise |
 
 ---
 
@@ -131,7 +137,7 @@ nicht für Produktions-Broker.
 
 ## MVP-Abgrenzung
 
-### Bestandteil des MVP
+### Zielumfang des MVP
 
 - C#/.NET Worker Service
 - Domain-Modell, Realtime Snapshot Store, State Machine
@@ -145,6 +151,34 @@ nicht für Produktions-Broker.
 - strukturierte Logs
 - Docker Compose
 - Unit Tests für Kernlogik
+
+### Aktueller Implementierungsstand
+
+Vorhanden sind derzeit unter anderem:
+
+- `BatteryEms.sln` mit hexagonaler Struktur unter `src/`
+- Domain-Modell, State Machine, Constraint Limiter, Ramp Limiter,
+  Adapter-Schreibbegrenzung und Retention-Modell
+- Application Ports/Use-Cases für Snapshot Store, Regelzyklus,
+  Schedule Tracking, NoOp-Dispatch-Optimierung und Retention
+- Modbus- und MQTT-Adapter mit Lese-/Schreibpfad und Unit-/Integrationstests
+- PostgreSQL-Persistenzadapter mit Dapper/Npgsql, idempotenter DDL und
+  Roundtrip-Integrationstest
+- API-Anfänge für Health, Battery Status, Current Command und aktuelle
+  Schedules
+- JSON-Schemas und Beispielkonfigurationen unter `config/`
+- Go-Feldsimulator unter `simulators/bess-field-sim`
+- Architektur-, Domain-, Application-, Adapter-, Infrastructure- und
+  Integrationstests
+- Dockerfile-Stages und Makefile-Ziele für aktive M1-Gates
+
+Noch in Arbeit bzw. nicht vollständig verdrahtet sind insbesondere:
+
+- vollständiger Worker-/Runtime-Composition-Root
+- Root-Compose für das Gesamtsystem `bess-ems` + PostgreSQL + MQTT-Broker
+- AuthN/AuthZ und schreibende Operator-Stop-API
+- vollständige strukturierte Logs, Metriken und Runtime-Smoke-Gates
+- produktiver Solver, Intraday, Regelleistung, OPC-UA und Native Core
 
 ### Nach MVP
 
@@ -162,28 +196,43 @@ zertifizierungsnahe Regelleistungsintegration.
 
 ## Repository-Struktur
 
-```text
-.
-├── README.md             # dieses Dokument
-├── LICENSE               # MIT-Lizenz
-├── spec/
-│   ├── lastenheft.md     # Lastenheft (V-Modell-ähnliche Anforderungsstruktur)
-│   └── architecture.md   # Architekturentwurf (Schichten, Module, Datenfluss)
-└── docs/
-    ├── archive/
-    │   └── idea.md                   # historische Ideenskizze, nicht normativ
-    ├── user/
-    │   └── quality.md                # verbindliche Qualitäts- und Messpfade
-    └── plan/
-        ├── adr/                      # Architecture Decision Records
-        └── planning/
-            ├── open/                 # noch nicht begonnene Pläne
-            ├── in-progress/          # in Umsetzung (u. a. roadmap.md)
-            └── done/                 # abgeschlossen
+Die verbindliche Modul- und Schichtenstruktur ist in
+[`spec/architecture.md`](spec/architecture.md) beschrieben. Die wichtigsten
+Einstiegspunkte im Repository sind:
+
+- `BatteryEms.sln` — .NET-Solution
+- `src/hexagon/` — Domain und Application Core
+- `src/adapters/` — Driving Adapter (API, Worker) und Driven Adapter
+  (Modbus, MQTT, Persistence, Optimization, Telemetry)
+- `src/infrastructure/` — Infrastruktur-Implementierungen
+- `tests/` — Architektur-, Unit- und Integrationstests
+- `config/` — JSON-Schemas und Beispielkonfigurationen
+- `simulators/bess-field-sim/` — Go-Feldsimulator
+- `docs/plan/` — Roadmap, aktive und offene Detailpläne
+
+Native-Core-Module sind noch nicht vorhanden; sie folgen erst in einer
+späteren Roadmap-Phase.
+
+---
+
+## Lokale Gates
+
+Die aktiven Gate-Ziele sind im `Makefile` sichtbar:
+
+```bash
+make help
+make lint
+make arch-check
+make test
+make test-safety
+make coverage-gate
+make simulator-test
+make test-integration
 ```
 
-Implementierungsmodule (Worker, API, Domain, Adapter, Infrastructure, Native
-Core) folgen gemäß Lastenheft.
+`make build`, `make runtime`, `make ci`, `make test-container` und
+`make fullbuild` sind als spätere M1/Welle-5-Ziele vorbereitet, aber noch
+nicht aktiv.
 
 ---
 
