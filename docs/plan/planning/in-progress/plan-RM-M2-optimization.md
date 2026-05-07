@@ -60,11 +60,112 @@ Echtzeit-Single-Step-Dispatch im Regelzyklus sind dort vollständig.
 | ✅     | RM-M2-OP-02 | Application: `IScheduleOptimizer` + Request/Result-DTOs            | RM-M2-OP-01        | `IScheduleOptimizer` als Driven Port in `Application.Optimization` neben `IDispatchOptimizer`. `ScheduleOptimizationRequest` validiert Time-Grid eagerly: Horizon = `n × TimeStep`, Preisreihen mit StepCount-Match + finite Werte + non-blank PriceUnit (LH-OPT-008), Inputs via `ScheduleReference.EnsureValid`. `ScheduleOptimizationResult` hält drei Invarianten: `HasUsableSolution ⇔ ProducedSchedule≠null`, Run-Reference matcht Schedule-Version, Non-Solution-Status verbietet Schedule. Architektur-Tabu-Tests `Schedule_optimizer_types_do_not_depend_on_dispatch_types` + `Dispatch_optimizer_types_do_not_depend_on_schedule_types` erzwingen LH-OPT-007 type-für-type. 8+5+2 Tests. (Commit `a02782d`) |
 | ✅     | RM-M2-OP-03 | Application: `IScheduleOptimizationUseCase` (Driving Port)         | RM-M2-OP-02        | `IScheduleOptimizationUseCase` in `Application.Api`; `DefaultScheduleOptimizationUseCase` ruft `IScheduleOptimizer`, appendet `OptimizationRun` (LH-PERSIST-007, **unabhängig vom Status** — auch infeasible/failed Runs landen in der Audit-History), und ruft `IScheduleRepository.Replace` nur bei usable solution. Solver-Crashes propagieren (Run-Eintrag ohne tatsächlichen Run wäre Audit-Lüge). `ScheduleOptimizationOutcome { RunId, Status, ProducedScheduleVersion?, TerminationReason }` als API-Summary; volle LH-OPT-009-Payload bleibt im persistierten Run. Strukturierter `LoggerMessage`-Log. 5 Tests. (Commit `af980e6`) |
 | ✅     | RM-M2-OP-04 | Application: `IOptimizationRunRepository`                          | RM-M2-OP-01        | Driven Port + `InMemoryOptimizationRunRepository` (M1-Pattern, Dapper-Variante folgt mit OP-06). Append + FindById + halboffene `[from, until)`-Range-Query gefiltert auf AssetId, ordered by CreatedAt. Append-only: re-appending einer RunId wirft (LH-OPT-009 Audit-Stance). 9 Tests. (Commit `971fa7e`) |
-| ⬜     | RM-M2-OP-05 | Adapter: LP-Solver-Adapter (HiGHS oder OR-Tools, Auswahl per Config) | RM-M2-OP-02        | Solver-Auswahl/Bindings sind konfigurierbar; Einheiten- und Zeitschritt-Konsistenz nach LH-OPT-008 ist in Modelltests nachgewiesen (E = P · Δt). **Default per RM-M2-OP-OPEN-01: OR-Tools NuGet.** Bis dahin steht `Application.Optimization.NoOpScheduleOptimizer` (Failed/no-solver-configured) als Default-Wiring (siehe OP-07). |
+| ⬜     | RM-M2-OP-05 | Adapter: LP-Solver-Adapter für `IScheduleOptimizer`                 | RM-M2-OP-02        | `BatteryEms.Adapters.Optimization` liefert einen produktiven `IScheduleOptimizer`; Solver-Binding und Detailmodell sind noch zu entscheiden und werden per Config aktiviert. Ohne aktives Backend bleibt `Application.Optimization.NoOpScheduleOptimizer` der Default. Das Arbeitsmodell optimiert Day-Ahead-Energiekosten über das bestehende `ScheduleOptimizationRequest`-Grid mit getrennten Charge-/Discharge-Variablen, SOC-Dynamik, Leistungsgrenzen und expliziter Einheitenrechnung nach LH-OPT-008. Ergebnis ist ein `Schedule` mit genau `StepCount` halboffenen Fenstern, `OptimizationRun` mit Solvername/Runtime/Status/ObjectiveBreakdown (`energy_cost`) und stabiler Backend-Status-Abbildung → `OptimizationSolverStatus`. Tests decken Options-Validation, DI-Fallback, Status-Mapping, konstante Preis-/Δt-Einheitenrechnung, Zeitfenster-Grid, SOC-Grenzen, Leistungsgrenzen, infeasible Setup und Cancellation ab; `make lint` + `make test` + `make arch-check` + `make coverage-gate` real grün. |
 | ✅     | RM-M2-OP-06 | Adapter: `DapperOptimizationRunRepository` + DDL-Erweiterung       | RM-M2-OP-04, RM-M1-13 | Neue Tabellen `optimization_runs` (UUID-PK + JSON-Text-Spalten für inputs/violations/warnings, nullable Tripel `produced_schedule_*`) + `optimization_objective_breakdowns` (PK `(run_id, name)`, UNIQUE `(run_id, position)`, ON DELETE CASCADE) idempotent im `BessDbSchema.CreateScript`. `DapperOptimizationRunRepository` mirrort das `DapperScheduleRepository`-Pattern: ein `NpgsqlDataSource`-ctor, `DapperConfig.EnsureConfigured()`, Append + Komponenten in einer Transaktion, `PostgresErrorCodes.UniqueViolation` → `InvalidOperationException` (Append-only-Vertrag matcht InMemory-Repo). `QueryAsync` lädt Header über `[from, until)` halboffen + Komponenten via `run_id = ANY(@RunIds)` in einem zweiten Query (kein N+1). `ScheduleTypeWire` und `SolverStatusWire` als geteilte interne Helpers, `DapperScheduleRepository` zieht jetzt aus derselben Quelle. DI: `IOptimizationRunRepository → DapperOptimizationRunRepository` als Singleton. 2 neue Integrationstests: voll-fidelity Roundtrip mit zwei Komponenten + Asset/Range-Filter inkl. halboffener Boundary, Append-only-Verletzung. `make lint` + `make test` (27/27) + `make test-integration` (8/8) + `make arch-check` (13/13) + `make coverage-gate` real grün. |
 | ✅     | RM-M2-OP-07 | API: `POST /markets/day-ahead/optimize`                            | RM-M2-OP-03, RM-M1-15 | Endpoint operator-policy-guarded (analog `/operator/stop`). Validation-Reihenfolge: 400 missing-or-invalid-field → 404 asset-not-registered → 400 unknown-schedule-type → 400 invalid-request (Konstruktor-Invarianten). `OptimizationResponse` rendert `Status` als Enum, der zentrale snake_case-Converter liefert `failed`/`optimal`/… auf der Wire. `NoOpScheduleOptimizer` wandert von `Adapters.Optimization` nach `Application.Optimization` (analog zu NoOpBatteryTelemetrySource), damit der API-only-Test-Host ihn ohne Driven-Adapter-Ref auflöst. DI: `AddBessApplicationInMemoryStores` registriert `IOptimizationRunRepository`, `IScheduleOptimizationUseCase` und `IScheduleOptimizer` (NoOp-Default). 6 Endpoint-Tests + 3 NoOp-Tests; `make build` + `make runtime` real grün. (Commit `d3bea8e`) |
 | ✅     | RM-M2-OP-08 | Telemetrie + Metriken                                              | RM-M2-OP-03        | `IOptimizationRunMetrics`-Port (Application.Observability) + `NoOpOptimizationRunMetrics`-Default + `PrometheusOptimizationRunMetrics`-Adapter (Telemetry.Prometheus). Vier Instrumente unter `bess_optimization_*`: Counter `runs_total{asset_id,status}`, Histogram `run_duration_seconds{asset_id,status}` (log-spaced 5 ms .. 600 s), Gauge `objective_value{asset_id}` (Last-Value), Counter `constraint_violations_total{asset_id}` inkrementiert um Verletzungs-Anzahl. Status-Label snake_case-aligned mit `SolverStatusWire` (RM-M2-OP-06) und API-JSON-Converter (RM-M2-OP-07). `DefaultScheduleOptimizationUseCase` ruft `Record(run)` **nach** `AppendAsync` (LH-OPT-009: Metric-Counts ↔ persistierte Run-Historie können nicht divergieren); Solver-Crashes werfen vor dem Append → keine Metric-Emission, getestet. DI: `AddBessApplicationInMemoryStores` registriert NoOp-Default, `AddBessTelemetry` überschreibt mit Prometheus-Adapter (last-registration-wins, gleiches Pattern wie `IControlCycleMetrics`/`IHealthQuery`). 3 neue UseCase-Tests (zwei Status-Pfade, Solver-Crash) + 5 Adapter-Scrape-Tests (alle 7 Status-Labels, Counter ohne Inc bleibt unsichtbar, Null-Run wirft). `make lint` + `make test` + `make arch-check` + `make coverage-gate` (≥ 90% line) real grün. |
 | ⬜     | RM-M2-OP-09 | Replay-/Reproduzierbarkeitstest                                    | RM-M2-OP-06        | Zwei Runs mit identischen Inputs liefern entweder identische Ergebnisse oder einen explizit dokumentierten Begründungsvermerk (LH-OPT-009-Akzeptanz). |
+
+---
+
+## Detailierung RM-M2-OP-05
+
+**Status:** Die folgenden Punkte sind eine Arbeitsgrundlage für OP-05,
+keine finalen Designentscheidungen. OP-05 ersetzt den bisherigen
+Schedule-Optimizer-Platzhalter nicht global, sondern ergänzt den Driven
+Adapter um ein produktives, konfigurierbares Backend. API-only-Hosts und
+Tests ohne Solver-Bindings behalten `NoOpScheduleOptimizer`.
+
+**Lieferobjekte**
+
+- Solver-Binding nach Entscheidung als zentral versioniertes NuGet-Paket
+  in `Directory.Packages.props`; P/Invoke- oder gRPC-Sidecar-Arbeit bleibt
+  außerhalb des M2-Minimalschnitts, solange kein expliziter Beschluss
+  dafür fällt.
+- Options-Typ im Optimization-Adapter, z. B.
+  `OrToolsScheduleOptimizerOptions { TimeLimit, GapTolerance }` oder ein
+  backend-neutraler `ScheduleSolverOptions`, abhängig von der
+  Solver-Entscheidung.
+- Produktiver Adapter `...ScheduleOptimizer : IScheduleOptimizer` in
+  `BatteryEms.Adapters.Optimization`; keine Abhängigkeit auf API,
+  Persistence oder Worker.
+- DI-Wiring in `OptimizationRegistration`: Default bleibt NoOp, ein
+  konfiguriertes Backend überschreibt gezielt `IScheduleOptimizer`.
+- Interne Mapper für Status und Solver-Terminierung; unbekannte oder
+  native Fehler werden zu `OptimizationSolverStatus.Failed` mit
+  aussagekräftiger `TerminationReason`.
+
+**Arbeitsmodell**
+
+- Zeitraster ist exakt `request.StepCount`; jedes Solver-Intervall
+  entspricht `[HorizonStart + i * TimeStep, HorizonStart + (i+1) *
+  TimeStep)`.
+- Entscheidungsvariablen pro Schritt:
+  `p_charge[t] ∈ [0, MaxChargePowerKw]`,
+  `p_discharge[t] ∈ [0, MaxDischargePowerKw]` und `soc[t]` in kWh.
+- Leistungsgrenzen kommen ausschließlich aus `BatteryAsset`:
+  `p_charge <= MaxChargePowerKw`,
+  `p_discharge <= MaxDischargePowerKw`.
+- SOC-Bilanz nutzt kWh:
+  `soc[t+1] = soc[t] + (ChargeEfficiency * p_charge[t] -
+  p_discharge[t] / DischargeEfficiency) * Δt_h`.
+- SOC-Grenzen werden aus `MinSocPercent`, `MaxSocPercent` und
+  `CapacityKwh` abgeleitet; ein M2-Minimalvorschlag ist
+  `initial_soc = (MinSocPercent + MaxSocPercent) / 2 * CapacityKwh`.
+- Terminal-SOC ist im M2-Minimalvorschlag frei, um keine
+  Horizon-End-Floor/Ceil-Effekte einzubauen.
+- Objective in M2 ist nur Day-Ahead-Energiekosten:
+  `energy_cost = Σ price[t] * (p_charge[t] - p_discharge[t]) * Δt_h /
+  1000` bei `PriceUnit = "EUR/MWh"`.
+- Schedule-Output folgt der Domain-Konvention:
+  `target_power_kw[t] = p_discharge[t] - p_charge[t]`
+  (Entladen positiv, Laden negativ).
+- Tarif-, Reserve-, Degradations-, Ramp- und P/Q-Fähigkeitskosten bleiben
+  Folgearbeit, sofern sie nicht explizit in OP-05 gehoben werden.
+
+**Offene Designentscheidungen**
+
+- Initial SOC: M2-Konstante `(MinSocPercent + MaxSocPercent) / 2` vs.
+  Request-Feld; Request-Feld wäre eine Port-Erweiterung, Telemetrie-Feed
+  ist eher M3.
+- Charge/Discharge-Exklusivität: LP-Relaxation vs. MILP mit binärem
+  Indikator; bei `η < 1` sollte das LP-Optimum Doppelfluss vermeiden,
+  ein Test muss diese Annahme absichern.
+- Preis-Einheit: nur `EUR/MWh` akzeptieren mit
+  `Failed/"unsupported price unit"` vs. mehrere Units übersetzen.
+- Terminal-SOC: frei vs. zyklusbalanciert `soc[N] == soc[0]`; frei kann
+  am Horizon-Ende leerfahren, balanciert ist realistischer, reduziert
+  aber Erlöse.
+- Solver: OR-Tools GLOP vs. HiGHS/CBC; reines LP braucht kein MILP.
+- Konfigurierbarkeit: zunächst ein Solver mit kleinem Options-Typ vs.
+  sofortige Multi-Solver-Abstraction.
+
+**Resultatvertrag**
+
+- `Optimal` und `Feasible` erzeugen einen `Schedule` mit genau einem
+  Fenster pro Schritt; `ScheduleReference` im `OptimizationRun` zeigt auf
+  dieselbe `(AssetId, Type, Version)`.
+- Nicht-lösbare Läufe (`Infeasible`, `Unbounded`, `Failed`) erzeugen
+  keinen Schedule, werden aber als `OptimizationRun` vollständig
+  zurückgegeben und später durch den Use Case persistiert.
+- `ObjectiveBreakdown` enthält mindestens `energy_cost`; zusätzliche
+  Komponenten sind erst zulässig, wenn ihr physikalischer
+  Unit-Denominator dokumentiert und getestet ist.
+- `ConstraintViolations` bleibt für harte Modellverletzungen leer; bei
+  Status `Infeasible` steht die Ursache in `TerminationReason` und
+  optional in `Warnings`.
+
+**Testfokus**
+
+- Adapter-Unit-Tests ohne Host: Options-Validation, Status-Mapping,
+  Cancellation und Fehlerpfade.
+- Modelltests mit kleinen deterministischen Horizonten: konstante Preise,
+  30-min- und 1-h-Schritte, `E = P * Δt`, SOC-Update mit Wirkungsgrad,
+  Power-Limits, unsupported PriceUnit und infeasible Initial-SOC.
+- DI-Tests: ohne Config bleibt NoOp aktiv; mit konfiguriertem Backend
+  wird der produktive `IScheduleOptimizer` aufgelöst.
+- Architekturtests bleiben grün: Adapter darf Application/Domain
+  referenzieren, aber nicht API/Worker/Persistence.
 
 ---
 
@@ -91,7 +192,7 @@ Echtzeit-Single-Step-Dispatch im Regelzyklus sind dort vollständig.
 
 | Kennung      | Frage                                                                              | Default-Vorschlag |
 | ------------ | ---------------------------------------------------------------------------------- | ----------------- |
-| RM-M2-OP-OPEN-01 | HiGHS via NuGet vs. OR-Tools via P/Invoke vs. gRPC-Sidecar — welcher Bindungspfad zuerst? | OR-Tools NuGet als M2-Erstimplementierung; gRPC-Sidecar bleibt Option für custom solver pipelines. |
+| RM-M2-OP-OPEN-01 | HiGHS via NuGet vs. OR-Tools GLOP/CBC vs. gRPC-Sidecar — welcher Bindungspfad zuerst? | Noch offen; M2 bevorzugt einen LP-fähigen In-Process-NuGet-Adapter, gRPC-Sidecar bleibt Option für custom solver pipelines. |
 | RM-M2-OP-OPEN-02 | Wie stark wird `IScheduleOptimizer` mit `MarketCommitment`-Strafkosten und Tarifmodell (LH-MKT-008) gekoppelt? | M2 minimal: Day-Ahead-Energiekosten als Objective; Tarif/Reserve folgen mit RM-M2-04 Configurable Objective. |
 | RM-M2-OP-OPEN-03 | Replay-Reproduzierbarkeit: deterministische Solver-Konfiguration als M2-Anforderung oder als Soll? | Soll für M2; Solver-Determinismus hängt vom Backend ab und ist nicht überall garantiert. |
 | RM-M2-OP-OPEN-04 | API-Trigger: synchrone Antwort mit Solverlauf vs. asynchroner Job mit Status-Endpunkt? | Asynchron — `POST` legt Run an und gibt RunId zurück; `GET /optimization/runs/{id}` liefert Status. Solverlaufzeiten passen nicht in HTTP-Request-Budgets. |
