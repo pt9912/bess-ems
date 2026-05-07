@@ -70,12 +70,15 @@ ersetzen, **bevor** M3 die ersten echten Schema-Änderungen mitbringt.
 
 | Bereich         | Artefakt                                                       | LH-Bezug             |
 | --------------- | -------------------------------------------------------------- | -------------------- |
-| Persistence     | Migrations-Engine (DbUp / FluentMigrator / m-trace-style — siehe MIG-01)| LH-PERSIST-007 |
-| Persistence     | Explizit konfigurierte `__SchemaVersions`-Tracking-Tabelle bzw. Äquivalent | LH-PERSIST-007       |
+| Schema-Quelle   | `schema/schema.yaml` — neutrales Schema im d-migrate-Format    | LH-PERSIST-007       |
+| Build-Time      | d-migrate als Docker-Container (`ghcr.io/pt9912/d-migrate:<digest-pinned>`); `make schema-validate` + `make schema-generate` | LH-PERSIST-007 |
+| Persistence     | Runtime-Apply via DbUp (siehe MIG-01)                          | LH-PERSIST-007       |
+| Persistence     | Explizit konfigurierte `__SchemaVersions`-Tracking-Tabelle     | LH-PERSIST-007       |
 | Persistence     | `BessDbMigrator` (ersetzt `BessDbInitializer`)                 | LH-PERSIST-007       |
-| Persistence     | `Migrations/RunOnce/` Embedded-Resource-Verzeichnis: `0001_initial.sql`, `0002_*.sql`, …; `Migrations/Drafts/` bleibt nicht eingebettet | LH-PERSIST-007 |
+| Persistence     | `Migrations/RunOnce/` Embedded-Resource-Verzeichnis: `0001_initial.sql`, `0002_*.sql`, … (vom d-migrate-Build erzeugt); `Migrations/Drafts/` bleibt nicht eingebettet | LH-PERSIST-007 |
 | Tests           | Snapshot-Test: Bootstrap-Stand vs. Migration-0001-Stand        | LH-TEST-001/002      |
 | Tests           | Idempotenz-Test: zweimaliges `MigrateAsync` ohne Effekt        | LH-TEST-002          |
+| Tests           | Drift-Check: `make schema-generate` gegen den committeten `0001_initial.sql` ergibt einen leeren git-Diff (CI-Gate) | LH-TEST-002 |
 | ADR             | `docs/plan/adr/0001-persistence-migrations.md` (erstes ADR im Repo) | spec/architecture §11 |
 
 ---
@@ -84,9 +87,9 @@ ersetzen, **bevor** M3 die ersten echten Schema-Änderungen mitbringt.
 
 | Status | ID            | Paket                                                         | Abhängigkeit              | DoD                                                                                                                                                                                                                                          |
 | ------ | ------------- | ------------------------------------------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ⬜     | RM-M2-MIG-01  | ADR `0001-persistence-migrations.md`                          | —                         | ADR im Format wie m-trace `docs/adr/0002-persistence-store.md` (Referenz). Vergleicht **DbUp**, **FluentMigrator**, **EF Core Migrations**, **m-trace-Style YAML+Apply-Runner**, **plain `.sql`-Verzeichnis**. Empfiehlt **DbUp** (siehe OPEN-01). Begründung pro Option, Konsequenzen, Status „Accepted". |
-| ⬜     | RM-M2-MIG-02  | DbUp-Setup im Persistence-Adapter                             | RM-M2-MIG-01              | NuGet-Package `dbup-postgresql` zentral in `Directory.Packages.props` gepinnt + im Lock-File; `BatteryEms.Adapters.Persistence/Migrations/RunOnce/`-Ordner mit Embedded-Resource-Glob **nur** für `????_*.sql`; `Migrations/Drafts/` ist Build-Action `None` und wird vom Migrator nicht geladen. `BessDbMigrator` mit `MigrateAsync(CancellationToken)`-API; bestehender `BessDbInitializer` markiert `[Obsolete]` mit Migrationspfad-Hinweis. |
-| ⬜     | RM-M2-MIG-03  | Migration `0001_initial.sql` als Snapshot                     | RM-M2-MIG-02              | `0001_initial.sql` enthält den heutigen `BessDbSchema.CreateScript`-Inhalt 1:1; temporärer Cut-Over-Snapshot-Test (Postgres-Container, leere DB → 0001 anwenden → `pg_dump --schema-only` liefert dasselbe DDL wie `BessDbInitializer.InitializeAsync()` auf einer separaten leeren DB, **normalisiert um die Migrator-Journal-Tabelle `__SchemaVersions`**). Erst dann gilt der Snapshot als äquivalent. Der Test ist explizit an den alten Initializer gekoppelt und wird in MIG-05 entfernt oder durch einen reinen „Migration 0001 erzeugt erwartete Tabellen/Indizes"-Smoke ersetzt. |
+| ⬜     | RM-M2-MIG-01  | ADR `0001-persistence-migrations.md` (erstes ADR im Repo)     | —                         | Trennt **Build-Time-DDL-Generierung** von **Runtime-Apply** und vergleicht beide Achsen separat. Build-Time: **d-migrate** (Kotlin-CLI, neutraler YAML→DDL-Generator, image-pinned per `ghcr.io/pt9912/d-migrate:<version>`) **vs.** Hand-SQL. Runtime-Apply: **DbUp**, **FluentMigrator**, **EF Core Migrations**, **selbstgeschriebener .NET-Runner**. Default-Empfehlung **d-migrate (Build) + DbUp (Apply)** als Hybrid (OPEN-01). Begründung pro Achse, Konsequenzen, Status „Accepted". |
+| ⬜     | RM-M2-MIG-02  | Tooling-Setup: d-migrate (Build) + DbUp (Apply)               | RM-M2-MIG-01              | **Build-Seite:** `schema/schema.yaml` als zentrale Schema-Quelle im d-migrate-YAML-Format (Tables, Columns, PKs, Indices, Constraints, Foreign Keys); `make schema-validate` und `make schema-generate` rufen `ghcr.io/pt9912/d-migrate:<pinned-version>` als Container — Image-Pin parallel zur NuGet-Lock-File-Disziplin (siehe `docs/user/quality.md §1.4`). Erzeugt versionierte SQL-Files unter `BatteryEms.Adapters.Persistence/Migrations/RunOnce/`. **Apply-Seite:** NuGet-Package `dbup-postgresql` zentral in `Directory.Packages.props` gepinnt + im Lock-File; `Migrations/RunOnce/`-Ordner mit Embedded-Resource-Glob **nur** für `????_*.sql`; `Migrations/Drafts/` ist Build-Action `None` und wird vom Migrator nicht geladen. `BessDbMigrator` mit `MigrateAsync(CancellationToken)`-API; bestehender `BessDbInitializer` markiert `[Obsolete]` mit Migrationspfad-Hinweis. |
+| ⬜     | RM-M2-MIG-03  | `schema.yaml` + Migration `0001_initial.sql` als Snapshot     | RM-M2-MIG-02              | `bess-ems/schema/schema.yaml` (per d-migrate-Reverse-Engineering aus dem heutigen `BessDbSchema.CreateScript` initial befüllt, danach manuell gepflegt); `make schema-generate` erzeugt `0001_initial.sql` daraus. Temporärer Cut-Over-Snapshot-Test: Postgres-Container, leere DB → 0001 anwenden → `pg_dump --schema-only` liefert dasselbe DDL wie `BessDbInitializer.InitializeAsync()` auf einer separaten leeren DB, **normalisiert um die Migrator-Journal-Tabelle `__SchemaVersions`**. Zusätzlich: `make schema-validate` als CI-Gate (d-migrate-Validierung ohne DB-Aufruf). Erst dann gilt der Snapshot als äquivalent. Test wird in MIG-05 entfernt oder durch einen reinen „Migration 0001 erzeugt erwartete Tabellen/Indizes"-Smoke ersetzt. |
 | ⬜     | RM-M2-MIG-04  | Idempotenz, Versionskontinuität + Lock-Test                   | RM-M2-MIG-02              | Integrationstest in `BatteryEms.Persistence.IntegrationTests`: leere DB → `MigrateAsync` → `__SchemaVersions` enthält `0001_initial`; erneutes `MigrateAsync` ist no-op. `BessDbMigrator` validiert vor DbUp, dass eingebettete RunOnce-Migrationen bei `0001` starten, lückenlos numeriert sind und keine doppelte Nummer tragen; Test-Seam mit `0002_*` ohne `0001_*` bzw. `0001_*` + `0003_*` wirft vor der DbUp-Ausführung. Zwei parallele `MigrateAsync`-Aufrufe gegen dieselbe DB werden über `pg_advisory_lock(<repo-id>)` serialisiert; Test belegt, dass nur ein Lauf die Scripts anwendet und die zweite Replica danach no-op ist. |
 | ⬜     | RM-M2-MIG-05  | Cut-Over: Aufrufer von `BessDbInitializer` umstellen          | RM-M2-MIG-02..04          | `BessHostBuilder` ruft `BessDbMigrator.MigrateAsync` statt `BessDbInitializer.InitializeAsync`; alle 8 bestehenden Persistence-Integrationstests + Modbus/MQTT-Integration durchlaufen ohne Anpassung. Der temporäre MIG-03-Initializer-Vergleich wird entfernt oder entkoppelt, dann werden `BessDbInitializer` + `BessDbSchema.CreateScript` gelöscht (zentrale Schema-Quelle ist ab jetzt `0001_initial.sql`). |
 | ⬜     | RM-M2-MIG-06  | Vorlagen-Migration für RM-M2-OP-OPEN-05 (draft)               | RM-M2-MIG-05              | Optionaler Entwurf `Migrations/Drafts/0002_schedules_optimistic_concurrency.sql` als **nicht eingebettete** Datei (Build-Action `None`) oder als Plan-Snippet unter `docs/plan/planning/open/`; CI-Test aus MIG-02 belegt, dass Drafts nicht in den DbUp-Script-Set gelangen. Die echte `0002_*.sql` wird erst committed, wenn OPEN-05 als RM-M3-Item zieht. |
@@ -97,7 +100,7 @@ ersetzen, **bevor** M3 die ersten echten Schema-Änderungen mitbringt.
 
 | Kennung           | Frage                                                                                          | Default-Vorschlag |
 | ----------------- | ---------------------------------------------------------------------------------------------- | ----------------- |
-| RM-M2-MIG-OPEN-01 | DbUp vs. FluentMigrator vs. m-trace-Style YAML+Runner vs. EF Core Migrations vs. plain `.sql` | **DbUp** — SQL-first matcht den Dapper-Stack (kein C#-DSL, kein EF-ORM nötig); bestehende Schema-Quelle ist bereits inline-SQL in `BessDbSchema.cs`, der Übergang ist mechanisch; m-trace-Pattern (`schema.yaml` + apply-runner mit `schema_migrations`-Tabelle, siehe Memory-Note `reference_migration_pattern.md`) ist Go-spezifisch und in .NET zu re-implementieren wäre Aufwand ohne Mehrwert; FluentMigrator hat einen schwereren C#-DSL-Footprint, den unser einfaches Schema nicht braucht; EF Core Migrations zwingen das Repo in einen ORM-Stack, den wir bewusst gemieden haben. **ADR muss diese Reihenfolge sauber begründen, weil die Architektur §11 nur EF/FluentMigrator nennt — DbUp ist ein zusätzlicher Pfad, der eine Architektur-Spec-Erweiterung mitbringt.** |
+| RM-M2-MIG-OPEN-01 | Build-Time-DDL-Generator + Runtime-Apply-Tool — welche Kombination? | **Hybrid: d-migrate (Build) + DbUp (Apply).** Begründung in zwei Achsen: (1) Build-Time: d-migrate ist ein neutraler YAML→DDL-Generator (Postgres/MySQL/SQLite) mit Schema-Validierung, Schema-Compare und Reverse-Engineering. Für bess-ems heißt das: eine reviewbare Schema-Quelle in YAML, mechanische Initial-Befüllung per `d-migrate schema reverse` aus dem heutigen `BessDbSchema.CreateScript`, automatisierter DDL-Drift-Check als CI-Gate. Hand-SQL als Alternative spart das zusätzliche Tool, verliert aber Validierung, Cross-DB-Portabilität (relevant wenn perspektivisch SQLite-Tests oder MySQL-Profile dazukommen) und das Reverse-Engineering, das den Cut-Over erst sauber macht. (2) Runtime-Apply: **DbUp** matcht den Dapper-Stack (SQL-First, kein C#-DSL, kein EF-ORM); FluentMigrator hat einen schwereren C#-DSL-Footprint, den ein per-d-migrate-erzeugtes Schema nicht braucht; EF Core Migrations zwingen das Repo in einen ORM-Stack, den wir bewusst gemieden haben; ein selbstgeschriebener .NET-Runner wäre eine Re-Erfindung des DbUp-Funktionsumfangs (Tracking-Tabelle, idempotente Apply-Order, Embedded-Resource-Loader). **ADR muss erklären, warum die Architektur §11 (die nur EF/FluentMigrator nennt) um den d-migrate+DbUp-Hybrid erweitert werden soll, und das Tool-Novelty-Risiko (d-migrate jung, kleines Adoptions-Set) explizit gegen den Funktionsgewinn abwägen.** |
 | RM-M2-MIG-OPEN-02 | Forward-only vs. reversible Migrations                                                         | **Forward-only**. Ops-only-Deployment, kein Dev-Use-Case für Down-Migrations, kein Rollback-Wunsch im Lastenheft. Vereinfacht das Tooling und matcht DbUp-Default. |
 | RM-M2-MIG-OPEN-03 | Wie wird die Tracking-Tabelle benannt?                                                          | **Explizit `__SchemaVersions` konfigurieren** — nicht auf DbUp-Provider-Defaults verlassen. Das `__`-Präfix entkoppelt die Tracking-Tabelle vom Domain-Schema und ist leicht aus Backups/Schema-Diffs exkludierbar. |
 | RM-M2-MIG-OPEN-04 | Wie wird Migration in CI getestet?                                                              | **Bestehende `test-integration`-Stage erweitern**, kein neuer Compose-Service. Der Postgres-Container der Stage erhält in `IAsyncLifetime.InitializeAsync` einen `MigrateAsync`-Aufruf statt `InitializeAsync`; alle bestehenden Integrationstests prüfen so implizit die End-to-end-Migration. |
@@ -126,24 +129,29 @@ werden.
 
 ---
 
-## Anschluss an m-trace
+## d-migrate-Integration (Build-Seite)
 
-Das m-trace-Pattern (declarative `schema.yaml` + apply-runner mit
-`schema_migrations`-Tabelle, Quelle `docs/adr/0002-persistence-store.md`
-in m-trace) ist als Referenz im Auto-Memory-Note
-`reference_migration_pattern.md` festgehalten. Es taucht hier als
-**Vergleichs-Spalte** im ADR auf:
+d-migrate ist ein extern gepflegtes Kotlin-CLI, das aus einer neutralen
+`schema.yaml` versionierte DDL-Files für Postgres (und perspektivisch
+MySQL/SQLite) erzeugt. bess-ems integriert es wie folgt:
 
-- **Stärken** des Patterns: ein einziges deklaratives Artefakt definiert
-  Schema + Generator-Toolchain, Schema-Diffs sind reviewbar als
-  YAML-Diffs.
-- **Schwächen** für bess-ems: das Pattern ist Go-spezifisch
-  (`make schema-generate` baut auf Go-Tooling); cross-Language-Sharing
-  wäre eine Eigenentwicklung in .NET. Der Aufwand kauft kein konkretes
-  Feature, das DbUp nicht bereits liefert.
-
-Die Memory-Note bleibt als Lookup-Pointer; der ADR begründet die
-Nicht-Adoption explizit.
+- **Schema-Quelle**: `schema/schema.yaml` im Repo, einmalig per
+  `d-migrate schema reverse` aus dem heutigen
+  `BessDbSchema.CreateScript` initial befüllt, danach von Hand
+  gepflegt — die YAML ist die kanonische Quelle, das committete
+  `0001_initial.sql` ihr generiertes Artefakt.
+- **CI-Gates**: `make schema-validate` (statische YAML-Prüfung, ohne
+  DB) und `make schema-generate` mit anschließendem leerem
+  `git diff`-Check (Drift zwischen YAML und committeter SQL ist ein
+  Build-Fehler).
+- **Image-Pin**: `ghcr.io/pt9912/d-migrate:<version>@sha256:<digest>`
+  fest in einer `Makefile`-Variable; das Digest-Pin matcht die
+  NuGet-Lock-File-Disziplin aus `docs/user/quality.md §1.4`. Eine
+  Versionserhöhung ist ein bewusster Commit, kein schleichendes
+  Tag-Movement.
+- **Runtime-Trennung**: d-migrate läuft nur zur Build-Zeit. Zur
+  Laufzeit kennt der bess-ems-Host das Tool nicht — `BessDbMigrator`
+  appliziert die committeten SQL-Files via DbUp (siehe MIG-02).
 
 ---
 
@@ -156,6 +164,8 @@ Nicht-Adoption explizit.
 | Embedded-Resource-Pfad falsch — Migrationen werden zur Laufzeit nicht gefunden oder Drafts werden versehentlich angewendet | Test in MIG-04 listet die geladenen Migrations-Files explizit auf, vergleicht mit dem `Migrations/RunOnce/`-Disk-Stand und stellt sicher, dass `Migrations/Drafts/` nicht eingebettet ist. |
 | Versionslücke oder doppelte Migrationsnummer läuft bei DbUp alphabetisch trotzdem weiter | Preflight in `BessDbMigrator` validiert `000N`-Kontinuität vor DbUp; MIG-04 testet fehlende `0001`, Lücke `0001`/`0003` und doppelte Nummern. |
 | Bestehende Integrationstests brechen, weil `TruncateAll` jetzt auch `__SchemaVersions` antastet | `TruncateAllAsync` in `PersistenceRoundtripTests` auf Domain-Tabellen einschränken; Tracking-Tabelle bleibt unberührt. |
+| `schema.yaml` und committeter `0001_initial.sql` driften, weil ein Entwickler die SQL-Datei direkt editiert ohne YAML-Update | `make schema-generate`-Drift-Check als CI-Gate: nach Re-Generation muss der git-Diff leer sein, sonst schlägt CI fehl. |
+| d-migrate-Image-Tag schweigend bewegt sich (Mutable-Tag) und erzeugt anderes DDL beim nächsten Build | Image per Digest pinnen (`@sha256:...`) statt nur Version-Tag, parallel zum NuGet-Lock-File-Discipline. ADR-Entscheidung in MIG-01. |
 
 **Reihenfolge:**
 

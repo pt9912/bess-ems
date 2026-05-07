@@ -6,7 +6,8 @@ unter `open/`, bis der LP-Solver-Adapter aus dem aktiven M2-Plan
 ([`../in-progress/plan-RM-M2-optimization.md`](../in-progress/plan-RM-M2-optimization.md))
 ein Resultat liefert, das gegen ein dynamisches PCS-/PQ-Capability-
 Modell sanity-geprüft werden soll.
-**Quelle:** `/Development/bess/bess-hil-simulator`
+**Quelle:** `bess-hil-simulator`-Schwesterprojekt (Checkout-Pfad
+projekt-/operatorabhängig).
 **Bezug:** [`../in-progress/roadmap.md`](../in-progress/roadmap.md)
 (M2-Folgewelle), [`../in-progress/plan-RM-M2-optimization.md`](../in-progress/plan-RM-M2-optimization.md)
 (Aktivierungs-Trigger), `docs/plan/planning/done/plan-RM-M1.md`,
@@ -70,7 +71,7 @@ Der HIL-Simulator:
 Beispielstart:
 
 ```sh
-docker build -t bess-hil-simulator:local /Development/bess/bess-hil-simulator
+docker build -t bess-hil-simulator:local "$BESS_HIL_SIMULATOR_PATH"
 mkdir -p data
 docker run --rm --user "$(id -u):$(id -g)" -p 5020:502 -v "$PWD/data:/data" bess-hil-simulator:local
 ```
