@@ -196,11 +196,6 @@ in `Directory.Packages.props`:
   `IMqttClient.cs`, `MqttRegistration.cs` und den
   `ArchitectureTabusTests`-Eintrag, der `MQTTnet.Client` als verbotene
   Application-Referenz nennt.
-- **JsonSchema.Net 7.4.0 → 8.x/9.x:** `EvaluationResults.HasErrors` weg,
-  `Evaluate(JsonNode)` statt `Evaluate(JsonElement)`. Betrifft
-  `JsonFileConfigurationLoader.cs` (Schema-Validierung der Adapter-
-  Mappings).
-
 Bei `Google.OrTools` steht ebenfalls ein 9.11 → 9.15-Bump aus, der
 die Native-Bindings updatet — separater Review-Schritt mit Lock-File-
 Diff (vgl. dieselbe §1.4-Begründung wie für die Erstaufnahme).

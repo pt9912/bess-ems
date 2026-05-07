@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -25,13 +26,16 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
         }
 
         // LH-DOM-005 device-point base lives in its own schema and is
-        // referenced from both the Modbus and MQTT mapping schemas. We
-        // register it once with the global schema registry so $ref to
-        // its $id resolves at evaluation time without per-loader plumbing.
-        var devicePointSchema = LoadSchema(schemaDirectory, "device-point.schema.json");
-        SchemaRegistry.Global.Register(
-            new Uri("https://bess-ems.io/schema/device-point.json"),
-            devicePointSchema);
+        // referenced from both the Modbus and MQTT mapping schemas.
+        // JsonSchema.Net 8.0 changed Build/FromFile to auto-register
+        // schemas in SchemaRegistry.Global via their $id (the
+        // device-point.schema.json carries
+        // $id="https://bess-ems.io/schema/device-point.json"), so an
+        // explicit Register call is redundant — and worse, it now
+        // throws on the second loader instance in the same process.
+        // The path-keyed schema cache below ensures FromFile runs once
+        // per file, period.
+        _ = LoadSchema(schemaDirectory, "device-point.schema.json");
 
         _assetSchema = LoadSchema(schemaDirectory, "asset.schema.json");
         _modbusSchema = LoadSchema(schemaDirectory, "modbus-mapping.schema.json");
@@ -258,6 +262,17 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
         return result;
     }
 
+    // Process-wide cache: JsonSchema.Net 8.0 auto-registers each
+    // schema in SchemaRegistry.Global by its $id and rejects duplicate
+    // registrations. Repeated FromFile calls on the same path would
+    // otherwise throw on every test that constructs a second loader.
+    // Lazy<T> with ExecutionAndPublication serialises the FromFile call
+    // for any given path so two parallel test classes loading the same
+    // schema directory don't race the registry. Different paths are
+    // independent — the dictionary lookup is non-blocking.
+    private static readonly ConcurrentDictionary<string, Lazy<JsonSchema>> _schemaCache =
+        new(StringComparer.Ordinal);
+
     private static JsonSchema LoadSchema(string directory, string fileName)
     {
         var path = Path.Combine(directory, fileName);
@@ -266,7 +281,11 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
             throw new FileNotFoundException($"Schema not found: {path}", path);
         }
 
-        return JsonSchema.FromFile(path);
+        return _schemaCache.GetOrAdd(
+            path,
+            p => new Lazy<JsonSchema>(
+                () => JsonSchema.FromFile(p),
+                LazyThreadSafetyMode.ExecutionAndPublication)).Value;
     }
 
     private static JsonNode LoadAndValidate(string filePath, JsonSchema schema)
@@ -292,7 +311,13 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
             throw new ConfigurationValidationException($"Configuration file is empty: {filePath}");
         }
 
-        var results = schema.Evaluate(node, new EvaluationOptions { OutputFormat = OutputFormat.List });
+        // JsonSchema.Net 8.0 broke the JsonNode-based Evaluate signature
+        // in favour of JsonElement (cuts allocations, matches the
+        // System.Text.Json zero-copy idiom). Deserialize<JsonElement>
+        // round-trips through the parser; cheaper than re-reading the
+        // file and keeps the JsonNode parse-error path above intact.
+        var element = node.Deserialize<JsonElement>();
+        var results = schema.Evaluate(element, new EvaluationOptions { OutputFormat = OutputFormat.List });
         if (!results.IsValid)
         {
             var messages = CollectErrors(results).ToList();
@@ -305,7 +330,11 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
 
     private static IEnumerable<string> CollectErrors(EvaluationResults results)
     {
-        if (results.HasErrors && results.Errors is { Count: > 0 } errors)
+        // JsonSchema.Net 8.0 removed HasErrors / HasDetails — both
+        // collection properties are nullable on a node that didn't
+        // evaluate or didn't fail, so a single null-check replaces
+        // the old has-flag pattern.
+        if (results.Errors is { Count: > 0 } errors)
         {
             foreach (var (keyword, message) in errors)
             {
@@ -313,11 +342,14 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
             }
         }
 
-        foreach (var detail in results.Details)
+        if (results.Details is { Count: > 0 } details)
         {
-            foreach (var nested in CollectErrors(detail))
+            foreach (var detail in details)
             {
-                yield return nested;
+                foreach (var nested in CollectErrors(detail))
+                {
+                    yield return nested;
+                }
             }
         }
     }
