@@ -189,6 +189,43 @@ public sealed class PidControllerTests
     }
 
     [Fact]
+    public void Conditional_integration_allows_integrator_to_land_exactly_on_OutputMax_before_freezing()
+    {
+        // Pin the strict-`>` boundary semantics: the integrator is
+        // permitted to walk up to a candidate that lands EXACTLY on
+        // OutputMax (no freeze, integrator commits the boundary value);
+        // the next tick where the candidate would be > OutputMax does
+        // freeze. A future refactor that changed `>` to `>=` would land
+        // the plateau at 4.5 instead of 5.0 and break this test.
+        //
+        // Step size 0.5 is exactly representable in IEEE 754, so
+        // accumulating to 5.0 is bit-exact (no floating-point drift).
+        var options = Options(ki: 0.5, outputMax: 5);
+        var state = PidControllerState.Initial;
+
+        // Walk to integrator = 4.5 (one step below the bound).
+        for (var i = 0; i < 9; i++)
+        {
+            var step = PidController.Step(state, options, setpoint: 1, measurement: 0, Dt);
+            Assert.False(step.WasIntegralFrozen);
+            state = step.NextState;
+        }
+        Assert.Equal(4.5, state.Integral);
+
+        // Next tick: candidateIntegral = 4.5 + 0.5 = 5.0, exactly on
+        // OutputMax. `5.0 > 5.0` is false → no freeze, integrator
+        // commits the boundary value.
+        var atBoundary = PidController.Step(state, options, setpoint: 1, measurement: 0, Dt);
+        Assert.False(atBoundary.WasIntegralFrozen);
+        Assert.Equal(5.0, atBoundary.NextState.Integral);
+
+        // Next tick: candidateIntegral = 5.5 > OutputMax → freeze.
+        var pastBoundary = PidController.Step(atBoundary.NextState, options, setpoint: 1, measurement: 0, Dt);
+        Assert.True(pastBoundary.WasIntegralFrozen);
+        Assert.Equal(5.0, pastBoundary.NextState.Integral);
+    }
+
+    [Fact]
     public void Conditional_integration_unwinds_when_error_reverses()
     {
         var options = Options(ki: 0.1, outputMax: 5);
@@ -568,9 +605,10 @@ public sealed class PidControllerTests
     [Fact]
     public void Pre_clamp_overflow_throws_overflow_exception()
     {
-        // Construct a setup that forces the D term to overflow:
-        // very large Kd, very large error change, very small dt.
-        // d = 1e300 * (1e300 - (-1e300)) / 1e-7 = 2e607, non-finite.
+        // D-side overflow path: very large Kd, very large error change,
+        // very small dt. d = 1e300 * (1e300 - (-1e300)) / 1e-7 = 2e607,
+        // non-finite. The post-compute IsFinite(preClamp) guard catches
+        // it; integrator path stays finite (Ki=0).
         var options = new PidControllerOptions
         {
             Kp = 0, Ki = 0, Kd = 1e300,
@@ -582,6 +620,32 @@ public sealed class PidControllerTests
             state, options,
             setpoint: 1e300, measurement: 0,
             TimeSpan.FromTicks(1)));
+    }
+
+    [Fact]
+    public void Integrator_overflow_throws_overflow_exception_even_when_freeze_could_mask_it()
+    {
+        // Integrator-side overflow path. With the candidateIntegral
+        // IsFinite check absent, anti-windup would freeze at the
+        // (still-finite) state.Integral and the step would return a
+        // finite output, silently dropping the overflow on the floor —
+        // exactly the freeze-as-mask antipattern the kernel rejects.
+        //
+        // Setup: state.Integral near +MaxValue, integratorStep also
+        // huge → candidateIntegral overflows to +Infinity. P+D are
+        // small enough that without the dedicated check the freeze
+        // would produce a finite preClamp.
+        var options = new PidControllerOptions
+        {
+            Kp = 0, Ki = 1e308, Kd = 0,
+            OutputMin = -1e10, OutputMax = 1e10,
+        };
+        var state = PidControllerState.Initial with { Integral = 1e308 };
+
+        Assert.Throws<OverflowException>(() => PidController.Step(
+            state, options,
+            setpoint: 1e10, measurement: 0,
+            Dt));
     }
 
     // --- Validation: null arguments ---------------------------------------

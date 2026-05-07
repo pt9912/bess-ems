@@ -94,6 +94,22 @@ public static class PidController
             : options.Kd * (effectiveError - state.PreviousError) / dtSeconds;
         var integratorStep = options.Ki * effectiveError;
         var candidateIntegral = state.Integral + (integratorStep * dtSeconds);
+        if (!double.IsFinite(candidateIntegral))
+        {
+            // Anti-windup could mask this by freezing chosenIntegral to
+            // the (still-finite) state.Integral, which would let the
+            // step return a finite output and silently drop the
+            // overflow on the floor. The freeze is operationally
+            // meaningful (resists integrator drift), but masking
+            // numerical overflow is not — once the integrator update
+            // overflows, the gains/error/dt combination is outside any
+            // reasonable operating regime and the right answer is to
+            // surface that to the caller.
+            throw new OverflowException(
+                $"PID integrator overflowed (state.Integral={state.Integral}, "
+                + $"Ki={options.Ki}, error={effectiveError}, dt={dtSeconds}). "
+                + "Reduce Ki, narrow the error range, or check the feedback path for instability.");
+        }
 
         var candidatePreClamp = p + candidateIntegral + d;
 
@@ -101,9 +117,13 @@ public static class PidController
         var chosenIntegral = candidateIntegral;
         if (options.AntiWindupMode == PidAntiWindupMode.ConditionalIntegration)
         {
-            // Freeze when the integrator update would push *further*
-            // past the saturation bound. Direction is decided by the
-            // sign of integratorStep (= Ki·error), not error alone.
+            // Freeze when the candidate output is past the saturation
+            // bound and the integrator step has the same sign as the
+            // violation — i.e. continuing to integrate would not
+            // relieve it. Direction is the sign of integratorStep
+            // (= Ki·error), not error alone, so a negative-Ki
+            // configuration with positive error correctly does NOT
+            // freeze when the integrator is decrementing toward relief.
             if (candidatePreClamp > options.OutputMax && integratorStep > 0)
             {
                 chosenIntegral = state.Integral;
@@ -119,6 +139,12 @@ public static class PidController
         var preClamp = p + chosenIntegral + d;
         if (!double.IsFinite(preClamp))
         {
+            // Catches non-finite from the P or D side (the integrator
+            // path is checked above). OverflowException carries no
+            // ParamName analogous to ArgumentException — diagnostics
+            // are in the message, which is the same convention the
+            // rest of Domain (RampLimiter etc.) uses for non-argument
+            // numerical faults.
             throw new OverflowException(
                 $"PID step produced a non-finite output (P={p}, I={chosenIntegral}, D={d}). "
                 + "Reduce gains or widen the sample time.");
