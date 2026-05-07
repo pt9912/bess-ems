@@ -92,11 +92,12 @@ Mindest-Check vor Aktivierung:
 
 | Check | Erwartung |
 | ----- | --------- |
-| M2-Baseline | `make lint`, `make arch-check`, `make test`, `make coverage-gate`, `make build` und `make runtime` sind auf `main` gruen. |
+| M2-Baseline | `make lint`, `make arch-check`, `make test`, `make coverage-gate`, `make build`, `make runtime` und das ab M2 geforderte Replay-Gate `make test-replay` sind auf `main` gruen. Falls `make test-replay` noch nicht existiert oder RM-M2-10 nicht abgeschlossen ist, ist M3 noch nicht aktivierungsbereit; eine Ausnahme braucht einen expliziten Roadmap-/Plan-Entscheid. |
 | Referenzpfad | Managed Control Kernel ist eindeutig lokalisierbar und kann von Native-Parity-Tests direkt aufgerufen werden. |
 | Build-Toolchain | Linux-C++-Build in Docker ist verfuegbar; lokale Host-Toolchain ist Komfort, aber keine Voraussetzung. |
 | Migrationsbedarf | Kein RM-M3-01..13-Slice verlangt eine DB-Schema-Aenderung. Falls doch: erst RM-M3-FUP-01 ziehen. |
-| Doku-Policy | `docs/user/quality.md` §5.2 und Architektur §13.4 beschreiben dieselbe M3-Default-Policy: ABI-Mismatch fuehrt zu .NET-Fallback, nicht zu Startabbruch. RM-M3-03 haelt diesen Vertrag beim ABI-Policy-Slice synchron; der erste PR mit ABI-Mismatch-Verhalten darf keinen widerspruechlichen Quality-Vertrag hinterlassen. |
+| Doku-Policy | `docs/user/quality.md` §5.2 und Architektur §13.4 beschreiben dieselbe M3-Default-Policy: ABI-Mismatch fuehrt zu .NET-Fallback, nicht zu Startabbruch. RM-M3-03 haelt diesen Vertrag beim ABI-Policy-Slice synchron; der erste PR mit ABI-Mismatch-Verhalten darf keinen widerspruechlichen Quality-Vertrag hinterlassen. Bekannter Doku-Drift vor M3: `docs/user/quality.md` nennt fuer den Header noch `native/include/battery_control_core.h`; RM-M3-03 oder spaetestens RM-M3-12 muss den Pfad auf `native/battery_control_core/include/battery_control_core.h` angleichen. |
+| Managed-Precheck-Gap | Der heutige Snapshot-/Control-Pfad faengt bereits unbrauchbare Qualitaet, stale Snapshots, `Available == false`, SOC/SOH ausserhalb 0..100 und nicht-finite Active Power ab. Vor RM-M3-05 muessen zusaetzlich nicht-finite SOC/SOH, nicht-finite oder unplausible Temperatur sowie nicht-finite Dispatch-/Limit-/Request-Mapping-Werte als Managed-Precheck nachgewiesen sein. |
 
 RM-M3-05 darf Routing nur hinter expliziter Test-/Profilkonfiguration
 einfuehren. Vor dem ersten PR, der Native als produktiven Default oder als
@@ -243,11 +244,17 @@ Stale-Snapshot-Entscheidungen, `ValidUntil` und freie
 `DataQuality.Reason`-Texte bleiben Managed-Prechecks des Control-Cycles.
 Dasselbe gilt fuer `Available == false`, unbrauchbare Snapshot-Qualitaet
 und nicht-finite oder unplausible Werte in Snapshot, Dispatch, Limits oder
-Request. Die .NET-Precheck-Tests muessen mindestens SOC, SOH, Active Power
-und Temperatur auf finite/plausible Werte abdecken; zusaetzliche Limit- und
-Request-Werte werden im Mapping vor Kernel-Aufruf validiert. Diese Faelle
-werden in .NET-Control-/Mapping-Tests nachgewiesen, aber nicht als
-Native-Parity-Faelle gezaehlt, solange die ABI diese Felder nicht fuehrt.
+Request. Der aktuelle Managed-Pfad ist dafuer noch nicht vollstaendig
+M3-bereit: Er deckt stale/unusable Snapshot-Qualitaet, `Available ==
+false`, SOC/SOH ausserhalb 0..100 und nicht-finite Active Power ab, aber
+nicht alle nicht-finiten SOC/SOH-/Temperatur- und Mapping-Werte. Diese
+Luecke ist Teil von RM-M3-05, bevor Native-Routing in einem Control-Cycle
+aktiviert wird. Die .NET-Precheck-Tests muessen mindestens SOC, SOH, Active
+Power und Temperatur auf finite/plausible Werte abdecken; zusaetzliche
+Limit- und Request-Werte werden im Mapping vor Kernel-Aufruf validiert.
+Diese Faelle werden in .NET-Control-/Mapping-Tests nachgewiesen, aber
+nicht als Native-Parity-Faelle gezaehlt, solange die ABI diese Felder nicht
+fuehrt.
 
 Export-Baseline fuer RM-M3-01:
 
