@@ -27,7 +27,7 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
         var runs = new InMemoryOptimizationRunRepository();
         var useCase = Build(optimizer, schedules, runs);
 
-        var outcome = await useCase.ExecuteAsync(BuildInputs(), CancellationToken.None);
+        var outcome = await useCase.ExecuteAsync(BuildCommand(), CancellationToken.None);
 
         Assert.Equal(OptimizationSolverStatus.Optimal, outcome.Status);
         Assert.Equal(1, outcome.ProducedScheduleVersion);
@@ -51,7 +51,7 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
         var runs = new InMemoryOptimizationRunRepository();
         var useCase = Build(optimizer, schedules, runs);
 
-        var outcome = await useCase.ExecuteAsync(BuildInputs(), CancellationToken.None);
+        var outcome = await useCase.ExecuteAsync(BuildCommand(), CancellationToken.None);
 
         Assert.Equal(4, outcome.ProducedScheduleVersion);
         Assert.Equal("AT", optimizer.LastRequest!.MarketBidArea);
@@ -80,9 +80,9 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
         });
         var useCase = Build(optimizer, schedules, runs);
 
-        var inputs = BuildInputs();
-        var first = useCase.ExecuteAsync(inputs, CancellationToken.None);
-        var second = useCase.ExecuteAsync(inputs, CancellationToken.None);
+        var command = BuildCommand();
+        var first = useCase.ExecuteAsync(command, CancellationToken.None);
+        var second = useCase.ExecuteAsync(command, CancellationToken.None);
         await Task.WhenAll(first, second);
 
         var outcomes = new[] { await first, await second };
@@ -104,12 +104,12 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
         var optimalCase = Build(
             new SpyOptimizer(req => BuildResult(req, OptimizationSolverStatus.Optimal, includeSchedule: true)),
             schedules, runs, metrics);
-        await optimalCase.ExecuteAsync(BuildInputs(), CancellationToken.None);
+        await optimalCase.ExecuteAsync(BuildCommand(), CancellationToken.None);
 
         var failedCase = Build(
             new SpyOptimizer(req => BuildResult(req, OptimizationSolverStatus.Failed, includeSchedule: false)),
             schedules, runs, metrics);
-        await failedCase.ExecuteAsync(BuildInputs(), CancellationToken.None);
+        await failedCase.ExecuteAsync(BuildCommand(), CancellationToken.None);
 
         Assert.Equal(2, metrics.Recorded.Count);
         Assert.Equal(OptimizationSolverStatus.Optimal, metrics.Recorded[0].Status);
@@ -127,7 +127,7 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
             metrics);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            useCase.ExecuteAsync(BuildInputs(), CancellationToken.None));
+            useCase.ExecuteAsync(BuildCommand(), CancellationToken.None));
 
         Assert.Empty(metrics.Recorded);
     }
@@ -141,7 +141,7 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
         var runs = new InMemoryOptimizationRunRepository();
         var useCase = Build(optimizer, schedules, runs);
 
-        var outcome = await useCase.ExecuteAsync(BuildInputs(), CancellationToken.None);
+        var outcome = await useCase.ExecuteAsync(BuildCommand(), CancellationToken.None);
 
         Assert.Equal(OptimizationSolverStatus.Infeasible, outcome.Status);
         Assert.Null(outcome.ProducedScheduleVersion);
@@ -158,7 +158,7 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
         var useCase = Build(optimizer, schedules, runs);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            useCase.ExecuteAsync(BuildInputs(), CancellationToken.None));
+            useCase.ExecuteAsync(BuildCommand(), CancellationToken.None));
 
         Assert.Null(schedules.FindActive("asset-1", ScheduleType.DayAhead));
         var noRuns = await runs.QueryAsync("asset-1", DateTimeOffset.MinValue, DateTimeOffset.MaxValue, CancellationToken.None);
@@ -166,7 +166,7 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
     }
 
     [Fact]
-    public async Task Null_inputs_throws()
+    public async Task Null_command_throws()
     {
         var useCase = Build(
             new SpyOptimizer(req => BuildResult(req, OptimizationSolverStatus.Optimal, includeSchedule: true)),
@@ -185,12 +185,12 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
             new SpyOptimizer(req => BuildResult(req, OptimizationSolverStatus.Optimal, includeSchedule: true)),
             new InMemoryScheduleRepository(),
             new InMemoryOptimizationRunRepository());
-        await useCase.ExecuteAsync(BuildInputs(), CancellationToken.None);
+        await useCase.ExecuteAsync(BuildCommand(), CancellationToken.None);
 
         useCase.Dispose();
 
         await Assert.ThrowsAsync<ObjectDisposedException>(() =>
-            useCase.ExecuteAsync(BuildInputs(), CancellationToken.None));
+            useCase.ExecuteAsync(BuildCommand(), CancellationToken.None));
     }
 
     [Fact]
@@ -213,7 +213,7 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
                 terminationCode: "time-limit-but-feasible"));
         var useCase = Build(optimizer, new InMemoryScheduleRepository(), new InMemoryOptimizationRunRepository());
 
-        var outcome = await useCase.ExecuteAsync(BuildInputs(), CancellationToken.None);
+        var outcome = await useCase.ExecuteAsync(BuildCommand(), CancellationToken.None);
 
         Assert.Equal("time-limit-but-feasible", outcome.TerminationReason);
         Assert.Equal(1, outcome.ProducedScheduleVersion);
@@ -231,7 +231,8 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
             metrics ?? NoOpOptimizationRunMetrics.Instance,
             NullLogger<DefaultScheduleOptimizationUseCase>.Instance);
 
-    private static ScheduleOptimizationCommand BuildInputs() => new(
+    private static ScheduleOptimizationCommand BuildCommand() =>
+        new(
         assetId: "asset-1",
         scheduleType: ScheduleType.DayAhead,
         asset: TestFixtures.CreateAsset(),

@@ -50,6 +50,12 @@ internal static class BessDbSchema
         CREATE INDEX IF NOT EXISTS idx_commands_asset_issued_at
             ON commands(asset_id, issued_at DESC);
 
+        -- M2: `version` is upsert-overwritten without an
+        -- expected-version guard, see DapperScheduleRepository.
+        -- RM-M2-OP-OPEN-05 will add a UNIQUE constraint on
+        -- (asset_id, type, version) plus a Replace overload that
+        -- enforces optimistic concurrency once multi-replica
+        -- deployments need it.
         CREATE TABLE IF NOT EXISTS schedules (
             asset_id TEXT NOT NULL,
             type TEXT NOT NULL,
@@ -93,7 +99,10 @@ internal static class BessDbSchema
             constraint_violations_json TEXT NOT NULL DEFAULT '[]',
             warnings_json TEXT NOT NULL DEFAULT '[]',
             solver_runtime_seconds DOUBLE PRECISION NOT NULL,
-            termination_reason TEXT NOT NULL,
+            -- 256-char cap matches the domain TerminationCode max (64) plus
+            -- a generous Detail allowance so a deviating writer cannot push
+            -- a megabyte of payload through the column (3rd-pass review #12).
+            termination_reason TEXT NOT NULL CHECK (length(termination_reason) <= 256),
             created_at TIMESTAMPTZ NOT NULL,
             inputs_json TEXT NOT NULL DEFAULT '[]',
             produced_schedule_asset_id TEXT,

@@ -280,7 +280,11 @@ public sealed class DapperOptimizationRunRepository : IOptimizationRunRepository
 
         // Read-side companion to OptimizationRun.TerminationReason
         // (review #16): the column persists the composed string, the
-        // domain reconstructs (Code, Detail) on the way in.
+        // domain reconstructs (Code, Detail) on the way in. The DB-side
+        // CHECK on length keeps a malformed writer from pushing values
+        // that the domain ctor would reject; if a future migration ever
+        // relaxes that CHECK, this Parse call is the chokepoint that
+        // would surface the breakage.
         var (code, detail) = OptimizationRun.ParseTerminationReason(header.TerminationReason);
 
         return new OptimizationRun(

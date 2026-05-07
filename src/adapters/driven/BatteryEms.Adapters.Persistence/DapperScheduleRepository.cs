@@ -12,6 +12,13 @@ public sealed class DapperScheduleRepository : IScheduleRepository
     // replace the previous set inside a single transaction so a reader
     // never sees a torn schedule mid-rewrite. RM-M1-14 will own the
     // historical retention story.
+    //
+    // Concurrency: the upsert has *no* `WHERE version = @expected`
+    // guard. Two writers racing on the same (asset, type) will both
+    // win their write; the second silently overwrites. M2 callers
+    // serialise via DefaultScheduleOptimizationUseCase's per-key
+    // SemaphoreSlim within one process. Multi-replica deployments
+    // need RM-M2-OP-OPEN-05 — see IScheduleRepository.Replace doc.
     private const string DeleteWindowsSql = "DELETE FROM schedule_windows WHERE asset_id = @AssetId AND type = @Type;";
     private const string UpsertHeaderSql = """
         INSERT INTO schedules (asset_id, type, market_bid_area, version)

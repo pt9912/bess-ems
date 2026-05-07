@@ -165,12 +165,16 @@ Hash, den der Reviewer beim Mergen gesehen hat.
 
 1. Version in `Directory.Packages.props` ändern.
 2. Lock-Files refreshen — aus dem Repo-Root und im SDK-Container, damit
-   die Hashes denen entsprechen, die CI sieht:
+   die Hashes denen entsprechen, die CI sieht. Da `Directory.Build.props`
+   `RestoreLockedMode=true` global setzt, muss der Refresh den Lock-Modus
+   explizit aushebeln:
 
    ```bash
    docker run --rm -v $(pwd):/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 \
-     dotnet restore BatteryEms.sln /p:ForceEvaluate=true
+     dotnet restore BatteryEms.sln /p:RestoreLockedMode=false
    ```
+
+   (alternativ `--force-evaluate`).
 
 3. Refreshte `packages.lock.json`-Dateien zusammen mit der Versionsänderung
    committen — `make lint` schlägt sonst auf der nächsten Ebene fehl.

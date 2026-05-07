@@ -19,9 +19,14 @@ namespace BatteryEms.Application.Api;
 // repository (LH-PERSIST-007) so the audit log only mentions schedules
 // that were actually persisted (review S2).
 //
-// Errors raised by the optimiser bubble out: appending a run record
-// that wasn't actually produced would lie to the audit log. The API
-// layer turns the bubble into the appropriate HTTP shape (RM-M2-OP-07).
+// Errors raised by the optimiser or by the schedule Replace bubble
+// out before any run is appended (review S2 swap-order). The residual
+// failure window is Replace-succeeds-Append-throws: the new schedule
+// is live but no run record exists, so dashboards and the audit log
+// disagree until an operator reconciles via the
+// schedule-version-without-run query slated for RM-M2-OP-OPEN-05. The
+// API layer turns the bubble into the appropriate HTTP shape
+// (RM-M2-OP-07).
 //
 // Concurrency scope (review S1): the per-key SemaphoreSlim guards the
 // read-optimise-write block within a single host process. A multi-
@@ -116,6 +121,12 @@ public sealed partial class DefaultScheduleOptimizationUseCase
         // can still Release on a snapshot reference. The native handle
         // backing each SemaphoreSlim is released here; the GC would
         // otherwise rely on a finaliser to close the kernel handle.
+        //
+        // Caller contract (standard .NET expectation): serialise Dispose
+        // vs. ExecuteAsync. A truly concurrent Dispose racing an
+        // already-acquired semaphore can surface as
+        // ObjectDisposedException on Release — the host's shutdown
+        // sequence is expected to drain inflight work first.
         foreach (var gate in _locks.Values)
         {
             gate.Dispose();

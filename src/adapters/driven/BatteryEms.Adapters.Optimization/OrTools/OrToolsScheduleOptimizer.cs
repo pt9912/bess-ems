@@ -247,7 +247,7 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
         });
 
         var run = CreateRun(
-            request, status, terminationCode, terminationDetail, elapsed,
+            request, horizonStartUtc, status, terminationCode, terminationDetail, elapsed,
             objectiveValue, breakdown,
             warnings: Array.Empty<string>(),
             producedSchedule: producedReference);
@@ -266,7 +266,8 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
         TimeSpan elapsed)
     {
         var run = CreateRun(
-            request, status, terminationCode, terminationDetail, elapsed,
+            request, request.HorizonStart.ToUniversalTime(),
+            status, terminationCode, terminationDetail, elapsed,
             objectiveValue: 0,
             breakdown: OptimizationObjectiveBreakdown.Empty,
             warnings: Array.Empty<string>(),
@@ -282,7 +283,7 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
     {
         Log.PreflightFailed(_logger, request.AssetId, terminationCode);
         var run = CreateRun(
-            request,
+            request, request.HorizonStart.ToUniversalTime(),
             status: OptimizationSolverStatus.Failed,
             terminationCode: terminationCode,
             terminationDetail: terminationDetail,
@@ -296,12 +297,14 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
 
     // Single source of truth for OptimizationRun construction (review #17):
     // every adapter-side run record flows through here, so a new field on
-    // OptimizationRun changes one site instead of three. Also the only
-    // place that normalises the horizon to UTC for the run record (review
-    // N1) — so the audit log offset is canonical regardless of which path
-    // built the run.
+    // OptimizationRun changes one site instead of three. Callers pre-
+    // compute the UTC-normalised horizon start (review #4 / N1 / 3rd-pass
+    // #11) so BuildSolutionResult's window-construction loop and this
+    // run-record builder agree on a single value without recomputing
+    // ToUniversalTime() twice.
     private OptimizationRun CreateRun(
         ScheduleOptimizationRequest request,
+        DateTimeOffset horizonStartUtc,
         OptimizationSolverStatus status,
         string terminationCode,
         string? terminationDetail,
@@ -311,7 +314,6 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
         IReadOnlyList<string> warnings,
         ScheduleReference? producedSchedule)
     {
-        var horizonStartUtc = request.HorizonStart.ToUniversalTime();
         return new OptimizationRun(
             runId: Guid.NewGuid(),
             assetId: request.AssetId,

@@ -22,6 +22,12 @@
          version requires "dotnet restore /p:ForceEvaluate=true" (or the
          force-evaluate flag) to refresh the lock files in the same commit. -->
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <!-- Default to locked restore everywhere — even a bare local
+         "dotnet restore" fails the same way CI does (3rd-pass review #1)
+         instead of silently regenerating lock files. Bumping a version
+         is the explicit out: pass /p:RestoreLockedMode=false or use the
+         force-evaluate flag (see docs/user/quality.md §1.4). -->
+    <RestoreLockedMode>true</RestoreLockedMode>
   </PropertyGroup>
 
 </Project>

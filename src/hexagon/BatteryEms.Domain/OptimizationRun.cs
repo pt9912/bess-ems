@@ -102,6 +102,28 @@ public sealed class OptimizationRun
                 $"TerminationCode must not contain ':'; the colon separates code from detail in the composed reason (got '{terminationCode}').",
                 nameof(terminationCode));
         }
+        // Codes are kebab-case identifiers used as dashboard grouping
+        // keys (review #16). Reject control chars and cap the length so
+        // a foreign writer (or a copy-paste bug) can't push a megabyte
+        // of payload or an embedded newline through the column and
+        // corrupt the read-side parser. 64 chars covers every code the
+        // M2 producers emit by a comfortable margin.
+        const int TerminationCodeMaxLength = 64;
+        if (terminationCode.Length > TerminationCodeMaxLength)
+        {
+            throw new ArgumentException(
+                $"TerminationCode length {terminationCode.Length} exceeds {TerminationCodeMaxLength}.",
+                nameof(terminationCode));
+        }
+        foreach (var c in terminationCode)
+        {
+            if (char.IsControl(c))
+            {
+                throw new ArgumentException(
+                    $"TerminationCode must not contain control characters (got '{terminationCode}').",
+                    nameof(terminationCode));
+            }
+        }
         if (terminationDetail is not null && string.IsNullOrWhiteSpace(terminationDetail))
         {
             throw new ArgumentException(
@@ -191,13 +213,17 @@ public sealed class OptimizationRun
     public static (string Code, string? Detail) ParseTerminationReason(string raw)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(raw);
-        var idx = raw.IndexOf(':', StringComparison.Ordinal);
+        // Trim defensively: a foreign writer (M3 multi-writer scenario)
+        // might have inserted leading/trailing whitespace that the
+        // round-trip equality check would otherwise see as drift.
+        var trimmed = raw.Trim();
+        var idx = trimmed.IndexOf(':', StringComparison.Ordinal);
         if (idx < 0)
         {
-            return (raw, null);
+            return (trimmed, null);
         }
-        var code = raw[..idx];
-        var detail = raw[(idx + 1)..];
+        var code = trimmed[..idx].TrimEnd();
+        var detail = trimmed[(idx + 1)..].TrimStart();
         if (string.IsNullOrWhiteSpace(detail))
         {
             // "code:" with nothing after — treat as code-only so the
