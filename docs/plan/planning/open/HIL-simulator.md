@@ -1,15 +1,16 @@
 # Plan: HIL-Simulator-Integration
 
 **Dokumenttyp:** Offener Detailplan / M2-Folgewelle
-**Status:** Vorgemerkt für RM-M2-Folgewelle nach RM-M2-OP-05; bleibt
-unter `open/`, bis der LP-Solver-Adapter aus dem aktiven M2-Plan
-([`../in-progress/plan-RM-M2-optimization.md`](../in-progress/plan-RM-M2-optimization.md))
-ein Resultat liefert, das gegen ein dynamisches PCS-/PQ-Capability-
-Modell sanity-geprüft werden soll.
+**Status:** Vorgemerkt für RM-M2-Folgewelle. Der Aktivierungs-Trigger
+(LP-Solver-Adapter steht und liefert ein Resultat, das gegen ein
+dynamisches PCS-/PQ-Capability-Modell sanity-geprüft werden kann) ist
+mit dem Abschluss von OP-05 in
+[`../done/plan-RM-M2-optimization.md`](../done/plan-RM-M2-optimization.md)
+erfüllt. Der Plan bleibt unter `open/`, bis er aktiv aufgenommen wird.
 **Quelle:** `bess-hil-simulator`-Schwesterprojekt (Checkout-Pfad
 projekt-/operatorabhängig).
 **Bezug:** [`../in-progress/roadmap.md`](../in-progress/roadmap.md)
-(M2-Folgewelle), [`../in-progress/plan-RM-M2-optimization.md`](../in-progress/plan-RM-M2-optimization.md)
+(M2-Folgewelle), [`../done/plan-RM-M2-optimization.md`](../done/plan-RM-M2-optimization.md)
 (Aktivierungs-Trigger), `docs/plan/planning/done/plan-RM-M1.md`,
 `docs/plan/planning/done/plan-RM-M1-simulator.md`,
 `docs/user/quality.md`, `spec/lastenheft.md`, `spec/architecture.md`

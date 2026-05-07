@@ -6,7 +6,7 @@
 zündet.
 **Bezug:**
 [`../in-progress/roadmap.md`](../in-progress/roadmap.md),
-[`../in-progress/plan-RM-M2-optimization.md`](../in-progress/plan-RM-M2-optimization.md)
+[`../done/plan-RM-M2-optimization.md`](../done/plan-RM-M2-optimization.md)
 (§Open RM-M2-OP-OPEN-05/06 — die ersten echten Konsumenten dieses Plans),
 [`../done/plan-RM-M1.md`](../done/plan-RM-M1.md) (RM-M1-13 hat
 `BessDbInitializer` + `BessDbSchema.cs` als M1-Strategie sanktioniert),
@@ -112,7 +112,7 @@ ersetzen, **bevor** M3 die ersten echten Schema-Änderungen mitbringt.
 ## Anschluss an OP-OPEN-05 / OP-OPEN-06
 
 Beide M3-Folgepakete aus dem
-[Optimization-Plan](../in-progress/plan-RM-M2-optimization.md) hängen
+[Optimization-Plan](../done/plan-RM-M2-optimization.md) hängen
 **direkt** von diesem Migrationspfad ab:
 
 - **OP-OPEN-05** (Optimistic-Concurrency in `IScheduleRepository.Replace`):

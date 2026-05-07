@@ -43,22 +43,30 @@ unter `in-progress/`.
 > **Abgeschlossen:** M1 — MVP sichere Regelpipeline (alle 24 Liefergegenstände grün);
 > `make fullbuild` reproduzierbar grün, Compose-Stack (bess-ems + Postgres +
 > Mosquitto + bess-field-sim) liefert `/health = ok` inkl. Postgres-Probe.
-> **Aktive Phase:** M2 — Marktausbau und Optimierung. Detailplan:
-> [`plan-RM-M2-optimization.md`](plan-RM-M2-optimization.md).
-> **M2-Welle 1 (Optimization-Slice):** Geliefert sind RM-M2-OP-01..04
-> + 07 — Domain-Records mit LH-OPT-009-Payload und Invarianten,
-> `IScheduleOptimizer`-Driven-Port mit Architektur-Tabus für die
-> Horizon-↔-Dispatch-Trennung, `IScheduleOptimizationUseCase` als
-> API-Driving-Port, `IOptimizationRunRepository`-In-Memory-Variante,
-> und `POST /markets/day-ahead/optimize` operator-policy-guarded.
-> `NoOpScheduleOptimizer` läuft als Default-Wiring (Failed/
-> no-solver-configured) bis OP-05. `make ci`, `make fullbuild`,
-> `make runtime` reproduzierbar grün; 383 Tests gesamt.
-> **Nächster konkreter Schritt:** RM-M2-OP-05 — LP-Solver-Adapter
-> mit OR-Tools NuGet (RM-M2-OP-OPEN-01 als Default geschlossen).
-> Alternativ vorziehbar: RM-M2-OP-08 (Prometheus-Metriken für
-> Solverzeit + Run-Counter), wenn der Solver zuerst beobachtbar
-> sein soll.
+> **Aktive Phase:** M2 — Marktausbau und Optimierung. Optimization-
+> Slice ist abgeschlossen, weitere M2-Liefergegenstände (siehe Tabelle
+> unten) bleiben offen.
+> **M2-Welle 1 (Optimization-Slice, abgeschlossen):**
+> [`../done/plan-RM-M2-optimization.md`](../done/plan-RM-M2-optimization.md)
+> hat alle Arbeitspakete OP-01..09 grün gezogen — Domain mit
+> LH-OPT-009-Payload und Invarianten, `IScheduleOptimizer`-Driven-Port,
+> `IScheduleOptimizationUseCase` als API-Driving-Port, In-Memory- und
+> Dapper-Variante des `IOptimizationRunRepository`, OR-Tools-GLOP-LP
+> als produktiver Solver-Adapter (config-getrieben aktiviert),
+> Prometheus-Metriken für Run-Counter/Runtime/Objective/Constraint-
+> Violations, `POST /markets/day-ahead/optimize` operator-policy-
+> guarded, sowie Replay-/Reproduzierbarkeitstests (LH-OPT-009).
+> Drei Review-Pässe, alle Findings adressiert oder mit präzise
+> dokumentiertem M3-Trigger eingefroren (OP-OPEN-05/06).
+> **Nächste M2-Wellen:** Hardware-in-the-Loop (siehe Folgewelle-Hinweis
+> unter „M2 — Marktausbau und Optimierung"), Tracing/Replay-Harness
+> (RM-M2-06/10), PID-Regler (RM-M2-08), Configurable Objective
+> (RM-M2-04), Marktcommitment-Priorisierung (RM-M2-01) und
+> Zeitmodell-Erweiterung (RM-M2-02). Persistenz-Migrations-Tooling
+> ist als M2-Folgewelle in
+> [`../open/plan-RM-M2-migration.md`](../open/plan-RM-M2-migration.md)
+> vorgemerkt; aktiviert sobald OP-OPEN-05/06 oder die erste echte
+> Schema-Änderung den Trigger zünden.
 
 ---
 
@@ -67,7 +75,7 @@ unter `in-progress/`.
 | Status | Meilenstein | Titel                              | Phase | Detailplan |
 | ------ | ----------- | ---------------------------------- | ----- | ---------- |
 | ✅     | M1          | MVP — sichere Regelpipeline        | 1     | [Abgeschlossen](../done/plan-RM-M1.md) |
-| 🟡     | M2          | Marktausbau und Optimierung        | 1 → 2 | [Aktiv](plan-RM-M2-optimization.md) |
+| 🟡     | M2          | Marktausbau und Optimierung        | 1 → 2 | Optimization-Slice [abgeschlossen](../done/plan-RM-M2-optimization.md); weitere RM-M2-Items offen |
 | ⬜     | M3          | Native Control Core (Library)      | 2     | folgt mit Aktivierung |
 | ⬜     | M4          | Regelleistung und OPC-UA           | 2     | folgt mit Aktivierung |
 | ⬜     | M5          | MPC, Solver-Sidecar, Replay        | 3     | folgt mit Aktivierung |
@@ -149,18 +157,20 @@ AuthN/AuthZ-geschütztem Operator-Stop.
 LP-Optimierer (.NET-Interface, optional OR-Tools/HiGHS), Tracing und Replay.
 
 **Detailplan:** Der Schedule-Optimizer- und Run-Persistenz-Slice
-(RM-M2-03/04/05/09 und Anschluss an LH-OPT-007/008/009 + LH-PERSIST-007)
-ist in [`plan-RM-M2-optimization.md`](plan-RM-M2-optimization.md)
-detailliert. Der Plan ist seit M1-Abschluss in `in-progress/` und übernimmt
-die Verantwortung für die Optimization-/Run-Arbeitspakete.
+(RM-M2-03/05/07/09 und Anschluss an LH-OPT-007/008/009 + LH-PERSIST-007)
+ist in [`../done/plan-RM-M2-optimization.md`](../done/plan-RM-M2-optimization.md)
+detailliert und mit OP-01..09 abgeschlossen. RM-M2-04 (Configurable
+Objective) blieb bewusst aus dem M2-minimalen Scope draußen
+(OP-OPEN-02) und gehört zu den noch offenen M2-Liefergegenständen
+unten.
 
 **Folgewelle:** Der Hardware-in-the-Loop-Pfad gegen das externe
 `bess-hil-simulator:local`-Image ist als zweite M2-Welle vorgemerkt.
 Detail-Entwurf:
 [`open/HIL-simulator.md`](../open/HIL-simulator.md). Aktivierungs-
-Trigger: nach RM-M2-OP-05 (LP-Solver-Adapter steht), damit das LP-
-Resultat gegen ein dynamisches PCS-/PQ-Capability-Modell sanity-
-geprüft werden kann. Modbus-Adapter-Erweiterungen aus dem HIL-Plan
+Trigger ist mit dem Abschluss von OP-05 (LP-Solver-Adapter) erfüllt;
+HIL kann gegen das LP-Resultat ein dynamisches PCS-/PQ-Capability-
+Modell sanity-prüfen, sobald die Welle aufgenommen wird. Modbus-Adapter-Erweiterungen aus dem HIL-Plan
 (Input Registers, Word-Order, Q-Setpoint) sind gleichzeitig
 Vorarbeit für RM-M4 (OPC-UA / Vendor-Profile mit MW-Skalierung).
 HIL ist und bleibt **kein M2-Pflichtgate** — `make gates` und
@@ -172,14 +182,14 @@ HIL ist und bleibt **kein M2-Pflichtgate** — `make gates` und
 | ------ | ---------- | ------------------------------------------------------------------- | ----------------------- |
 | ⬜     | RM-M2-01   | Erweiterte Marktcommitment-Priorisierung und Optimierungsintegration | LH-MKT-003/006          |
 | ⬜     | RM-M2-02   | Erweiterte Zeitmodell-Nutzung für Optimierungshorizonte und Marktintervalle | LH-MKT-007              |
-| ⬜     | RM-M2-03   | LP-Implementierung des `IScheduleOptimizer` für Horizon-Optimierung (Solver-Auswahl per Config) | LH-OPT-001..009     |
-| ⬜     | RM-M2-04   | Zielfunktion konfigurierbar (Energiebezug, Einspeise, Strafkosten)  | LH-OPT-004              |
-| ⬜     | RM-M2-05   | Optimierungs-API (`POST /markets/day-ahead/optimize`)               | LH-API-005              |
+| ✅     | RM-M2-03   | LP-Implementierung des `IScheduleOptimizer` für Horizon-Optimierung (Solver-Auswahl per Config) | LH-OPT-001..009     |
+| ⬜     | RM-M2-04   | Zielfunktion konfigurierbar (Energiebezug, Einspeise, Strafkosten) — OP-OPEN-02 hat M2-minimal auf `energy_cost` begrenzt; Tarif-/Reservekosten als Folge-Welle | LH-OPT-004              |
+| ✅     | RM-M2-05   | Optimierungs-API (`POST /markets/day-ahead/optimize`)               | LH-API-005              |
 | ⬜     | RM-M2-06   | OpenTelemetry-Tracing für Snapshot → Control → Adapter              | LH-MON-003              |
-| ⬜     | RM-M2-07   | Erweiterte Prometheus-Metriken für Solverzeit und Optimierungsläufe | LH-MON-002              |
+| ✅     | RM-M2-07   | Erweiterte Prometheus-Metriken für Solverzeit und Optimierungsläufe | LH-MON-002              |
 | ⬜     | RM-M2-08   | PID-Regler (.NET) mit Anti-Windup, Output-Clamping, Totband         | LH-CTRL-004             |
-| ⬜     | RM-M2-09   | Erweiterte Persistenz für Optimierungsläufe und Solverstatus (`IOptimizationRunRepository`, `OptimizationRun` mit Objective Breakdown) | LH-PERSIST-007          |
-| ⬜     | RM-M2-10   | Replay-Test-Harness (Telemetrie-Wiedergabe, Command-Vergleich)      | LH-TEST-004             |
+| ✅     | RM-M2-09   | Erweiterte Persistenz für Optimierungsläufe und Solverstatus (`IOptimizationRunRepository`, `OptimizationRun` mit Objective Breakdown) | LH-PERSIST-007          |
+| 🟡     | RM-M2-10   | Replay-Test-Harness (Telemetrie-Wiedergabe, Command-Vergleich) — Solver-seitiger Replay (LH-OPT-009) ist mit OP-09 erbracht; Telemetrie-Replay-Harness bleibt offen | LH-TEST-004             |
 
 ### Abnahmekriterien
 

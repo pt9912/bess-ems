@@ -1,9 +1,13 @@
 # Plan RM-M2 Optimization: Schedule-Optimizer + Run-Persistenz
 
-**Dokumenttyp:** Aktiver Detailplan / M2
-**Status:** In Arbeit (aktiviert nach M1-Abschluss)
-**Bezug:** [`roadmap.md`](roadmap.md) (RM-M2-03, RM-M2-04,
-RM-M2-05, RM-M2-09), [`plan-RM-M1.md`](../done/plan-RM-M1.md)
+**Dokumenttyp:** Abgeschlossener Detailplan / M2
+**Status:** Abgeschlossen — alle Arbeitspakete OP-01..09 ✅. M3-Folgearbeit
+für die offenen Punkte OP-OPEN-05 (Optimistic-Concurrency in
+`IScheduleRepository.Replace`) und OP-OPEN-06 (Lock-Table-Eviction)
+hängt am ebenfalls offenen [`../open/plan-RM-M2-migration.md`](../open/plan-RM-M2-migration.md).
+**Bezug:** [`../in-progress/roadmap.md`](../in-progress/roadmap.md)
+(RM-M2-03, RM-M2-04, RM-M2-05, RM-M2-09),
+[`plan-RM-M1.md`](plan-RM-M1.md)
 (RM-M1-F04, Spezifikations-Folgepunkte),
 [`spec/lastenheft.md`](../../../../spec/lastenheft.md)
 (LH-OPT-001/007/008/009, LH-PERSIST-007, LH-API-005),
