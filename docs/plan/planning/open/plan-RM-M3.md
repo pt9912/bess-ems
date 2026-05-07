@@ -270,15 +270,17 @@ Export-Baseline fuer RM-M3-01:
 | M3-A ABI + Build-Skelett | `native/battery_control_core`, Header, CMake, leere/Stub-Implementierung, ABI-Version, frueher nativer Build-Stage ohne Runtime-Image-Pfad. | Native Library baut reproduzierbar im Build-Container und ABI-Version ist aus C++ testbar; noch kein Runtime-Routing und noch kein Worker-Image mit `/app/native/`. |
 | M3-B Constraint/Ramp Native | C++-Port von `ConstraintLimiter` und `RampLimiter`, Statuscodes, C++-Unit-Tests, Sanitizer. | C++-Tests erreichen alle Constraint-/Ramp-Reason-Codes und alle Fehlerstatus; keine P/Invoke-Abhaengigkeit. |
 | M3-C Interop + Fallback | `BatteryEms.Adapters.NativeInterop`, Loader, P/Invoke-Structs, Konfiguration, Routing hinter expliziter Test-/Profilkonfiguration, Managed-Fallback. | Fehlende `.so`, ABI-Mismatch und native Fehler aus gueltigem .NET-Kontext fallen deterministisch auf Managed zurueck; produktive Default-Aktivierung bleibt gesperrt. |
-| M3-D Parity + Gates | Golden-Datensatz, `test-native-interop`, `test-native-parity`, Native-Coverage, CI-/Make-Integration. | `make gates`/`make ci` ziehen Native-Gates reproduzierbar; Toleranzen dokumentiert; noch keine produktive Profilaktivierung in diesem Slice. |
-| M3-D2 Produktive Profilaktivierung | Separater Folge-Slice nach abgeschlossenen RM-M3-06, RM-M3-10, RM-M3-11 und RM-M3-12. | Ein produktionsnahes Profil darf Native als bevorzugten Runtime-Pfad setzen; Fallback-, Container-, Gate- und Doku-Nachweise sind bereits auf `main` gruen. |
+| M3-D Parity + Gates | Golden-Datensatz, Interop-/Parity-Runner, Native-Coverage, danach CI-/Make-Integration. | Parity und Coverage laufen zuerst standalone reproduzierbar; erst RM-M3-11 verdrahtet sie in `make gates`/`make ci`; noch keine produktive Profilaktivierung in diesem Slice. |
+| M3-D2 Produktive Profilaktivierung | Separater Folge-Slice nach abgeschlossenen RM-M3-03, RM-M3-05, RM-M3-06, RM-M3-07, RM-M3-10, RM-M3-11 und RM-M3-12. | Ein produktionsnahes Profil darf Native als bevorzugten Runtime-Pfad setzen; Fallback-, Container-, Interop-, Gate- und Doku-Nachweise sind bereits auf `main` gruen. |
 | M3-E PID-Slice | PID erst nach stabiler Constraint/Ramp-Parity; eigener ABI-/Struct-Delta nur falls noetig. | PID-Parity gegen `PidController.Step`; negative `dt`, non-finite State und Anti-Windup-Faelle getestet. |
 | M3-FUP | OP-OPEN-05/06 und Migrationen nur bei Trigger. | Keine Schema- oder Multi-Replica-Arbeit blockiert den Native-Kern ohne konkreten Bedarf. |
 
 `RM-M3-06` bleibt bewusst eine Roadmap-ID. Innerhalb dieses Plans wird sie
-in zwei Review-Grenzen geschnitten: erst Native-Build-Stage und Testartefakt,
-danach Runtime-Image-Pfad `/app/native/` plus Container-Smoke. Diese
-Unterteilung erzeugt keine neuen Roadmap-IDs.
+in zwei Review-Grenzen geschnitten: Teil 1 ist der fruehe Native-Build-Stage
+und darf nach RM-M3-01 im ABI/Build-Schnitt landen; Teil 2 ist der
+Runtime-Image-Pfad `/app/native/` plus Container-Smoke und braucht das
+Routing-/Fallback-Verhalten aus RM-M3-05. Diese Unterteilung erzeugt keine
+neuen Roadmap-IDs.
 
 ### PR-Schnitt Und Review-Grenzen
 
@@ -293,7 +295,7 @@ Not vermischen.
 | Interop Adapter | Neues Adapterprojekt, P/Invoke-Structs, Loader, ABI-Check, Adapter-Unit-Tests | produktives Routing als Default, Dockerfile-Umstellung |
 | Application Routing | Application-Port/Facade, Control-Cycle-Integration hinter expliziter Test-/Profilkonfiguration, Fallback-Tests, Metrics-Port-Erweiterung | produktive Default-Aktivierung, Native-Coverage-Gate, PID-ABI-Delta |
 | Container/Gates | Worker-Runtime-Image-Pfad `/app/native/`, Makefile, CI-Target-Verdrahtung, Native-Testcontainer | fachliche Native-Algorithmik, produktive Profilaktivierung |
-| Produktive Profilaktivierung | Separater Folge-PR nach abgeschlossenen RM-M3-06, RM-M3-10, RM-M3-11 und RM-M3-12; setzt ein produktionsnahes Profil auf Native-bevorzugt. | fachliche Native-Algorithmik, Gate-Erstaktivierung, Doku-Sync |
+| Produktive Profilaktivierung | Separater Folge-PR nach abgeschlossenen RM-M3-03, RM-M3-05, RM-M3-06, RM-M3-07, RM-M3-10, RM-M3-11 und RM-M3-12; setzt ein produktionsnahes Profil auf Native-bevorzugt. | fachliche Native-Algorithmik, Gate-Erstaktivierung, Doku-Sync |
 | PID | ABI-Delta falls noetig, C++ PID, Interop-Mapping, PID-Parity-Goldens | Constraint/Ramp-Erstaktivierung |
 | FUP | Migrationen, OP-OPEN-05/06, Multi-Replica-Semantik | Native-Core-Slices RM-M3-01..13 |
 
@@ -312,12 +314,12 @@ eine Native Library fuer die Tests gebaut oder bewusst simuliert wurde.
 | ⬜     | RM-M3-03 | ABI-Versionsfunktion + Startup-Check in .NET                      | RM-M3-01      | Native Library exportiert ABI-Version; `BatteryEms.Adapters.NativeInterop` liefert einen minimalen Loader-/Startup-Check, der bei `NativeControl:Enabled=false` nicht laedt, bei fehlender Library `library-missing`, bei Ladefehler `load-failed`, bei inkompatibler Major/Minor-Version `abi-mismatch` und bei kompatibler Library `loaded` meldet. `docs/user/quality.md` §5.2 bleibt zur M3-Default-Policy synchron: ABI-Mismatch fuehrt zu .NET-Fallback mit klarer Health-/Log-/Metric-Signalisierung; Startabbruch bleibt nur eine explizite Produktions-Policy mit eigenem Optionswert und Test. Noch keine produktive Compute-Bindings oder Routing-Aktivierung. |
 | ⬜     | RM-M3-04 | P/Invoke-Bindings (`BatteryEms.Adapters.NativeInterop`)            | RM-M3-01..03  | Neuer Driven Adapter referenziert nur Application-Ports/Domain; Compute-Bindings und P/Invoke-Structs fuer Snapshot, Limits, Request und Command pruefen erwartete ABI-Major/Minor-Kompatibilitaet vor jedem produktiven Native-Call. Struct-Layout-Tests pruefen Groesse, Offsets, Calling Convention, Charset-Unabhaengigkeit und Marshal-Verhalten auf Linux x64. Loader-Pfad ist konfigurierbar und defaultet im Container auf `/app/native/libbattery_control_core.so`. |
 | ⬜     | RM-M3-05 | Routing hinter expliziter Konfiguration, .NET-Fallback bei Fehler/Abwesenheit | RM-M3-04      | Control-Pfad kann Native nutzen, wenn Library vorhanden, kompatibel, explizit aktiviert und die Control-Eingaben endlich/plausibel sind; bei Ladefehler, ABI-Mismatch oder Native-Fehlercode aus gueltigen Eingaben wird deterministisch auf die Managed-Referenz fuer denselben Tick zurueckgerechnet und der Grund observierbar geloggt/gemessen. Nicht-finite oder fachlich ungueltige Snapshot-/Dispatch-/Limit-/Request-Werte werden vor Kernel-Aufruf als Managed-Precheck behandelt und fuehren nicht zu einem Blind-Fallback mit denselben ungueltigen Werten; Tests decken mindestens SOC, SOH, Active Power, Temperatur, Dispatch-Target und Native-Request-/Limit-Mapping ab. Konfiguration kann Native explizit deaktivieren; produktive Default-Aktivierung ist nicht Teil von RM-M3-05. |
-| ⬜     | RM-M3-06 | Multi-Stage Dockerfile mit Native-Build-Stage                     | RM-M3-01..05  | Teil 1 kompiliert `native/battery_control_core` reproduzierbar im Container und stellt die `.so` als Build-Artefakt fuer Native-Tests bereit, ohne Application-Routing oder Runtime-Pfad zu aktivieren. Teil 2 kopiert die native `.so` unter `/app/native/` ins Runtime-Image; der Host laedt bevorzugt ueber expliziten Loader-Pfad statt globalem `LD_LIBRARY_PATH`. Container-Smoke beweist, dass der Host die Library findet oder bei fehlender/falscher Library sauber fallbackt. |
-| ⬜     | RM-M3-07 | Interop-Tests: Struct Layout, ABI, Werte-Paritaet                  | RM-M3-04      | Tests vergleichen Native-Output gegen .NET-Referenz fuer definierte Snapshots/Limits; Toleranzen sind dokumentiert und eng. Negative Tests decken deaktivierte Native-Option, fehlende `.so` bei aktivierter Native-Option, ABI-Mismatch, non-finite ABI-Input und nativen Fehlerstatus aus gueltigem .NET-Kontext ab. |
+| ⬜     | RM-M3-06 | Multi-Stage Dockerfile mit Native-Build-Stage                     | Teil 1: RM-M3-01; Teil 2: RM-M3-05 | Teil 1 kompiliert `native/battery_control_core` reproduzierbar im Container und stellt die `.so` als Build-Artefakt fuer Native-Tests bereit, ohne Application-Routing oder Runtime-Pfad zu aktivieren. Teil 2 kopiert die native `.so` unter `/app/native/` ins Runtime-Image; der Host laedt bevorzugt ueber expliziten Loader-Pfad statt globalem `LD_LIBRARY_PATH`. Container-Smoke beweist, dass der Host die Library findet oder bei fehlender/falscher Library sauber fallbackt. |
+| ⬜     | RM-M3-07 | Interop-Tests: Struct Layout, ABI, Werte-Paritaet                  | RM-M3-02, RM-M3-04 | Layout-/ABI-Tests pruefen die P/Invoke-Grenze; Werte-Paritaet setzt die Native-Constraint/Ramp-Implementierung aus RM-M3-02 voraus. Tests vergleichen Native-Output gegen .NET-Referenz fuer definierte Snapshots/Limits; Toleranzen sind dokumentiert und eng. Negative Tests decken deaktivierte Native-Option, fehlende `.so` bei aktivierter Native-Option, ABI-Mismatch, non-finite ABI-Input und nativen Fehlerstatus aus gueltigem .NET-Kontext ab. |
 | ⬜     | RM-M3-08 | C++-Unit-Tests                                                     | RM-M3-02      | Native Tests decken Constraint, Ramp, den PID-Slice sobald RM-M3-13 aktiviert ist, NaN/Inf, Vorzeichen, `dt == 0`, negative `dt`, fehlenden Previous-Power-Kontext und alle Limit-Reason-Codes ab. Testdaten sind so gewaehlt, dass jede Statuscode-Variante mindestens einmal direkt im C++-Test erreicht wird. |
 | ⬜     | RM-M3-09 | Native-Quality-Gates                                               | RM-M3-08      | `native-lint`, Sanitizer und Native-Coverage laufen reproduzierbar; Native-Coverage bleibt bei 100 % line fuer `native/battery_control_core/src/`; Ausschluesse sind nur mit `Why:`-Kommentar und `native-coverage-exclusions` erlaubt. |
-| ⬜     | RM-M3-10 | Native/.NET-Parity-Gate ueber Replay-Datensatz                     | RM-M3-05, RM-M3-07 | Kleiner versionierter Golden-Datensatz aus M1/M2-Simulator-Faellen plus Randfaelle fuer SOC, Ramp, Vorzeichen und kombinierte Constraint/Ramp-Begrenzung liefert fuer Native und .NET identische Commands bis auf dokumentierte Toleranzen; Gate ist Pflicht in `make gates`/`make ci`. Negative `dt`, nicht-finite Snapshot-/Dispatch-/Limit-/Request-Werte, Stale-Snapshot- und `ValidUntil`-Faelle bleiben separate Managed-Control-/Mapping-Tests und duerfen nicht als Native-vs-Managed-Parity mit ungueltigen Inputs modelliert werden. |
-| ⬜     | RM-M3-11 | Makefile-Erweiterung um native Targets                            | RM-M3-09, RM-M3-10 | `native-lint`, `test-native-interop`, `test-native-parity`, `native-coverage-gate`, `native-coverage-report`, `native-coverage-exclusions` existieren; `gates`/`ci` ziehen die M3-Gates mit, sobald sie in CI reproduzierbar sind. |
+| ⬜     | RM-M3-10 | Native/.NET-Parity-Gate ueber Replay-Datensatz                     | RM-M3-05, RM-M3-07 | Kleiner versionierter Golden-Datensatz aus M1/M2-Simulator-Faellen plus Randfaelle fuer SOC, Ramp, Vorzeichen und kombinierte Constraint/Ramp-Begrenzung liefert fuer Native und .NET identische Commands bis auf dokumentierte Toleranzen. Parity-Runner/Testprojekt laeuft standalone reproduzierbar; die Pflichtverdrahtung in `make gates`/`make ci` erfolgt erst in RM-M3-11. Negative `dt`, nicht-finite Snapshot-/Dispatch-/Limit-/Request-Werte, Stale-Snapshot- und `ValidUntil`-Faelle bleiben separate Managed-Control-/Mapping-Tests und duerfen nicht als Native-vs-Managed-Parity mit ungueltigen Inputs modelliert werden. |
+| ⬜     | RM-M3-11 | Makefile-Erweiterung um native Targets                            | RM-M3-09, RM-M3-10 | `native-lint`, `test-native-interop`, `test-native-parity`, `native-coverage-gate`, `native-coverage-report`, `native-coverage-exclusions` existieren; `gates`/`ci` ziehen die M3-Gates mit, sobald alle Targets standalone und in CI reproduzierbar sind. |
 | ⬜     | RM-M3-12 | Doku-/Contract-Sync fuer Native-Policy und Adaptername             | RM-M3-03, RM-M3-05 | `docs/user/quality.md`, `spec/architecture.md`, `docs/plan/planning/in-progress/roadmap.md` und dieser Plan sind konsistent zur M3-Default-Policy: ABI-Mismatch und native Fehler aus gueltigem .NET-Kontext fuehren zu .NET-Fallback; Startabbruch ist eine separate Produktions-Policy mit eigenem Test. RM-M3-03 stellt diese Policy frueh sicher; RM-M3-12 ist der abschliessende Sync vor produktivem Routing. Der kanonische Adaptername ist ueberall `BatteryEms.Adapters.NativeInterop`; der kanonische Header-Pfad ist `native/battery_control_core/include/battery_control_core.h`; der kanonische Coverage-Scope ist `native/battery_control_core/src/`. |
 | ⬜     | RM-M3-13 | PID Native-Slice                                                   | RM-M3-10, RM-M3-11 | PID wird erst nach stabiler Constraint/Ramp-Parity aktiviert und bildet `PidController.Step` inklusive State-Update, Anti-Windup, Output-Limits und Fehlerpfaden ab. Falls ein ABI-/Struct-Delta noetig ist, wird es versioniert und durch Layout-/Mapping-Tests abgesichert. C++-, Interop- und Parity-Tests decken `dt <= 0`, non-finite Input/State, Saturation, Anti-Windup und State-Fortschreibung ab; Gates bleiben ohne Native Library im normalen Managed-Pfad lauffaehig. |
 
@@ -455,19 +457,22 @@ stabil dokumentiert sein.
 
 - `make lint`, `make test`, `make arch-check`, `make coverage-gate`
   bleiben Baseline.
-- Ab RM-M3-09/RM-M3-11 werden zusaetzlich aktiv:
+- RM-M3-09/RM-M3-10 liefern Native-Quality- und Parity-Nachweise zuerst
+  standalone reproduzierbar. RM-M3-11 standardisiert danach die Make-Targets:
   `native-lint`, `test-native-interop`, `test-native-parity`,
-  `native-coverage-gate` und optional `native-coverage-report`.
+  `native-coverage-gate`, optional `native-coverage-report` und
+  `native-coverage-exclusions`.
 - `make gates` und `make ci` duerfen erst auf Native-Gates erweitert
   werden, wenn die Targets reproduzierbar in CI laufen.
 - Vor Aktivierung in `make ci` muessen die Native-Targets in dieser
   Reihenfolge lokal und im Docker-Build gruen sein:
   `native-lint`, C++-Unit-Tests, `test-native-interop`,
   `test-native-parity`, `native-coverage-gate`.
-- RM-M3-06, RM-M3-10, RM-M3-11 und RM-M3-12 sind
+- RM-M3-03, RM-M3-05, RM-M3-06, RM-M3-07, RM-M3-10, RM-M3-11 und RM-M3-12 sind
   Gate-Voraussetzungen fuer den ersten PR, der Native als produktiven
   Default oder bevorzugten Runtime-Pfad in einem produktionsnahen Profil
-  aktiviert, damit Container-Pfad, Replay-Parity, CI-Targets und
+  aktiviert, damit ABI-Policy, Fallback, Container-Pfad, Interop,
+  Replay-Parity, CI-Targets und
   Doku-Policy zusammen nachgewiesen sind. RM-M3-05 darf vorher nur
   explizit aktivierbares Routing fuer Tests/Profile liefern.
 
@@ -485,7 +490,7 @@ stabil dokumentiert sein.
 | RM-M3-OPEN-06 | Muessen Native-Statuscodes schon vor Implementierung numerisch fixiert werden? | **Geschlossen:** ja, aber erst im ABI-Slice RM-M3-01. Ab Merge des Headers sind numerische Werte ABI und duerfen nur ueber Major-Version-Bump gebrochen werden. |
 | RM-M3-OPEN-07 | Muss die Native Library bei jeder lokalen Testausfuehrung vorhanden sein? | **Geschlossen:** nein. Normale .NET-Tests bleiben ohne Native lauffaehig; Native-spezifische Targets bauen oder mounten die `.so` explizit. |
 | RM-M3-OPEN-08 | Wie wird die Native-ABI-Policy in Quality-Doku und Plan behandelt? | **Geschlossen:** `docs/user/quality.md` §5.2, Architektur §13.4 und dieser Plan beschreiben denselben M3-Default: ABI-Mismatch fuehrt zu .NET-Fallback. Startabbruch bleibt optionale Produktions-Policy. |
-| RM-M3-OPEN-09 | Darf produktive Native-Profilaktivierung im selben PR wie Container-/Gate-Erstverdrahtung passieren? | **Geschlossen:** nein. Produktive Profilaktivierung ist ein eigener Folge-PR, nachdem RM-M3-06, RM-M3-10, RM-M3-11 und RM-M3-12 abgeschlossen und auf `main` gruen sind. |
+| RM-M3-OPEN-09 | Darf produktive Native-Profilaktivierung im selben PR wie Container-/Gate-Erstverdrahtung passieren? | **Geschlossen:** nein. Produktive Profilaktivierung ist ein eigener Folge-PR, nachdem RM-M3-03, RM-M3-05, RM-M3-06, RM-M3-07, RM-M3-10, RM-M3-11 und RM-M3-12 abgeschlossen und auf `main` gruen sind. |
 
 ---
 
@@ -506,22 +511,25 @@ stabil dokumentiert sein.
 ## Reihenfolge
 
 1. RM-M3-01 legt ABI und Datenvertrag fest.
-2. RM-M3-02/RM-M3-08 implementieren und testen Constraint + Ramp lokal;
+2. RM-M3-06 Teil 1 kann nach RM-M3-01 den fruehen Native-Build-Stage
+   liefern, ohne Runtime-Image-Pfad oder Routing zu aktivieren.
+3. RM-M3-02/RM-M3-08 implementieren und testen Constraint + Ramp lokal;
    PID folgt danach in RM-M3-13 als inkrementeller Native-Slice.
-3. RM-M3-03 liefert ABI-Version, .NET-Startup-Check und Policy-Sync;
+4. RM-M3-03 liefert ABI-Version, .NET-Startup-Check und Policy-Sync;
    RM-M3-04 liefert die Compute-Bindings und Struct-Layout-Tests.
-4. RM-M3-05 liefert explizit aktivierbares Runtime-Routing mit
-   Fallback; RM-M3-06 liefert zuerst den nativen Build-Stage und danach
-   den Runtime-Container-Pfad.
-5. RM-M3-07/RM-M3-10 bauen Interop- und Parity-Vertrauen auf.
-6. RM-M3-09/RM-M3-11 aktivieren Native-Gates in `make gates`/`make ci`.
-7. RM-M3-12 synchronisiert Qualitaets-/Architektur-Doku vor produktivem
+5. RM-M3-05 liefert explizit aktivierbares Runtime-Routing mit
+   Fallback; RM-M3-06 Teil 2 liefert danach den Runtime-Container-Pfad.
+6. RM-M3-07/RM-M3-10 bauen Interop- und Parity-Vertrauen auf; RM-M3-10
+   bleibt bis RM-M3-11 standalone und ist noch nicht `make ci`-Pflicht.
+7. RM-M3-09/RM-M3-11 aktivieren Native-Gates in `make gates`/`make ci`.
+8. RM-M3-12 synchronisiert Qualitaets-/Architektur-Doku vor produktivem
    Native-Routing.
-8. Erst nach RM-M3-06, RM-M3-10, RM-M3-11 und RM-M3-12 darf ein Profil
-   Native als produktiven Default oder bevorzugten Runtime-Pfad setzen.
-9. RM-M3-13 zieht PID erst nach stabiler Constraint/Ramp-Parity und
+9. Erst nach RM-M3-03, RM-M3-05, RM-M3-06, RM-M3-07, RM-M3-10,
+   RM-M3-11 und RM-M3-12 darf ein Profil Native als produktiven Default
+   oder bevorzugten Runtime-Pfad setzen.
+10. RM-M3-13 zieht PID erst nach stabiler Constraint/Ramp-Parity und
    aktiviert dafuer eigene C++-, Interop- und Parity-Nachweise.
-10. RM-M3-FUP-* werden nur gezogen, wenn ihre Trigger eintreten.
+11. RM-M3-FUP-* werden nur gezogen, wenn ihre Trigger eintreten.
 
 ---
 
@@ -538,4 +546,5 @@ stabil dokumentiert sein.
   in .NET-Mapping-Tests und in diesem Plan bzw. der finalen Doku
   nachgezogen.
 - [ ] Produktive Profilaktivierung passiert erst in einem Folge-PR,
-  nachdem RM-M3-06, RM-M3-10, RM-M3-11 und RM-M3-12 auf `main` gruen sind.
+  nachdem RM-M3-03, RM-M3-05, RM-M3-06, RM-M3-07, RM-M3-10, RM-M3-11
+  und RM-M3-12 auf `main` gruen sind.
