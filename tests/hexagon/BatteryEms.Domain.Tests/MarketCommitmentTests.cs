@@ -13,6 +13,7 @@ public sealed class MarketCommitmentTests
     {
         var commitment = new MarketCommitment(
             Market: MarketType.DayAhead,
+            MarketBidArea: "DE-LU",
             WindowStart: Start,
             WindowEnd: Start + TimeSpan.FromHours(1),
             PowerKw: 30,
@@ -30,6 +31,7 @@ public sealed class MarketCommitmentTests
     {
         var commitment = new MarketCommitment(
             MarketType.DayAhead,
+            "DE-LU",
             Start,
             Start + TimeSpan.FromMinutes(15),
             10,

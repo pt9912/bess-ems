@@ -88,4 +88,59 @@ public sealed class DefaultScheduleTrackerTests
         var tracker = new DefaultScheduleTracker(new InMemoryScheduleRepository());
         Assert.Empty(tracker.GetActiveCommitments("ghost", Start));
     }
+
+    [Fact]
+    public void Commitment_carries_market_bid_area_from_originating_schedule()
+    {
+        // RM-M2-02 / LH-MKT-007: market area is an attribute of the
+        // commitment, not just a back-reference to the schedule. The
+        // schedule's MarketBidArea must propagate verbatim.
+        var schedule = new Schedule("asset-1", ScheduleType.DayAhead, "AT", 1, new List<ScheduleWindow>
+        {
+            new(Start, Start + TimeSpan.FromHours(1), 12),
+        });
+        var tracker = new DefaultScheduleTracker(new InMemoryScheduleRepository(new[] { schedule }));
+
+        var commitments = tracker.GetActiveCommitments("asset-1", Start);
+
+        var single = Assert.Single(commitments);
+        Assert.Equal("AT", single.MarketBidArea);
+    }
+
+    [Fact]
+    public void Tracker_returns_consistent_commitments_across_dst_spring_forward()
+    {
+        // RM-M2-02 / LH-MKT-007 acceptance: tests cover at least one DST
+        // boundary. Spring-forward 2026-03-29 in Europe/Berlin: 02:00 CET
+        // → 03:00 CEST. In UTC (storage), the moment 01:00Z is the
+        // continuous successor of 00:59Z; the schedule never sees the
+        // jump and the tracker must surface a single commitment per
+        // moment on either side.
+        var dstStart = new DateTimeOffset(2026, 3, 28, 23, 0, 0, TimeSpan.Zero);
+        var schedule = new Schedule("asset-1", ScheduleType.DayAhead, "DE-LU", 1, new List<ScheduleWindow>
+        {
+            new(dstStart, dstStart + TimeSpan.FromHours(1), 10),     // 23:00Z .. 00:00Z
+            new(dstStart + TimeSpan.FromHours(1), dstStart + TimeSpan.FromHours(2), 20),   // 00:00Z .. 01:00Z (CET 01..02)
+            new(dstStart + TimeSpan.FromHours(2), dstStart + TimeSpan.FromHours(3), -15),  // 01:00Z .. 02:00Z (CEST 03..04)
+            new(dstStart + TimeSpan.FromHours(3), dstStart + TimeSpan.FromHours(4), -25),  // 02:00Z .. 03:00Z (CEST 04..05)
+        });
+        var tracker = new DefaultScheduleTracker(new InMemoryScheduleRepository(new[] { schedule }));
+
+        // Last UTC moment that maps to local CET (02:59:59 CET == 00:59:59Z+1d).
+        var lastCet = new DateTimeOffset(2026, 3, 29, 0, 59, 59, TimeSpan.Zero);
+        var atLastCet = Assert.Single(tracker.GetActiveCommitments("asset-1", lastCet));
+        Assert.Equal(20, atLastCet.PowerKw);
+
+        // First UTC moment after the wall-clock jump (03:00:00 CEST == 01:00:00Z+1d).
+        var firstCest = new DateTimeOffset(2026, 3, 29, 1, 0, 0, TimeSpan.Zero);
+        var atFirstCest = Assert.Single(tracker.GetActiveCommitments("asset-1", firstCest));
+        Assert.Equal(-15, atFirstCest.PowerKw);
+
+        // The half-open interval boundary itself (exact 01:00:00Z, the
+        // start of the post-jump window) is covered by the new window,
+        // not the old one.
+        var atBoundary = Assert.Single(tracker.GetActiveCommitments("asset-1",
+            new DateTimeOffset(2026, 3, 29, 1, 0, 0, TimeSpan.Zero)));
+        Assert.Equal(-15, atBoundary.PowerKw);
+    }
 }

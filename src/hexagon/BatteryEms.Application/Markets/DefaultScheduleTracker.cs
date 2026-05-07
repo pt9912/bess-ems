@@ -27,6 +27,11 @@ public sealed class DefaultScheduleTracker : IScheduleTracker
 
             commitments.Add(new MarketCommitment(
                 Market: MapType(schedule.Type),
+                // RM-M2-02 / LH-MKT-007: market area travels with the
+                // commitment so downstream consumers (LP penalty
+                // modelling, audit logs) don't have to back-reference
+                // the originating schedule. Schedule already carries it.
+                MarketBidArea: schedule.MarketBidArea,
                 WindowStart: window.Start,
                 WindowEnd: window.End,
                 PowerKw: window.TargetPowerKw,

@@ -17,6 +17,7 @@ public enum CommitmentBindingState
 
 public sealed record MarketCommitment(
     MarketType Market,
+    string MarketBidArea,
     DateTimeOffset WindowStart,
     DateTimeOffset WindowEnd,
     double PowerKw,

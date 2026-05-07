@@ -38,6 +38,7 @@ public sealed class ScheduleFollowingDispatchOptimizerTests
         double powerKw = 10) =>
         new(
             Market: market,
+            MarketBidArea: "DE-LU",
             WindowStart: Now,
             WindowEnd: Now.AddHours(1),
             PowerKw: powerKw,

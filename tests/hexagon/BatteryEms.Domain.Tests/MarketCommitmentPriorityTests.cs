@@ -12,7 +12,7 @@ public sealed class MarketCommitmentPriorityTests
         MarketType market,
         CommitmentBindingState state,
         double powerKw = 10) =>
-        new(market, Start, End, powerKw, Penalty: 0, BindingState: state);
+        new(market, MarketBidArea: "DE-LU", Start, End, powerKw, Penalty: 0, BindingState: state);
 
     // --- Rank ---------------------------------------------------------
 
