@@ -103,7 +103,88 @@ public sealed class OptimizationRunTests
     {
         Assert.Throws<ArgumentException>(() => BuildRun(assetId: ""));
         Assert.Throws<ArgumentException>(() => BuildRun(solverName: ""));
-        Assert.Throws<ArgumentException>(() => BuildRun(terminationReason: ""));
+        Assert.Throws<ArgumentException>(() => BuildRun(terminationCode: ""));
+    }
+
+    [Fact]
+    public void Termination_code_with_colon_throws()
+    {
+        // Colons are reserved as the code/detail separator in the
+        // composed TerminationReason string (review #16).
+        Assert.Throws<ArgumentException>(() => BuildRun(terminationCode: "code:detail"));
+    }
+
+    [Fact]
+    public void Termination_detail_blank_but_not_null_throws()
+    {
+        // Either provide a non-blank detail or null; an empty detail
+        // would compose into "code:" which is misleading.
+        Assert.Throws<ArgumentException>(() =>
+            BuildRun(terminationCode: "or-tools-time-limit", terminationDetail: ""));
+        Assert.Throws<ArgumentException>(() =>
+            BuildRun(terminationCode: "or-tools-time-limit", terminationDetail: "   "));
+    }
+
+    [Fact]
+    public void Termination_reason_renders_code_only_when_detail_is_null()
+    {
+        var run = BuildRun(terminationCode: "or-tools-optimal", terminationDetail: null);
+        Assert.Equal("or-tools-optimal", run.TerminationReason);
+        Assert.Equal("or-tools-optimal", run.TerminationCode);
+        Assert.Null(run.TerminationDetail);
+    }
+
+    [Fact]
+    public void Termination_reason_renders_code_colon_detail_when_detail_present()
+    {
+        var run = BuildRun(
+            terminationCode: "unsupported-price-unit",
+            terminationDetail: "EUR/kWh");
+        Assert.Equal("unsupported-price-unit:EUR/kWh", run.TerminationReason);
+        Assert.Equal("unsupported-price-unit", run.TerminationCode);
+        Assert.Equal("EUR/kWh", run.TerminationDetail);
+    }
+
+    [Fact]
+    public void Parse_termination_reason_round_trips_code_only()
+    {
+        var (code, detail) = OptimizationRun.ParseTerminationReason("or-tools-optimal");
+        Assert.Equal("or-tools-optimal", code);
+        Assert.Null(detail);
+    }
+
+    [Fact]
+    public void Parse_termination_reason_splits_on_first_colon()
+    {
+        var (code, detail) = OptimizationRun.ParseTerminationReason("unsupported-price-unit:EUR/kWh");
+        Assert.Equal("unsupported-price-unit", code);
+        Assert.Equal("EUR/kWh", detail);
+    }
+
+    [Fact]
+    public void Parse_termination_reason_first_colon_only_keeps_remainder_intact()
+    {
+        // A future Detail may itself contain colons (e.g. an ISO timestamp).
+        var (code, detail) = OptimizationRun.ParseTerminationReason("or-tools-time-limit:5.000s > 2.000s");
+        Assert.Equal("or-tools-time-limit", code);
+        Assert.Equal("5.000s > 2.000s", detail);
+    }
+
+    [Fact]
+    public void Parse_termination_reason_treats_trailing_colon_as_code_only()
+    {
+        // "code:" with nothing after — guard against round-tripping a
+        // blank detail that the constructor would reject.
+        var (code, detail) = OptimizationRun.ParseTerminationReason("or-tools-optimal:");
+        Assert.Equal("or-tools-optimal", code);
+        Assert.Null(detail);
+    }
+
+    [Fact]
+    public void Parse_termination_reason_blank_throws()
+    {
+        Assert.Throws<ArgumentException>(() => OptimizationRun.ParseTerminationReason(""));
+        Assert.Throws<ArgumentException>(() => OptimizationRun.ParseTerminationReason("   "));
     }
 
     [Fact]
@@ -130,7 +211,8 @@ public sealed class OptimizationRunTests
         TimeSpan? timeStep = null,
         double objectiveValue = 42.0,
         TimeSpan? solverRuntime = null,
-        string terminationReason = "ok",
+        string terminationCode = "ok",
+        string? terminationDetail = null,
         IReadOnlyList<ScheduleReference>? inputs = null,
         ScheduleReference? producedSchedule = null,
         bool omitProducedSchedule = false)
@@ -158,7 +240,8 @@ public sealed class OptimizationRunTests
             constraintViolations: Array.Empty<string>(),
             warnings: Array.Empty<string>(),
             solverRuntime: solverRuntime ?? TimeSpan.FromMilliseconds(15),
-            terminationReason: terminationReason,
+            terminationCode: terminationCode,
+            terminationDetail: terminationDetail,
             createdAt: HorizonStart,
             inputs: inputs ?? Array.Empty<ScheduleReference>(),
             producedSchedule: resolvedProduced);

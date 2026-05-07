@@ -16,7 +16,7 @@ namespace BatteryEms.Application.Optimization;
 public sealed class NoOpScheduleOptimizer : IScheduleOptimizer
 {
     private const string SolverName = "noop-schedule-optimizer";
-    private const string Reason = "no-solver-configured";
+    private const string TerminationCode = "no-solver-configured";
 
     private readonly IClock _clock;
 
@@ -45,7 +45,8 @@ public sealed class NoOpScheduleOptimizer : IScheduleOptimizer
             constraintViolations: Array.Empty<string>(),
             warnings: Array.Empty<string>(),
             solverRuntime: TimeSpan.Zero,
-            terminationReason: Reason,
+            terminationCode: TerminationCode,
+            terminationDetail: null,
             createdAt: _clock.UtcNow,
             inputs: request.Inputs,
             producedSchedule: null);

@@ -443,6 +443,7 @@ public sealed class PersistenceRoundtripTests : IAsyncLifetime
         IReadOnlyList<ScheduleReference> inputs,
         ScheduleReference? producedSchedule)
     {
+        var (code, detail) = OptimizationRun.ParseTerminationReason(terminationReason);
         return new OptimizationRun(
             runId: runId,
             assetId: assetId,
@@ -458,7 +459,8 @@ public sealed class PersistenceRoundtripTests : IAsyncLifetime
             constraintViolations: constraintViolations,
             warnings: warnings,
             solverRuntime: TimeSpan.FromMilliseconds(125),
-            terminationReason: terminationReason,
+            terminationCode: code,
+            terminationDetail: detail,
             createdAt: createdAt,
             inputs: inputs,
             producedSchedule: producedSchedule);

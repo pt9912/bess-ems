@@ -278,6 +278,11 @@ public sealed class DapperOptimizationRunRepository : IOptimizationRunRepository
                 version);
         }
 
+        // Read-side companion to OptimizationRun.TerminationReason
+        // (review #16): the column persists the composed string, the
+        // domain reconstructs (Code, Detail) on the way in.
+        var (code, detail) = OptimizationRun.ParseTerminationReason(header.TerminationReason);
+
         return new OptimizationRun(
             runId: header.RunId,
             assetId: header.AssetId,
@@ -291,7 +296,8 @@ public sealed class DapperOptimizationRunRepository : IOptimizationRunRepository
             constraintViolations: DeserializeStringList(header.ConstraintViolationsJson),
             warnings: DeserializeStringList(header.WarningsJson),
             solverRuntime: TimeSpan.FromSeconds(header.SolverRuntimeSeconds),
-            terminationReason: header.TerminationReason,
+            terminationCode: code,
+            terminationDetail: detail,
             createdAt: TimestampConverter.ToOffset(header.CreatedAt),
             inputs: DeserializeInputs(header.InputsJson),
             producedSchedule: produced);

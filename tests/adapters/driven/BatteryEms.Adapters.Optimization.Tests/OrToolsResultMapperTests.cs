@@ -18,22 +18,28 @@ public sealed class OrToolsResultMapperTests
     public void Backend_status_maps_to_expected_solver_status(
         Solver.ResultStatus backendStatus,
         OptimizationSolverStatus expected,
-        string expectedReasonPrefix)
+        string expectedCode)
     {
-        var (status, reason) = OrToolsResultMapper.Map(backendStatus, TimeSpan.FromMilliseconds(5), timeLimit: null);
+        var (status, code, detail) = OrToolsResultMapper.Map(backendStatus, TimeSpan.FromMilliseconds(5), timeLimit: null);
         Assert.Equal(expected, status);
-        Assert.Equal(expectedReasonPrefix, reason);
+        Assert.Equal(expectedCode, code);
+        // Plain status maps emit no detail — the code alone identifies
+        // the outcome (review #16).
+        Assert.Null(detail);
     }
 
     [Fact]
-    public void Not_solved_strictly_past_time_limit_maps_to_time_limit()
+    public void Not_solved_strictly_past_time_limit_maps_to_time_limit_with_elapsed_detail()
     {
-        var (status, reason) = OrToolsResultMapper.Map(
+        var (status, code, detail) = OrToolsResultMapper.Map(
             Solver.ResultStatus.NOT_SOLVED,
             elapsed: TimeSpan.FromSeconds(2.5),
             timeLimit: TimeSpan.FromSeconds(2));
         Assert.Equal(OptimizationSolverStatus.TimeLimit, status);
-        Assert.StartsWith("or-tools-time-limit", reason, StringComparison.Ordinal);
+        Assert.Equal("or-tools-time-limit", code);
+        Assert.NotNull(detail);
+        Assert.Contains("2.000s", detail, StringComparison.Ordinal);
+        Assert.Contains("2.500s", detail, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -43,7 +49,7 @@ public sealed class OrToolsResultMapperTests
         // exactly equal to the budget the solver might still have a
         // valid result; only NOT_SOLVED past the budget gets the
         // TimeLimit reclass.
-        var (status, _) = OrToolsResultMapper.Map(
+        var (status, _, _) = OrToolsResultMapper.Map(
             Solver.ResultStatus.NOT_SOLVED,
             elapsed: TimeSpan.FromSeconds(2),
             timeLimit: TimeSpan.FromSeconds(2));
@@ -57,7 +63,7 @@ public sealed class OrToolsResultMapperTests
         // re-classified to TimeLimit and its schedule discarded. Now
         // FEASIBLE always stays FEASIBLE — the caller keeps the run's
         // produced schedule. TimeLimit only applies to NOT_SOLVED.
-        var (status, _) = OrToolsResultMapper.Map(
+        var (status, _, _) = OrToolsResultMapper.Map(
             Solver.ResultStatus.FEASIBLE,
             elapsed: TimeSpan.FromSeconds(5),
             timeLimit: TimeSpan.FromSeconds(2));
@@ -67,7 +73,7 @@ public sealed class OrToolsResultMapperTests
     [Fact]
     public void Optimal_inside_time_limit_window_stays_optimal()
     {
-        var (status, _) = OrToolsResultMapper.Map(
+        var (status, _, _) = OrToolsResultMapper.Map(
             Solver.ResultStatus.OPTIMAL,
             elapsed: TimeSpan.FromSeconds(1),
             timeLimit: TimeSpan.FromSeconds(2));

@@ -181,7 +181,7 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
     {
         var optimizer = new SpyOptimizer(req =>
             BuildResult(req, OptimizationSolverStatus.Feasible, includeSchedule: true,
-                terminationReason: "time-limit-but-feasible"));
+                terminationCode: "time-limit-but-feasible"));
         var useCase = Build(optimizer, new InMemoryScheduleRepository(), new InMemoryOptimizationRunRepository());
 
         var outcome = await useCase.ExecuteAsync(BuildInputs(), CancellationToken.None);
@@ -217,7 +217,8 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
         ScheduleOptimizationRequest request,
         OptimizationSolverStatus status,
         bool includeSchedule,
-        string terminationReason = "ok")
+        string terminationCode = "ok",
+        string? terminationDetail = null)
     {
         Schedule? schedule = null;
         ScheduleReference? produced = null;
@@ -241,7 +242,8 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
             constraintViolations: Array.Empty<string>(),
             warnings: Array.Empty<string>(),
             solverRuntime: TimeSpan.FromMilliseconds(1),
-            terminationReason: terminationReason,
+            terminationCode: terminationCode,
+            terminationDetail: terminationDetail,
             createdAt: HorizonStart,
             inputs: Array.Empty<ScheduleReference>(),
             producedSchedule: produced);

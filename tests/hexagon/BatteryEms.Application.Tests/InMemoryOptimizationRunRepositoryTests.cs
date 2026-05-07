@@ -122,7 +122,8 @@ public sealed class InMemoryOptimizationRunRepositoryTests
             constraintViolations: Array.Empty<string>(),
             warnings: Array.Empty<string>(),
             solverRuntime: TimeSpan.FromMilliseconds(1),
-            terminationReason: "ok",
+            terminationCode: "ok",
+            terminationDetail: null,
             createdAt: createdAt ?? T0,
             inputs: Array.Empty<ScheduleReference>(),
             producedSchedule: new ScheduleReference(assetId, ScheduleType.DayAhead, 1));

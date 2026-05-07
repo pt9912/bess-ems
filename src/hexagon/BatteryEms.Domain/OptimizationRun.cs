@@ -41,7 +41,21 @@ public sealed class OptimizationRun
     public IReadOnlyList<string> ConstraintViolations { get; }
     public IReadOnlyList<string> Warnings { get; }
     public TimeSpan SolverRuntime { get; }
-    public string TerminationReason { get; }
+
+    // Termination is split into a low-cardinality Code (the dashboardable
+    // grouping key, e.g. "or-tools-time-limit", "unsupported-price-unit")
+    // and an optional Detail (e.g. "EUR/kWh", "5.000s > 2.000s") that
+    // varies per run (review #16 / Option B). Persistence stores the
+    // composed string in `optimization_runs.termination_reason`; the read
+    // path reconstructs (Code, Detail) via ParseTerminationReason.
+    public string TerminationCode { get; }
+    public string? TerminationDetail { get; }
+
+    // Combined wire form. Detail-bearing reasons render as "code:detail"
+    // so the existing API + audit-log consumers see no breaking change.
+    public string TerminationReason =>
+        TerminationDetail is null ? TerminationCode : $"{TerminationCode}:{TerminationDetail}";
+
     public DateTimeOffset CreatedAt { get; }
 
     // Schedules consumed as input to the run. Empty when the run started
@@ -69,7 +83,8 @@ public sealed class OptimizationRun
         IReadOnlyList<string> constraintViolations,
         IReadOnlyList<string> warnings,
         TimeSpan solverRuntime,
-        string terminationReason,
+        string terminationCode,
+        string? terminationDetail,
         DateTimeOffset createdAt,
         IReadOnlyList<ScheduleReference> inputs,
         ScheduleReference? producedSchedule)
@@ -80,7 +95,19 @@ public sealed class OptimizationRun
         }
         ArgumentException.ThrowIfNullOrWhiteSpace(assetId);
         ArgumentException.ThrowIfNullOrWhiteSpace(solverName);
-        ArgumentException.ThrowIfNullOrWhiteSpace(terminationReason);
+        ArgumentException.ThrowIfNullOrWhiteSpace(terminationCode);
+        if (terminationCode.Contains(':', StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                $"TerminationCode must not contain ':'; the colon separates code from detail in the composed reason (got '{terminationCode}').",
+                nameof(terminationCode));
+        }
+        if (terminationDetail is not null && string.IsNullOrWhiteSpace(terminationDetail))
+        {
+            throw new ArgumentException(
+                "TerminationDetail must be either null or a non-blank string.",
+                nameof(terminationDetail));
+        }
         ArgumentNullException.ThrowIfNull(objectiveBreakdown);
         ArgumentNullException.ThrowIfNull(constraintViolations);
         ArgumentNullException.ThrowIfNull(warnings);
@@ -141,7 +168,8 @@ public sealed class OptimizationRun
         ConstraintViolations = constraintViolations;
         Warnings = warnings;
         SolverRuntime = solverRuntime;
-        TerminationReason = terminationReason;
+        TerminationCode = terminationCode;
+        TerminationDetail = terminationDetail;
         CreatedAt = createdAt;
         Inputs = inputs;
         ProducedSchedule = producedSchedule;
@@ -154,4 +182,29 @@ public sealed class OptimizationRun
     // taxonomy.
     public bool HasUsableSolution =>
         Status is OptimizationSolverStatus.Optimal or OptimizationSolverStatus.Feasible;
+
+    // Inverse of TerminationReason: persistence reads back the composed
+    // string from `optimization_runs.termination_reason` and reconstructs
+    // (Code, Detail). Splits on the FIRST ':' so a Detail can itself
+    // contain colons (e.g. an ISO timestamp later). Code may not contain
+    // ':' (the constructor enforces it on the write side).
+    public static (string Code, string? Detail) ParseTerminationReason(string raw)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(raw);
+        var idx = raw.IndexOf(':', StringComparison.Ordinal);
+        if (idx < 0)
+        {
+            return (raw, null);
+        }
+        var code = raw[..idx];
+        var detail = raw[(idx + 1)..];
+        if (string.IsNullOrWhiteSpace(detail))
+        {
+            // "code:" with nothing after — treat as code-only so the
+            // round-trip never produces a blank Detail that the
+            // constructor would reject.
+            return (code, null);
+        }
+        return (code, detail);
+    }
 }

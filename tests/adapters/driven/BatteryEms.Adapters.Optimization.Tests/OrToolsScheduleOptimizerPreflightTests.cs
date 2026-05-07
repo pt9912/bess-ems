@@ -33,6 +33,8 @@ public sealed class OrToolsScheduleOptimizerPreflightTests
         var result = await optimizer.OptimizeAsync(request, CancellationToken.None);
 
         Assert.Equal(OptimizationSolverStatus.Failed, result.Run.Status);
+        Assert.Equal("unsupported-price-unit", result.Run.TerminationCode);
+        Assert.Equal("EUR/kWh", result.Run.TerminationDetail);
         Assert.Equal("unsupported-price-unit:EUR/kWh", result.Run.TerminationReason);
     }
 
@@ -45,7 +47,9 @@ public sealed class OrToolsScheduleOptimizerPreflightTests
         var result = await optimizer.OptimizeAsync(request, CancellationToken.None);
 
         Assert.Equal(OptimizationSolverStatus.Failed, result.Run.Status);
-        Assert.Equal("initial-soc-out-of-bounds", result.Run.TerminationReason);
+        Assert.Equal("initial-soc-out-of-bounds", result.Run.TerminationCode);
+        Assert.NotNull(result.Run.TerminationDetail);
+        Assert.Contains("5", result.Run.TerminationDetail, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -57,7 +61,9 @@ public sealed class OrToolsScheduleOptimizerPreflightTests
         var result = await optimizer.OptimizeAsync(request, CancellationToken.None);
 
         Assert.Equal(OptimizationSolverStatus.Failed, result.Run.Status);
-        Assert.Equal("initial-soc-out-of-bounds", result.Run.TerminationReason);
+        Assert.Equal("initial-soc-out-of-bounds", result.Run.TerminationCode);
+        Assert.NotNull(result.Run.TerminationDetail);
+        Assert.Contains("95", result.Run.TerminationDetail, StringComparison.Ordinal);
     }
 
     [Fact]

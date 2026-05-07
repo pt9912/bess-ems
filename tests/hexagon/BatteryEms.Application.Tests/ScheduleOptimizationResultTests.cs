@@ -83,7 +83,8 @@ public sealed class ScheduleOptimizationResultTests
             constraintViolations: Array.Empty<string>(),
             warnings: Array.Empty<string>(),
             solverRuntime: TimeSpan.FromMilliseconds(1),
-            terminationReason: "ok",
+            terminationCode: "ok",
+            terminationDetail: null,
             createdAt: HorizonStart,
             inputs: Array.Empty<ScheduleReference>(),
             producedSchedule: producedReference);

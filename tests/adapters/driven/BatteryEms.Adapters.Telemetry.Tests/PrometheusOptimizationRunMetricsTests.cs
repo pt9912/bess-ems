@@ -155,7 +155,8 @@ public sealed class PrometheusOptimizationRunMetricsTests
             constraintViolations: constraintViolations ?? Array.Empty<string>(),
             warnings: Array.Empty<string>(),
             solverRuntime: solverRuntime,
-            terminationReason: "test",
+            terminationCode: "test",
+            terminationDetail: null,
             createdAt: HorizonStart,
             inputs: Array.Empty<ScheduleReference>(),
             producedSchedule: produced);

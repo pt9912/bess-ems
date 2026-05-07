@@ -14,7 +14,7 @@ namespace BatteryEms.Adapters.Optimization.OrTools;
 // distinction.
 internal static class OrToolsResultMapper
 {
-    public static (OptimizationSolverStatus Status, string TerminationReason) Map(
+    public static (OptimizationSolverStatus Status, string Code, string? Detail) Map(
         Solver.ResultStatus backendStatus,
         TimeSpan elapsed,
         TimeSpan? timeLimit)
@@ -31,18 +31,19 @@ internal static class OrToolsResultMapper
             && backendStatus == Solver.ResultStatus.NOT_SOLVED)
         {
             return (OptimizationSolverStatus.TimeLimit,
-                $"or-tools-time-limit ({elapsed.TotalSeconds:F3}s > {limit.TotalSeconds:F3}s)");
+                "or-tools-time-limit",
+                $"{elapsed.TotalSeconds:F3}s > {limit.TotalSeconds:F3}s");
         }
 
         return backendStatus switch
         {
-            Solver.ResultStatus.OPTIMAL => (OptimizationSolverStatus.Optimal, "or-tools-optimal"),
-            Solver.ResultStatus.FEASIBLE => (OptimizationSolverStatus.Feasible, "or-tools-feasible-not-proven-optimal"),
-            Solver.ResultStatus.INFEASIBLE => (OptimizationSolverStatus.Infeasible, "or-tools-infeasible"),
-            Solver.ResultStatus.UNBOUNDED => (OptimizationSolverStatus.Unbounded, "or-tools-unbounded"),
-            Solver.ResultStatus.ABNORMAL => (OptimizationSolverStatus.Failed, "or-tools-abnormal"),
-            Solver.ResultStatus.MODEL_INVALID => (OptimizationSolverStatus.Failed, "or-tools-model-invalid"),
-            Solver.ResultStatus.NOT_SOLVED => (OptimizationSolverStatus.Failed, "or-tools-not-solved"),
+            Solver.ResultStatus.OPTIMAL => (OptimizationSolverStatus.Optimal, "or-tools-optimal", null),
+            Solver.ResultStatus.FEASIBLE => (OptimizationSolverStatus.Feasible, "or-tools-feasible-not-proven-optimal", null),
+            Solver.ResultStatus.INFEASIBLE => (OptimizationSolverStatus.Infeasible, "or-tools-infeasible", null),
+            Solver.ResultStatus.UNBOUNDED => (OptimizationSolverStatus.Unbounded, "or-tools-unbounded", null),
+            Solver.ResultStatus.ABNORMAL => (OptimizationSolverStatus.Failed, "or-tools-abnormal", null),
+            Solver.ResultStatus.MODEL_INVALID => (OptimizationSolverStatus.Failed, "or-tools-model-invalid", null),
+            Solver.ResultStatus.NOT_SOLVED => (OptimizationSolverStatus.Failed, "or-tools-not-solved", null),
             // Unreachable under the OR-Tools 9.x ResultStatus contract;
             // kept as defensive fallback so a future SDK enum addition
             // doesn't silently drop into the wrong branch.
@@ -51,6 +52,6 @@ internal static class OrToolsResultMapper
     }
 
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    private static (OptimizationSolverStatus, string) UnknownStatus(Solver.ResultStatus status) =>
-        (OptimizationSolverStatus.Failed, $"or-tools-unknown-status:{(int)status}");
+    private static (OptimizationSolverStatus, string, string?) UnknownStatus(Solver.ResultStatus status) =>
+        (OptimizationSolverStatus.Failed, "or-tools-unknown-status", ((int)status).ToString(System.Globalization.CultureInfo.InvariantCulture));
 }

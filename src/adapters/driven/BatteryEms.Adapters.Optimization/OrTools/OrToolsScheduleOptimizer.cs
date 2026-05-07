@@ -74,14 +74,17 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
         // failure path fast and fully deterministic.
         if (request.PricesPerStep is null)
         {
-            return Task.FromResult(BuildFailedResult(request, "missing-prices",
-                "PricesPerStep is required for energy-cost optimisation."));
+            return Task.FromResult(BuildFailedResult(request,
+                terminationCode: "missing-prices",
+                terminationDetail: null,
+                warning: "PricesPerStep is required for energy-cost optimisation."));
         }
         if (!string.Equals(request.PriceUnit, SupportedPriceUnit, StringComparison.Ordinal))
         {
             return Task.FromResult(BuildFailedResult(request,
-                $"unsupported-price-unit:{request.PriceUnit}",
-                $"OR-Tools schedule optimiser only accepts PriceUnit '{SupportedPriceUnit}'."));
+                terminationCode: "unsupported-price-unit",
+                terminationDetail: request.PriceUnit,
+                warning: $"OR-Tools schedule optimiser only accepts PriceUnit '{SupportedPriceUnit}'."));
         }
 
         return Task.FromResult(Solve(request, cancellationToken));
@@ -102,9 +105,12 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
             ?? (asset.MinSocPercent + asset.MaxSocPercent) / 2.0;
         if (initialSocPercent < asset.MinSocPercent || initialSocPercent > asset.MaxSocPercent)
         {
-            return BuildFailedResult(request, "initial-soc-out-of-bounds",
-                $"InitialSocPercent {initialSocPercent} is outside the asset's SOC band " +
-                $"[{asset.MinSocPercent}, {asset.MaxSocPercent}].");
+            return BuildFailedResult(request,
+                terminationCode: "initial-soc-out-of-bounds",
+                terminationDetail: System.FormattableString.Invariant(
+                    $"{initialSocPercent} not in [{asset.MinSocPercent}, {asset.MaxSocPercent}]"),
+                warning: $"InitialSocPercent {initialSocPercent} is outside the asset's SOC band " +
+                    $"[{asset.MinSocPercent}, {asset.MaxSocPercent}].");
         }
         var initialSocKwh = initialSocPercent / 100.0 * capacityKwh;
 
@@ -171,7 +177,7 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
             // mid-solve, but the build path that follows can take long
             // enough for a cooperative caller to give up (review #9).
             cancellationToken.ThrowIfCancellationRequested();
-            var (mappedStatus, terminationReason) = OrToolsResultMapper.Map(
+            var (mappedStatus, terminationCode, terminationDetail) = OrToolsResultMapper.Map(
                 backendStatus, elapsed, _options.TimeLimit);
 
             Log.SolveCompleted(_logger, request.AssetId, mappedStatus, elapsed.TotalMilliseconds, n);
@@ -185,11 +191,11 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
                 // breakdown that confuses dashboards.
                 var snappedObjective = Math.Abs(rawObjective) < ObjectiveZeroEpsilon ? 0.0 : rawObjective;
                 return BuildSolutionResult(
-                    request, mappedStatus, terminationReason,
+                    request, mappedStatus, terminationCode, terminationDetail,
                     charge, discharge, snappedObjective, elapsed);
             }
 
-            return BuildNonSolutionResult(request, mappedStatus, terminationReason, elapsed);
+            return BuildNonSolutionResult(request, mappedStatus, terminationCode, terminationDetail, elapsed);
         }
         finally
         {
@@ -200,7 +206,8 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
     private ScheduleOptimizationResult BuildSolutionResult(
         ScheduleOptimizationRequest request,
         OptimizationSolverStatus status,
-        string terminationReason,
+        string terminationCode,
+        string? terminationDetail,
         Variable[] charge,
         Variable[] discharge,
         double objectiveValue,
@@ -240,7 +247,7 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
         });
 
         var run = CreateRun(
-            request, status, terminationReason, elapsed,
+            request, status, terminationCode, terminationDetail, elapsed,
             objectiveValue, breakdown,
             warnings: Array.Empty<string>(),
             producedSchedule: producedReference);
@@ -254,11 +261,12 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
     private ScheduleOptimizationResult BuildNonSolutionResult(
         ScheduleOptimizationRequest request,
         OptimizationSolverStatus status,
-        string terminationReason,
+        string terminationCode,
+        string? terminationDetail,
         TimeSpan elapsed)
     {
         var run = CreateRun(
-            request, status, terminationReason, elapsed,
+            request, status, terminationCode, terminationDetail, elapsed,
             objectiveValue: 0,
             breakdown: OptimizationObjectiveBreakdown.Empty,
             warnings: Array.Empty<string>(),
@@ -268,14 +276,16 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
 
     private ScheduleOptimizationResult BuildFailedResult(
         ScheduleOptimizationRequest request,
-        string terminationReason,
+        string terminationCode,
+        string? terminationDetail,
         string warning)
     {
-        Log.PreflightFailed(_logger, request.AssetId, terminationReason);
+        Log.PreflightFailed(_logger, request.AssetId, terminationCode);
         var run = CreateRun(
             request,
             status: OptimizationSolverStatus.Failed,
-            terminationReason: terminationReason,
+            terminationCode: terminationCode,
+            terminationDetail: terminationDetail,
             elapsed: TimeSpan.Zero,
             objectiveValue: 0,
             breakdown: OptimizationObjectiveBreakdown.Empty,
@@ -293,7 +303,8 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
     private OptimizationRun CreateRun(
         ScheduleOptimizationRequest request,
         OptimizationSolverStatus status,
-        string terminationReason,
+        string terminationCode,
+        string? terminationDetail,
         TimeSpan elapsed,
         double objectiveValue,
         OptimizationObjectiveBreakdown breakdown,
@@ -314,7 +325,8 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
             constraintViolations: Array.Empty<string>(),
             warnings: warnings,
             solverRuntime: elapsed,
-            terminationReason: terminationReason,
+            terminationCode: terminationCode,
+            terminationDetail: terminationDetail,
             createdAt: _clock.UtcNow,
             inputs: request.Inputs,
             producedSchedule: producedSchedule);
