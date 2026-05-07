@@ -101,7 +101,7 @@ public sealed class DapperScheduleRepository : IScheduleRepository
         {
             var header = await connection.QuerySingleOrDefaultAsync<ScheduleRow>(new CommandDefinition(
                 SelectHeaderSql,
-                new { AssetId = assetId, Type = TypeToWire(type) },
+                new { AssetId = assetId, Type = ScheduleTypeWire.ToWire(type) },
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
             if (header is null)
             {
@@ -122,7 +122,7 @@ public sealed class DapperScheduleRepository : IScheduleRepository
             var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
             await using (transaction.ConfigureAwait(false))
             {
-                var typeWire = TypeToWire(schedule.Type);
+                var typeWire = ScheduleTypeWire.ToWire(schedule.Type);
                 await connection.ExecuteAsync(new CommandDefinition(
                     UpsertHeaderSql,
                     new
@@ -183,27 +183,11 @@ public sealed class DapperScheduleRepository : IScheduleRepository
             .ToArray();
         return new Schedule(
             header.AssetId,
-            TypeFromWire(header.Type),
+            ScheduleTypeWire.FromWire(header.Type),
             header.MarketBidArea,
             header.Version,
             domainWindows);
     }
-
-    private static string TypeToWire(ScheduleType type) => type switch
-    {
-        ScheduleType.DayAhead => "day_ahead",
-        ScheduleType.Intraday => "intraday",
-        ScheduleType.RegelLeistungReserve => "regel_leistung_reserve",
-        _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unknown schedule type."),
-    };
-
-    private static ScheduleType TypeFromWire(string wire) => wire switch
-    {
-        "day_ahead" => ScheduleType.DayAhead,
-        "intraday" => ScheduleType.Intraday,
-        "regel_leistung_reserve" => ScheduleType.RegelLeistungReserve,
-        _ => throw new InvalidOperationException($"Unknown schedule type '{wire}' in storage."),
-    };
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "Instantiated by Dapper via reflection.")]
     private sealed class ScheduleRow

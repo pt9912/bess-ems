@@ -80,5 +80,38 @@ internal static class BessDbSchema
         );
         CREATE INDEX IF NOT EXISTS idx_audit_recorded_at
             ON audit_events(recorded_at DESC);
+
+        CREATE TABLE IF NOT EXISTS optimization_runs (
+            run_id UUID PRIMARY KEY,
+            asset_id TEXT NOT NULL,
+            solver_name TEXT NOT NULL,
+            status TEXT NOT NULL,
+            horizon_start TIMESTAMPTZ NOT NULL,
+            horizon_end TIMESTAMPTZ NOT NULL,
+            time_step_seconds DOUBLE PRECISION NOT NULL,
+            objective_value DOUBLE PRECISION NOT NULL,
+            constraint_violations_json TEXT NOT NULL DEFAULT '[]',
+            warnings_json TEXT NOT NULL DEFAULT '[]',
+            solver_runtime_seconds DOUBLE PRECISION NOT NULL,
+            termination_reason TEXT NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL,
+            inputs_json TEXT NOT NULL DEFAULT '[]',
+            produced_schedule_asset_id TEXT,
+            produced_schedule_type TEXT,
+            produced_schedule_version INTEGER
+        );
+        CREATE INDEX IF NOT EXISTS idx_optimization_runs_asset_created_at
+            ON optimization_runs(asset_id, created_at);
+
+        CREATE TABLE IF NOT EXISTS optimization_objective_breakdowns (
+            run_id UUID NOT NULL,
+            position INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            value DOUBLE PRECISION NOT NULL,
+            unit TEXT NOT NULL,
+            PRIMARY KEY (run_id, name),
+            UNIQUE (run_id, position),
+            FOREIGN KEY (run_id) REFERENCES optimization_runs(run_id) ON DELETE CASCADE
+        );
         """;
 }

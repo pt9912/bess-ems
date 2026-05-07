@@ -28,6 +28,7 @@ public static class PersistenceRegistration
         services.AddSingleton<IScheduleRepository, DapperScheduleRepository>();
         services.AddSingleton<IOperatorAuditLog, DapperOperatorAuditLog>();
         services.AddSingleton<IRetentionRepository, DapperRetentionRepository>();
+        services.AddSingleton<IOptimizationRunRepository, DapperOptimizationRunRepository>();
         // RM-M1-19c: replace the default "ok"-only IHealthQuery with the
         // Postgres-aware probe so /health returns 503 when the database
         // is unreachable. Order matters: AddBessApplicationInMemoryStores

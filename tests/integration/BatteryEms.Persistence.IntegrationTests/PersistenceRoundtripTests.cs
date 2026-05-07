@@ -15,6 +15,9 @@ public sealed class PersistenceRoundtripTests : IAsyncLifetime
     private static readonly DateTimeOffset Now =
         new(2026, 5, 6, 12, 0, 0, TimeSpan.Zero);
 
+    private static readonly string[] TightSocWarnings = { "tight-binding-soc-floor" };
+    private static readonly string[] SocFloorViolations = { "soc_floor_violated" };
+
     private NpgsqlDataSource? _dataSource;
 
     private static string Host => Environment.GetEnvironmentVariable("POSTGRES_HOST") ?? "127.0.0.1";
@@ -233,6 +236,152 @@ public sealed class PersistenceRoundtripTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Optimization_run_repository_round_trips_full_payload_and_supports_range_query()
+    {
+        var repo = new DapperOptimizationRunRepository(_dataSource!);
+
+        var optimalRun = BuildRun(
+            runId: Guid.NewGuid(),
+            assetId: "single-bess-1",
+            createdAt: Now,
+            status: OptimizationSolverStatus.Optimal,
+            terminationReason: "solver_finished",
+            objectiveValue: -1234.5,
+            components: new[]
+            {
+                new OptimizationObjectiveComponent("energy_cost", -1500.0, "EUR"),
+                new OptimizationObjectiveComponent("degradation", 265.5, "EUR"),
+            },
+            constraintViolations: Array.Empty<string>(),
+            warnings: TightSocWarnings,
+            inputs: new[] { new ScheduleReference("single-bess-1", ScheduleType.DayAhead, 7) },
+            producedSchedule: new ScheduleReference("single-bess-1", ScheduleType.DayAhead, 8));
+
+        var failedRun = BuildRun(
+            runId: Guid.NewGuid(),
+            assetId: "single-bess-1",
+            createdAt: Now + TimeSpan.FromMinutes(5),
+            status: OptimizationSolverStatus.Failed,
+            terminationReason: "solver_crash",
+            objectiveValue: 0,
+            components: Array.Empty<OptimizationObjectiveComponent>(),
+            constraintViolations: SocFloorViolations,
+            warnings: Array.Empty<string>(),
+            inputs: Array.Empty<ScheduleReference>(),
+            producedSchedule: null);
+
+        var foreignAssetRun = BuildRun(
+            runId: Guid.NewGuid(),
+            assetId: "single-bess-2",
+            createdAt: Now + TimeSpan.FromMinutes(1),
+            status: OptimizationSolverStatus.Optimal,
+            terminationReason: "solver_finished",
+            objectiveValue: -10,
+            components: new[] { new OptimizationObjectiveComponent("energy_cost", -10, "EUR") },
+            constraintViolations: Array.Empty<string>(),
+            warnings: Array.Empty<string>(),
+            inputs: Array.Empty<ScheduleReference>(),
+            producedSchedule: new ScheduleReference("single-bess-2", ScheduleType.DayAhead, 1));
+
+        await repo.AppendAsync(optimalRun, CancellationToken.None);
+        await repo.AppendAsync(failedRun, CancellationToken.None);
+        await repo.AppendAsync(foreignAssetRun, CancellationToken.None);
+
+        var roundTripped = await repo.FindByIdAsync(optimalRun.RunId, CancellationToken.None);
+        Assert.NotNull(roundTripped);
+        Assert.Equal(optimalRun.AssetId, roundTripped!.AssetId);
+        Assert.Equal(optimalRun.Status, roundTripped.Status);
+        Assert.Equal(optimalRun.HorizonStart, roundTripped.HorizonStart);
+        Assert.Equal(optimalRun.HorizonEnd, roundTripped.HorizonEnd);
+        Assert.Equal(optimalRun.TimeStep, roundTripped.TimeStep);
+        Assert.Equal(optimalRun.ObjectiveValue, roundTripped.ObjectiveValue);
+        Assert.Equal(2, roundTripped.ObjectiveBreakdown.Components.Count);
+        Assert.Equal("energy_cost", roundTripped.ObjectiveBreakdown.Components[0].Name);
+        Assert.Equal(-1500.0, roundTripped.ObjectiveBreakdown.Components[0].Value);
+        Assert.Equal("degradation", roundTripped.ObjectiveBreakdown.Components[1].Name);
+        Assert.Equal(optimalRun.SolverRuntime, roundTripped.SolverRuntime);
+        Assert.Equal(optimalRun.TerminationReason, roundTripped.TerminationReason);
+        Assert.Equal(optimalRun.CreatedAt, roundTripped.CreatedAt);
+        Assert.Empty(roundTripped.ConstraintViolations);
+        Assert.Single(roundTripped.Warnings);
+        Assert.Equal("tight-binding-soc-floor", roundTripped.Warnings[0]);
+        Assert.Single(roundTripped.Inputs);
+        Assert.Equal(7, roundTripped.Inputs[0].Version);
+        Assert.NotNull(roundTripped.ProducedSchedule);
+        Assert.Equal(8, roundTripped.ProducedSchedule!.Version);
+
+        // Failed run preserves null produced schedule and one violation.
+        var failedRoundTripped = await repo.FindByIdAsync(failedRun.RunId, CancellationToken.None);
+        Assert.NotNull(failedRoundTripped);
+        Assert.Equal(OptimizationSolverStatus.Failed, failedRoundTripped!.Status);
+        Assert.Null(failedRoundTripped.ProducedSchedule);
+        Assert.Single(failedRoundTripped.ConstraintViolations);
+        Assert.Equal("soc_floor_violated", failedRoundTripped.ConstraintViolations[0]);
+        Assert.Empty(failedRoundTripped.ObjectiveBreakdown.Components);
+
+        // Range query: asset filter + half-open [from, until). The
+        // foreign-asset run must not appear; failedRun (CreatedAt=Now+5m)
+        // must be excluded by an Until=Now+5m boundary because the range
+        // is right-open.
+        var assetRuns = await repo.QueryAsync(
+            "single-bess-1",
+            Now - TimeSpan.FromMinutes(1),
+            Now + TimeSpan.FromMinutes(5),
+            CancellationToken.None);
+        Assert.Single(assetRuns);
+        Assert.Equal(optimalRun.RunId, assetRuns[0].RunId);
+
+        // Widen the range — failedRun is now included; both ordered by CreatedAt asc.
+        var bothRuns = await repo.QueryAsync(
+            "single-bess-1",
+            Now - TimeSpan.FromMinutes(1),
+            Now + TimeSpan.FromMinutes(10),
+            CancellationToken.None);
+        Assert.Equal(2, bothRuns.Count);
+        Assert.Equal(optimalRun.RunId, bothRuns[0].RunId);
+        Assert.Equal(failedRun.RunId, bothRuns[1].RunId);
+    }
+
+    [Fact]
+    public async Task Optimization_run_repository_rejects_duplicate_run_id_append()
+    {
+        var repo = new DapperOptimizationRunRepository(_dataSource!);
+        var runId = Guid.NewGuid();
+
+        var first = BuildRun(
+            runId: runId,
+            assetId: "single-bess-1",
+            createdAt: Now,
+            status: OptimizationSolverStatus.Optimal,
+            terminationReason: "ok",
+            objectiveValue: -1,
+            components: new[] { new OptimizationObjectiveComponent("energy_cost", -1, "EUR") },
+            constraintViolations: Array.Empty<string>(),
+            warnings: Array.Empty<string>(),
+            inputs: Array.Empty<ScheduleReference>(),
+            producedSchedule: new ScheduleReference("single-bess-1", ScheduleType.DayAhead, 1));
+
+        await repo.AppendAsync(first, CancellationToken.None);
+
+        var second = BuildRun(
+            runId: runId,
+            assetId: "single-bess-1",
+            createdAt: Now + TimeSpan.FromMinutes(1),
+            status: OptimizationSolverStatus.Failed,
+            terminationReason: "rebound",
+            objectiveValue: 0,
+            components: Array.Empty<OptimizationObjectiveComponent>(),
+            constraintViolations: Array.Empty<string>(),
+            warnings: Array.Empty<string>(),
+            inputs: Array.Empty<ScheduleReference>(),
+            producedSchedule: null);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => repo.AppendAsync(second, CancellationToken.None));
+        Assert.Contains(runId.ToString(), ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Initializer_is_idempotent_on_re_application()
     {
         // Calling InitializeAsync twice must not throw and must not break
@@ -281,13 +430,48 @@ public sealed class PersistenceRoundtripTests : IAsyncLifetime
         public DateTimeOffset UtcNow { get; }
     }
 
+    private static OptimizationRun BuildRun(
+        Guid runId,
+        string assetId,
+        DateTimeOffset createdAt,
+        OptimizationSolverStatus status,
+        string terminationReason,
+        double objectiveValue,
+        IReadOnlyList<OptimizationObjectiveComponent> components,
+        IReadOnlyList<string> constraintViolations,
+        IReadOnlyList<string> warnings,
+        IReadOnlyList<ScheduleReference> inputs,
+        ScheduleReference? producedSchedule)
+    {
+        return new OptimizationRun(
+            runId: runId,
+            assetId: assetId,
+            solverName: "or-tools-stub",
+            status: status,
+            horizonStart: createdAt,
+            horizonEnd: createdAt + TimeSpan.FromHours(24),
+            timeStep: TimeSpan.FromMinutes(15),
+            objectiveValue: objectiveValue,
+            objectiveBreakdown: components.Count == 0
+                ? OptimizationObjectiveBreakdown.Empty
+                : new OptimizationObjectiveBreakdown(components),
+            constraintViolations: constraintViolations,
+            warnings: warnings,
+            solverRuntime: TimeSpan.FromMilliseconds(125),
+            terminationReason: terminationReason,
+            createdAt: createdAt,
+            inputs: inputs,
+            producedSchedule: producedSchedule);
+    }
+
     private static async Task TruncateAllAsync(NpgsqlDataSource dataSource)
     {
         var connection = await dataSource.OpenConnectionAsync();
         await using (connection.ConfigureAwait(false))
         {
             await using var cmd = new NpgsqlCommand(
-                "TRUNCATE telemetry, commands, schedule_windows, schedules, audit_events RESTART IDENTITY CASCADE;",
+                "TRUNCATE telemetry, commands, schedule_windows, schedules, audit_events, "
+                + "optimization_objective_breakdowns, optimization_runs RESTART IDENTITY CASCADE;",
                 connection);
             await cmd.ExecuteNonQueryAsync();
         }
