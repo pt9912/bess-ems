@@ -30,7 +30,19 @@ namespace BatteryEms.Application.Api;
 // The M3 follow-up (plan §Open RM-M2-OP-OPEN-05) lifts the guarantee
 // into the persistence layer with an optimistic-concurrency check on
 // `IScheduleRepository.Replace`.
-public sealed partial class DefaultScheduleOptimizationUseCase : IScheduleOptimizationUseCase
+//
+// Lock-table lifetime (review C2): _locks accumulates one entry per
+// distinct (AssetId, ScheduleType) ever optimised by this instance.
+// For M2 with a stable IBatteryAssetRegistry the table plateaus at
+// |assets| × |ScheduleType| ≈ a handful and never grows further. The
+// native SemaphoreSlim handles are released on host shutdown via
+// IDisposable so the kernel handles don't survive the process. The
+// concern flips to "actively bounded" only if/when assets become
+// ephemeral (multi-tenant rotation, per-test asset IDs); at that
+// point an LRU/TTL eviction replaces the dictionary — captured as
+// RM-M2-OP-OPEN-06 in the plan.
+public sealed partial class DefaultScheduleOptimizationUseCase
+    : IScheduleOptimizationUseCase, IDisposable
 {
     // M2 default: every host is single-bid-area "DE-LU"; multi-area
     // hosts will replace this with a configured option in M3 once the
@@ -48,6 +60,10 @@ public sealed partial class DefaultScheduleOptimizationUseCase : IScheduleOptimi
     // sequence so two parallel calls cannot read the same base version
     // and overwrite each other's produced schedule (review #1).
     private readonly ConcurrentDictionary<(string AssetId, ScheduleType Type), SemaphoreSlim> _locks = new();
+
+    // 0 = alive, 1 = disposed. Interlocked to make Dispose idempotent
+    // even under unexpected concurrent-disposal races.
+    private int _disposed;
 
     public DefaultScheduleOptimizationUseCase(
         IScheduleOptimizer optimizer,
@@ -74,6 +90,7 @@ public sealed partial class DefaultScheduleOptimizationUseCase : IScheduleOptimi
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(inputs);
+        ObjectDisposedException.ThrowIf(_disposed == 1, this);
 
         var key = (inputs.AssetId, inputs.ScheduleType);
         var gate = _locks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
@@ -86,6 +103,24 @@ public sealed partial class DefaultScheduleOptimizationUseCase : IScheduleOptimi
         {
             gate.Release();
         }
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) == 1)
+        {
+            return;
+        }
+        // Drain the dictionary before disposing each semaphore so an
+        // inflight ExecuteAsync that already passed the IsDisposed gate
+        // can still Release on a snapshot reference. The native handle
+        // backing each SemaphoreSlim is released here; the GC would
+        // otherwise rely on a finaliser to close the kernel handle.
+        foreach (var gate in _locks.Values)
+        {
+            gate.Dispose();
+        }
+        _locks.Clear();
     }
 
     private async Task<ScheduleOptimizationOutcome> ExecuteUnderLockAsync(

@@ -197,6 +197,7 @@ Tests ohne Solver-Bindings behalten `NoOpScheduleOptimizer`.
 | RM-M2-OP-OPEN-03 | Replay-Reproduzierbarkeit: deterministische Solver-Konfiguration als M2-Anforderung oder als Soll? | Soll für M2; Solver-Determinismus hängt vom Backend ab und ist nicht überall garantiert. |
 | RM-M2-OP-OPEN-04 | API-Trigger: synchrone Antwort mit Solverlauf vs. asynchroner Job mit Status-Endpunkt? | Asynchron — `POST` legt Run an und gibt RunId zurück; `GET /optimization/runs/{id}` liefert Status. Solverlaufzeiten passen nicht in HTTP-Request-Budgets. |
 | RM-M2-OP-OPEN-05 | Schedule-Replace ist nicht atomar gegen parallele Optimize-Calls auf Multi-Replica-Hosts (Review S1). | M3: optimistic-concurrency in `IScheduleRepository.Replace(schedule, expectedBaseVersion)` mit `WHERE version = @expected` in der Dapper-Variante; bei Versionskonflikt wird ein eigener `OptimizationSolverStatus`-Pfad ausgelöst (Failed mit Reason `concurrent-version-conflict`). M2 nutzt den per-(asset,type)-Semaphore in `DefaultScheduleOptimizationUseCase` — ausreichend für Single-Host-Deployments. |
+| RM-M2-OP-OPEN-06 | `_locks`-Dictionary in `DefaultScheduleOptimizationUseCase` wächst pro Lifetime ohne Eviction (Review C2). | M2 ist OK: Asset-Registry ist statisch, Tabelle plateaut. `IDisposable` schließt native Semaphor-Handles am Host-Shutdown. M3-Trigger: ephemerär werdende Asset-IDs (Multi-Tenant-Rotation, per-test fresh IDs) — dann LRU- oder TTL-Eviction in `_locks` mit konfigurierbarer Schwelle und Metrik `bess_optimization_lock_table_size`. |
 
 ---
 

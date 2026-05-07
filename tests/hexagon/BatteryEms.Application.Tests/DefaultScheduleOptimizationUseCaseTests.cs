@@ -177,6 +177,35 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
     }
 
     [Fact]
+    public async Task Dispose_makes_subsequent_execute_throw_object_disposed()
+    {
+        // Review C2: the use case owns native SemaphoreSlim handles in
+        // _locks; Dispose releases them and rejects further work.
+        var useCase = Build(
+            new SpyOptimizer(req => BuildResult(req, OptimizationSolverStatus.Optimal, includeSchedule: true)),
+            new InMemoryScheduleRepository(),
+            new InMemoryOptimizationRunRepository());
+        await useCase.ExecuteAsync(BuildInputs(), CancellationToken.None);
+
+        useCase.Dispose();
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(() =>
+            useCase.ExecuteAsync(BuildInputs(), CancellationToken.None));
+    }
+
+    [Fact]
+    public void Dispose_is_idempotent()
+    {
+        var useCase = Build(
+            new SpyOptimizer(req => BuildResult(req, OptimizationSolverStatus.Optimal, includeSchedule: true)),
+            new InMemoryScheduleRepository(),
+            new InMemoryOptimizationRunRepository());
+
+        useCase.Dispose();
+        useCase.Dispose(); // must not throw under repeated calls
+    }
+
+    [Fact]
     public async Task Outcome_carries_run_id_and_termination_reason_from_persisted_run()
     {
         var optimizer = new SpyOptimizer(req =>
