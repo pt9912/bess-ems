@@ -9,8 +9,12 @@ public sealed record PidControllerOptions
     // OutputMin/OutputMax are required so a caller cannot silently
     // disable LH-CTRL-004's output-clamping property by forgetting to
     // configure them. Both must be finite — pass tight engineering
-    // bounds, or ±double.MaxValue if a particular consumer genuinely
-    // wants effectively unbounded behaviour.
+    // bounds. If a particular consumer genuinely wants effectively
+    // unbounded behaviour, use a wide finite range like ±1e10; do
+    // NOT pass ±double.MaxValue, because the post-compute sum
+    // P+I+D can step one ULP past MaxValue purely from the addition
+    // and trigger the IsFinite guard in PidController.Step, even
+    // though the gains and inputs were entirely reasonable.
     public required double OutputMin { get; init; }
     public required double OutputMax { get; init; }
 

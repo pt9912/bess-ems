@@ -623,6 +623,25 @@ public sealed class PidControllerTests
     }
 
     [Fact]
+    public void P_term_overflow_throws_overflow_exception()
+    {
+        // P-side overflow path. Ki=Kd=0 keeps the integrator and
+        // derivative branches finite; p = 1e300 * 1e300 = 1e600
+        // overflows to +Infinity, post-compute IsFinite(preClamp) fires.
+        var options = new PidControllerOptions
+        {
+            Kp = 1e300, Ki = 0, Kd = 0,
+            OutputMin = -1e308, OutputMax = 1e308,
+        };
+
+        Assert.Throws<OverflowException>(() => PidController.Step(
+            PidControllerState.Initial,
+            options,
+            setpoint: 1e300, measurement: 0,
+            Dt));
+    }
+
+    [Fact]
     public void Integrator_overflow_throws_overflow_exception_even_when_freeze_could_mask_it()
     {
         // Integrator-side overflow path. With the candidateIntegral

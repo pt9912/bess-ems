@@ -140,11 +140,9 @@ public static class PidController
         if (!double.IsFinite(preClamp))
         {
             // Catches non-finite from the P or D side (the integrator
-            // path is checked above). OverflowException carries no
-            // ParamName analogous to ArgumentException — diagnostics
-            // are in the message, which is the same convention the
-            // rest of Domain (RampLimiter etc.) uses for non-argument
-            // numerical faults.
+            // path is checked above). OverflowException is the
+            // semantic fit; it carries no ParamName analogous to
+            // ArgumentException, so diagnostics are in the message.
             throw new OverflowException(
                 $"PID step produced a non-finite output (P={p}, I={chosenIntegral}, D={d}). "
                 + "Reduce gains or widen the sample time.");
