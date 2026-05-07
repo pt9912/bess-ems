@@ -1,6 +1,5 @@
 using BatteryEms.Adapters.Optimization;
 using BatteryEms.Adapters.Optimization.OrTools;
-using BatteryEms.Application.Markets;
 using BatteryEms.Application.Optimization;
 using BatteryEms.Application.Time;
 using Microsoft.Extensions.DependencyInjection;
@@ -47,7 +46,6 @@ public sealed class OptimizationRegistrationTests
         services.AddBessScheduleSolver(opt =>
         {
             opt.TimeLimit = TimeSpan.FromSeconds(5);
-            opt.DefaultMarketBidArea = "AT";
             opt.InitialSocPercent = 50;
         });
 
@@ -55,7 +53,6 @@ public sealed class OptimizationRegistrationTests
         var options = provider.GetRequiredService<ScheduleSolverOptions>();
 
         Assert.Equal(TimeSpan.FromSeconds(5), options.TimeLimit);
-        Assert.Equal("AT", options.DefaultMarketBidArea);
         Assert.Equal(50, options.InitialSocPercent);
     }
 
@@ -69,10 +66,29 @@ public sealed class OptimizationRegistrationTests
             services.AddBessScheduleSolver(opt => opt.TimeLimit = TimeSpan.Zero));
     }
 
+    [Fact]
+    public void Resolved_options_are_init_only_and_with_expression_does_not_mutate_singleton()
+    {
+        // Review #11: the resolved ScheduleSolverOptions instance is
+        // immutable — a `with` copy yields a new instance, the live
+        // singleton stays unchanged. Behavioural test trumps reflection
+        // because the IL pattern for init-only setters is brittle.
+        var services = new ServiceCollection();
+        SeedApplicationDefaults(services);
+        services.AddBessScheduleSolver(opt => opt.TimeLimit = TimeSpan.FromSeconds(1));
+
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<ScheduleSolverOptions>();
+        var copy = options with { TimeLimit = TimeSpan.FromSeconds(99) };
+
+        Assert.Equal(TimeSpan.FromSeconds(99), copy.TimeLimit);
+        Assert.Equal(TimeSpan.FromSeconds(1), options.TimeLimit);
+        Assert.NotSame(options, copy);
+    }
+
     private static void SeedApplicationDefaults(IServiceCollection services)
     {
         services.AddSingleton<IClock>(new TestFixtures.FrozenClock(TestFixtures.HorizonStart));
-        services.AddSingleton<IScheduleRepository>(_ => new InMemoryScheduleRepository());
         services.AddSingleton(NullLoggerFactory.Instance);
         services.AddSingleton(typeof(Microsoft.Extensions.Logging.ILogger<>),
             typeof(Microsoft.Extensions.Logging.Abstractions.NullLogger<>));

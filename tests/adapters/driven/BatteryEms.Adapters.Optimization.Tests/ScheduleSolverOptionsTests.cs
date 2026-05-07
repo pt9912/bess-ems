@@ -11,7 +11,6 @@ public sealed class ScheduleSolverOptionsTests
         var options = new ScheduleSolverOptions();
         var validated = options.EnsureValid();
         Assert.Same(options, validated);
-        Assert.Equal("DE-LU", options.DefaultMarketBidArea);
         Assert.Null(options.TimeLimit);
         Assert.Null(options.GapTolerance);
         Assert.Null(options.InitialSocPercent);
@@ -48,12 +47,4 @@ public sealed class ScheduleSolverOptionsTests
             new ScheduleSolverOptions { InitialSocPercent = double.NaN }.EnsureValid());
     }
 
-    [Fact]
-    public void Blank_default_market_bid_area_throws()
-    {
-        Assert.Throws<ArgumentException>(() =>
-            new ScheduleSolverOptions { DefaultMarketBidArea = "" }.EnsureValid());
-        Assert.Throws<ArgumentException>(() =>
-            new ScheduleSolverOptions { DefaultMarketBidArea = "   " }.EnsureValid());
-    }
 }

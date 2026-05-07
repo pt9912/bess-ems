@@ -28,13 +28,13 @@ public static class OptimizationRegistration
     // override actually replaces the default.
     public static IServiceCollection AddBessScheduleSolver(
         this IServiceCollection services,
-        Action<ScheduleSolverOptions>? configure = null)
+        Action<ScheduleSolverOptionsBuilder>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        var options = new ScheduleSolverOptions();
-        configure?.Invoke(options);
-        options.EnsureValid();
+        var builder = new ScheduleSolverOptionsBuilder();
+        configure?.Invoke(builder);
+        var options = builder.Build().EnsureValid();
 
         services.AddSingleton(options);
         services.AddSingleton<IScheduleOptimizer, OrToolsScheduleOptimizer>();

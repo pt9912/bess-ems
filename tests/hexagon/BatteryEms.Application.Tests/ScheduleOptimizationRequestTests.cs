@@ -25,6 +25,8 @@ public sealed class ScheduleOptimizationRequestTests
             horizonStart: HorizonStart,
             horizonEnd: HorizonStart + TimeSpan.FromHours(24),
             timeStep: TimeSpan.FromHours(1),
+            marketBidArea: "DE-LU",
+            baseScheduleVersion: 0,
             pricesPerStep: prices,
             priceUnit: "EUR/MWh");
 
@@ -44,6 +46,8 @@ public sealed class ScheduleOptimizationRequestTests
             horizonStart: HorizonStart,
             horizonEnd: HorizonStart + TimeSpan.FromHours(1),
             timeStep: TimeSpan.FromHours(1),
+            marketBidArea: "DE-LU",
+            baseScheduleVersion: 0,
             inputs: new[] { new ScheduleReference("asset-1", ScheduleType.DayAhead, 7) });
 
         Assert.Equal(7, Assert.Single(request.Inputs).Version);
@@ -58,7 +62,9 @@ public sealed class ScheduleOptimizationRequestTests
             asset: TestFixtures.CreateAsset(),
             horizonStart: HorizonStart,
             horizonEnd: HorizonStart + TimeSpan.FromMinutes(90),
-            timeStep: TimeSpan.FromHours(1)));
+            timeStep: TimeSpan.FromHours(1),
+            marketBidArea: "DE-LU",
+            baseScheduleVersion: 0));
     }
 
     [Fact]
@@ -70,7 +76,9 @@ public sealed class ScheduleOptimizationRequestTests
             asset: TestFixtures.CreateAsset(),
             horizonStart: HorizonStart + TimeSpan.FromHours(1),
             horizonEnd: HorizonStart,
-            timeStep: TimeSpan.FromHours(1)));
+            timeStep: TimeSpan.FromHours(1),
+            marketBidArea: "DE-LU",
+            baseScheduleVersion: 0));
     }
 
     [Fact]
@@ -82,7 +90,9 @@ public sealed class ScheduleOptimizationRequestTests
             asset: TestFixtures.CreateAsset(),
             horizonStart: HorizonStart,
             horizonEnd: HorizonStart + TimeSpan.FromHours(1),
-            timeStep: TimeSpan.Zero));
+            timeStep: TimeSpan.Zero,
+            marketBidArea: "DE-LU",
+            baseScheduleVersion: 0));
     }
 
     private static readonly double[] OnePriceFifty = { 50.0 };
@@ -98,6 +108,8 @@ public sealed class ScheduleOptimizationRequestTests
             horizonStart: HorizonStart,
             horizonEnd: HorizonStart + TimeSpan.FromHours(2),
             timeStep: TimeSpan.FromHours(1),
+            marketBidArea: "DE-LU",
+            baseScheduleVersion: 0,
             pricesPerStep: OnePriceTen,
             priceUnit: "EUR/MWh"));
     }
@@ -112,6 +124,8 @@ public sealed class ScheduleOptimizationRequestTests
             horizonStart: HorizonStart,
             horizonEnd: HorizonStart + TimeSpan.FromHours(1),
             timeStep: TimeSpan.FromHours(1),
+            marketBidArea: "DE-LU",
+            baseScheduleVersion: 0,
             pricesPerStep: OnePriceFifty,
             priceUnit: ""));
     }
@@ -129,6 +143,8 @@ public sealed class ScheduleOptimizationRequestTests
             horizonStart: HorizonStart,
             horizonEnd: HorizonStart + TimeSpan.FromHours(1),
             timeStep: TimeSpan.FromHours(1),
+            marketBidArea: "DE-LU",
+            baseScheduleVersion: 0,
             pricesPerStep: prices,
             priceUnit: "EUR/MWh"));
     }
@@ -142,6 +158,36 @@ public sealed class ScheduleOptimizationRequestTests
             asset: TestFixtures.CreateAsset(),
             horizonStart: HorizonStart,
             horizonEnd: HorizonStart + TimeSpan.FromHours(1),
-            timeStep: TimeSpan.FromHours(1)));
+            timeStep: TimeSpan.FromHours(1),
+            marketBidArea: "DE-LU",
+            baseScheduleVersion: 0));
+    }
+
+    [Fact]
+    public void Blank_market_bid_area_throws()
+    {
+        Assert.Throws<ArgumentException>(() => new ScheduleOptimizationRequest(
+            assetId: "asset-1",
+            scheduleType: ScheduleType.DayAhead,
+            asset: TestFixtures.CreateAsset(),
+            horizonStart: HorizonStart,
+            horizonEnd: HorizonStart + TimeSpan.FromHours(1),
+            timeStep: TimeSpan.FromHours(1),
+            marketBidArea: "",
+            baseScheduleVersion: 0));
+    }
+
+    [Fact]
+    public void Negative_base_schedule_version_throws()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ScheduleOptimizationRequest(
+            assetId: "asset-1",
+            scheduleType: ScheduleType.DayAhead,
+            asset: TestFixtures.CreateAsset(),
+            horizonStart: HorizonStart,
+            horizonEnd: HorizonStart + TimeSpan.FromHours(1),
+            timeStep: TimeSpan.FromHours(1),
+            marketBidArea: "DE-LU",
+            baseScheduleVersion: -1));
     }
 }

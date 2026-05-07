@@ -30,6 +30,15 @@ public sealed class ScheduleOptimizationRequest
     public string? PriceUnit { get; }
     public IReadOnlyList<ScheduleReference> Inputs { get; }
 
+    // RM-M2-OP-05 review #1/#3: identity is resolved by the use case
+    // before the optimiser is invoked. MarketBidArea is inherited from
+    // the latest existing Schedule for (AssetId, ScheduleType); when no
+    // prior schedule exists the use case supplies its configured default.
+    // BaseScheduleVersion is the version of that prior schedule (0 when
+    // none exists); the optimiser produces version BaseScheduleVersion+1.
+    public string MarketBidArea { get; }
+    public int BaseScheduleVersion { get; }
+
     public ScheduleOptimizationRequest(
         string assetId,
         ScheduleType scheduleType,
@@ -37,12 +46,21 @@ public sealed class ScheduleOptimizationRequest
         DateTimeOffset horizonStart,
         DateTimeOffset horizonEnd,
         TimeSpan timeStep,
+        string marketBidArea,
+        int baseScheduleVersion,
         IReadOnlyList<double>? pricesPerStep = null,
         string? priceUnit = null,
         IReadOnlyList<ScheduleReference>? inputs = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(assetId);
         ArgumentNullException.ThrowIfNull(asset);
+        ArgumentException.ThrowIfNullOrWhiteSpace(marketBidArea);
+        if (baseScheduleVersion < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(baseScheduleVersion), baseScheduleVersion,
+                "BaseScheduleVersion must be non-negative; 0 means no prior schedule exists.");
+        }
         if (horizonStart >= horizonEnd)
         {
             throw new ArgumentException(
@@ -103,6 +121,8 @@ public sealed class ScheduleOptimizationRequest
         HorizonStart = horizonStart;
         HorizonEnd = horizonEnd;
         TimeStep = timeStep;
+        MarketBidArea = marketBidArea;
+        BaseScheduleVersion = baseScheduleVersion;
         PricesPerStep = pricesPerStep;
         PriceUnit = priceUnit;
         Inputs = inputs ?? Array.Empty<ScheduleReference>();

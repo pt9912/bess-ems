@@ -1,5 +1,4 @@
 using BatteryEms.Adapters.Optimization.OrTools;
-using BatteryEms.Application.Markets;
 using BatteryEms.Application.Optimization;
 using BatteryEms.Domain;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -79,18 +78,6 @@ public sealed class OrToolsScheduleOptimizerPreflightTests
         Assert.Throws<ArgumentNullException>(() =>
             new OrToolsScheduleOptimizer(
                 null!,
-                new InMemoryScheduleRepository(),
-                new TestFixtures.FrozenClock(TestFixtures.HorizonStart),
-                NullLogger<OrToolsScheduleOptimizer>.Instance));
-    }
-
-    [Fact]
-    public void Null_repository_throws_in_constructor()
-    {
-        Assert.Throws<ArgumentNullException>(() =>
-            new OrToolsScheduleOptimizer(
-                new ScheduleSolverOptions(),
-                null!,
                 new TestFixtures.FrozenClock(TestFixtures.HorizonStart),
                 NullLogger<OrToolsScheduleOptimizer>.Instance));
     }
@@ -101,7 +88,6 @@ public sealed class OrToolsScheduleOptimizerPreflightTests
         Assert.Throws<ArgumentNullException>(() =>
             new OrToolsScheduleOptimizer(
                 new ScheduleSolverOptions(),
-                new InMemoryScheduleRepository(),
                 null!,
                 NullLogger<OrToolsScheduleOptimizer>.Instance));
     }
@@ -112,7 +98,6 @@ public sealed class OrToolsScheduleOptimizerPreflightTests
         Assert.Throws<ArgumentNullException>(() =>
             new OrToolsScheduleOptimizer(
                 new ScheduleSolverOptions(),
-                new InMemoryScheduleRepository(),
                 new TestFixtures.FrozenClock(TestFixtures.HorizonStart),
                 null!));
     }
@@ -128,7 +113,6 @@ public sealed class OrToolsScheduleOptimizerPreflightTests
     private static OrToolsScheduleOptimizer Build(ScheduleSolverOptions? options = null) =>
         new(
             options ?? new ScheduleSolverOptions(),
-            new InMemoryScheduleRepository(),
             new TestFixtures.FrozenClock(TestFixtures.HorizonStart),
             NullLogger<OrToolsScheduleOptimizer>.Instance);
 
@@ -143,6 +127,8 @@ public sealed class OrToolsScheduleOptimizerPreflightTests
             horizonStart: TestFixtures.HorizonStart,
             horizonEnd: TestFixtures.HorizonStart + TimeSpan.FromHours(2),
             timeStep: TimeSpan.FromHours(1),
+            marketBidArea: "DE-LU",
+            baseScheduleVersion: 0,
             pricesPerStep: prices,
             priceUnit: priceUnit);
     }

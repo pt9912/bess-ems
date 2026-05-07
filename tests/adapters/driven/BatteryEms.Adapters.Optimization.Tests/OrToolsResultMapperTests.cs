@@ -26,24 +26,42 @@ public sealed class OrToolsResultMapperTests
     }
 
     [Fact]
-    public void Not_solved_within_time_limit_window_maps_to_time_limit()
+    public void Not_solved_strictly_past_time_limit_maps_to_time_limit()
     {
         var (status, reason) = OrToolsResultMapper.Map(
             Solver.ResultStatus.NOT_SOLVED,
-            elapsed: TimeSpan.FromSeconds(2),
+            elapsed: TimeSpan.FromSeconds(2.5),
             timeLimit: TimeSpan.FromSeconds(2));
         Assert.Equal(OptimizationSolverStatus.TimeLimit, status);
         Assert.StartsWith("or-tools-time-limit", reason, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Feasible_after_time_limit_also_maps_to_time_limit_status()
+    public void Not_solved_at_exact_time_limit_boundary_stays_failed()
     {
+        // Review #2: strict `>` protects boundary cases — at elapsed
+        // exactly equal to the budget the solver might still have a
+        // valid result; only NOT_SOLVED past the budget gets the
+        // TimeLimit reclass.
+        var (status, _) = OrToolsResultMapper.Map(
+            Solver.ResultStatus.NOT_SOLVED,
+            elapsed: TimeSpan.FromSeconds(2),
+            timeLimit: TimeSpan.FromSeconds(2));
+        Assert.Equal(OptimizationSolverStatus.Failed, status);
+    }
+
+    [Fact]
+    public void Feasible_past_time_limit_keeps_feasible_status_and_preserves_schedule_path()
+    {
+        // Review #2 fix: previously a FEASIBLE solve at time-limit was
+        // re-classified to TimeLimit and its schedule discarded. Now
+        // FEASIBLE always stays FEASIBLE — the caller keeps the run's
+        // produced schedule. TimeLimit only applies to NOT_SOLVED.
         var (status, _) = OrToolsResultMapper.Map(
             Solver.ResultStatus.FEASIBLE,
             elapsed: TimeSpan.FromSeconds(5),
             timeLimit: TimeSpan.FromSeconds(2));
-        Assert.Equal(OptimizationSolverStatus.TimeLimit, status);
+        Assert.Equal(OptimizationSolverStatus.Feasible, status);
     }
 
     [Fact]

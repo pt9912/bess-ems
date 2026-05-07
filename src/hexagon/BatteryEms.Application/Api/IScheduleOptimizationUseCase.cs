@@ -11,7 +11,7 @@ namespace BatteryEms.Application.Api;
 public interface IScheduleOptimizationUseCase
 {
     Task<ScheduleOptimizationOutcome> ExecuteAsync(
-        ScheduleOptimizationRequest request,
+        ScheduleOptimizationInputs inputs,
         CancellationToken cancellationToken);
 }
 

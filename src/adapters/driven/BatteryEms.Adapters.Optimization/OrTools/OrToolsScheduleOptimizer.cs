@@ -1,4 +1,3 @@
-using BatteryEms.Application.Markets;
 using BatteryEms.Application.Optimization;
 using BatteryEms.Application.Time;
 using BatteryEms.Domain;
@@ -14,37 +13,54 @@ namespace BatteryEms.Adapters.Optimization.OrTools;
 // objective (PriceUnit "EUR/MWh"), no MILP because LP-relaxation under
 // η<1 already discourages simultaneous charge + discharge.
 //
-// The adapter is *also* the place that decides the produced Schedule's
-// version and market bid area: it looks up the latest Schedule for
-// (assetId, type) on the IScheduleRepository, inherits MarketBidArea
-// and increments Version. When no prior schedule exists the M2 default
-// from ScheduleSolverOptions.DefaultMarketBidArea applies and version
-// starts at 1.
+// Schedule identity (MarketBidArea + version) is supplied on the
+// request by the use case (RM-M2-OP-05 review #1/#3) — the optimiser
+// no longer reaches into IScheduleRepository to derive it, so the
+// read-optimise-write race against parallel calls disappears (the use
+// case serialises per (asset, type)).
 public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
 {
     private const string SolverName = "or-tools-glop";
     private const string SupportedPriceUnit = "EUR/MWh";
 
+    // Solutions whose absolute objective value sits below this threshold
+    // are snapped to zero before being recorded in the run breakdown so
+    // a trivial optimum (flat prices, no profitable arbitrage) does not
+    // surface floating-point noise like -1.4e-12 EUR (review #18).
+    private const double ObjectiveZeroEpsilon = 1e-9;
+
     private readonly ScheduleSolverOptions _options;
-    private readonly IScheduleRepository _scheduleRepository;
     private readonly IClock _clock;
     private readonly ILogger<OrToolsScheduleOptimizer> _logger;
 
+    // Test seam: lets a test substitute the backend's Solve() return
+    // value so the non-solution path (Infeasible / Unbounded / Failed)
+    // can be exercised without forcing a contrived LP that GLOP rejects
+    // (review #7). null in production = use the real backend status.
+    private readonly Func<Solver.ResultStatus, Solver.ResultStatus>? _resultStatusOverride;
+
     public OrToolsScheduleOptimizer(
         ScheduleSolverOptions options,
-        IScheduleRepository scheduleRepository,
         IClock clock,
         ILogger<OrToolsScheduleOptimizer> logger)
+        : this(options, clock, logger, resultStatusOverride: null)
+    {
+    }
+
+    internal OrToolsScheduleOptimizer(
+        ScheduleSolverOptions options,
+        IClock clock,
+        ILogger<OrToolsScheduleOptimizer> logger,
+        Func<Solver.ResultStatus, Solver.ResultStatus>? resultStatusOverride)
     {
         ArgumentNullException.ThrowIfNull(options);
-        ArgumentNullException.ThrowIfNull(scheduleRepository);
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(logger);
 
         _options = options.EnsureValid();
-        _scheduleRepository = scheduleRepository;
         _clock = clock;
         _logger = logger;
+        _resultStatusOverride = resultStatusOverride;
     }
 
     public Task<ScheduleOptimizationResult> OptimizeAsync(
@@ -68,10 +84,12 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
                 $"OR-Tools schedule optimiser only accepts PriceUnit '{SupportedPriceUnit}'."));
         }
 
-        return Task.FromResult(Solve(request));
+        return Task.FromResult(Solve(request, cancellationToken));
     }
 
-    private ScheduleOptimizationResult Solve(ScheduleOptimizationRequest request)
+    private ScheduleOptimizationResult Solve(
+        ScheduleOptimizationRequest request,
+        CancellationToken cancellationToken)
     {
         var asset = request.Asset;
         var n = request.StepCount;
@@ -108,12 +126,12 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
             var soc = new Variable[n + 1];
             for (var t = 0; t < n; t++)
             {
-                charge[t] = solver.MakeNumVar(0, asset.MaxChargePowerKw, FormattableString.Invariant($"p_charge_{t}"));
-                discharge[t] = solver.MakeNumVar(0, asset.MaxDischargePowerKw, FormattableString.Invariant($"p_discharge_{t}"));
+                charge[t] = solver.MakeNumVar(0, asset.MaxChargePowerKw, $"p_charge_{t}");
+                discharge[t] = solver.MakeNumVar(0, asset.MaxDischargePowerKw, $"p_discharge_{t}");
             }
             for (var t = 0; t <= n; t++)
             {
-                soc[t] = solver.MakeNumVar(socMinKwh, socMaxKwh, FormattableString.Invariant($"soc_{t}"));
+                soc[t] = solver.MakeNumVar(socMinKwh, socMaxKwh, $"soc_{t}");
             }
 
             // Initial SOC pinned (LP equality is a [c, c] range constraint).
@@ -125,7 +143,7 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
             // → soc[t+1] − soc[t] − ηC * Δt * p_charge[t] + Δt/ηD * p_discharge[t] = 0
             for (var t = 0; t < n; t++)
             {
-                var dyn = solver.MakeConstraint(0, 0, FormattableString.Invariant($"soc_dyn_{t}"));
+                var dyn = solver.MakeConstraint(0, 0, $"soc_dyn_{t}");
                 dyn.SetCoefficient(soc[t + 1], 1.0);
                 dyn.SetCoefficient(soc[t], -1.0);
                 dyn.SetCoefficient(charge[t], -asset.ChargeEfficiency * dtHours);
@@ -144,8 +162,15 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
             }
             objective.SetMinimization();
 
-            var backendStatus = solver.Solve();
+            var rawBackendStatus = solver.Solve();
+            var backendStatus = _resultStatusOverride is null
+                ? rawBackendStatus
+                : _resultStatusOverride(rawBackendStatus);
             var elapsed = TimeSpan.FromMilliseconds(solver.WallTime());
+            // Post-solve cancellation — GLOP itself is uncancellable
+            // mid-solve, but the build path that follows can take long
+            // enough for a cooperative caller to give up (review #9).
+            cancellationToken.ThrowIfCancellationRequested();
             var (mappedStatus, terminationReason) = OrToolsResultMapper.Map(
                 backendStatus, elapsed, _options.TimeLimit);
 
@@ -153,9 +178,15 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
 
             if (mappedStatus is OptimizationSolverStatus.Optimal or OptimizationSolverStatus.Feasible)
             {
+                var rawObjective = objective.Value();
+                // Snap floating-point noise around a trivial optimum to
+                // exact zero before persisting (review #18) — keeps a
+                // flat-price idle run from surfacing a -1.4e-12 EUR
+                // breakdown that confuses dashboards.
+                var snappedObjective = Math.Abs(rawObjective) < ObjectiveZeroEpsilon ? 0.0 : rawObjective;
                 return BuildSolutionResult(
                     request, mappedStatus, terminationReason,
-                    charge, discharge, objective.Value(), elapsed);
+                    charge, discharge, snappedObjective, elapsed);
             }
 
             return BuildNonSolutionResult(request, mappedStatus, terminationReason, elapsed);
@@ -176,22 +207,27 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
         TimeSpan elapsed)
     {
         var n = request.StepCount;
+        // Defensive normalisation to UTC: Schedule's downstream consumers
+        // (loader, persistence, IScheduleTracker) assume Offset == Zero
+        // (Schedule.cs:13). The request-level constructor doesn't enforce
+        // the offset, so do it once here to keep windows in canonical form
+        // (review #4).
+        var horizonStartUtc = request.HorizonStart.ToUniversalTime();
         var windows = new ScheduleWindow[n];
         for (var t = 0; t < n; t++)
         {
             // Domain convention: discharge positive, charge negative.
             var targetKw = discharge[t].SolutionValue() - charge[t].SolutionValue();
-            var start = request.HorizonStart + TimeSpan.FromTicks(request.TimeStep.Ticks * t);
-            var end = request.HorizonStart + TimeSpan.FromTicks(request.TimeStep.Ticks * (t + 1));
+            var start = horizonStartUtc + TimeSpan.FromTicks(request.TimeStep.Ticks * t);
+            var end = horizonStartUtc + TimeSpan.FromTicks(request.TimeStep.Ticks * (t + 1));
             windows[t] = new ScheduleWindow(start, end, targetKw);
         }
 
-        var (marketBidArea, version) = ResolveScheduleIdentity(request);
         var schedule = new Schedule(
             request.AssetId,
             request.ScheduleType,
-            marketBidArea,
-            version,
+            request.MarketBidArea,
+            request.BaseScheduleVersion + 1,
             windows);
 
         var producedReference = new ScheduleReference(
@@ -222,21 +258,10 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
         return new ScheduleOptimizationResult(run, schedule);
     }
 
-    private (string MarketBidArea, int Version) ResolveScheduleIdentity(ScheduleOptimizationRequest request)
-    {
-        var existing = _scheduleRepository.FindActive(request.AssetId, request.ScheduleType);
-        return existing is null
-            ? (_options.DefaultMarketBidArea, 1)
-            : (existing.MarketBidArea, existing.Version + 1);
-    }
-
-    // Defensive: GLOP's LP under M2-minimal inputs (linear, finite price
-    // series, sane SOC/power bounds) is always feasible at p_charge =
-    // p_discharge = 0, so Infeasible / Unbounded / TimeLimit are
-    // unreachable in normal operation. Kept as a guarded fallback for the
-    // day a future model adds binaries / discrete constraints; coverage
-    // is then lifted along with the new path's tests.
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    // Plan §Resultatvertrag mandates this output shape for non-solution
+    // statuses (Infeasible / Unbounded / Failed / TimeLimit). The path is
+    // exercised end-to-end by the test that injects a custom result-status
+    // override (review #7).
     private ScheduleOptimizationResult BuildNonSolutionResult(
         ScheduleOptimizationRequest request,
         OptimizationSolverStatus status,

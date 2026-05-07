@@ -19,16 +19,19 @@ internal static class OrToolsResultMapper
         TimeSpan elapsed,
         TimeSpan? timeLimit)
     {
-        // GLOP usually surfaces NOT_SOLVED both for "I gave up" and for
-        // "I never started"; if a TimeLimit was set and we crossed it,
-        // map to the dedicated TimeLimit status so the status counter
-        // doesn't lump deadline misses with crashes.
+        // GLOP surfaces NOT_SOLVED both for "I gave up" and for "I never
+        // started"; if a TimeLimit was set and we *strictly* crossed it,
+        // map NOT_SOLVED to the dedicated TimeLimit status so the status
+        // counter doesn't lump deadline misses with crashes. Strict `>`
+        // (review #2) protects a FEASIBLE solve that finishes exactly at
+        // the budget boundary from being re-classified — its schedule
+        // would otherwise be discarded by the caller.
         if (timeLimit is { } limit
-            && elapsed >= limit
-            && backendStatus is Solver.ResultStatus.NOT_SOLVED or Solver.ResultStatus.FEASIBLE)
+            && elapsed > limit
+            && backendStatus == Solver.ResultStatus.NOT_SOLVED)
         {
             return (OptimizationSolverStatus.TimeLimit,
-                $"or-tools-time-limit ({elapsed.TotalSeconds:F3}s ≥ {limit.TotalSeconds:F3}s)");
+                $"or-tools-time-limit ({elapsed.TotalSeconds:F3}s > {limit.TotalSeconds:F3}s)");
         }
 
         return backendStatus switch

@@ -21,7 +21,9 @@ public sealed class NoOpScheduleOptimizerTests
             asset: TestFixtures.CreateAsset(),
             horizonStart: HorizonStart,
             horizonEnd: HorizonStart + TimeSpan.FromHours(1),
-            timeStep: TimeSpan.FromHours(1));
+            timeStep: TimeSpan.FromHours(1),
+            marketBidArea: "DE-LU",
+            baseScheduleVersion: 0);
 
         var result = await optimizer.OptimizeAsync(request, CancellationToken.None);
 
