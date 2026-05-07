@@ -81,6 +81,11 @@ RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.cs
     --no-build \
     --no-restore \
     --logger "console;verbosity=normal" \
+ && dotnet test tests/adapters/driven/BatteryEms.Adapters.Optimization.Tests/BatteryEms.Adapters.Optimization.Tests.csproj \
+    --configuration "${BUILD_CONFIGURATION}" \
+    --no-build \
+    --no-restore \
+    --logger "console;verbosity=normal" \
  && dotnet test tests/adapters/driving/BatteryEms.Worker.Tests/BatteryEms.Worker.Tests.csproj \
     --configuration "${BUILD_CONFIGURATION}" \
     --no-build \
@@ -141,7 +146,18 @@ RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.cs
     /p:CollectCoverage=true \
     /p:CoverletOutputFormat=cobertura \
     /p:CoverletOutput=/src/coverage/Application/ \
-    /p:Include="[BatteryEms.Application]*%2C[BatteryEms.Adapters.Optimization]*" \
+    /p:Include="[BatteryEms.Application]*" \
+    /p:ExcludeByFile="**/*.generated.cs" \
+    /p:Threshold=90 \
+    /p:ThresholdType=line \
+    /p:ThresholdStat=total \
+ && dotnet test tests/adapters/driven/BatteryEms.Adapters.Optimization.Tests/BatteryEms.Adapters.Optimization.Tests.csproj \
+    --configuration "${BUILD_CONFIGURATION}" \
+    --no-restore \
+    /p:CollectCoverage=true \
+    /p:CoverletOutputFormat=cobertura \
+    /p:CoverletOutput=/src/coverage/Optimization/ \
+    /p:Include="[BatteryEms.Adapters.Optimization]*" \
     /p:ExcludeByFile="**/*.generated.cs" \
     /p:Threshold=90 \
     /p:ThresholdType=line \

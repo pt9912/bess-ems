@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>BatteryEms.Adapters.Optimization.Tests</RootNamespace>
+    <AssemblyName>BatteryEms.Adapters.Optimization.Tests</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="coverlet.msbuild">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\src\hexagon\BatteryEms.Domain\BatteryEms.Domain.csproj" />
+    <ProjectReference Include="..\..\..\..\src\hexagon\BatteryEms.Application\BatteryEms.Application.csproj" />
+    <ProjectReference Include="..\..\..\..\src\adapters\driven\BatteryEms.Adapters.Optimization\BatteryEms.Adapters.Optimization.csproj" />
+  </ItemGroup>
+
+</Project>

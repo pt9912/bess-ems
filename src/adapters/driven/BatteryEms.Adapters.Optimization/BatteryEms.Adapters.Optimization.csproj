@@ -6,7 +6,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Google.OrTools" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
   </ItemGroup>
 
   <ItemGroup>
