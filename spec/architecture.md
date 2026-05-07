@@ -178,8 +178,8 @@ Case → Driven Ports → Driven Adapter**.
 
 #### Verzeichnisstruktur (.NET-Solution)
 
-Bess-ems folgt dem **driving/driven**-Stil (analog `d-migrate`,
-`m-trace`). „Driving" markiert die Aufrufrichtung von außen in den Kern,
+Bess-ems folgt dem **driving/driven**-Stil. „Driving" markiert die
+Aufrufrichtung von außen in den Kern,
 „Driven" die Aufrufrichtung vom Kern nach außen. Die Verzeichnisstruktur
 ist verbindlich für den Solution-Aufbau (RM-M1-01):
 

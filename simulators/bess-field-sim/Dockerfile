@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1.7
 #
 # bess-field-sim — Go simulator (plan-RM-M1-simulator.md).
-# Docker-only workflow; no host Go toolchain required. Multi-stage layout
-# adapted from m-trace/apps/api/Dockerfile.
+# Docker-only workflow; no host Go toolchain required. Standard
+# multi-stage Go build with separate deps/build/runtime layers.
 #
 # Stages:
 #   deps     — go module download (cache layer)

@@ -1,5 +1,4 @@
-# bess-field-sim Makefile (plan-RM-M1-simulator.md). Docker-only workflow,
-# adapted from m-trace/apps/api/Makefile.
+# bess-field-sim Makefile (plan-RM-M1-simulator.md). Docker-only workflow.
 
 IMAGE := bess-field-sim
 THRESHOLD ?= 90

@@ -356,10 +356,10 @@ BatteryEms.Adapters.Optimization
 BatteryEms.Adapters.NativeInterop     # ab M3
 ```
 
-Threshold: **90 % Line-Coverage**, Ziel **≥ 95 %**. Begründung analog
-m-trace: ein Threshold, der mit der Realität gleichzieht statt sie zu
-führen, wird typischerweise gesenkt — also wird er von Anfang an hoch
-gehalten. Senkung des Defaults ist eine ADR-pflichtige Entscheidung.
+Threshold: **90 % Line-Coverage**, Ziel **≥ 95 %**. Ein Threshold, der
+mit der Realität gleichzieht statt sie zu führen, wird typischerweise
+gesenkt — also wird er von Anfang an hoch gehalten. Senkung des
+Defaults ist eine ADR-pflichtige Entscheidung.
 
 Artefakte:
 
