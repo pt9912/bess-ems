@@ -23,11 +23,7 @@
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.7" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.7" />
     <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.7" />
-    <!-- MQTTnet 5.x ist ein dokumentiertes Breaking-Change-Release
-         (`MQTTnet.Client`-Namespace abgeschafft, Types nach `MQTTnet`
-         gewandert; Builder-API überarbeitet). Bumpe verlangt einen
-         eigenen Migration-Slice — Fallback auf 4.3.7.1207 für jetzt. -->
-    <PackageVersion Include="MQTTnet" Version="4.3.7.1207" />
+    <PackageVersion Include="MQTTnet" Version="5.1.0.1559" />
     <PackageVersion Include="Npgsql" Version="10.0.2" />
     <PackageVersion Include="NSubstitute" Version="5.3.0" />
     <PackageVersion Include="prometheus-net.AspNetCore" Version="8.2.1" />

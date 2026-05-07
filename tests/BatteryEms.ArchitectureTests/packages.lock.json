@@ -338,7 +338,7 @@
         "dependencies": {
           "BatteryEms.Application": "[1.0.0, )",
           "BatteryEms.Domain": "[1.0.0, )",
-          "MQTTnet": "[4.3.7.1207, )",
+          "MQTTnet": "[5.1.0.1559, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.7, )"
         }
       },
@@ -528,9 +528,9 @@
       },
       "MQTTnet": {
         "type": "CentralTransitive",
-        "requested": "[4.3.7.1207, )",
-        "resolved": "4.3.7.1207",
-        "contentHash": "ah7aHXoedWp5m5a4zy2u4phOEVj0QFYzOb5tFKQeV8RRBrxp+1QREF4ymZuG8D+hzB2dhtrrG81WxTFv0PzOeQ=="
+        "requested": "[5.1.0.1559, )",
+        "resolved": "5.1.0.1559",
+        "contentHash": "9mkk0H+76CToIzp9ru5Uj5BuC3P5hQdkhvXM+CLmmTDdZWqajjICCHuUMbDd1yVBt9BWL77Rvzt0A+/PA4WMCA=="
       },
       "Npgsql": {
         "type": "CentralTransitive",

@@ -1,6 +1,6 @@
+using System.Buffers;
 using System.Collections.Concurrent;
 using MQTTnet;
-using MQTTnet.Client;
 using MQTTnet.Protocol;
 
 namespace BatteryEms.Adapters.Mqtt;
@@ -14,7 +14,7 @@ namespace BatteryEms.Adapters.Mqtt;
 // are M2 work; do not point this client at production brokers.
 public sealed class MqttNetClient : IMqttClient
 {
-    private readonly MQTTnet.Client.IMqttClient _inner;
+    private readonly MQTTnet.IMqttClient _inner;
     private readonly MqttClientOptions _connectOptions;
     private readonly TimeSpan _connectTimeout;
     private readonly ConcurrentDictionary<string, List<Func<MqttMessage, Task>>> _handlers = new(StringComparer.Ordinal);
@@ -24,7 +24,9 @@ public sealed class MqttNetClient : IMqttClient
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        var factory = new MqttFactory();
+        // MQTTnet 5.0 split MqttFactory into client / server factories;
+        // we only need the client side.
+        var factory = new MqttClientFactory();
         _inner = factory.CreateMqttClient();
         _connectOptions = new MqttClientOptionsBuilder()
             .WithTcpServer(options.BrokerHost, options.BrokerPort)
@@ -121,7 +123,11 @@ public sealed class MqttNetClient : IMqttClient
             snapshot = handlers.ToArray();
         }
 
-        var payload = e.ApplicationMessage.PayloadSegment.ToArray();
+        // MQTTnet 5.0: ApplicationMessage.PayloadSegment lost its
+        // getter; the read-side is ReadOnlySequence<byte> Payload, and
+        // ToArray() materialises it into the byte[] our handlers
+        // expect. Single-allocation copy, same shape as before.
+        var payload = e.ApplicationMessage.Payload.ToArray();
         var message = new MqttMessage(topic, payload);
         foreach (var handler in snapshot)
         {

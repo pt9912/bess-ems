@@ -185,19 +185,10 @@ Hash, den der Reviewer beim Mergen gesehen hat.
 Der Workflow ist als `make lock-refresh` Target verfügbar; er ruft
 denselben Docker-Befehl wie oben.
 
-**Aufgeschobene Major-Bumps (Stand 2026-05-07):** Beim Bulk-Refresh
-auf Latest-Stable im RM-M2-06-Slice zeigten zwei Pakete dokumentierte
-Breaking-Changes, die je einen eigenen Migration-Slice brauchen. Bis
-dieser kommt, bleiben die Versionen festgepinnt mit Begründungs-Kommentar
-in `Directory.Packages.props`:
+**Aufgeschobene Bumps (Stand 2026-05-07):**
 
-- **MQTTnet 4.3.7.1207 → 5.x:** `MQTTnet.Client`-Namespace abgeschafft,
-  Builder-API überarbeitet. Betrifft `MqttNetClient.cs`,
-  `IMqttClient.cs`, `MqttRegistration.cs` und den
-  `ArchitectureTabusTests`-Eintrag, der `MQTTnet.Client` als verbotene
-  Application-Referenz nennt.
-Bei `Google.OrTools` steht ebenfalls ein 9.11 → 9.15-Bump aus, der
-die Native-Bindings updatet — separater Review-Schritt mit Lock-File-
+Bei `Google.OrTools` steht ein 9.11 → 9.15-Bump aus, der die
+Native-Bindings updatet — separater Review-Schritt mit Lock-File-
 Diff (vgl. dieselbe §1.4-Begründung wie für die Erstaufnahme).
 
 ---
