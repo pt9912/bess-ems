@@ -25,6 +25,14 @@ public sealed record ScheduleSolverOptions
     // telemetry has been plumbed in yet (M3 work).
     public double? InitialSocPercent { get; init; }
 
+    // RM-M2-04: optional configurable objective components. When null
+    // the component is omitted entirely (no LP terms, no breakdown
+    // entry) — that's the M2-minimal default that matches OP-OPEN-02.
+    // When set, the adapter adds the LP modelling and emits one
+    // OptimizationObjectiveComponent entry per active component.
+    public DegradationCostOptions? DegradationCost { get; init; }
+    public SocTargetPenaltyOptions? SocTargetPenalty { get; init; }
+
     public ScheduleSolverOptions EnsureValid()
     {
         if (TimeLimit is { } limit && limit <= TimeSpan.Zero)
@@ -42,6 +50,8 @@ public sealed record ScheduleSolverOptions
             throw new ArgumentOutOfRangeException(
                 nameof(InitialSocPercent), InitialSocPercent, "InitialSocPercent must be in [0, 100] when set.");
         }
+        DegradationCost?.EnsureValid();
+        SocTargetPenalty?.EnsureValid();
         return this;
     }
 }
@@ -54,11 +64,15 @@ public sealed class ScheduleSolverOptionsBuilder
     public TimeSpan? TimeLimit { get; set; }
     public double? GapTolerance { get; set; }
     public double? InitialSocPercent { get; set; }
+    public DegradationCostOptions? DegradationCost { get; set; }
+    public SocTargetPenaltyOptions? SocTargetPenalty { get; set; }
 
     internal ScheduleSolverOptions Build() => new()
     {
         TimeLimit = TimeLimit,
         GapTolerance = GapTolerance,
         InitialSocPercent = InitialSocPercent,
+        DegradationCost = DegradationCost,
+        SocTargetPenalty = SocTargetPenalty,
     };
 }

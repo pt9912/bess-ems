@@ -156,16 +156,28 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
                 dyn.SetCoefficient(discharge[t], dtHours / asset.DischargeEfficiency);
             }
 
-            // Objective: minimise day-ahead energy cost (EUR).
-            //   cost_t = price[t] (EUR/MWh) * (p_charge − p_discharge) (kW) * Δt (h) / 1000
-            // Charging draws from the grid (cost), discharging exports (revenue, negative cost).
+            // Optional SOC-target slack variables (RM-M2-04). Created
+            // here when the option is set so the LP holds them; their
+            // objective coefficients are added below alongside the
+            // other components.
+            var (slackBelow, slackAbove) = BuildSocTargetSlacks(solver, soc, n, capacityKwh);
+
+            // Objective: minimise total cost across all configured
+            // components (LH-OPT-004 "konfigurierbar oder erweiterbar").
+            // Per-step charge/discharge coefficients are accumulated
+            // from each active component first, then set on the solver
+            // once — OR-Tools' SetCoefficient overwrites, so a single
+            // pass keeps the contributions explicit.
+            var (chargeCoef, dischargeCoef) = ComputeChargeDischargeCoefficients(
+                request, n, dtHours);
+
             var objective = solver.Objective();
             for (var t = 0; t < n; t++)
             {
-                var coef = request.PricesPerStep![t] * dtHours / 1000.0;
-                objective.SetCoefficient(charge[t], coef);
-                objective.SetCoefficient(discharge[t], -coef);
+                objective.SetCoefficient(charge[t], chargeCoef[t]);
+                objective.SetCoefficient(discharge[t], dischargeCoef[t]);
             }
+            ApplySocTargetObjective(objective, slackBelow, slackAbove, capacityKwh);
             objective.SetMinimization();
 
             var rawBackendStatus = solver.Solve();
@@ -184,15 +196,20 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
 
             if (mappedStatus is OptimizationSolverStatus.Optimal or OptimizationSolverStatus.Feasible)
             {
-                var rawObjective = objective.Value();
+                var components = ComputeObjectiveComponents(
+                    request, charge, discharge, slackBelow, slackAbove, dtHours, capacityKwh);
+                var rawTotal = components.Sum(c => c.Value);
                 // Snap floating-point noise around a trivial optimum to
                 // exact zero before persisting (review #18) — keeps a
                 // flat-price idle run from surfacing a -1.4e-12 EUR
-                // breakdown that confuses dashboards.
-                var snappedObjective = Math.Abs(rawObjective) < ObjectiveZeroEpsilon ? 0.0 : rawObjective;
+                // total that confuses dashboards. The snap applies only
+                // to the run-level total; individual component values
+                // carry their raw LP contributions so a breakdown sums
+                // to the snapped total within epsilon.
+                var snappedTotal = Math.Abs(rawTotal) < ObjectiveZeroEpsilon ? 0.0 : rawTotal;
                 return BuildSolutionResult(
                     request, mappedStatus, terminationCode, terminationDetail,
-                    charge, discharge, snappedObjective, elapsed);
+                    charge, discharge, snappedTotal, components, elapsed);
             }
 
             return BuildNonSolutionResult(request, mappedStatus, terminationCode, terminationDetail, elapsed);
@@ -211,6 +228,7 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
         Variable[] charge,
         Variable[] discharge,
         double objectiveValue,
+        IReadOnlyList<OptimizationObjectiveComponent> components,
         TimeSpan elapsed)
     {
         var n = request.StepCount;
@@ -241,10 +259,7 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
         var producedReference = new ScheduleReference(
             schedule.AssetId, schedule.Type, schedule.Version);
 
-        var breakdown = new OptimizationObjectiveBreakdown(new[]
-        {
-            new OptimizationObjectiveComponent("energy_cost", objectiveValue, "EUR"),
-        });
+        var breakdown = new OptimizationObjectiveBreakdown(components);
 
         var run = CreateRun(
             request, horizonStartUtc, status, terminationCode, terminationDetail, elapsed,
@@ -293,6 +308,167 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
             warnings: new[] { warning },
             producedSchedule: null);
         return new ScheduleOptimizationResult(run, producedSchedule: null);
+    }
+
+    // Computes per-step objective coefficients on charge/discharge from
+    // every active component that contributes to those variables. Each
+    // component adds to the running totals, then SetCoefficient is called
+    // exactly once per (variable, step) — OR-Tools' SetCoefficient
+    // overwrites, so accumulating in arrays first keeps the contributions
+    // explicit and avoids read-modify-write against the solver state.
+    private (double[] chargeCoef, double[] dischargeCoef) ComputeChargeDischargeCoefficients(
+        ScheduleOptimizationRequest request,
+        int n,
+        double dtHours)
+    {
+        var chargeCoef = new double[n];
+        var dischargeCoef = new double[n];
+
+        // energy_cost: price[t] (EUR/MWh) * (charge − discharge) (kW) *
+        // Δt (h) / 1000. Charging draws from the grid (cost), discharging
+        // exports (revenue, negative cost).
+        for (var t = 0; t < n; t++)
+        {
+            var energyCoef = request.PricesPerStep![t] * dtHours / 1000.0;
+            chargeCoef[t] += energyCoef;
+            dischargeCoef[t] -= energyCoef;
+        }
+
+        // degradation_cost (RM-M2-04): linear throughput proxy. Both
+        // charge and discharge contribute their absolute kWh because both
+        // stress the cells.
+        if (_options.DegradationCost is { } degradation)
+        {
+            var degCoef = degradation.EurPerKwhThroughput * dtHours;
+            for (var t = 0; t < n; t++)
+            {
+                chargeCoef[t] += degCoef;
+                dischargeCoef[t] += degCoef;
+            }
+        }
+
+        return (chargeCoef, dischargeCoef);
+    }
+
+    // Builds the optional slack variables for the SOC-target penalty.
+    // Returns (null, null) when the option is not configured so callers
+    // can skip the related objective and post-solve work cleanly.
+    //
+    // Slacks live for steps t in [0, n) and bind against soc[t+1] — the
+    // SOC at the *end* of step t. soc[0] is fixed by the initial-SOC
+    // constraint, so including it would add a fixed offset to the
+    // objective that the optimiser cannot influence.
+    private (Variable[]? below, Variable[]? above) BuildSocTargetSlacks(
+        Solver solver,
+        Variable[] soc,
+        int n,
+        double capacityKwh)
+    {
+        if (_options.SocTargetPenalty is not { } penalty)
+        {
+            return (null, null);
+        }
+
+        var targetKwh = penalty.TargetSocPercent / 100.0 * capacityKwh;
+        var below = new Variable[n];
+        var above = new Variable[n];
+        for (var t = 0; t < n; t++)
+        {
+            below[t] = solver.MakeNumVar(0, double.PositiveInfinity, $"soc_below_{t}");
+            above[t] = solver.MakeNumVar(0, double.PositiveInfinity, $"soc_above_{t}");
+
+            // below[t] + soc[t+1] >= target  ⇔  below[t] >= target - soc[t+1]
+            var belowCons = solver.MakeConstraint(
+                targetKwh, double.PositiveInfinity, $"soc_below_c_{t}");
+            belowCons.SetCoefficient(below[t], 1.0);
+            belowCons.SetCoefficient(soc[t + 1], 1.0);
+
+            // above[t] - soc[t+1] >= -target  ⇔  above[t] >= soc[t+1] - target
+            var aboveCons = solver.MakeConstraint(
+                -targetKwh, double.PositiveInfinity, $"soc_above_c_{t}");
+            aboveCons.SetCoefficient(above[t], 1.0);
+            aboveCons.SetCoefficient(soc[t + 1], -1.0);
+        }
+        return (below, above);
+    }
+
+    // Adds the SOC-target slack contribution to the LP objective. The
+    // user-facing rate is EUR per percentage point of deviation; the
+    // slack variables are kWh, so the coefficient converts: deviation
+    // in percent = slack_kwh / capacity_kwh * 100, hence
+    // EurPerKwhSlack = EurPerPercentDeviation * 100 / capacity_kwh.
+    private void ApplySocTargetObjective(
+        Objective objective,
+        Variable[]? slackBelow,
+        Variable[]? slackAbove,
+        double capacityKwh)
+    {
+        if (_options.SocTargetPenalty is not { } penalty
+            || slackBelow is null || slackAbove is null)
+        {
+            return;
+        }
+
+        var penaltyEurPerKwh = penalty.EurPerPercentDeviation * 100.0 / capacityKwh;
+        for (var t = 0; t < slackBelow.Length; t++)
+        {
+            objective.SetCoefficient(slackBelow[t], penaltyEurPerKwh);
+            objective.SetCoefficient(slackAbove[t], penaltyEurPerKwh);
+        }
+    }
+
+    // Reconstructs each objective component from the LP solution. Per-
+    // component values are computed from the SAME coefficients used in
+    // ComputeChargeDischargeCoefficients / ApplySocTargetObjective, so
+    // their sum equals the LP objective value within floating-point
+    // epsilon. Component order is stable: energy_cost first, then
+    // degradation_cost, then soc_target_penalty — matches the
+    // configuration order callers will read in dashboards and the order
+    // the persistence layer stores via the `position` column.
+    private List<OptimizationObjectiveComponent> ComputeObjectiveComponents(
+        ScheduleOptimizationRequest request,
+        Variable[] charge,
+        Variable[] discharge,
+        Variable[]? slackBelow,
+        Variable[]? slackAbove,
+        double dtHours,
+        double capacityKwh)
+    {
+        var n = request.StepCount;
+        var components = new List<OptimizationObjectiveComponent>(capacity: 3);
+
+        var energyCost = 0.0;
+        for (var t = 0; t < n; t++)
+        {
+            var coef = request.PricesPerStep![t] * dtHours / 1000.0;
+            energyCost += coef * (charge[t].SolutionValue() - discharge[t].SolutionValue());
+        }
+        components.Add(new OptimizationObjectiveComponent("energy_cost", energyCost, "EUR"));
+
+        if (_options.DegradationCost is { } degradation)
+        {
+            var degCoef = degradation.EurPerKwhThroughput * dtHours;
+            var degradationCost = 0.0;
+            for (var t = 0; t < n; t++)
+            {
+                degradationCost += degCoef * (charge[t].SolutionValue() + discharge[t].SolutionValue());
+            }
+            components.Add(new OptimizationObjectiveComponent("degradation_cost", degradationCost, "EUR"));
+        }
+
+        if (_options.SocTargetPenalty is { } penalty
+            && slackBelow is not null && slackAbove is not null)
+        {
+            var penaltyEurPerKwh = penalty.EurPerPercentDeviation * 100.0 / capacityKwh;
+            var socPenalty = 0.0;
+            for (var t = 0; t < n; t++)
+            {
+                socPenalty += penaltyEurPerKwh * (slackBelow[t].SolutionValue() + slackAbove[t].SolutionValue());
+            }
+            components.Add(new OptimizationObjectiveComponent("soc_target_penalty", socPenalty, "EUR"));
+        }
+
+        return components;
     }
 
     // Single source of truth for OptimizationRun construction (review #17):
