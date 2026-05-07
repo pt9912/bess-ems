@@ -122,6 +122,29 @@ Kanonischer .NET-Adaptername fuer M3 ist
 muessen diesen Namen in RM-M3-12 konsistent verwenden, bevor produktives
 Routing gemerged wird.
 
+### Implementierungsanker Im Codebestand
+
+M3 darf den bestehenden Hexagon-Schnitt nicht verwischen. Die relevanten
+Startpunkte im heutigen Code sind:
+
+| Thema | Bestehender Anker | M3-Konsequenz |
+| ----- | ----------------- | ------------- |
+| Constraint-Referenz | `src/hexagon/BatteryEms.Domain/ConstraintLimiter.cs` | Native portiert exakt die Reihenfolge und Reasons von `ConstraintLimiter.Apply`. |
+| Ramp-Referenz | `src/hexagon/BatteryEms.Domain/RampLimiter.cs` | Native portiert `dt == 0`, `MaxRampKwPerSecond == 0`, positive/negative Delta-Grenzen und negative-`dt`-Fehler. |
+| PID-Referenz | `src/hexagon/BatteryEms.Domain/PidController.cs` | RM-M3-13 portiert erst nach stabiler Constraint/Ramp-Parity; State-Felder bleiben expliziter ABI-Vertrag. |
+| Routing-Orchestrierung | `src/hexagon/BatteryEms.Application/Control/ControlCycleUseCase.cs` | Der fachliche Cycle bleibt Application-seitig; Native wird als optionaler Kernel-Port eingehangen, nicht als neuer Use-Case. |
+| Metrics-Port | `src/hexagon/BatteryEms.Application/Observability/IControlCycleMetrics.cs` | Native-Observability erweitert Ports oder fuehrt einen separaten Port ein, ohne Prometheus in Application zu ziehen. |
+| Telemetrie-Adapter | `src/adapters/driven/BatteryEms.Adapters.Telemetry/` | Konkrete Metriknamen und Labels landen im Driven Adapter, nicht im Domain-Code. |
+| Worker Composition | `src/adapters/driving/BatteryEms.Worker/WorkerRegistration.cs` | Registrierung schaltet Native per Konfiguration hinzu; Default bleibt ohne vorhandene `.so` lauffaehig. |
+| Tests | `tests/hexagon/BatteryEms.Domain.Tests/*LimiterTests.cs`, `tests/hexagon/BatteryEms.Domain.Tests/PidControllerTests.cs`, `tests/hexagon/BatteryEms.Application.Tests/ControlCycle*Tests.cs` | Golden- und Interop-Tests muessen aus diesen Referenzfaellen ableitbar sein. |
+
+Falls fuer Native ein neuer Application-Port eingefuehrt wird, liegt er
+unter `src/hexagon/BatteryEms.Application/Control/` oder einem
+benachbarten Application-Namespace. Der Port beschreibt eine fachliche
+Kernel-Berechnung, nicht P/Invoke-Details. `BatteryEms.Adapters.NativeInterop`
+ist der einzige Ort fuer Loader, ABI-Check, DllImport/LibraryImport,
+Struct-Marshalling und native Fehlercode-Mapping.
+
 ---
 
 ## Technische Leitplanken
@@ -154,6 +177,26 @@ Routing gemerged wird.
 - **Build-Reproduzierbarkeit:** Docker ist die Referenzumgebung fuer
   Compiler, Sanitizer und Coverage. Lokale Builds duerfen andere Pfade
   nutzen, muessen aber dieselben Make-Targets ansteuern.
+
+### Runtime-Konfigurationsvertrag
+
+RM-M3-03/RM-M3-05 finalisieren die konkreten Optionsnamen. Bis dahin gilt
+dieser Mindestvertrag fuer Reviews und Tests:
+
+| Option | Default in M3 | Bedeutung |
+| ------ | ------------- | --------- |
+| `NativeControl:Enabled` | `false` fuer fruehe ABI-/Build-Slices; erst nach RM-M3-12 darf ein Runtime-PR `true` als produktiven Profilwert setzen | Expliziter Schalter, ob der Native-Pfad ueberhaupt versucht wird. |
+| `NativeControl:LibraryPath` | `/app/native/libbattery_control_core.so` im Container | Primaerer Loader-Pfad; lokale Tests duerfen temporaere Build-Pfade setzen. |
+| `NativeControl:ExpectedAbiMajor` | Wert aus Header-Konstante | Major muss exakt passen. |
+| `NativeControl:ExpectedAbiMinor` | Wert aus Header-Konstante | Minor darf kompatibel sein; konkrete Regel wird in RM-M3-01 dokumentiert. |
+| `NativeControl:FallbackOnError` | `true` | M3-Default: fehlende Library, ABI-Mismatch und Native-Fehler liefern Managed-Fallback. |
+
+Der Adapter muss seinen Initialisierungszustand als eigenes Ergebnis
+modellieren, z. B. `disabled`, `loaded`, `library-missing`,
+`abi-mismatch`, `load-failed`. Exceptions aus Loader/ABI-Check duerfen
+nicht bis in den Control-Cycle durchschlagen. Ein produktives Profil, das
+bei erwarteter aber inkompatibler Library den Start abbricht, braucht
+einen eigenen Optionswert und Tests; es ist nicht der M3-Default.
 
 ---
 
@@ -205,6 +248,26 @@ Export-Baseline fuer RM-M3-01:
 | M3-E PID-Slice | PID erst nach stabiler Constraint/Ramp-Parity; eigener ABI-/Struct-Delta nur falls noetig. | PID-Parity gegen `PidController.Step`; negative `dt`, non-finite State und Anti-Windup-Faelle getestet. |
 | M3-FUP | OP-OPEN-05/06 und Migrationen nur bei Trigger. | Keine Schema- oder Multi-Replica-Arbeit blockiert den Native-Kern ohne konkreten Bedarf. |
 
+### PR-Schnitt Und Review-Grenzen
+
+Damit M3 reviewbar bleibt, sollen PRs entlang dieser Grenzen geschnitten
+werden. Ein PR darf kleiner sein, aber nicht mehrere riskante Grenzen ohne
+Not vermischen.
+
+| PR-Schnitt | Erlaubte Aenderungen | Nicht mischen mit |
+| ---------- | -------------------- | ----------------- |
+| ABI/Build | `native/battery_control_core/**`, CMake/Build-Skripte, Header-Tests ohne Runtime-Routing | Application-Routing, Docker-Runtime-Pfad, PID |
+| Native Constraint/Ramp | C++-Implementierung und C++-Tests fuer bestehende Domain-Referenzfaelle | P/Invoke, .NET-Registrierung, Schema/FUP |
+| Interop Adapter | Neues Adapterprojekt, P/Invoke-Structs, Loader, ABI-Check, Adapter-Unit-Tests | produktives Routing als Default, Dockerfile-Umstellung |
+| Application Routing | Application-Port/Facade, Control-Cycle-Integration, Fallback-Tests, Metrics-Port-Erweiterung | Native-Coverage-Gate, PID-ABI-Delta |
+| Container/Gates | Dockerfile, Makefile, CI-Target-Verdrahtung, Native-Testcontainer | fachliche Native-Algorithmik |
+| PID | ABI-Delta falls noetig, C++ PID, Interop-Mapping, PID-Parity-Goldens | Constraint/Ramp-Erstaktivierung |
+| FUP | Migrationen, OP-OPEN-05/06, Multi-Replica-Semantik | Native-Core-Slices RM-M3-01..13 |
+
+Jeder PR nennt im Body: betroffener Slice `M3-A`..`M3-FUP`,
+abgeschlossene RM-M3-IDs, Fallback-Verhalten, Testtargets und ob eine
+Native Library fuer die Tests gebaut oder bewusst simuliert wurde.
+
 ---
 
 ## Arbeitspakete
@@ -251,6 +314,24 @@ Die Golden-Dateien duerfen synthetisch sein, muessen aber die aktuellen
 Domain-Tests spiegeln und pro Fall den erwarteten Command mit Status,
 Reason-Code, ActivePowerKw und Mode enthalten.
 
+### Abnahmematrix Nach Testtyp
+
+| Nachweis | Primaerer Ort | Muss mindestens beweisen |
+| -------- | ------------- | ------------------------ |
+| C++-Unit | `native/battery_control_core/tests/` | Constraint/Ramp-Reasons, nicht-finite Inputs, negative `dt`, Exception-Barriere am Export. |
+| ABI-Layout | .NET-Interop-Tests + kleiner C++-Layout-Test | `sizeof`, Offsets, Calling Convention, ABI-Version und Statuscode-Breiten stimmen zwischen Header und P/Invoke. |
+| Adapter-Negativtests | `BatteryEms.Adapters.NativeInterop.Tests` | fehlende `.so`, falsche ABI, Loader-Fehler, Native-Fehlerstatus und deaktivierte Native-Option liefern kontrollierten Adapterzustand. |
+| Application-Fallback | `BatteryEms.Application.Tests/ControlCycle*` oder neues gezieltes Testprojekt | derselbe Tick wird bei Native-Fehler ueber Managed neu berechnet; kein stale Native-Command wird verwendet. |
+| Parity-Golden | `test-native-parity` | Native und Managed liefern fuer Golden-Faelle denselben Command bis zur dokumentierten Toleranz. |
+| Container-Smoke | `make runtime` oder dediziertes Native-Smoke-Target | Runtime-Image enthaelt `/app/native/libbattery_control_core.so` und Host kann mit und ohne Library kontrolliert starten. |
+| Observability | Application-/Telemetry-Tests | Health/Logs/Metriken unterscheiden disabled, loaded, library-missing, abi-mismatch und native-error. |
+
+Testdaten sollen nicht nur erwartete Powers vergleichen. Pro Fall werden
+mindestens `active_power_kw`, `mode`, `status`, `reason_code` und
+`fallback_reason` (falls Fallback) asserted. Fuer Floating-Point-Vergleiche
+gilt die M3-Starttoleranz `1e-6 kW` absolut; Status, Mode und Reason-Codes
+muessen exakt matchen.
+
 ---
 
 ## M2-Folgearbeit Mit M3-Trigger
@@ -277,6 +358,33 @@ als ABI behandelt. Die semantische Mindestmenge ist:
 | `non-finite` | NaN/Inf in Eingabe oder Ergebnis | .NET-Fallback; Fehlercounter erhoehen |
 | `negative-dt` | `dt < 0` fuer Ramp; `dt <= 0` fuer PID | .NET-Fallback; Tick als fehlerhaft markieren |
 | `unsupported-state` | ABI gueltig, aber Zustand im Native-Slice nicht implementiert | .NET-Fallback; Warnung statt Crash |
+
+### Reason-Code-Mindestmenge
+
+Die numerischen Werte werden in RM-M3-01 vergeben. Die Namen hier sind die
+semantische Untergrenze und muessen aus den heutigen .NET-Reasons ableitbar
+bleiben:
+
+| Reason | Quelle / Fall | Erwarteter Status |
+| ------ | ------------- | ----------------- |
+| `within-limits` | Constraint/Ramp unveraendert | `ok` |
+| `asset-unavailable` | `ConstraintLimiter` begrenzt auf 0, falls Native diesen Precheck bekommt | `limited` oder `invalid-input` nach ABI-Entscheidung; M3-A muss das festlegen |
+| `temperature-out-of-range` | Temperatur unter/ueber Asset-Grenze | `limited` |
+| `soc-at-max-charge-blocked` | Laden bei SOC >= Max | `limited` |
+| `soc-at-min-discharge-blocked` | Entladen bei SOC <= Min | `limited` |
+| `max-charge-power` | Target unter negativer Charge-Grenze | `limited` |
+| `max-discharge-power` | Target ueber positiver Discharge-Grenze | `limited` |
+| `ramp-not-permitted` | `dt == 0` oder `MaxRampKwPerSecond == 0` und Target != Previous | `limited` |
+| `ramp-down-clamped` | negative Delta-Grenze verletzt | `limited` |
+| `ramp-up-clamped` | positive Delta-Grenze verletzt | `limited` |
+| `non-finite-input` | NaN/Inf in ABI-Eingabe | `non-finite` |
+| `non-finite-output` | Rechenergebnis nicht endlich | `non-finite` |
+| `negative-dt` | `dt < 0` fuer Ramp, `dt <= 0` fuer PID | `negative-dt` |
+| `unsupported-state` | gueltige ABI, aber Slice kann Fall fachlich nicht berechnen | `unsupported-state` |
+
+Freie .NET-Reason-Texte duerfen nicht ungefiltert in Native wandern.
+Native liefert nur numerische Reason-Codes; Mapping auf die heutigen
+Reason-Strings passiert auf .NET-Seite und wird getestet.
 
 ---
 
