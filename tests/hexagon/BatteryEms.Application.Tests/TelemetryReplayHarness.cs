@@ -88,7 +88,29 @@ internal sealed class TelemetryReplayHarness
 // One row of the telemetry-replay fixture. Telemetry == null means
 // "skip pumping the snapshot store this tick" — useful to model a
 // missing-snapshot path or a stale-after-no-update scenario.
-internal sealed record TelemetryReplayRecord(
-    DateTimeOffset Timestamp,
-    BatteryTelemetry? Telemetry,
-    DateTimeOffset? ReceivedAt = null);
+//
+// ReceivedAt is meaningful only when Telemetry is set; combining a
+// null Telemetry with a non-null ReceivedAt would silently drop the
+// timestamp inside the harness, so the constructor rejects it.
+internal sealed record TelemetryReplayRecord
+{
+    public TelemetryReplayRecord(
+        DateTimeOffset Timestamp,
+        BatteryTelemetry? Telemetry,
+        DateTimeOffset? ReceivedAt = null)
+    {
+        if (Telemetry is null && ReceivedAt is not null)
+        {
+            throw new ArgumentException(
+                "ReceivedAt is meaningless without Telemetry — the harness only consults it when calling Update.",
+                nameof(ReceivedAt));
+        }
+        this.Timestamp = Timestamp;
+        this.Telemetry = Telemetry;
+        this.ReceivedAt = ReceivedAt;
+    }
+
+    public DateTimeOffset Timestamp { get; }
+    public BatteryTelemetry? Telemetry { get; }
+    public DateTimeOffset? ReceivedAt { get; }
+}

@@ -139,13 +139,16 @@ public sealed class TelemetryReplayHarnessTests
         var first = await RunOnce();
         var second = await RunOnce();
 
-        // Tick 0 — safe-stop with reason "no-snapshot".
-        Assert.Equal(0.0, first[0].ActivePowerKw);
+        // Tick 0 — safe-stop with reason "no-snapshot". Mode is the
+        // load-bearing signal that distinguishes safe-stop from a
+        // dispatched command (ActivePowerKw is 0 on either by
+        // construction of NoOpDispatchOptimizer, so an
+        // ActivePowerKw==0 assertion would be tautological).
+        Assert.Equal(CommandMode.Stop, first[0].Mode);
         Assert.Equal("no-snapshot", first[0].Reason);
         Assert.Equal(CommandSource.Fallback, first[0].Source);
 
         // Tick 1 — normal dispatch (NoOp returns Idle).
-        Assert.Equal(0.0, first[1].ActivePowerKw);
         Assert.Equal(CommandMode.Idle, first[1].Mode);
         Assert.Equal(CommandSource.Optimization, first[1].Source);
 
@@ -158,14 +161,14 @@ public sealed class TelemetryReplayHarnessTests
     {
         // Distinct production failure mode from the missing-snapshot
         // case above: telemetry IS pumped, but its receivedAt is older
-        // than InMemorySnapshotStore.MaxAge (10 s by default), so the
-        // store flips Quality to Stale and the cycle short-circuits
-        // with reason "snapshot-aged-...". Tick 1 pumps fresh
+        // than the staleness window the harness configures (10 s),
+        // so the store flips Quality to Stale and the cycle short-
+        // circuits with reason "snapshot-aged-...". Tick 1 pumps fresh
         // telemetry inside the freshness window → normal dispatch.
         // The audit reason must be reproducible across replays so
         // dashboards can correlate the same operational event.
         var asset = TestFixtures.CreateAsset(AssetId);
-        var staleAt = Start - TimeSpan.FromSeconds(15); // > 10 s MaxAge
+        var staleAt = Start - TimeSpan.FromSeconds(15); // > 10 s MaxAge configured by the harness
         var fixture = new[]
         {
             new TelemetryReplayRecord(
@@ -186,16 +189,17 @@ public sealed class TelemetryReplayHarnessTests
         var first = await RunOnce();
         var second = await RunOnce();
 
-        // Tick 0 — safe-stop with stale-aged reason. The exact
-        // formatted seconds are clock-derived; verify by prefix and
-        // that the suffix encodes the configured staleness window.
-        Assert.Equal(0.0, first[0].ActivePowerKw);
-        Assert.StartsWith("snapshot-aged-", first[0].Reason, StringComparison.Ordinal);
-        Assert.EndsWith("s", first[0].Reason, StringComparison.Ordinal);
+        // Tick 0 — safe-stop with stale-aged reason. Pin the format
+        // shape (decimal seconds with one fractional digit followed
+        // by 's'); a future refactor that changes the precision —
+        // e.g. F1 → F2 or integer seconds — must update this regex
+        // alongside the producer in InMemorySnapshotStore so the
+        // dashboard contract stays in sync.
+        Assert.Equal(CommandMode.Stop, first[0].Mode);
+        Assert.Matches(@"^snapshot-aged-\d+\.\d+s$", first[0].Reason);
         Assert.Equal(CommandSource.Fallback, first[0].Source);
 
         // Tick 1 — fresh telemetry → normal dispatch.
-        Assert.Equal(0.0, first[1].ActivePowerKw);
         Assert.Equal(CommandMode.Idle, first[1].Mode);
         Assert.Equal(CommandSource.Optimization, first[1].Source);
 
