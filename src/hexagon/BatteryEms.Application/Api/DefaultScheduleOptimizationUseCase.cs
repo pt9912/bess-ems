@@ -1,4 +1,5 @@
 using BatteryEms.Application.Markets;
+using BatteryEms.Application.Observability;
 using BatteryEms.Application.Optimization;
 using BatteryEms.Application.Persistence;
 using Microsoft.Extensions.Logging;
@@ -20,22 +21,26 @@ public sealed partial class DefaultScheduleOptimizationUseCase : IScheduleOptimi
     private readonly IScheduleOptimizer _optimizer;
     private readonly IScheduleRepository _scheduleRepository;
     private readonly IOptimizationRunRepository _runRepository;
+    private readonly IOptimizationRunMetrics _metrics;
     private readonly ILogger<DefaultScheduleOptimizationUseCase> _logger;
 
     public DefaultScheduleOptimizationUseCase(
         IScheduleOptimizer optimizer,
         IScheduleRepository scheduleRepository,
         IOptimizationRunRepository runRepository,
+        IOptimizationRunMetrics metrics,
         ILogger<DefaultScheduleOptimizationUseCase> logger)
     {
         ArgumentNullException.ThrowIfNull(optimizer);
         ArgumentNullException.ThrowIfNull(scheduleRepository);
         ArgumentNullException.ThrowIfNull(runRepository);
+        ArgumentNullException.ThrowIfNull(metrics);
         ArgumentNullException.ThrowIfNull(logger);
 
         _optimizer = optimizer;
         _scheduleRepository = scheduleRepository;
         _runRepository = runRepository;
+        _metrics = metrics;
         _logger = logger;
     }
 
@@ -51,6 +56,12 @@ public sealed partial class DefaultScheduleOptimizationUseCase : IScheduleOptimi
         // non-null, version + reference matching) are already checked in
         // ScheduleOptimizationResult's constructor; we can rely on them.
         await _runRepository.AppendAsync(result.Run, cancellationToken).ConfigureAwait(false);
+
+        // Metrics fire after the run is durably persisted so a /metrics
+        // scrape and the persisted run history can never disagree on
+        // counts (LH-OPT-009 audit-stance: a run that wasn't appended
+        // didn't happen, so it shouldn't be counted either).
+        _metrics.Record(result.Run);
 
         int? producedVersion = null;
         if (result.ProducedSchedule is not null)

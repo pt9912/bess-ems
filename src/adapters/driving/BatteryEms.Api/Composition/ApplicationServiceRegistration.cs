@@ -2,6 +2,7 @@ using BatteryEms.Application.Api;
 using BatteryEms.Application.Assets;
 using BatteryEms.Application.Control;
 using BatteryEms.Application.Markets;
+using BatteryEms.Application.Observability;
 using BatteryEms.Application.Optimization;
 using BatteryEms.Application.Persistence;
 using BatteryEms.Application.Realtime;
@@ -38,6 +39,12 @@ public static class ApplicationServiceRegistration
         // until RM-M2-OP-05 plugs in the OR-Tools adapter through the
         // Composition Root.
         services.AddSingleton<IScheduleOptimizer, NoOpScheduleOptimizer>();
+
+        // Observability default. Telemetry hosts (Worker/Host) replace
+        // this with PrometheusOptimizationRunMetrics via AddBessTelemetry;
+        // API-only test hosts keep the no-op so the use case resolves
+        // without dragging the Prometheus adapter in.
+        services.AddSingleton<IOptimizationRunMetrics>(_ => NoOpOptimizationRunMetrics.Instance);
 
         // Driving-port use cases.
         services.AddSingleton<IHealthQuery, DefaultHealthQuery>();

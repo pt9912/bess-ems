@@ -15,6 +15,10 @@ public static class TelemetryRegistration
     {
         ArgumentNullException.ThrowIfNull(services);
         services.AddSingleton<IControlCycleMetrics, PrometheusControlCycleMetrics>();
+        // RM-M2-OP-08: telemetry hosts replace the NoOp default registered
+        // by AddBessApplicationInMemoryStores; last registration wins for
+        // GetService<IOptimizationRunMetrics>().
+        services.AddSingleton<IOptimizationRunMetrics, PrometheusOptimizationRunMetrics>();
         return services;
     }
 

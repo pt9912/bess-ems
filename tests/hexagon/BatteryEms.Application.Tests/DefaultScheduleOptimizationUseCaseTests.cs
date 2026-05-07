@@ -1,5 +1,6 @@
 using BatteryEms.Application.Api;
 using BatteryEms.Application.Markets;
+using BatteryEms.Application.Observability;
 using BatteryEms.Application.Optimization;
 using BatteryEms.Application.Persistence;
 using BatteryEms.Domain;
@@ -28,6 +29,40 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
         Assert.Equal(7, outcome.ProducedScheduleVersion);
         Assert.Same(producedSchedule, schedules.FindActive("asset-1", ScheduleType.DayAhead));
         Assert.NotNull(await runs.FindByIdAsync(outcome.RunId, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Persisted_run_is_recorded_in_metrics_for_both_optimal_and_failed_paths()
+    {
+        var optimalProduced = BuildSchedule(version: 1);
+        var optimalRun = BuildResult(OptimizationSolverStatus.Optimal, optimalProduced).Run;
+        var failedRun = BuildResult(OptimizationSolverStatus.Failed, schedule: null).Run;
+
+        var metrics = new RecordingMetrics();
+        var schedules = new InMemoryScheduleRepository();
+        var runs = new InMemoryOptimizationRunRepository();
+
+        var useCaseOptimal = Build(new SpyOptimizer(new ScheduleOptimizationResult(optimalRun, optimalProduced)), schedules, runs, metrics);
+        await useCaseOptimal.ExecuteAsync(BuildRequest(), CancellationToken.None);
+
+        var useCaseFailed = Build(new SpyOptimizer(new ScheduleOptimizationResult(failedRun, null)), schedules, runs, metrics);
+        await useCaseFailed.ExecuteAsync(BuildRequest(), CancellationToken.None);
+
+        Assert.Equal(2, metrics.Recorded.Count);
+        Assert.Equal(OptimizationSolverStatus.Optimal, metrics.Recorded[0].Status);
+        Assert.Equal(OptimizationSolverStatus.Failed, metrics.Recorded[1].Status);
+    }
+
+    [Fact]
+    public async Task Metrics_are_not_recorded_when_solver_throws()
+    {
+        var metrics = new RecordingMetrics();
+        var useCase = Build(new SpyOptimizer(throwOnExecute: true), new InMemoryScheduleRepository(), new InMemoryOptimizationRunRepository(), metrics);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            useCase.ExecuteAsync(BuildRequest(), CancellationToken.None));
+
+        Assert.Empty(metrics.Recorded);
     }
 
     [Fact]
@@ -87,8 +122,14 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
     private static DefaultScheduleOptimizationUseCase Build(
         IScheduleOptimizer optimizer,
         IScheduleRepository schedules,
-        IOptimizationRunRepository runs)
-        => new(optimizer, schedules, runs, NullLogger<DefaultScheduleOptimizationUseCase>.Instance);
+        IOptimizationRunRepository runs,
+        IOptimizationRunMetrics? metrics = null)
+        => new(
+            optimizer,
+            schedules,
+            runs,
+            metrics ?? NoOpOptimizationRunMetrics.Instance,
+            NullLogger<DefaultScheduleOptimizationUseCase>.Instance);
 
     private static ScheduleOptimizationRequest BuildRequest() => new(
         assetId: "asset-1",
@@ -138,6 +179,12 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
         {
             new(HorizonStart, HorizonStart + TimeSpan.FromHours(1), 0),
         });
+
+    private sealed class RecordingMetrics : IOptimizationRunMetrics
+    {
+        public List<OptimizationRun> Recorded { get; } = new();
+        public void Record(OptimizationRun run) => Recorded.Add(run);
+    }
 
     private sealed class SpyOptimizer : IScheduleOptimizer
     {
