@@ -449,7 +449,11 @@ Aktiv ab **M3** (LH-NATIVE-005, RM-M3-03).
 | --------------------------------------------------- | -------------------------------- |
 | `battery_control_core_abi_version()` exportiert     | `native/include/battery_control_core.h` |
 | `.NET`-Startup-Check vergleicht erwartete ABI       | `BatteryEms.Adapters.NativeInterop` |
-| Mismatch → Service startet nicht (LH-OPS-001)       | Integrationstest in M3           |
+| Mismatch -> .NET-Fallback, Health/Logs/Metrik nennen `abi-mismatch` | Integrationstest in M3 |
+
+Ein Startabbruch bei erwarteter, aber inkompatibler Library ist keine
+M3-Default-Policy. Er braucht einen expliziten Produktions-Optionswert und
+einen eigenen Integrationstest.
 
 ### 5.3 Adapter-Mapping-Schema
 
