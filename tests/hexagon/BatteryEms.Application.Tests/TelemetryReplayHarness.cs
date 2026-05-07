@@ -23,6 +23,12 @@ namespace BatteryEms.Application.Tests;
 // the use case's internal _previous power dictionary starts empty.
 // Reproducibility tests build TWO harnesses for the same fixture and
 // assert the output sequences are bit-exact identical.
+//
+// `RunAsync` is single-shot per instance: a second call inherits the
+// snapshot store contents and the use case's _previous-power
+// dictionary from the first run, so the same fixture replayed twice
+// on the same harness will not produce reproducible commands. Build
+// a fresh harness per replay.
 internal sealed class TelemetryReplayHarness
 {
     private readonly FakeClock _clock = new();
