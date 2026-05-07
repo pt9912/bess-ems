@@ -40,6 +40,14 @@ public static class ApplicationServiceRegistration
         // Composition Root.
         services.AddSingleton<IScheduleOptimizer, NoOpScheduleOptimizer>();
 
+        // Dispatch optimiser default (RM-M2-01): the schedule-following
+        // implementation picks the highest-priority commitment per
+        // LH-MKT-006 and emits its PowerKw. With no active commitment
+        // it returns Idle — same observable behaviour as the legacy
+        // NoOpDispatchOptimizer for hosts that haven't seeded any
+        // schedules yet.
+        services.AddSingleton<IDispatchOptimizer, ScheduleFollowingDispatchOptimizer>();
+
         // Observability default. Telemetry hosts (Worker/Host) replace
         // this with PrometheusOptimizationRunMetrics via AddBessTelemetry;
         // API-only test hosts keep the no-op so the use case resolves

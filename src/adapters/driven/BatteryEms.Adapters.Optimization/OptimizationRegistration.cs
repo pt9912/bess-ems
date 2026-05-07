@@ -9,11 +9,18 @@ public static class OptimizationRegistration
     public static IServiceCollection AddBessOptimization(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        services.AddSingleton<IDispatchOptimizer, NoOpDispatchOptimizer>();
-        // The Application layer ships its own NoOpScheduleOptimizer as
-        // the default for headless / API-only hosts; AddBessScheduleSolver
-        // (RM-M2-OP-05) overrides it when a host activates the OR-Tools
-        // backend.
+        // The Application layer ships its own defaults for headless /
+        // API-only hosts:
+        //   IScheduleOptimizer  → NoOpScheduleOptimizer (overridden by
+        //                         AddBessScheduleSolver, RM-M2-OP-05).
+        //   IDispatchOptimizer  → ScheduleFollowingDispatchOptimizer
+        //                         (RM-M2-01) — picks the highest-priority
+        //                         commitment per LH-MKT-006 and emits
+        //                         its PowerKw, falls back to Idle when
+        //                         no commitment is active. NoOpDispatch
+        //                         Optimizer remains in this assembly
+        //                         for test hosts that want to wire it
+        //                         explicitly.
         return services;
     }
 
