@@ -39,13 +39,14 @@ unter `in-progress/`.
 
 ## Aktueller Stand
 
-> **Stand:** 2026-05-06
-> **Abgeschlossen:** M1 — MVP sichere Regelpipeline (alle 24 Liefergegenstände grün);
-> `make fullbuild` reproduzierbar grün, Compose-Stack (bess-ems + Postgres +
-> Mosquitto + bess-field-sim) liefert `/health = ok` inkl. Postgres-Probe.
-> **Aktive Phase:** M2 — Marktausbau und Optimierung. Optimization-
-> Slice ist abgeschlossen, weitere M2-Liefergegenstände (siehe Tabelle
-> unten) bleiben offen.
+> **Stand:** 2026-05-07
+> **Abgeschlossen:** M1 (alle 24 Liefergegenstände grün) und M2 (alle
+> 10 Liefergegenstände RM-M2-01..10 grün). `make fullbuild`
+> reproduzierbar grün, Compose-Stack (bess-ems + Postgres + Mosquitto
+> + bess-field-sim) liefert `/health = ok` inkl. Postgres-Probe.
+> **Nächste Phase:** M3 — Native Control Core (Library); Aktivierung
+> noch nicht entschieden.
+>
 > **M2-Welle 1 (Optimization-Slice, abgeschlossen):**
 > [`../done/plan-RM-M2-optimization.md`](../done/plan-RM-M2-optimization.md)
 > hat alle Arbeitspakete OP-01..09 grün gezogen — Domain mit
@@ -58,20 +59,36 @@ unter `in-progress/`.
 > guarded, sowie Replay-/Reproduzierbarkeitstests (LH-OPT-009).
 > Drei Review-Pässe, alle Findings adressiert oder mit präzise
 > dokumentiertem M3-Trigger eingefroren (OP-OPEN-05/06).
-> **PID-Regler (RM-M2-08):** Domain-Primitive `PidController` mit
-> Conditional-Integration-Anti-Windup, Output-Clamping und optionalem
-> Totband ist als reine Funktion in `BatteryEms.Domain` ausgeliefert
-> (LH-CTRL-004 ist „Soll"; der Regelzyklus konsumiert das Primitive
-> bisher nicht — Verdrahtung folgt mit konkreten Konsumenten).
-> **Nächste M2-Wellen:** Hardware-in-the-Loop (siehe Folgewelle-Hinweis
-> unter „M2 — Marktausbau und Optimierung"), Tracing/Replay-Harness
-> (RM-M2-06/10), Configurable Objective (RM-M2-04),
-> Marktcommitment-Priorisierung (RM-M2-01) und
-> Zeitmodell-Erweiterung (RM-M2-02). Persistenz-Migrations-Tooling
-> ist als M2-Folgewelle in
+>
+> **M2-Welle 2 (Restliche M2-Items, abgeschlossen):**
+> RM-M2-01 (Marktcommitment-Priorisierung mit `MarketCommitmentPriority`
+> + `ScheduleFollowingDispatchOptimizer`), RM-M2-02 (Zeitmodell-
+> Erweiterung mit `MarketCommitment.MarketBidArea` + `ScheduleTimeGrid`
+> + DST-Pipeline-Tests), RM-M2-04 (Configurable Objective mit
+> `degradation_cost` + `soc_target_penalty` als zwei LP-Patterns),
+> RM-M2-06 (OTel-Tracing für `bess.control_cycle.execute` /
+> `bess.command_dispatch.write` / `bess.schedule_optimization.run`,
+> SDK 1.15.3 mit zwei Vulns gefixt), RM-M2-08 (PID-Regler-Primitive
+> `PidController` als pure Function — LH-CTRL-004 „Soll", produktive
+> Verdrahtung folgt mit konkreten Konsumenten), RM-M2-10 (Telemetrie-
+> Replay-Harness mit Reproduzierbarkeit / Golden-Trace / Missing- und
+> Stale-Recovery). Mehrere Review-Pässe pro Slice, alle Findings
+> adressiert oder als Carve-out mit Trigger in den jeweiligen
+> RM-M2-Tabellenzeilen festgehalten.
+>
+> **M2-Folgewellen (offen):**
+> [`../open/HIL-simulator.md`](../open/HIL-simulator.md) (HIL gegen
+> `bess-hil-simulator:local`) — Aktivierungs-Trigger
+> (LP-Solver-Adapter steht) ist mit OP-05 erfüllt; Plan bleibt unter
+> `open/` bis aktiv aufgenommen.
 > [`../open/plan-RM-M2-migration.md`](../open/plan-RM-M2-migration.md)
-> vorgemerkt; aktiviert sobald OP-OPEN-05/06 oder die erste echte
-> Schema-Änderung den Trigger zünden.
+> (versionierte Persistence-Migrations) — aktiviert sobald
+> OP-OPEN-05/06 oder die erste echte Schema-Änderung den Trigger
+> zünden. Plus mehrere Carve-out-Slices innerhalb der RM-M2-Zeilen
+> (LH-OPT-004 #4 Marktverpflichtungs-Strafkosten unter RM-M2-04,
+> Adapter-Spans / DB-Spans / Trace-ID-Persistenz unter RM-M2-06,
+> JSON-Loader / Operator-Replay-CLI / Multi-Asset-Replay unter
+> RM-M2-10), je mit eigenem Trigger in der Tabellenzeile.
 
 ---
 
@@ -80,7 +97,7 @@ unter `in-progress/`.
 | Status | Meilenstein | Titel                              | Phase | Detailplan |
 | ------ | ----------- | ---------------------------------- | ----- | ---------- |
 | ✅     | M1          | MVP — sichere Regelpipeline        | 1     | [Abgeschlossen](../done/plan-RM-M1.md) |
-| 🟡     | M2          | Marktausbau und Optimierung        | 1 → 2 | Optimization-Slice [abgeschlossen](../done/plan-RM-M2-optimization.md); weitere RM-M2-Items offen |
+| ✅     | M2          | Marktausbau und Optimierung        | 1 → 2 | Abgeschlossen ([Optimization-Slice](../done/plan-RM-M2-optimization.md) plus RM-M2-01..10 in der Tabelle unten); zwei Folgewellen ([HIL](../open/HIL-simulator.md), [Migrations-Tooling](../open/plan-RM-M2-migration.md)) bleiben unter `open/` |
 | ⬜     | M3          | Native Control Core (Library)      | 2     | folgt mit Aktivierung |
 | ⬜     | M4          | Regelleistung und OPC-UA           | 2     | folgt mit Aktivierung |
 | ⬜     | M5          | MPC, Solver-Sidecar, Replay        | 3     | folgt mit Aktivierung |
