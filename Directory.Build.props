@@ -12,6 +12,16 @@
     <RunAnalyzersDuringBuild>true</RunAnalyzersDuringBuild>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CA1014</NoWarn>
+
+    <!-- NuGet supply-chain defence: every project emits a packages.lock.json
+         pinning the resolved content hash for every direct and transitive
+         dependency. CI restores with locked mode so a tampered or
+         republished package version (notably the Google.OrTools native
+         binaries introduced by RM-M2-OP-05) breaks the build instead of
+         silently swapping the binary. Bumping a Directory.Packages.props
+         version requires "dotnet restore /p:ForceEvaluate=true" (or the
+         force-evaluate flag) to refresh the lock files in the same commit. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 
 </Project>

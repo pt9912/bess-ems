@@ -139,11 +139,44 @@ Verletzungen brechen den Build (LH-TEST-005-nahe).
 | Datei                       | Zweck                                                |
 | --------------------------- | ---------------------------------------------------- |
 | `.editorconfig`             | C#-Style + Roslyn-Diagnostic-Severities (CA-Regeln aus §1.1)        |
-| `Directory.Build.props`     | `TreatWarningsAsErrors=true`, `AnalysisLevel=latest-all`, gemeinsame Analyzer-PackageReference |
+| `Directory.Build.props`     | `TreatWarningsAsErrors=true`, `AnalysisLevel=latest-all`, `RestorePackagesWithLockFile=true` (siehe §1.4), gemeinsame Analyzer-PackageReference |
 | `Directory.Packages.props`  | Zentrale Package-Versionen inkl. `Microsoft.CodeAnalysis.NetAnalyzers` |
+| `**/packages.lock.json`     | Pro Projekt eingecheckte Lock-Datei mit Content-Hashes (siehe §1.4) |
 | `native/.clang-format`      | C/C++ Layout                                         |
 | `native/.clang-tidy`        | C/C++ Check-Profil                                   |
 | `native/CMakeLists.txt`     | Compiler-Flags `-Wall -Wextra -Wpedantic -Werror`    |
+
+### 1.4 Supply-Chain: NuGet-Lock-Files
+
+`Directory.Build.props` setzt `RestorePackagesWithLockFile=true`, dadurch
+emittiert jedes Projekt beim Restore eine `packages.lock.json` mit
+Content-Hashes für direkte und transitive Dependencies. Die `restore`-
+Stage des `Dockerfile` ruft `dotnet restore --locked-mode` auf — fehlt
+eine Lock-Datei, oder weicht ein Hash vom Committeten ab, schlägt der
+Restore fehl, bevor irgendetwas gebaut wird.
+
+Anlass: RM-M2-OP-05 hat mit `Google.OrTools` die erste Dependency mit
+Native-Bindings (`libortools.so`, `libabsl_*.so`) eingeführt. Eine
+republished oder kompromittierte Native-DLL würde im aspnet-Prozess als
+Code mit User-Rechten ausgeführt; Lock-Files binden den Inhalt an den
+Hash, den der Reviewer beim Mergen gesehen hat.
+
+**Workflow zum Versionsbump:**
+
+1. Version in `Directory.Packages.props` ändern.
+2. Lock-Files refreshen — aus dem Repo-Root und im SDK-Container, damit
+   die Hashes denen entsprechen, die CI sieht:
+
+   ```bash
+   docker run --rm -v $(pwd):/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 \
+     dotnet restore BatteryEms.sln /p:ForceEvaluate=true
+   ```
+
+3. Refreshte `packages.lock.json`-Dateien zusammen mit der Versionsänderung
+   committen — `make lint` schlägt sonst auf der nächsten Ebene fehl.
+4. Im Pull-Request den Lock-File-Diff mit reviewen: ein unerwarteter
+   Hash-Wechsel auf einer Version, die nicht angefasst wurde, ist ein
+   Supply-Chain-Signal, kein Lärm.
 
 ---
 
