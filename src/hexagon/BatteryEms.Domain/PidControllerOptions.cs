@@ -5,13 +5,21 @@ public sealed record PidControllerOptions
     public double Kp { get; init; }
     public double Ki { get; init; }
     public double Kd { get; init; }
-    public double OutputMin { get; init; } = double.NegativeInfinity;
-    public double OutputMax { get; init; } = double.PositiveInfinity;
+
+    // OutputMin/OutputMax are required so a caller cannot silently
+    // disable LH-CTRL-004's output-clamping property by forgetting to
+    // configure them. Both must be finite — pass tight engineering
+    // bounds, or ±double.MaxValue if a particular consumer genuinely
+    // wants effectively unbounded behaviour.
+    public required double OutputMin { get; init; }
+    public required double OutputMax { get; init; }
 
     // Symmetric absolute deadband on the error: when |error| <
-    // DeadbandAbsolute the controller treats the error as 0 for P, I and
-    // D. The integral state stays at its previous value, so the output
-    // holds at the integrated position. 0 disables the deadband.
+    // DeadbandAbsolute the controller treats the error as 0 for P and
+    // suppresses both the I update and the D term. The integrator's
+    // value is held, and PreviousError is preserved so the derivative
+    // across a deadband transition computes the actual error change on
+    // exit. 0 disables the deadband.
     public double DeadbandAbsolute { get; init; }
 
     public PidAntiWindupMode AntiWindupMode { get; init; } = PidAntiWindupMode.ConditionalIntegration;
@@ -30,9 +38,17 @@ public sealed record PidControllerOptions
         {
             throw new ArgumentException($"Kd must be finite (got {Kd}).", nameof(Kd));
         }
-        if (double.IsNaN(OutputMin) || double.IsNaN(OutputMax))
+        if (!double.IsFinite(OutputMin))
         {
-            throw new ArgumentException("OutputMin/OutputMax must not be NaN.", nameof(OutputMin));
+            throw new ArgumentException(
+                $"OutputMin must be finite (got {OutputMin}).",
+                nameof(OutputMin));
+        }
+        if (!double.IsFinite(OutputMax))
+        {
+            throw new ArgumentException(
+                $"OutputMax must be finite (got {OutputMax}).",
+                nameof(OutputMax));
         }
         if (OutputMin > OutputMax)
         {

@@ -7,12 +7,20 @@ public sealed class PidControllerTests
 {
     private static readonly TimeSpan Dt = TimeSpan.FromSeconds(1);
 
+    // Wide finite bounds for tests that don't care about clamping.
+    // Using ±double.MaxValue would be the literal "effectively
+    // unbounded" option but invites clamping false-positives if a test
+    // ever produces a near-MaxValue intermediate; 1e10 is plenty for
+    // anything the test fixtures generate.
+    private const double UnboundedMin = -1e10;
+    private const double UnboundedMax = 1e10;
+
     private static PidControllerOptions Options(
         double kp = 0,
         double ki = 0,
         double kd = 0,
-        double outputMin = double.NegativeInfinity,
-        double outputMax = double.PositiveInfinity,
+        double outputMin = UnboundedMin,
+        double outputMax = UnboundedMax,
         double deadband = 0,
         PidAntiWindupMode antiWindup = PidAntiWindupMode.ConditionalIntegration) =>
         new()
@@ -167,7 +175,8 @@ public sealed class PidControllerTests
         // bound on step 1. Without anti-windup the integral after 100
         // steps would be 100 * 0.1 * 10 * 1 = 100. Conditional
         // integration plateaus it once a further update would push the
-        // candidate past OutputMax while the error still pulls upward.
+        // candidate past OutputMax while the integrator step has the
+        // same sign as the saturation direction.
         var options = Options(ki: 0.1, outputMax: 5);
         var state = PidControllerState.Initial;
 
@@ -221,8 +230,8 @@ public sealed class PidControllerTests
         // Pre-load a negative integral so the candidate output starts
         // below OutputMin even though the current error is positive
         // (would pull the output up). Anti-windup must NOT freeze here
-        // because the integration would relieve, not worsen, the
-        // saturation.
+        // because the integrator step (Ki>0, error>0) would relieve,
+        // not worsen, the saturation.
         var options = Options(ki: 1.0, outputMin: -5);
         var state = PidControllerState.Initial with { Integral = -20 };
 
@@ -232,19 +241,93 @@ public sealed class PidControllerTests
         Assert.Equal(-10.0, result.NextState.Integral, precision: 12);
     }
 
+    [Fact]
+    public void Anti_windup_uses_integrator_step_sign_not_error_sign_with_negative_ki()
+    {
+        // With Ki < 0 the integrator decrements when error > 0. If the
+        // output is saturated at OutputMax with positive error, the
+        // integrator update relieves saturation — anti-windup must NOT
+        // freeze. The pre-fix logic gated on `error > 0` alone and
+        // would have frozen here, locking the integrator out of its
+        // legitimate decrement.
+        var options = Options(ki: -0.1, outputMax: 5);
+        var state = PidControllerState.Initial with { Integral = 10.0 };
+
+        var step = PidController.Step(state, options, setpoint: 10, measurement: 0, Dt);
+
+        Assert.False(step.WasIntegralFrozen);
+        Assert.Equal(9.0, step.NextState.Integral, precision: 12);
+    }
+
+    [Fact]
+    public void Anti_windup_freezes_at_lower_bound_when_negative_ki_with_positive_error_pushes_down()
+    {
+        // Symmetric to the above: Ki<0, error>0 → integrator
+        // decrements. If the candidate already sits below OutputMin,
+        // the decrement worsens saturation and must be frozen.
+        var options = Options(ki: -0.1, outputMin: -5);
+        var state = PidControllerState.Initial with { Integral = -10.0 };
+
+        var step = PidController.Step(state, options, setpoint: 10, measurement: 0, Dt);
+
+        Assert.True(step.WasIntegralFrozen);
+        Assert.Equal(-10.0, step.NextState.Integral, precision: 12);
+    }
+
     // --- Deadband ----------------------------------------------------------
 
     [Fact]
-    public void Deadband_suppresses_output_for_small_errors()
+    public void Deadband_suppresses_p_and_holds_integrator_for_small_errors()
     {
         var options = Options(kp: 5, ki: 1, kd: 1, deadband: 1.5);
-        var warm = PidControllerState.Initial with { PreviousError = 0 };
+        // Warm-start with a non-zero previous error to verify the
+        // kernel does NOT zero PreviousError on deadband entry; that
+        // would create a derivative kick (and break the post-band
+        // derivative test below).
+        var warm = PidControllerState.Initial with { PreviousError = 7.0, Integral = 3.0 };
 
         var result = PidController.Step(warm, options, setpoint: 10, measurement: 9.5, Dt);
 
-        Assert.Equal(0.0, result.Output);
-        Assert.Equal(0.0, result.NextState.Integral);
-        Assert.Equal(0.0, result.NextState.PreviousError);
+        // Inside deadband: P=0, D suppressed to 0, integrator held.
+        // Output = held integrator = 3.
+        Assert.Equal(3.0, result.Output);
+        Assert.Equal(3.0, result.NextState.Integral);
+        // PreviousError preserved (7.0), not overwritten.
+        Assert.Equal(7.0, result.NextState.PreviousError);
+    }
+
+    [Fact]
+    public void Deadband_entry_does_not_produce_derivative_kick()
+    {
+        // Without deadband-D-suppression, entering the deadband with a
+        // nonzero previous error would compute D = Kd*(0 - prevErr)/dt,
+        // producing a spike. Verify that does not happen.
+        var options = Options(kp: 0, ki: 0, kd: 5, deadband: 1.0);
+        var warm = PidControllerState.Initial with { PreviousError = 8.0, Integral = 2.0 };
+
+        var result = PidController.Step(warm, options, setpoint: 10, measurement: 9.5, Dt);
+
+        // P=0, D=0 (suppressed), I held. Output = I = 2.
+        Assert.Equal(2.0, result.Output);
+    }
+
+    [Fact]
+    public void Deadband_exit_uses_last_real_error_for_derivative()
+    {
+        // After spending time in the deadband, the next out-of-band
+        // step computes the derivative against the LAST REAL error
+        // (preserved through the deadband sojourn), not against zero.
+        var options = Options(kp: 0, ki: 0, kd: 1, deadband: 1.0);
+        var state = PidControllerState.Initial with { PreviousError = 5.0 };
+
+        // Step 1: error = 0.5, in deadband → PreviousError stays 5.0,
+        // D suppressed.
+        state = PidController.Step(state, options, setpoint: 10, measurement: 9.5, Dt).NextState;
+        Assert.Equal(5.0, state.PreviousError);
+
+        // Step 2: error = 8 (out of deadband). D = 1 * (8 - 5) / 1 = 3.
+        var exit = PidController.Step(state, options, setpoint: 10, measurement: 2, Dt);
+        Assert.Equal(3.0, exit.Output);
     }
 
     [Fact]
@@ -258,8 +341,8 @@ public sealed class PidControllerTests
         var heldIntegral = state.Integral;
         Assert.Equal(10.0, heldIntegral, precision: 12);
 
-        // Now error is well inside the deadband — output should hold at
-        // the previously accumulated integral, not collapse.
+        // Now error is well inside the deadband — output holds at the
+        // previously accumulated integral, not collapsed.
         var result = PidController.Step(state, options, setpoint: 10, measurement: 9.9, Dt);
 
         Assert.Equal(heldIntegral, result.NextState.Integral, precision: 12);
@@ -315,28 +398,31 @@ public sealed class PidControllerTests
     }
 
     [Fact]
-    public void Two_runs_over_a_constant_setpoint_match_bit_exact()
+    public void Step_sequence_matches_golden_trace()
     {
-        var options = Options(kp: 1.2, ki: 0.4, kd: 0.1, outputMin: -50, outputMax: 50);
-
-        static List<double> Run(PidControllerOptions opt)
+        // Bit-exact golden trace. Inputs are chosen so every
+        // intermediate is exactly representable in IEEE 754 binary
+        // floats (integers and halves only); any change to the kernel
+        // math that alters the output sequence breaks this test.
+        var options = new PidControllerOptions
         {
-            var outputs = new List<double>();
-            var state = PidControllerState.Initial;
-            for (var i = 0; i < 50; i++)
-            {
-                var measurement = i * 0.7;
-                var result = PidController.Step(state, opt, setpoint: 20, measurement: measurement, TimeSpan.FromSeconds(0.5));
-                outputs.Add(result.Output);
-                state = result.NextState;
-            }
-            return outputs;
-        }
+            Kp = 1, Ki = 0.5, Kd = 2,
+            OutputMin = -100, OutputMax = 100,
+        };
 
-        Assert.Equal(Run(options), Run(options));
+        double[] measurements = [0, 5, 8, 10, 9, 7];
+        double[] expected = [35.0, 2.5, 4.5, 4.5, 12.0, 17.5];
+
+        var state = PidControllerState.Initial;
+        for (var i = 0; i < measurements.Length; i++)
+        {
+            var result = PidController.Step(state, options, setpoint: 10, measurement: measurements[i], Dt);
+            Assert.Equal(expected[i], result.Output);
+            state = result.NextState;
+        }
     }
 
-    // --- Validation --------------------------------------------------------
+    // --- Validation: gains -------------------------------------------------
 
     [Theory]
     [InlineData(double.NaN, 0, 0)]
@@ -352,6 +438,8 @@ public sealed class PidControllerTests
             setpoint: 1, measurement: 0, Dt));
     }
 
+    // --- Validation: output bounds (required + finite) --------------------
+
     [Fact]
     public void Output_min_above_max_throws()
     {
@@ -360,6 +448,45 @@ public sealed class PidControllerTests
             Options(kp: 1, outputMin: 10, outputMax: 5),
             setpoint: 1, measurement: 0, Dt));
     }
+
+    [Fact]
+    public void Non_finite_output_min_throws()
+    {
+        var options = new PidControllerOptions
+        {
+            Kp = 1, OutputMin = double.NegativeInfinity, OutputMax = 10,
+        };
+        Assert.Throws<ArgumentException>(() => PidController.Step(
+            PidControllerState.Initial, options, 1, 0, Dt));
+    }
+
+    [Fact]
+    public void Non_finite_output_max_throws()
+    {
+        var options = new PidControllerOptions
+        {
+            Kp = 1, OutputMin = -10, OutputMax = double.PositiveInfinity,
+        };
+        Assert.Throws<ArgumentException>(() => PidController.Step(
+            PidControllerState.Initial, options, 1, 0, Dt));
+    }
+
+    [Fact]
+    public void Nan_output_max_throws_with_correct_param_name()
+    {
+        // Diagnosability: ParamName must point at the actual offender,
+        // not always at OutputMin (which the previous implementation
+        // did because the NaN check was a single combined branch).
+        var options = new PidControllerOptions
+        {
+            Kp = 1, OutputMin = -10, OutputMax = double.NaN,
+        };
+        var ex = Assert.Throws<ArgumentException>(() => PidController.Step(
+            PidControllerState.Initial, options, 1, 0, Dt));
+        Assert.Equal("OutputMax", ex.ParamName);
+    }
+
+    // --- Validation: deadband / dt / inputs -------------------------------
 
     [Fact]
     public void Negative_deadband_throws()
@@ -411,6 +538,53 @@ public sealed class PidControllerTests
             Options(kp: 1),
             setpoint: 0, measurement: measurement, Dt));
     }
+
+    // --- Validation: state non-finite -------------------------------------
+
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void Non_finite_state_integral_throws(double integral)
+    {
+        var state = PidControllerState.Initial with { Integral = integral };
+        Assert.Throws<ArgumentException>(() => PidController.Step(
+            state, Options(kp: 1), setpoint: 1, measurement: 0, Dt));
+    }
+
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void Non_finite_state_previous_error_throws(double prevError)
+    {
+        var state = PidControllerState.Initial with { PreviousError = prevError };
+        Assert.Throws<ArgumentException>(() => PidController.Step(
+            state, Options(kp: 1), setpoint: 1, measurement: 0, Dt));
+    }
+
+    // --- Validation: overflow on computed pre-clamp -----------------------
+
+    [Fact]
+    public void Pre_clamp_overflow_throws_overflow_exception()
+    {
+        // Construct a setup that forces the D term to overflow:
+        // very large Kd, very large error change, very small dt.
+        // d = 1e300 * (1e300 - (-1e300)) / 1e-7 = 2e607, non-finite.
+        var options = new PidControllerOptions
+        {
+            Kp = 0, Ki = 0, Kd = 1e300,
+            OutputMin = -1e308, OutputMax = 1e308,
+        };
+        var state = PidControllerState.Initial with { PreviousError = -1e300 };
+
+        Assert.Throws<OverflowException>(() => PidController.Step(
+            state, options,
+            setpoint: 1e300, measurement: 0,
+            TimeSpan.FromTicks(1)));
+    }
+
+    // --- Validation: null arguments ---------------------------------------
 
     [Fact]
     public void Null_state_throws()
