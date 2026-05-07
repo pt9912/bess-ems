@@ -1,6 +1,7 @@
 using BatteryEms.Adapters.Modbus;
 using BatteryEms.Adapters.Mqtt;
 using BatteryEms.Adapters.Optimization;
+using BatteryEms.Adapters.Optimization.OrTools;
 using BatteryEms.Adapters.Persistence;
 using BatteryEms.Adapters.Telemetry.Prometheus;
 using BatteryEms.Api.Auth;
@@ -73,6 +74,7 @@ public static class BessHostBuilder
 
         // Driven adapters: optimisation + telemetry are always wired.
         builder.Services.AddBessOptimization();
+        ConfigureScheduleSolver(builder.Services, hostOptions.ScheduleSolver);
         builder.Services.AddBessTelemetry();
 
         // The Modbus / MQTT command sinks need the BatteryAsset; expose
@@ -145,5 +147,37 @@ public static class BessHostBuilder
         app.MapBatteryEms();
         app.MapMetrics();
         return app;
+    }
+
+    private static void ConfigureScheduleSolver(
+        IServiceCollection services,
+        BessScheduleSolverOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(options);
+
+        var backend = string.IsNullOrWhiteSpace(options.Backend)
+            ? "noop"
+            : options.Backend.Trim();
+        if (string.Equals(backend, "noop", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+        if (!string.Equals(backend, "or_tools", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(backend, "ortools", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Unsupported Bess:ScheduleSolver:Backend '{options.Backend}'. Supported values: noop, or_tools.");
+        }
+
+        services.AddBessScheduleSolver(solver =>
+        {
+            if (options.TimeLimitSeconds is { } seconds)
+            {
+                solver.TimeLimit = TimeSpan.FromSeconds(seconds);
+            }
+            solver.GapTolerance = options.GapTolerance;
+            solver.InitialSocPercent = options.InitialSocPercent;
+        });
     }
 }

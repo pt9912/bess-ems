@@ -157,5 +157,72 @@ public sealed record OptimizationRequestBody(
 public sealed record OptimizationResponse(
     Guid RunId,
     OptimizationSolverStatus Status,
+    DateTimeOffset HorizonStart,
+    DateTimeOffset HorizonEnd,
     int? ProducedScheduleVersion,
     string TerminationReason);
+
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+public sealed record OptimizationRunResponse(
+    Guid RunId,
+    string AssetId,
+    string SolverName,
+    OptimizationSolverStatus Status,
+    DateTimeOffset HorizonStart,
+    DateTimeOffset HorizonEnd,
+    double TimeStepSeconds,
+    double ObjectiveValue,
+    IReadOnlyList<OptimizationObjectiveComponentView> ObjectiveBreakdown,
+    IReadOnlyList<string> ConstraintViolations,
+    IReadOnlyList<string> Warnings,
+    double SolverRuntimeSeconds,
+    string TerminationReason,
+    DateTimeOffset CreatedAt,
+    IReadOnlyList<ScheduleReferenceView> Inputs,
+    ScheduleReferenceView? ProducedSchedule)
+{
+    public static OptimizationRunResponse From(OptimizationRun run)
+    {
+        ArgumentNullException.ThrowIfNull(run);
+        return new(
+            RunId: run.RunId,
+            AssetId: run.AssetId,
+            SolverName: run.SolverName,
+            Status: run.Status,
+            HorizonStart: run.HorizonStart,
+            HorizonEnd: run.HorizonEnd,
+            TimeStepSeconds: run.TimeStep.TotalSeconds,
+            ObjectiveValue: run.ObjectiveValue,
+            ObjectiveBreakdown: run.ObjectiveBreakdown.Components
+                .Select(c => new OptimizationObjectiveComponentView(c.Name, c.Value, c.Unit))
+                .ToArray(),
+            ConstraintViolations: run.ConstraintViolations,
+            Warnings: run.Warnings,
+            SolverRuntimeSeconds: run.SolverRuntime.TotalSeconds,
+            TerminationReason: run.TerminationReason,
+            CreatedAt: run.CreatedAt,
+            Inputs: run.Inputs.Select(ScheduleReferenceView.From).ToArray(),
+            ProducedSchedule: run.ProducedSchedule is null
+                ? null
+                : ScheduleReferenceView.From(run.ProducedSchedule));
+    }
+}
+
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+public sealed record OptimizationObjectiveComponentView(
+    string Name,
+    double Value,
+    string Unit);
+
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+public sealed record ScheduleReferenceView(
+    string AssetId,
+    ScheduleType Type,
+    int Version)
+{
+    public static ScheduleReferenceView From(ScheduleReference reference)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        return new(reference.AssetId, reference.Type, reference.Version);
+    }
+}

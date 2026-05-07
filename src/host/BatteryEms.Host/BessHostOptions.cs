@@ -31,6 +31,11 @@ public sealed class BessHostOptions
     // Application layer take over so headless smoke tests can run.
     public string? PersistenceConnectionString { get; set; }
 
+    // Optional horizon-solver wiring. Empty / "noop" keeps the
+    // Application-layer NoOpScheduleOptimizer; "or_tools" enables the
+    // production LP backend from BatteryEms.Adapters.Optimization.
+    public BessScheduleSolverOptions ScheduleSolver { get; set; } = new();
+
     // Optional Modbus driven-adapter wiring (RM-M1-19c). When all three
     // fields are set, the host loads the mapping JSON and registers
     // ModbusTelemetrySource + ModbusCommandSink; otherwise the NoOp
@@ -46,4 +51,12 @@ public sealed class BessHostOptions
     public string? MqttBrokerHost { get; set; }
     public int MqttBrokerPort { get; set; }
     public string? MqttClientId { get; set; }
+}
+
+public sealed class BessScheduleSolverOptions
+{
+    public string? Backend { get; set; }
+    public double? TimeLimitSeconds { get; set; }
+    public double? GapTolerance { get; set; }
+    public double? InitialSocPercent { get; set; }
 }

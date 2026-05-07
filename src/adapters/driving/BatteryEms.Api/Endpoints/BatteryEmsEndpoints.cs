@@ -24,6 +24,7 @@ public static class BatteryEmsEndpoints
         MapCurrentSchedules(routes);
         MapOperatorStop(routes);
         MapDayAheadOptimize(routes);
+        MapOptimizationRunStatus(routes);
         return routes;
     }
 
@@ -234,12 +235,30 @@ public static class BatteryEmsEndpoints
                 return Results.Ok(new OptimizationResponse(
                     RunId: outcome.RunId,
                     Status: outcome.Status,
+                    HorizonStart: command.HorizonStart,
+                    HorizonEnd: command.HorizonEnd,
                     ProducedScheduleVersion: outcome.ProducedScheduleVersion,
                     TerminationReason: outcome.TerminationReason));
             })
             .RequireAuthorization(AuthConstants.OperatorPolicy)
             .WithName("DayAheadOptimize")
             .WithSummary("Trigger a day-ahead schedule optimisation (LH-API-005).");
+    }
+
+    private static void MapOptimizationRunStatus(IEndpointRouteBuilder routes)
+    {
+        routes.MapGet("/optimization/runs/{runId:guid}", async (
+                Guid runId,
+                IOptimizationRunRepository runs,
+                CancellationToken ct) =>
+            {
+                var run = await runs.FindByIdAsync(runId, ct).ConfigureAwait(false);
+                return run is null
+                    ? Results.NotFound(new { error = "optimization-run-not-found", run_id = runId })
+                    : Results.Ok(OptimizationRunResponse.From(run));
+            })
+            .WithName("OptimizationRunStatus")
+            .WithSummary("Status and persisted payload for an optimisation run (LH-API-005).");
     }
 
     private static ScheduleType? ParseScheduleType(string? value) => value switch

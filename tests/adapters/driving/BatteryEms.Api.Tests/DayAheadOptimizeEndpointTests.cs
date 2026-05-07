@@ -96,6 +96,8 @@ public sealed class DayAheadOptimizeEndpointTests : IClassFixture<BatteryEmsApiF
         Assert.NotNull(dto);
         Assert.NotEqual(Guid.Empty, dto!.RunId);
         Assert.Equal("failed", dto.Status);  // snake_case enum converter, NoOp stub
+        Assert.Equal(HorizonStart, dto.HorizonStart);
+        Assert.Equal(HorizonStart + TimeSpan.FromHours(1), dto.HorizonEnd);
         Assert.Null(dto.ProducedScheduleVersion);
         Assert.Equal("no-solver-configured", dto.TerminationReason);
 
@@ -103,6 +105,41 @@ public sealed class DayAheadOptimizeEndpointTests : IClassFixture<BatteryEmsApiF
         var stored = await runs.FindByIdAsync(dto.RunId, CancellationToken.None);
         Assert.NotNull(stored);
         Assert.Equal(OptimizationSolverStatus.Failed, stored!.Status);
+    }
+
+    [Fact]
+    public async Task Get_optimization_run_returns_persisted_status_payload()
+    {
+        using var client = AuthenticatedClient();
+        SeedAsset();
+        var body = ValidBody(assetId: "asset-opt-1");
+        var post = await client.PostAsJsonAsync("/markets/day-ahead/optimize", body, TestJson.Options);
+        post.EnsureSuccessStatusCode();
+        var posted = await post.Content.ReadFromJsonAsync<OptimizationDto>(TestJson.Options);
+
+        var response = await client.GetAsync($"/optimization/runs/{posted!.RunId}");
+
+        response.EnsureSuccessStatusCode();
+        var dto = await response.Content.ReadFromJsonAsync<OptimizationRunDto>(TestJson.Options);
+        Assert.NotNull(dto);
+        Assert.Equal(posted.RunId, dto!.RunId);
+        Assert.Equal("asset-opt-1", dto.AssetId);
+        Assert.Equal("failed", dto.Status);
+        Assert.Equal(HorizonStart, dto.HorizonStart);
+        Assert.Equal(HorizonStart + TimeSpan.FromHours(1), dto.HorizonEnd);
+        Assert.Equal(3600, dto.TimeStepSeconds);
+        Assert.Equal("no-solver-configured", dto.TerminationReason);
+        Assert.Null(dto.ProducedSchedule);
+    }
+
+    [Fact]
+    public async Task Get_optimization_run_returns_404_for_unknown_run()
+    {
+        using var client = AuthenticatedClient();
+
+        var response = await client.GetAsync($"/optimization/runs/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     private HttpClient AuthenticatedClient()
@@ -144,6 +181,23 @@ public sealed class DayAheadOptimizeEndpointTests : IClassFixture<BatteryEmsApiF
     private sealed record OptimizationDto(
         Guid RunId,
         string Status,
+        DateTimeOffset HorizonStart,
+        DateTimeOffset HorizonEnd,
         int? ProducedScheduleVersion,
         string TerminationReason);
+
+    private sealed record OptimizationRunDto(
+        Guid RunId,
+        string AssetId,
+        string Status,
+        DateTimeOffset HorizonStart,
+        DateTimeOffset HorizonEnd,
+        double TimeStepSeconds,
+        string TerminationReason,
+        ScheduleReferenceDto? ProducedSchedule);
+
+    private sealed record ScheduleReferenceDto(
+        string AssetId,
+        string Type,
+        int Version);
 }

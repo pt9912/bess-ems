@@ -24,6 +24,7 @@ services:
       Bess__SchemaDirectory: /app/config/schema
       Bess__AssetConfigPath: /app/config/examples/asset.single-bess.json
       Bess__PersistenceConnectionString: Host=postgres;Port=5432;Database=bessems;Username=bessems;Password=bessems;Include Error Detail=true
+      Bess__ScheduleSolver__Backend: or_tools
       Bess__MqttMappingPath: /app/config/examples/adapters/mqtt.simulator.json
       Bess__MqttBrokerHost: mosquitto
       Bess__MqttBrokerPort: "1883"
