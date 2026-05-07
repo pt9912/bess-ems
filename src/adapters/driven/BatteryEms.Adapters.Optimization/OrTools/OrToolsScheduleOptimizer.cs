@@ -211,7 +211,8 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
         // (loader, persistence, IScheduleTracker) assume Offset == Zero
         // (Schedule.cs:13). The request-level constructor doesn't enforce
         // the offset, so do it once here to keep windows in canonical form
-        // (review #4).
+        // (review #4); CreateRun applies the same normalisation to the run
+        // record so audit log and produced schedule never disagree (#N1).
         var horizonStartUtc = request.HorizonStart.ToUniversalTime();
         var windows = new ScheduleWindow[n];
         for (var t = 0; t < n; t++)
@@ -238,25 +239,10 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
             new OptimizationObjectiveComponent("energy_cost", objectiveValue, "EUR"),
         });
 
-        var run = new OptimizationRun(
-            runId: Guid.NewGuid(),
-            assetId: request.AssetId,
-            solverName: SolverName,
-            status: status,
-            // Run horizons follow the same UTC normalisation as the
-            // produced windows so the audit log and the persisted
-            // schedule never disagree on the offset (review N1).
-            horizonStart: horizonStartUtc,
-            horizonEnd: horizonStartUtc + (request.HorizonEnd - request.HorizonStart),
-            timeStep: request.TimeStep,
-            objectiveValue: objectiveValue,
-            objectiveBreakdown: breakdown,
-            constraintViolations: Array.Empty<string>(),
+        var run = CreateRun(
+            request, status, terminationReason, elapsed,
+            objectiveValue, breakdown,
             warnings: Array.Empty<string>(),
-            solverRuntime: elapsed,
-            terminationReason: terminationReason,
-            createdAt: _clock.UtcNow,
-            inputs: request.Inputs,
             producedSchedule: producedReference);
         return new ScheduleOptimizationResult(run, schedule);
     }
@@ -271,23 +257,11 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
         string terminationReason,
         TimeSpan elapsed)
     {
-        var horizonStartUtc = request.HorizonStart.ToUniversalTime();
-        var run = new OptimizationRun(
-            runId: Guid.NewGuid(),
-            assetId: request.AssetId,
-            solverName: SolverName,
-            status: status,
-            horizonStart: horizonStartUtc,
-            horizonEnd: horizonStartUtc + (request.HorizonEnd - request.HorizonStart),
-            timeStep: request.TimeStep,
+        var run = CreateRun(
+            request, status, terminationReason, elapsed,
             objectiveValue: 0,
-            objectiveBreakdown: OptimizationObjectiveBreakdown.Empty,
-            constraintViolations: Array.Empty<string>(),
+            breakdown: OptimizationObjectiveBreakdown.Empty,
             warnings: Array.Empty<string>(),
-            solverRuntime: elapsed,
-            terminationReason: terminationReason,
-            createdAt: _clock.UtcNow,
-            inputs: request.Inputs,
             producedSchedule: null);
         return new ScheduleOptimizationResult(run, producedSchedule: null);
     }
@@ -298,25 +272,52 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
         string warning)
     {
         Log.PreflightFailed(_logger, request.AssetId, terminationReason);
+        var run = CreateRun(
+            request,
+            status: OptimizationSolverStatus.Failed,
+            terminationReason: terminationReason,
+            elapsed: TimeSpan.Zero,
+            objectiveValue: 0,
+            breakdown: OptimizationObjectiveBreakdown.Empty,
+            warnings: new[] { warning },
+            producedSchedule: null);
+        return new ScheduleOptimizationResult(run, producedSchedule: null);
+    }
+
+    // Single source of truth for OptimizationRun construction (review #17):
+    // every adapter-side run record flows through here, so a new field on
+    // OptimizationRun changes one site instead of three. Also the only
+    // place that normalises the horizon to UTC for the run record (review
+    // N1) — so the audit log offset is canonical regardless of which path
+    // built the run.
+    private OptimizationRun CreateRun(
+        ScheduleOptimizationRequest request,
+        OptimizationSolverStatus status,
+        string terminationReason,
+        TimeSpan elapsed,
+        double objectiveValue,
+        OptimizationObjectiveBreakdown breakdown,
+        IReadOnlyList<string> warnings,
+        ScheduleReference? producedSchedule)
+    {
         var horizonStartUtc = request.HorizonStart.ToUniversalTime();
-        var run = new OptimizationRun(
+        return new OptimizationRun(
             runId: Guid.NewGuid(),
             assetId: request.AssetId,
             solverName: SolverName,
-            status: OptimizationSolverStatus.Failed,
+            status: status,
             horizonStart: horizonStartUtc,
             horizonEnd: horizonStartUtc + (request.HorizonEnd - request.HorizonStart),
             timeStep: request.TimeStep,
-            objectiveValue: 0,
-            objectiveBreakdown: OptimizationObjectiveBreakdown.Empty,
+            objectiveValue: objectiveValue,
+            objectiveBreakdown: breakdown,
             constraintViolations: Array.Empty<string>(),
-            warnings: new[] { warning },
-            solverRuntime: TimeSpan.Zero,
+            warnings: warnings,
+            solverRuntime: elapsed,
             terminationReason: terminationReason,
             createdAt: _clock.UtcNow,
             inputs: request.Inputs,
-            producedSchedule: null);
-        return new ScheduleOptimizationResult(run, producedSchedule: null);
+            producedSchedule: producedSchedule);
     }
 
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
