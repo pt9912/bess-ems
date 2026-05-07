@@ -22,7 +22,7 @@ DOCKER_BUILD = $(DOCKER) build $(BUILD_CONTEXT) \
 	lint arch-check gates \
 	test test-safety test-integration test-container coverage-gate \
 	simulator-test simulator-race simulator-lint simulator-coverage-gate \
-	build ci runtime fullbuild
+	build ci runtime fullbuild lock-refresh
 
 help:
 	@echo "bess-ems Makefile (RM-M1-21)"
@@ -54,12 +54,26 @@ help:
 	@echo "  make simulator-coverage-gate Go coverage gate (90% line)"
 	@echo "  make test-integration        Modbus roundtrip vs Go-Simulator via docker compose"
 	@echo ""
+	@echo "Maintenance:"
+	@echo "  make lock-refresh    Refresh packages.lock.json files in Docker (per docs/user/quality.md §1.4)"
+	@echo ""
 	@echo "Welle 5 (Closure, active):"
 	@echo "  make build           Multi-stage runtime image (non-root, /health HEALTHCHECK)"
 	@echo "  make runtime         Compose-up + /health probe + down (depends on make build)"
 	@echo "  make test-container  Runtime smoke (alias for make runtime)"
 	@echo "  make ci              Sequential CI run of every M1 mandatory gate"
 	@echo "  make fullbuild       make ci + make build + make runtime (M1 closure)"
+
+# --- Maintenance -----------------------------------------------------------
+
+# Lock-file refresh per docs/user/quality.md §1.4. Use after bumping a
+# version in Directory.Packages.props or adding a new PackageReference;
+# the refreshed packages.lock.json files MUST be committed alongside
+# the version change so `make lint` (which runs `dotnet restore --locked-mode`)
+# stays green for the next CI run.
+lock-refresh:
+	$(DOCKER) run --rm -v "$$(pwd)":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 \
+		dotnet restore BatteryEms.sln /p:RestoreLockedMode=false
 
 # --- Welle 1 (active) ------------------------------------------------------
 

@@ -3,6 +3,7 @@ using BatteryEms.Adapters.Mqtt;
 using BatteryEms.Adapters.Optimization;
 using BatteryEms.Adapters.Optimization.OrTools;
 using BatteryEms.Adapters.Persistence;
+using BatteryEms.Adapters.Telemetry.OpenTelemetry;
 using BatteryEms.Adapters.Telemetry.Prometheus;
 using BatteryEms.Api.Auth;
 using BatteryEms.Api.Composition;
@@ -76,6 +77,10 @@ public static class BessHostBuilder
         builder.Services.AddBessOptimization();
         ConfigureScheduleSolver(builder.Services, hostOptions.ScheduleSolver);
         builder.Services.AddBessTelemetry();
+        // RM-M2-06: OTel tracing for the three Application-grenze flows.
+        // Exporter is opt-in via OTEL_EXPORTER_OTLP_ENDPOINT; without it
+        // spans flow through the SDK pipeline but never leave the host.
+        builder.Services.AddBessTracing();
 
         // The Modbus / MQTT command sinks need the BatteryAsset; expose
         // the loaded asset to DI so the adapter constructors resolve it.

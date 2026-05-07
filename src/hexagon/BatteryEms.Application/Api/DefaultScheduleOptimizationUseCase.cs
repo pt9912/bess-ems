@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using BatteryEms.Application.Markets;
 using BatteryEms.Application.Observability;
 using BatteryEms.Application.Optimization;
@@ -97,12 +98,36 @@ public sealed partial class DefaultScheduleOptimizationUseCase
         ArgumentNullException.ThrowIfNull(command);
         ObjectDisposedException.ThrowIf(_disposed == 1, this);
 
+        // RM-M2-06 / LH-MON-003: span around the full optimisation use
+        // case so the API trigger, lock acquisition, schedule-replace
+        // and run-append all live under one trace context. The
+        // optimiser-internal solve is not separately spanned — the
+        // outcome attributes (run_id, solver_status, termination_reason,
+        // produced_schedule_version) capture the relevant detail.
+        using var activity = BessActivitySources.ScheduleOptimization.StartActivity(
+            "bess.schedule_optimization.run");
+        activity?.SetTag(BessActivityTags.AssetId, command.AssetId);
+
         var key = (command.AssetId, command.ScheduleType);
         var gate = _locks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            return await ExecuteUnderLockAsync(command, cancellationToken).ConfigureAwait(false);
+            var outcome = await ExecuteUnderLockAsync(command, cancellationToken).ConfigureAwait(false);
+            activity?.SetTag(BessActivityTags.RunId, outcome.RunId);
+            activity?.SetTag(BessActivityTags.SolverStatus, outcome.Status.ToString());
+            activity?.SetTag(BessActivityTags.TerminationReason, outcome.TerminationReason);
+            if (outcome.ProducedScheduleVersion is { } v)
+            {
+                activity?.SetTag(BessActivityTags.ProducedScheduleVersion, v);
+            }
+            activity?.SetStatus(ActivityStatusCode.Ok);
+            return outcome;
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            throw;
         }
         finally
         {

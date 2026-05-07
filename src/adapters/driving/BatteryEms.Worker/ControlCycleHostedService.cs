@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using BatteryEms.Application.Assets;
 using BatteryEms.Application.Control;
 using BatteryEms.Application.IO;
@@ -94,16 +95,45 @@ public sealed partial class ControlCycleHostedService : BackgroundService
 
     private async Task ExecuteForAssetAsync(string assetId, CancellationToken cancellationToken)
     {
+        // RM-M2-06 / LH-MON-003: outer span covers snapshot read,
+        // dispatch decision, limiter chain and command emission. Span
+        // attributes mirror LH-MON-001 structured-log fields so traces,
+        // logs and metrics share a vocabulary.
+        using var cycleActivity = BessActivitySources.ControlCycle.StartActivity(
+            "bess.control_cycle.execute");
+        cycleActivity?.SetTag(BessActivityTags.AssetId, assetId);
         try
         {
             var command = await _cycle.ExecuteAsync(assetId, cancellationToken).ConfigureAwait(false);
-            var dispatch = await _sink.WriteAsync(command, cancellationToken).ConfigureAwait(false);
+            cycleActivity?.SetTag(BessActivityTags.CommandMode, command.Mode.ToString());
+            cycleActivity?.SetTag(BessActivityTags.PowerKw, command.ActivePowerKw);
+            cycleActivity?.SetTag(BessActivityTags.CommandReason, command.Reason);
+
+            // RM-M2-06: child span around the sink write so failed
+            // dispatches surface in the trace as a distinct span with
+            // an Error status, not just as a log line on the parent.
+            CommandDispatchResult dispatch;
+            using (var dispatchActivity = BessActivitySources.CommandDispatch.StartActivity(
+                "bess.command_dispatch.write"))
+            {
+                dispatchActivity?.SetTag(BessActivityTags.AssetId, assetId);
+                dispatchActivity?.SetTag(BessActivityTags.CommandMode, command.Mode.ToString());
+                dispatchActivity?.SetTag(BessActivityTags.PowerKw, command.ActivePowerKw);
+                dispatch = await _sink.WriteAsync(command, cancellationToken).ConfigureAwait(false);
+                dispatchActivity?.SetTag(BessActivityTags.DispatchSuccess, dispatch.Success);
+                dispatchActivity?.SetTag(BessActivityTags.DispatchReason, dispatch.Reason);
+                dispatchActivity?.SetStatus(
+                    dispatch.Success ? ActivityStatusCode.Ok : ActivityStatusCode.Error,
+                    dispatch.Success ? null : dispatch.Reason);
+            }
+
             await _commandRepository.AppendAsync(command, dispatch, cancellationToken).ConfigureAwait(false);
             if (!dispatch.Success)
             {
                 _metrics.IncrementCommunicationError(assetId, "command-sink");
                 Log.DispatchFailed(_logger, assetId, dispatch.Reason);
             }
+            cycleActivity?.SetStatus(ActivityStatusCode.Ok);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -113,6 +143,7 @@ public sealed partial class ControlCycleHostedService : BackgroundService
         catch (Exception ex) // and continue so the next tick has a chance to recover.
 #pragma warning restore CA1031
         {
+            cycleActivity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             _metrics.IncrementCommunicationError(assetId, "control-cycle");
             Log.TickFailed(_logger, ex, assetId);
         }
