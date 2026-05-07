@@ -53,7 +53,7 @@ zündet.
 | Runtime-Apply      | **DbUp** (`dbup-postgresql`)                              | NuGet zentral in `Directory.Packages.props` + Lock-File (`packages.lock.json`)      |
 | Tracking-Tabelle   | `__schema_versions` (explizit konfiguriert)               | siehe MIG-OPEN-03 — kein Verlassen auf DbUp-Provider-Defaults                       |
 | Schema-Quelle      | `schema/schema.yaml` (kanonisch) → `Migrations/RunOnce/000N_*.sql` (generiert) | `make schema-generate` als CI-Gate mit leerem `git diff`             |
-| Concurrency        | `pg_advisory_lock(<repo-id>)` im `BessDbMigrator`         | MIG-04 testet zwei parallele `MigrateAsync`-Aufrufe                                 |
+| Concurrency        | `pg_advisory_lock(hashtextextended('bess-ems:migrations', 0))` im `BessDbMigrator` | MIG-04 testet zwei parallele `MigrateAsync`-Aufrufe               |
 | Migration-Stil     | Forward-only, eine `000N`-Datei pro logischer Änderung    | siehe MIG-OPEN-02 / MIG-OPEN-05                                                     |
 
 §11 der Architektur-Spec ist mit MIG-02 um den Hybrid-Pfad zu ergänzen
@@ -74,8 +74,10 @@ generate`-Kommandos. Vorteile gegenüber Hand-SQL:
   monolithischer DDL-String, Reviews sehen logische Änderungen statt
   Zeichen-Reflows.
 - **Mechanische Initial-Befüllung.** `d-migrate schema reverse`
-  erzeugt `schema/schema.yaml` aus dem heutigen
-  `BessDbSchema.CreateScript`, ohne dass jemand 130 Zeilen DDL
+  erzeugt `schema/schema.yaml` aus einer temporären Postgres-DB, die
+  vorher mit dem heutigen `BessDbSchema.CreateScript` initialisiert
+  wurde. Damit wird nicht der C#-String geparst, sondern das reale
+  Datenbankschema reverse-engineered, ohne dass jemand 130 Zeilen DDL
   manuell überträgt.
 - **CI-Gates.** `make schema-validate` (statische YAML-Prüfung,
   ohne DB) und `make schema-generate` mit anschließendem leerem
@@ -142,7 +144,11 @@ Funktionsgewinn, dafür Wartungslast.
 Bevor MIG-02 d-migrate als Build-Gate verdrahtet, **muss** ein
 Vorab-Smoke folgendes belegen — scheitert eines, fällt diese ADR
 auf **Hand-SQL + DbUp** zurück, MIG-02 wird auf reines DbUp
-umgeplant und MIG-03 entfällt:
+umgeplant. MIG-03 bleibt in diesem Fall als Snapshot-Absicherung
+erhalten: eine handgepflegte `0001_initial.sql` muss weiterhin gegen
+den heutigen `BessDbInitializer`-Stand diffbar äquivalent sein; nur
+`schema/schema.yaml`, `schema-validate` und der d-migrate-Drift-Check
+entfallen.
 
 1. **Image pullbar und digest-pinnbar.**
    `docker pull ghcr.io/pt9912/d-migrate:<version>@sha256:<digest>`
@@ -176,6 +182,14 @@ umgeplant und MIG-03 entfällt:
    erzeugen, das dasselbe Schema beschreibt wie das heutige
    `BessDbSchema.CreateScript` (Tabellen, Spalten, Constraints,
    Indizes; Whitespace und Reihenfolge-Differenzen sind tolerierbar).
+
+Der Advisory-Lock-Key ist absichtlich als fester String-Hash definiert,
+nicht als lokaler Zufallswert oder mutable Repository-Metadatum. Alle
+Repliken müssen denselben Lock nehmen; `hashtextextended(..., 0)` liefert
+Postgres-seitig einen `bigint` für die einargumentige
+`pg_advisory_lock`-Variante. Der Lock wird vor DbUp genommen und im
+`finally` per `pg_advisory_unlock` freigegeben; Cancellation darf den
+Wartepfad abbrechen, aber keinen gehaltenen Lock offenlassen.
 
 ---
 
