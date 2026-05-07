@@ -212,10 +212,10 @@ public static class BatteryEmsEndpoints
                     return Results.BadRequest(new { error = "unknown-schedule-type", value = body.ScheduleType });
                 }
 
-                ScheduleOptimizationInputs inputs;
+                ScheduleOptimizationCommand command;
                 try
                 {
-                    inputs = new ScheduleOptimizationInputs(
+                    command = new ScheduleOptimizationCommand(
                         assetId: body.AssetId,
                         scheduleType: scheduleType.Value,
                         asset: asset,
@@ -230,7 +230,7 @@ public static class BatteryEmsEndpoints
                     return Results.BadRequest(new { error = "invalid-request", detail = ex.Message });
                 }
 
-                var outcome = await useCase.ExecuteAsync(inputs, ct).ConfigureAwait(false);
+                var outcome = await useCase.ExecuteAsync(command, ct).ConfigureAwait(false);
                 return Results.Ok(new OptimizationResponse(
                     RunId: outcome.RunId,
                     Status: outcome.Status,

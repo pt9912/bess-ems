@@ -86,18 +86,18 @@ public sealed partial class DefaultScheduleOptimizationUseCase
     }
 
     public async Task<ScheduleOptimizationOutcome> ExecuteAsync(
-        ScheduleOptimizationInputs inputs,
+        ScheduleOptimizationCommand command,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(inputs);
+        ArgumentNullException.ThrowIfNull(command);
         ObjectDisposedException.ThrowIf(_disposed == 1, this);
 
-        var key = (inputs.AssetId, inputs.ScheduleType);
+        var key = (command.AssetId, command.ScheduleType);
         var gate = _locks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            return await ExecuteUnderLockAsync(inputs, cancellationToken).ConfigureAwait(false);
+            return await ExecuteUnderLockAsync(command, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -124,27 +124,18 @@ public sealed partial class DefaultScheduleOptimizationUseCase
     }
 
     private async Task<ScheduleOptimizationOutcome> ExecuteUnderLockAsync(
-        ScheduleOptimizationInputs inputs,
+        ScheduleOptimizationCommand command,
         CancellationToken cancellationToken)
     {
         // Inside the lock: read the latest schedule for (asset, type),
-        // derive identity, build the full request and call the optimiser.
-        var existing = _scheduleRepository.FindActive(inputs.AssetId, inputs.ScheduleType);
+        // derive identity, compose the full request and call the
+        // optimiser. The Command already carries every caller-side
+        // field; we only add the resolved identity (review C7).
+        var existing = _scheduleRepository.FindActive(command.AssetId, command.ScheduleType);
         var marketBidArea = existing?.MarketBidArea ?? DefaultMarketBidArea;
         var baseVersion = existing?.Version ?? 0;
 
-        var request = new ScheduleOptimizationRequest(
-            assetId: inputs.AssetId,
-            scheduleType: inputs.ScheduleType,
-            asset: inputs.Asset,
-            horizonStart: inputs.HorizonStart,
-            horizonEnd: inputs.HorizonEnd,
-            timeStep: inputs.TimeStep,
-            marketBidArea: marketBidArea,
-            baseScheduleVersion: baseVersion,
-            pricesPerStep: inputs.PricesPerStep,
-            priceUnit: inputs.PriceUnit,
-            inputs: inputs.Inputs);
+        var request = new ScheduleOptimizationRequest(command, marketBidArea, baseVersion);
 
         var result = await _optimizer.OptimizeAsync(request, cancellationToken).ConfigureAwait(false);
 

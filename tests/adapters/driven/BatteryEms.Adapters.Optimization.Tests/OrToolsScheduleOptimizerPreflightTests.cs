@@ -126,16 +126,15 @@ public sealed class OrToolsScheduleOptimizerPreflightTests
         IReadOnlyList<double>? prices,
         string? priceUnit)
     {
-        return new ScheduleOptimizationRequest(
+        var command = new ScheduleOptimizationCommand(
             assetId: "asset-1",
             scheduleType: ScheduleType.DayAhead,
             asset: TestFixtures.CreateAsset(),
             horizonStart: TestFixtures.HorizonStart,
             horizonEnd: TestFixtures.HorizonStart + TimeSpan.FromHours(2),
             timeStep: TimeSpan.FromHours(1),
-            marketBidArea: "DE-LU",
-            baseScheduleVersion: 0,
             pricesPerStep: prices,
             priceUnit: priceUnit);
+        return new ScheduleOptimizationRequest(command, "DE-LU", baseScheduleVersion: 0);
     }
 }

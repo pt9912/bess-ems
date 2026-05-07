@@ -247,17 +247,16 @@ public sealed class OrToolsScheduleOptimizerModelTests
         // loaders / persistence don't mis-shift.
         var nonUtcStart = new DateTimeOffset(2026, 5, 7, 14, 0, 0, TimeSpan.FromHours(2));
         var optimizer = Build();
-        var request = new ScheduleOptimizationRequest(
+        var command = new ScheduleOptimizationCommand(
             assetId: "asset-1",
             scheduleType: ScheduleType.DayAhead,
             asset: TestFixtures.CreateAsset(),
             horizonStart: nonUtcStart,
             horizonEnd: nonUtcStart + TimeSpan.FromHours(2),
             timeStep: TimeSpan.FromHours(1),
-            marketBidArea: "DE-LU",
-            baseScheduleVersion: 0,
             pricesPerStep: LowHighShort,
             priceUnit: "EUR/MWh");
+        var request = new ScheduleOptimizationRequest(command, "DE-LU", baseScheduleVersion: 0);
 
         var result = await optimizer.OptimizeAsync(request, CancellationToken.None);
 
@@ -283,17 +282,16 @@ public sealed class OrToolsScheduleOptimizerModelTests
         // discharge worth literally 0 EUR; floating-point noise in the
         // LP could surface as -1e-12, confusing downstream gauges.
         var optimizer = Build();
-        var request = new ScheduleOptimizationRequest(
+        var command = new ScheduleOptimizationCommand(
             assetId: "asset-1",
             scheduleType: ScheduleType.DayAhead,
             asset: TestFixtures.CreateAsset(),
             horizonStart: TestFixtures.HorizonStart,
             horizonEnd: TestFixtures.HorizonStart + TimeSpan.FromHours(2),
             timeStep: TimeSpan.FromHours(1),
-            marketBidArea: "DE-LU",
-            baseScheduleVersion: 0,
             pricesPerStep: FlatZero,
             priceUnit: "EUR/MWh");
+        var request = new ScheduleOptimizationRequest(command, "DE-LU", baseScheduleVersion: 0);
 
         var result = await optimizer.OptimizeAsync(request, CancellationToken.None);
 
@@ -355,6 +353,19 @@ public sealed class OrToolsScheduleOptimizerModelTests
     private static ScheduleOptimizationRequest NewRequest(
         BatteryAsset asset,
         IReadOnlyList<double> prices,
+        TimeSpan timeStep) =>
+        new(NewCommand(asset, prices, timeStep), "DE-LU", baseScheduleVersion: 0);
+
+    private static ScheduleOptimizationRequest NewRequestWithIdentity(
+        IReadOnlyList<double> prices,
+        TimeSpan timeStep,
+        string marketBidArea,
+        int baseScheduleVersion) =>
+        new(NewCommand(TestFixtures.CreateAsset(), prices, timeStep), marketBidArea, baseScheduleVersion);
+
+    private static ScheduleOptimizationCommand NewCommand(
+        BatteryAsset asset,
+        IReadOnlyList<double> prices,
         TimeSpan timeStep) => new(
         assetId: "asset-1",
         scheduleType: ScheduleType.DayAhead,
@@ -362,24 +373,6 @@ public sealed class OrToolsScheduleOptimizerModelTests
         horizonStart: TestFixtures.HorizonStart,
         horizonEnd: TestFixtures.HorizonStart + TimeSpan.FromTicks(timeStep.Ticks * prices.Count),
         timeStep: timeStep,
-        marketBidArea: "DE-LU",
-        baseScheduleVersion: 0,
-        pricesPerStep: prices,
-        priceUnit: "EUR/MWh");
-
-    private static ScheduleOptimizationRequest NewRequestWithIdentity(
-        IReadOnlyList<double> prices,
-        TimeSpan timeStep,
-        string marketBidArea,
-        int baseScheduleVersion) => new(
-        assetId: "asset-1",
-        scheduleType: ScheduleType.DayAhead,
-        asset: TestFixtures.CreateAsset(),
-        horizonStart: TestFixtures.HorizonStart,
-        horizonEnd: TestFixtures.HorizonStart + TimeSpan.FromTicks(timeStep.Ticks * prices.Count),
-        timeStep: timeStep,
-        marketBidArea: marketBidArea,
-        baseScheduleVersion: baseScheduleVersion,
         pricesPerStep: prices,
         priceUnit: "EUR/MWh");
 }

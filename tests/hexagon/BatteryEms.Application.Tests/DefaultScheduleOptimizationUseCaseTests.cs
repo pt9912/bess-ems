@@ -231,7 +231,7 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
             metrics ?? NoOpOptimizationRunMetrics.Instance,
             NullLogger<DefaultScheduleOptimizationUseCase>.Instance);
 
-    private static ScheduleOptimizationInputs BuildInputs() => new(
+    private static ScheduleOptimizationCommand BuildInputs() => new(
         assetId: "asset-1",
         scheduleType: ScheduleType.DayAhead,
         asset: TestFixtures.CreateAsset(),

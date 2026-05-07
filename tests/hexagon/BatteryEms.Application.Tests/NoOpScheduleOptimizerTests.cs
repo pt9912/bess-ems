@@ -15,15 +15,14 @@ public sealed class NoOpScheduleOptimizerTests
     public async Task OptimizeAsync_returns_failed_run_with_no_solver_configured_reason()
     {
         var optimizer = new NoOpScheduleOptimizer(new FakeClock { UtcNow = HorizonStart });
-        var request = new ScheduleOptimizationRequest(
+        var command = new ScheduleOptimizationCommand(
             assetId: "asset-1",
             scheduleType: ScheduleType.DayAhead,
             asset: TestFixtures.CreateAsset(),
             horizonStart: HorizonStart,
             horizonEnd: HorizonStart + TimeSpan.FromHours(1),
-            timeStep: TimeSpan.FromHours(1),
-            marketBidArea: "DE-LU",
-            baseScheduleVersion: 0);
+            timeStep: TimeSpan.FromHours(1));
+        var request = new ScheduleOptimizationRequest(command, "DE-LU", baseScheduleVersion: 0);
 
         var result = await optimizer.OptimizeAsync(request, CancellationToken.None);
 
