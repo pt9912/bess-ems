@@ -185,11 +185,12 @@ Hash, den der Reviewer beim Mergen gesehen hat.
 Der Workflow ist als `make lock-refresh` Target verfügbar; er ruft
 denselben Docker-Befehl wie oben.
 
-**Aufgeschobene Bumps (Stand 2026-05-07):**
-
-Bei `Google.OrTools` steht ein 9.11 → 9.15-Bump aus, der die
-Native-Bindings updatet — separater Review-Schritt mit Lock-File-
-Diff (vgl. dieselbe §1.4-Begründung wie für die Erstaufnahme).
+**Aufgeschobene Bumps (Stand 2026-05-07):** Keine offenen Major-/
+Native-Binding-Bumps. Beim RM-M2-06-Bulk-Refresh und den Folge-Slices
+wurden alle dokumentierten Folge-Bumps abgearbeitet — JsonSchema.Net
+9.x, MQTTnet 5.x und Google.OrTools 9.15 (Native-Bindings, Bit-genaue
+OP-09-Replay-Tests blieben grün). Die `Directory.Packages.props`-
+Versionen sind die jeweils aktuellsten kompatiblen Stable-Releases.
 
 ---
 
