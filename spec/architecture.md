@@ -694,7 +694,7 @@ Phase 4 (optional)   : Shared Memory / CPU Pinning / Edge Controller
 
 ### 13.4 Fallback
 
-`BatteryEms.NativeInterop` exportiert dasselbe Interface wie die
+`BatteryEms.Adapters.NativeInterop` exportiert dasselbe Interface wie die
 .NET-Referenzimplementierung. Bei fehlender Bibliothek, ABI-Mismatch oder
 Native-Fehler greift automatisch die .NET-Variante; der Regelkreis bleibt
 funktionsfähig (LH-ARCH-006).

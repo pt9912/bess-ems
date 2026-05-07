@@ -224,7 +224,7 @@ bleibt Fallback und Referenz.
 | ⬜     | RM-M3-01   | C-ABI `battery_control_core.h` (Snapshot/Limits/Command Structs)    | LH-NATIVE-002/003          |
 | ⬜     | RM-M3-02   | C++-Implementierung Constraint + Ramp + Statuscode-Fehlerpfade      | LH-NATIVE-001/004          |
 | ⬜     | RM-M3-03   | ABI-Versionsfunktion + Startup-Check in .NET                        | LH-NATIVE-005              |
-| ⬜     | RM-M3-04   | P/Invoke-Bindings (`BatteryEms.NativeInterop`)                      | LH-NATIVE-001              |
+| ⬜     | RM-M3-04   | P/Invoke-Bindings (`BatteryEms.Adapters.NativeInterop`)              | LH-NATIVE-001              |
 | ⬜     | RM-M3-05   | Routing: Native bevorzugt, .NET-Fallback bei Fehler/Abwesenheit     | LH-ARCH-006, LH-NF-002     |
 | ⬜     | RM-M3-06   | Multi-Stage Dockerfile mit Native-Build-Stage                       | LH-DEPLOY-003/004, LH-NATIVE-006 |
 | ⬜     | RM-M3-07   | Interop-Tests (Struct Layout, ABI, Werte-Parität gg. .NET-Referenz) | LH-TEST-005                |
@@ -232,6 +232,8 @@ bleibt Fallback und Referenz.
 | ⬜     | RM-M3-09   | Native-Quality-Gates: `native-lint`, Sanitizer, Native-Coverage     | LH-TEST-005, LH-NATIVE-*   |
 | ⬜     | RM-M3-10   | Native/.NET-Parity-Gate über Replay-Datensatz                       | LH-ARCH-006, LH-TEST-005   |
 | ⬜     | RM-M3-11   | Makefile-Erweiterung um native Targets (`native-lint`, `test-native-interop`, `test-native-parity`, `native-coverage-gate`, `native-coverage-report`, `native-coverage-exclusions`); `gates`/`ci` ziehen native Gates mit | LH-NATIVE-*, LH-TEST-005   |
+| ⬜     | RM-M3-12   | Doku-/Contract-Sync fuer Native-Policy und Adaptername              | LH-NATIVE-004/005, LH-OPS-001 |
+| ⬜     | RM-M3-13   | PID Native-Slice nach stabiler Constraint/Ramp-Parity               | LH-NATIVE-001/004, LH-TEST-005 |
 
 ### Abnahmekriterien
 

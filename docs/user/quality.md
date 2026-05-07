@@ -448,7 +448,7 @@ Aktiv ab **M3** (LH-NATIVE-005, RM-M3-03).
 | Gate                                                | Ort                              |
 | --------------------------------------------------- | -------------------------------- |
 | `battery_control_core_abi_version()` exportiert     | `native/include/battery_control_core.h` |
-| `.NET`-Startup-Check vergleicht erwartete ABI       | `BatteryEms.NativeInterop`       |
+| `.NET`-Startup-Check vergleicht erwartete ABI       | `BatteryEms.Adapters.NativeInterop` |
 | Mismatch → Service startet nicht (LH-OPS-001)       | Integrationstest in M3           |
 
 ### 5.3 Adapter-Mapping-Schema
