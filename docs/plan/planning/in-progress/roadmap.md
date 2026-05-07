@@ -58,10 +58,15 @@ unter `in-progress/`.
 > guarded, sowie Replay-/Reproduzierbarkeitstests (LH-OPT-009).
 > Drei Review-Pässe, alle Findings adressiert oder mit präzise
 > dokumentiertem M3-Trigger eingefroren (OP-OPEN-05/06).
+> **PID-Regler (RM-M2-08):** Domain-Primitive `PidController` mit
+> Conditional-Integration-Anti-Windup, Output-Clamping und optionalem
+> Totband ist als reine Funktion in `BatteryEms.Domain` ausgeliefert
+> (LH-CTRL-004 ist „Soll"; der Regelzyklus konsumiert das Primitive
+> bisher nicht — Verdrahtung folgt mit konkreten Konsumenten).
 > **Nächste M2-Wellen:** Hardware-in-the-Loop (siehe Folgewelle-Hinweis
 > unter „M2 — Marktausbau und Optimierung"), Tracing/Replay-Harness
-> (RM-M2-06/10), PID-Regler (RM-M2-08), Configurable Objective
-> (RM-M2-04), Marktcommitment-Priorisierung (RM-M2-01) und
+> (RM-M2-06/10), Configurable Objective (RM-M2-04),
+> Marktcommitment-Priorisierung (RM-M2-01) und
 > Zeitmodell-Erweiterung (RM-M2-02). Persistenz-Migrations-Tooling
 > ist als M2-Folgewelle in
 > [`../open/plan-RM-M2-migration.md`](../open/plan-RM-M2-migration.md)
@@ -187,7 +192,7 @@ HIL ist und bleibt **kein M2-Pflichtgate** — `make gates` und
 | ✅     | RM-M2-05   | Optimierungs-API (`POST /markets/day-ahead/optimize`)               | LH-API-005              |
 | ⬜     | RM-M2-06   | OpenTelemetry-Tracing für Snapshot → Control → Adapter              | LH-MON-003              |
 | ✅     | RM-M2-07   | Erweiterte Prometheus-Metriken für Solverzeit und Optimierungsläufe | LH-MON-002              |
-| ⬜     | RM-M2-08   | PID-Regler (.NET) mit Anti-Windup, Output-Clamping, Totband         | LH-CTRL-004             |
+| ✅     | RM-M2-08   | PID-Regler (.NET) mit Anti-Windup, Output-Clamping, Totband — Domain-Primitive `PidController` (functional `Step(state, options, …)`) mit Conditional-Integration-Anti-Windup, symmetrischem Output-Clamping und optionalem absoluten Totband. LH-CTRL-004 ist „Soll" und der Regelzyklus konsumiert das Primitive bisher nicht; produktive Verdrahtung folgt mit konkreten Konsumenten (PCC-Regelung, Peak-Shaving, Frequenz-Stützung, Export-Begrenzung). | LH-CTRL-004             |
 | ✅     | RM-M2-09   | Erweiterte Persistenz für Optimierungsläufe und Solverstatus (`IOptimizationRunRepository`, `OptimizationRun` mit Objective Breakdown) | LH-PERSIST-007          |
 | 🟡     | RM-M2-10   | Replay-Test-Harness (Telemetrie-Wiedergabe, Command-Vergleich) — Solver-seitiger Replay (LH-OPT-009) ist mit OP-09 erbracht; Telemetrie-Replay-Harness bleibt offen | LH-TEST-004             |
 
