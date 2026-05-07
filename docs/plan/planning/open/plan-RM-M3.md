@@ -49,7 +49,7 @@ solange jeder Slice seine Kompatibilitaets- und Fallback-Tests mitbringt.
 | Native liefert `ok` | `NativeControl:Enabled=true`, ABI kompatibel | Native-Command wird verwendet. | Interop-Test plus Parity-Fall. |
 | Native liefert `limited` | `NativeControl:Enabled=true`, ABI kompatibel | Native-Command wird verwendet, Limit-Reason bleibt observierbar. | Parity-Fall fuer Constraint und Ramp. |
 | Native liefert Fehlerstatus aus gueltigen Eingaben | `NativeControl:Enabled=true`, ABI kompatibel | Managed-Fallback wird fuer denselben Tick neu berechnet; kein stale Native-Ergebnis. | Negativtest je Fehlerklasse. |
-| Nicht-finite oder fachlich ungueltige Control-Eingabe | unabhaengig von Native | Application-/Mapping-Precheck liefert Safe-Stop oder invaliden Snapshot/Dispatch, bevor Native oder Managed-Kernel gerechnet werden; kein Fallback-Loop mit denselben ungueltigen Werten. | Tests fuer Snapshot-SOC, Dispatch-Target, Limits/Request-Mapping. |
+| Nicht-finite oder fachlich ungueltige Control-Eingabe | unabhaengig von Native | Application-/Mapping-Precheck liefert Safe-Stop oder invaliden Snapshot/Dispatch, bevor Native oder Managed-Kernel gerechnet werden; kein Fallback-Loop mit denselben ungueltigen Werten. | Tests fuer Snapshot-SOC/SOH/Active-Power/Temperatur, Dispatch-Target, Limits/Request-Mapping. |
 | Native wirft intern/Exception im C++ | `NativeControl:Enabled=true`, ABI kompatibel | Export-Funktion faengt ab und liefert Statuscode; keine C++-Exception verlaesst die ABI. | C++- und Interop-Test. |
 
 Produktions-Policy darf spaeter strenger sein (z. B. Startabbruch bei
@@ -235,9 +235,11 @@ Stale-Snapshot-Entscheidungen, `ValidUntil` und freie
 `DataQuality.Reason`-Texte bleiben Managed-Prechecks des Control-Cycles.
 Dasselbe gilt fuer `Available == false`, unbrauchbare Snapshot-Qualitaet
 und nicht-finite oder unplausible Werte in Snapshot, Dispatch, Limits oder
-Request. Sie werden in .NET-Control-/Mapping-Tests nachgewiesen, aber nicht
-als Native-Parity-Faelle gezaehlt, solange die ABI diese Felder nicht
-fuehrt.
+Request. Die .NET-Precheck-Tests muessen mindestens SOC, SOH, Active Power
+und Temperatur auf finite/plausible Werte abdecken; zusaetzliche Limit- und
+Request-Werte werden im Mapping vor Kernel-Aufruf validiert. Diese Faelle
+werden in .NET-Control-/Mapping-Tests nachgewiesen, aber nicht als
+Native-Parity-Faelle gezaehlt, solange die ABI diese Felder nicht fuehrt.
 
 Export-Baseline fuer RM-M3-01:
 
@@ -260,7 +262,8 @@ Export-Baseline fuer RM-M3-01:
 | M3-A ABI + Build-Skelett | `native/battery_control_core`, Header, CMake, leere/Stub-Implementierung, ABI-Version, Docker-Build-Stage. | Native Library baut reproduzierbar und ABI-Version ist aus C++ und .NET testbar; noch kein Runtime-Routing. |
 | M3-B Constraint/Ramp Native | C++-Port von `ConstraintLimiter` und `RampLimiter`, Statuscodes, C++-Unit-Tests, Sanitizer. | C++-Tests erreichen alle Constraint-/Ramp-Reason-Codes und alle Fehlerstatus; keine P/Invoke-Abhaengigkeit. |
 | M3-C Interop + Fallback | `BatteryEms.Adapters.NativeInterop`, Loader, P/Invoke-Structs, Konfiguration, Routing hinter expliziter Test-/Profilkonfiguration, Managed-Fallback. | Fehlende `.so`, ABI-Mismatch und Native-Fehler fallen deterministisch auf Managed zurueck; produktive Default-Aktivierung bleibt gesperrt. |
-| M3-D Parity + Gates | Golden-Datensatz, `test-native-interop`, `test-native-parity`, Native-Coverage, CI-/Make-Integration, danach produktive Profilaktivierung. | `make gates`/`make ci` ziehen Native-Gates reproduzierbar; Toleranzen dokumentiert; erst danach darf ein Profil Native als bevorzugten Runtime-Pfad setzen. |
+| M3-D Parity + Gates | Golden-Datensatz, `test-native-interop`, `test-native-parity`, Native-Coverage, CI-/Make-Integration. | `make gates`/`make ci` ziehen Native-Gates reproduzierbar; Toleranzen dokumentiert; noch keine produktive Profilaktivierung in diesem Slice. |
+| M3-D2 Produktive Profilaktivierung | Separater Folge-Slice nach abgeschlossenen RM-M3-06, RM-M3-10, RM-M3-11 und RM-M3-12. | Ein produktionsnahes Profil darf Native als bevorzugten Runtime-Pfad setzen; Fallback-, Container-, Gate- und Doku-Nachweise sind bereits auf `main` gruen. |
 | M3-E PID-Slice | PID erst nach stabiler Constraint/Ramp-Parity; eigener ABI-/Struct-Delta nur falls noetig. | PID-Parity gegen `PidController.Step`; negative `dt`, non-finite State und Anti-Windup-Faelle getestet. |
 | M3-FUP | OP-OPEN-05/06 und Migrationen nur bei Trigger. | Keine Schema- oder Multi-Replica-Arbeit blockiert den Native-Kern ohne konkreten Bedarf. |
 
@@ -276,13 +279,14 @@ Not vermischen.
 | Native Constraint/Ramp | C++-Implementierung und C++-Tests fuer bestehende Domain-Referenzfaelle | P/Invoke, .NET-Registrierung, Schema/FUP |
 | Interop Adapter | Neues Adapterprojekt, P/Invoke-Structs, Loader, ABI-Check, Adapter-Unit-Tests | produktives Routing als Default, Dockerfile-Umstellung |
 | Application Routing | Application-Port/Facade, Control-Cycle-Integration hinter expliziter Test-/Profilkonfiguration, Fallback-Tests, Metrics-Port-Erweiterung | produktive Default-Aktivierung, Native-Coverage-Gate, PID-ABI-Delta |
-| Container/Gates | Dockerfile, Makefile, CI-Target-Verdrahtung, Native-Testcontainer, produktive Profilaktivierung nach erfolgreichen Gates | fachliche Native-Algorithmik |
+| Container/Gates | Dockerfile, Makefile, CI-Target-Verdrahtung, Native-Testcontainer | fachliche Native-Algorithmik, produktive Profilaktivierung |
+| Produktive Profilaktivierung | Separater Folge-PR nach abgeschlossenen RM-M3-06, RM-M3-10, RM-M3-11 und RM-M3-12; setzt ein produktionsnahes Profil auf Native-bevorzugt. | fachliche Native-Algorithmik, Gate-Erstaktivierung, Doku-Sync |
 | PID | ABI-Delta falls noetig, C++ PID, Interop-Mapping, PID-Parity-Goldens | Constraint/Ramp-Erstaktivierung |
 | FUP | Migrationen, OP-OPEN-05/06, Multi-Replica-Semantik | Native-Core-Slices RM-M3-01..13 |
 
-Jeder PR nennt im Body: betroffener Slice `M3-A`..`M3-FUP`,
-abgeschlossene RM-M3-IDs, Fallback-Verhalten, Testtargets und ob eine
-Native Library fuer die Tests gebaut oder bewusst simuliert wurde.
+Jeder PR nennt im Body: betroffener Slice `M3-A`..`M3-FUP` bzw.
+`M3-D2`, abgeschlossene RM-M3-IDs, Fallback-Verhalten, Testtargets und ob
+eine Native Library fuer die Tests gebaut oder bewusst simuliert wurde.
 
 ---
 
@@ -294,7 +298,7 @@ Native Library fuer die Tests gebaut oder bewusst simuliert wurde.
 | ⬜     | RM-M3-02 | C++-Implementierung Constraint + Ramp + Statuscode-Fehlerpfade     | RM-M3-01      | Native Kern bildet zuerst die .NET-Referenzlogik aus `ConstraintLimiter.Apply` und `RampLimiter.Apply` ab; PID folgt danach in RM-M3-13 als eigener inkrementeller Slice, sobald Constraint/Ramp-Parity stabil ist. Statuscodes decken ok, limited, invalid-input, non-finite, negative-dt und unsupported-state ab; keine Exception verlaesst den Export-Pfad. |
 | ⬜     | RM-M3-03 | ABI-Versionsfunktion + Startup-Check in .NET                      | RM-M3-01      | Native Library exportiert ABI-Version; .NET prueft beim Start erwartete Major/Minor-Kompatibilitaet. ABI-Mismatch fuehrt im M3-Default zu .NET-Fallback mit klarer Health-/Log-/Metric-Signalisierung; Startabbruch bleibt nur eine explizite Produktions-Policy und darf nicht versehentlich aus `docs/user/quality.md` §5.2 uebernommen werden. |
 | ⬜     | RM-M3-04 | P/Invoke-Bindings (`BatteryEms.Adapters.NativeInterop`)            | RM-M3-01..03  | Neuer Driven Adapter referenziert nur Application-Ports/Domain; Struct-Layout-Tests pruefen Groesse, Offsets, Calling Convention, Charset-Unabhaengigkeit und Marshal-Verhalten auf Linux x64. Loader-Pfad ist konfigurierbar und defaultet im Container auf `/app/native/libbattery_control_core.so`. |
-| ⬜     | RM-M3-05 | Routing hinter expliziter Konfiguration, .NET-Fallback bei Fehler/Abwesenheit | RM-M3-04      | Control-Pfad kann Native nutzen, wenn Library vorhanden, kompatibel, explizit aktiviert und die Control-Eingaben endlich/plausibel sind; bei Ladefehler, ABI-Mismatch oder Native-Fehlercode aus gueltigen Eingaben wird deterministisch auf die Managed-Referenz fuer denselben Tick zurueckgerechnet und der Grund observierbar geloggt/gemessen. Nicht-finite oder fachlich ungueltige Snapshot-/Dispatch-/Limit-/Request-Werte werden vor Kernel-Aufruf als Managed-Precheck behandelt und fuehren nicht zu einem Blind-Fallback mit denselben ungueltigen Werten. Konfiguration kann Native explizit deaktivieren; produktive Default-Aktivierung ist nicht Teil von RM-M3-05. |
+| ⬜     | RM-M3-05 | Routing hinter expliziter Konfiguration, .NET-Fallback bei Fehler/Abwesenheit | RM-M3-04      | Control-Pfad kann Native nutzen, wenn Library vorhanden, kompatibel, explizit aktiviert und die Control-Eingaben endlich/plausibel sind; bei Ladefehler, ABI-Mismatch oder Native-Fehlercode aus gueltigen Eingaben wird deterministisch auf die Managed-Referenz fuer denselben Tick zurueckgerechnet und der Grund observierbar geloggt/gemessen. Nicht-finite oder fachlich ungueltige Snapshot-/Dispatch-/Limit-/Request-Werte werden vor Kernel-Aufruf als Managed-Precheck behandelt und fuehren nicht zu einem Blind-Fallback mit denselben ungueltigen Werten; Tests decken mindestens SOC, SOH, Active Power, Temperatur, Dispatch-Target und Native-Request-/Limit-Mapping ab. Konfiguration kann Native explizit deaktivieren; produktive Default-Aktivierung ist nicht Teil von RM-M3-05. |
 | ⬜     | RM-M3-06 | Multi-Stage Dockerfile mit Native-Build-Stage                      | RM-M3-02..05  | Runtime-Image enthaelt die native `.so` unter `/app/native/`; der Host laedt bevorzugt ueber expliziten Loader-Pfad statt globalem `LD_LIBRARY_PATH`. Build-Stage kompiliert C++ reproduzierbar; Container-Smoke beweist, dass Host die Library findet oder sauber fallbackt. |
 | ⬜     | RM-M3-07 | Interop-Tests: Struct Layout, ABI, Werte-Paritaet                  | RM-M3-04      | Tests vergleichen Native-Output gegen .NET-Referenz fuer definierte Snapshots/Limits; Toleranzen sind dokumentiert und eng. Negative Tests decken deaktivierte Native-Option, fehlende `.so` bei aktivierter Native-Option, ABI-Mismatch, non-finite ABI-Input und nativen Fehlerstatus ab. |
 | ⬜     | RM-M3-08 | C++-Unit-Tests                                                     | RM-M3-02      | Native Tests decken Constraint, Ramp, den PID-Slice sobald RM-M3-13 aktiviert ist, NaN/Inf, Vorzeichen, `dt == 0`, negative `dt`, fehlenden Previous-Power-Kontext und alle Limit-Reason-Codes ab. Testdaten sind so gewaehlt, dass jede Statuscode-Variante mindestens einmal direkt im C++-Test erreicht wird. |
@@ -331,10 +335,11 @@ Domain-Tests spiegeln und pro Fall den erwarteten Command mit Status,
 Reason-Code, ActivePowerKw und Mode enthalten.
 
 `Available == false`, unbrauchbare Snapshot-Qualitaet, stale Snapshots,
-ungueltiger SOC und nicht-finite Werte aus Snapshot, Dispatch, Limits oder
-Request sind Managed-Precheck-Faelle. Sie bekommen eigene
-Control-/Mapping-Tests, zaehlen aber nicht als Native-Parity-Goldens,
-solange der erste ABI-Slice diese Felder nicht fuehrt.
+ungueltiger SOC/SOH, nicht-finite SOC/SOH/Active-Power/Temperatur und
+nicht-finite Werte aus Dispatch, Limits oder Request sind
+Managed-Precheck-Faelle. Sie bekommen eigene Control-/Mapping-Tests,
+zaehlen aber nicht als Native-Parity-Goldens, solange der erste ABI-Slice
+diese Felder nicht fuehrt.
 
 ### Abnahmematrix Nach Testtyp
 
@@ -343,7 +348,7 @@ solange der erste ABI-Slice diese Felder nicht fuehrt.
 | C++-Unit | `native/battery_control_core/tests/` | Constraint/Ramp-Reasons, nicht-finite Inputs, negative `dt`, Exception-Barriere am Export. |
 | ABI-Layout | .NET-Interop-Tests + kleiner C++-Layout-Test | `sizeof`, Offsets, Calling Convention, ABI-Version und Statuscode-Breiten stimmen zwischen Header und P/Invoke. |
 | Adapter-Negativtests | `BatteryEms.Adapters.NativeInterop.Tests` | deaktivierte Native-Option, fehlende `.so` bei aktivierter Native-Option, falsche ABI, Loader-Fehler und Native-Fehlerstatus liefern kontrollierten Adapterzustand. |
-| Application-Fallback | `BatteryEms.Application.Tests/ControlCycle*` oder neues gezieltes Testprojekt | derselbe Tick wird bei Native-Fehler aus gueltigen Eingaben ueber Managed neu berechnet; kein stale Native-Command wird verwendet; nicht-finite Snapshot-/Dispatch-/Mapping-Werte werden vor Kernel-Aufruf abgefangen. |
+| Application-Fallback | `BatteryEms.Application.Tests/ControlCycle*` oder neues gezieltes Testprojekt | derselbe Tick wird bei Native-Fehler aus gueltigen Eingaben ueber Managed neu berechnet; kein stale Native-Command wird verwendet; nicht-finite Snapshot-SOC/SOH/Active-Power/Temperatur sowie Dispatch-/Mapping-Werte werden vor Kernel-Aufruf abgefangen. |
 | Parity-Golden | `test-native-parity` | Native und Managed liefern fuer Golden-Faelle denselben Command bis zur dokumentierten Toleranz, inklusive kombinierter Constraint/Ramp-Begrenzung und heutiger Reason-Prioritaet. |
 | Container-Smoke | `make runtime` oder dediziertes Native-Smoke-Target | Runtime-Image enthaelt `/app/native/libbattery_control_core.so` und Host kann mit und ohne Library kontrolliert starten. |
 | Observability | Application-/Telemetry-Tests | Health/Logs/Metriken unterscheiden disabled, loaded, library-missing, abi-mismatch und native-error. |
@@ -391,7 +396,7 @@ bleiben:
 | Reason | Quelle / Fall | Erwarteter Status |
 | ------ | ------------- | ----------------- |
 | `within-limits` | Constraint/Ramp unveraendert | `ok` |
-| `asset-unavailable` | `ConstraintLimiter` begrenzt auf 0, falls Native diesen Precheck bekommt | `limited` oder `invalid-input` nach ABI-Entscheidung; M3-A muss das festlegen |
+| `asset-unavailable` | Managed-Precheck im aktuellen Control-Cycle; nicht Teil des ersten ABI-Slice, solange `Available` nicht ueber die ABI geht | Kein Native-Reason im ersten Slice; bei spaeterem ABI-Delta neu entscheiden |
 | `temperature-out-of-range` | Temperatur unter/ueber Asset-Grenze | `limited` |
 | `soc-at-max-charge-blocked` | Laden bei SOC >= Max | `limited` |
 | `soc-at-min-discharge-blocked` | Entladen bei SOC <= Min | `limited` |
@@ -463,6 +468,7 @@ stabil dokumentiert sein.
 | RM-M3-OPEN-06 | Muessen Native-Statuscodes schon vor Implementierung numerisch fixiert werden? | **Geschlossen:** ja, aber erst im ABI-Slice RM-M3-01. Ab Merge des Headers sind numerische Werte ABI und duerfen nur ueber Major-Version-Bump gebrochen werden. |
 | RM-M3-OPEN-07 | Muss die Native Library bei jeder lokalen Testausfuehrung vorhanden sein? | **Geschlossen:** nein. Normale .NET-Tests bleiben ohne Native lauffaehig; Native-spezifische Targets bauen oder mounten die `.so` explizit. |
 | RM-M3-OPEN-08 | Wie wird die Abweichung `docs/user/quality.md` Startabbruch vs. M3-Fallback behandelt? | **Geschlossen fuer diesen Plan:** RM-M3-12 synchronisiert die Doku. Architektur §13.4 und LH-NATIVE-004 stuetzen Fallback; Startabbruch bleibt optionale Produktions-Policy. |
+| RM-M3-OPEN-09 | Darf produktive Native-Profilaktivierung im selben PR wie Container-/Gate-Erstverdrahtung passieren? | **Geschlossen:** nein. Produktive Profilaktivierung ist ein eigener Folge-PR, nachdem RM-M3-06, RM-M3-10, RM-M3-11 und RM-M3-12 abgeschlossen und auf `main` gruen sind. |
 
 ---
 
@@ -505,10 +511,12 @@ stabil dokumentiert sein.
 - [ ] Native-PR beruehrt keine Persistenzdateien und keine
   schema-veraendernden Migrationen, ausser ein FUP-Trigger ist bewusst
   aktiviert.
-- [ ] Jeder PR nennt den betroffenen Slice M3-A..M3-FUP und die
-  abgeschlossenen RM-M3-IDs.
+- [ ] Jeder PR nennt den betroffenen Slice M3-A..M3-FUP bzw. M3-D2 und
+  die abgeschlossenen RM-M3-IDs.
 - [ ] Managed-Referenztests bleiben ohne Native Library lauffaehig.
 - [ ] Native-spezifische Tests bauen oder mounten ihre `.so` explizit.
 - [ ] Jede neue Native-Reason oder jeder Statuscode ist im Header,
   in .NET-Mapping-Tests und in diesem Plan bzw. der finalen Doku
   nachgezogen.
+- [ ] Produktive Profilaktivierung passiert erst in einem Folge-PR,
+  nachdem RM-M3-06, RM-M3-10, RM-M3-11 und RM-M3-12 auf `main` gruen sind.
