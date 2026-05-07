@@ -267,6 +267,13 @@ public sealed class OrToolsScheduleOptimizerModelTests
             Assert.Equal(TimeSpan.Zero, window.Start.Offset);
             Assert.Equal(TimeSpan.Zero, window.End.Offset);
         }
+        // Review N1: run-record horizon must be UTC-canonical too,
+        // otherwise the audit log carries a different offset than the
+        // schedule it points at.
+        Assert.Equal(TimeSpan.Zero, result.Run.HorizonStart.Offset);
+        Assert.Equal(TimeSpan.Zero, result.Run.HorizonEnd.Offset);
+        // Same instant, just normalised: 14:00+02:00 ↔ 12:00Z.
+        Assert.Equal(nonUtcStart.UtcDateTime, result.Run.HorizonStart.UtcDateTime);
     }
 
     [Fact]

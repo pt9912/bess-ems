@@ -12,15 +12,24 @@ namespace BatteryEms.Application.Api;
 // (market bid area + next version) from the existing Schedule for
 // (AssetId, ScheduleType) under a per-key lock so two concurrent
 // optimise calls cannot race on the version, ask the driven
-// IScheduleOptimizer for a result, append the OptimizationRun to the
-// run repository (LH-PERSIST-007), and — when the solver produced a
-// usable schedule — replace the asset's schedule of that type so the
-// downstream IScheduleTracker / IDispatchOptimizer pair picks up the
-// new version on the next regulation cycle.
+// IScheduleOptimizer for a result, replace the asset's schedule (when
+// the solver produced a usable one) so the downstream IScheduleTracker
+// / IDispatchOptimizer pair picks up the new version on the next
+// regulation cycle, and finally append the OptimizationRun to the run
+// repository (LH-PERSIST-007) so the audit log only mentions schedules
+// that were actually persisted (review S2).
 //
 // Errors raised by the optimiser bubble out: appending a run record
 // that wasn't actually produced would lie to the audit log. The API
 // layer turns the bubble into the appropriate HTTP shape (RM-M2-OP-07).
+//
+// Concurrency scope (review S1): the per-key SemaphoreSlim guards the
+// read-optimise-write block within a single host process. A multi-
+// replica deployment with the Dapper schedule repository would still
+// race two API instances both reading version v3 and both writing v4.
+// The M3 follow-up (plan §Open RM-M2-OP-OPEN-05) lifts the guarantee
+// into the persistence layer with an optimistic-concurrency check on
+// `IScheduleRepository.Replace`.
 public sealed partial class DefaultScheduleOptimizationUseCase : IScheduleOptimizationUseCase
 {
     // M2 default: every host is single-bid-area "DE-LU"; multi-area
@@ -107,6 +116,22 @@ public sealed partial class DefaultScheduleOptimizationUseCase : IScheduleOptimi
         // The result invariants (Run.HasUsableSolution ⇔ ProducedSchedule
         // non-null, version + reference matching) are already checked in
         // ScheduleOptimizationResult's constructor; we can rely on them.
+
+        // Persistence order matters (review S2): replace the schedule
+        // first, then append the run. If the replace throws (e.g. transient
+        // DB error in the Dapper adapter) we never append a run that
+        // would lie about a ProducedSchedule version that was never
+        // persisted. The residual failure mode — Replace succeeds, Append
+        // throws — leaves an active schedule without an audit run; an M3
+        // follow-up wraps both writes in one transaction once the
+        // persistence ports expose a shared connection scope (OPEN-05).
+        int? producedVersion = null;
+        if (result.ProducedSchedule is not null)
+        {
+            _scheduleRepository.Replace(result.ProducedSchedule);
+            producedVersion = result.ProducedSchedule.Version;
+        }
+
         await _runRepository.AppendAsync(result.Run, cancellationToken).ConfigureAwait(false);
 
         // Metrics fire after the run is durably persisted so a /metrics
@@ -114,13 +139,6 @@ public sealed partial class DefaultScheduleOptimizationUseCase : IScheduleOptimi
         // counts (LH-OPT-009 audit-stance: a run that wasn't appended
         // didn't happen, so it shouldn't be counted either).
         _metrics.Record(result.Run);
-
-        int? producedVersion = null;
-        if (result.ProducedSchedule is not null)
-        {
-            _scheduleRepository.Replace(result.ProducedSchedule);
-            producedVersion = result.ProducedSchedule.Version;
-        }
 
         Log.RunCompleted(_logger, result.Run.RunId, request.AssetId, result.Run.Status, producedVersion ?? -1);
 

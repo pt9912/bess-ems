@@ -196,6 +196,7 @@ Tests ohne Solver-Bindings behalten `NoOpScheduleOptimizer`.
 | RM-M2-OP-OPEN-02 | Wie stark wird `IScheduleOptimizer` mit `MarketCommitment`-Strafkosten und Tarifmodell (LH-MKT-008) gekoppelt? | M2 minimal: Day-Ahead-Energiekosten als Objective; Tarif/Reserve folgen mit RM-M2-04 Configurable Objective. |
 | RM-M2-OP-OPEN-03 | Replay-Reproduzierbarkeit: deterministische Solver-Konfiguration als M2-Anforderung oder als Soll? | Soll für M2; Solver-Determinismus hängt vom Backend ab und ist nicht überall garantiert. |
 | RM-M2-OP-OPEN-04 | API-Trigger: synchrone Antwort mit Solverlauf vs. asynchroner Job mit Status-Endpunkt? | Asynchron — `POST` legt Run an und gibt RunId zurück; `GET /optimization/runs/{id}` liefert Status. Solverlaufzeiten passen nicht in HTTP-Request-Budgets. |
+| RM-M2-OP-OPEN-05 | Schedule-Replace ist nicht atomar gegen parallele Optimize-Calls auf Multi-Replica-Hosts (Review S1). | M3: optimistic-concurrency in `IScheduleRepository.Replace(schedule, expectedBaseVersion)` mit `WHERE version = @expected` in der Dapper-Variante; bei Versionskonflikt wird ein eigener `OptimizationSolverStatus`-Pfad ausgelöst (Failed mit Reason `concurrent-version-conflict`). M2 nutzt den per-(asset,type)-Semaphore in `DefaultScheduleOptimizationUseCase` — ausreichend für Single-Host-Deployments. |
 
 ---
 

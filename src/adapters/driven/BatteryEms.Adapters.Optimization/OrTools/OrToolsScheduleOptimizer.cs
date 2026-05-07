@@ -243,8 +243,11 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
             assetId: request.AssetId,
             solverName: SolverName,
             status: status,
-            horizonStart: request.HorizonStart,
-            horizonEnd: request.HorizonEnd,
+            // Run horizons follow the same UTC normalisation as the
+            // produced windows so the audit log and the persisted
+            // schedule never disagree on the offset (review N1).
+            horizonStart: horizonStartUtc,
+            horizonEnd: horizonStartUtc + (request.HorizonEnd - request.HorizonStart),
             timeStep: request.TimeStep,
             objectiveValue: objectiveValue,
             objectiveBreakdown: breakdown,
@@ -268,13 +271,14 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
         string terminationReason,
         TimeSpan elapsed)
     {
+        var horizonStartUtc = request.HorizonStart.ToUniversalTime();
         var run = new OptimizationRun(
             runId: Guid.NewGuid(),
             assetId: request.AssetId,
             solverName: SolverName,
             status: status,
-            horizonStart: request.HorizonStart,
-            horizonEnd: request.HorizonEnd,
+            horizonStart: horizonStartUtc,
+            horizonEnd: horizonStartUtc + (request.HorizonEnd - request.HorizonStart),
             timeStep: request.TimeStep,
             objectiveValue: 0,
             objectiveBreakdown: OptimizationObjectiveBreakdown.Empty,
@@ -294,13 +298,14 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
         string warning)
     {
         Log.PreflightFailed(_logger, request.AssetId, terminationReason);
+        var horizonStartUtc = request.HorizonStart.ToUniversalTime();
         var run = new OptimizationRun(
             runId: Guid.NewGuid(),
             assetId: request.AssetId,
             solverName: SolverName,
             status: OptimizationSolverStatus.Failed,
-            horizonStart: request.HorizonStart,
-            horizonEnd: request.HorizonEnd,
+            horizonStart: horizonStartUtc,
+            horizonEnd: horizonStartUtc + (request.HorizonEnd - request.HorizonStart),
             timeStep: request.TimeStep,
             objectiveValue: 0,
             objectiveBreakdown: OptimizationObjectiveBreakdown.Empty,
