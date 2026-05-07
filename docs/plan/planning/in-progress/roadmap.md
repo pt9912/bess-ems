@@ -165,9 +165,11 @@ LP-Optimierer (.NET-Interface, optional OR-Tools/HiGHS), Tracing und Replay.
 (RM-M2-03/05/07/09 und Anschluss an LH-OPT-007/008/009 + LH-PERSIST-007)
 ist in [`../done/plan-RM-M2-optimization.md`](../done/plan-RM-M2-optimization.md)
 detailliert und mit OP-01..09 abgeschlossen. RM-M2-04 (Configurable
-Objective) blieb bewusst aus dem M2-minimalen Scope draußen
-(OP-OPEN-02) und gehört zu den noch offenen M2-Liefergegenständen
-unten.
+Objective) hebt das M2-minimale `energy_cost`-Objective (OP-OPEN-02)
+um `degradation_cost` und `soc_target_penalty` an; drei weitere
+LH-OPT-004-Komponenten (Marktverpflichtung, Reserve, Peak-Shaving)
+hängen jeweils an einer eigenen Vorbedingung — Begründung in der
+RM-M2-04-Tabellenzeile unten.
 
 **Folgewelle:** Der Hardware-in-the-Loop-Pfad gegen das externe
 `bess-hil-simulator:local`-Image ist als zweite M2-Welle vorgemerkt.
@@ -188,7 +190,7 @@ HIL ist und bleibt **kein M2-Pflichtgate** — `make gates` und
 | ⬜     | RM-M2-01   | Erweiterte Marktcommitment-Priorisierung und Optimierungsintegration | LH-MKT-003/006          |
 | ⬜     | RM-M2-02   | Erweiterte Zeitmodell-Nutzung für Optimierungshorizonte und Marktintervalle | LH-MKT-007              |
 | ✅     | RM-M2-03   | LP-Implementierung des `IScheduleOptimizer` für Horizon-Optimierung (Solver-Auswahl per Config) | LH-OPT-001..009     |
-| ⬜     | RM-M2-04   | Zielfunktion konfigurierbar (Energiebezug, Einspeise, Strafkosten) — OP-OPEN-02 hat M2-minimal auf `energy_cost` begrenzt; Tarif-/Reservekosten als Folge-Welle | LH-OPT-004              |
+| ⬜     | RM-M2-04   | Zielfunktion konfigurierbar — OP-OPEN-02 hat M2-minimal auf `energy_cost` begrenzt; RM-M2-04 hebt das auf zwei zusätzliche LP-Komponenten an: `degradation_cost` (linearer Throughput-Proxy für LH-OPT-004 „Batteriealterungskosten") und `soc_target_penalty` (zwei Slack-Variablen pro Schritt für LH-OPT-004 „SOC-Zielabweichung"). Damit sind zwei verschiedene LP-Patterns (gewichtete Beiträge, Hilfsvariablen) am bestehenden OR-Tools-Adapter verprobt; die Akzeptanz „Zielfunktion ist konfigurierbar oder erweiterbar" ist erfüllt. Bewusst draussen gelassen mit jeweils konkretem Trigger: **Marktverpflichtungs-Abweichungen** (LH-OPT-004 #4) brauchen das `MarketCommitment`-Plumbing aus RM-M2-01 (Commitment-Lookup im Horizont, Strafsatz am Commitment-Objekt) und gehören dorthin; **Reserveverletzung** (#5) braucht ein Reserve-Domain-Modell (FCR/aFRR/mFRR-Produkttyp, Bidirektionalität, Aktivierungsdauer), das im Repo heute nicht existiert und seine eigene Welle bekommt; **Peak-Shaving** (#6) ist LP-modellierbar (`peak ≥ p_charge[t]` mit N Constraints) braucht aber operator-seitige Klärung (Peak-Definition: Import-only vs. Netto, Bezugszeitraum vs. Horizon, statisch vs. gestaffelt) und kommt als eigener Slice. | LH-OPT-004              |
 | ✅     | RM-M2-05   | Optimierungs-API (`POST /markets/day-ahead/optimize`)               | LH-API-005              |
 | ⬜     | RM-M2-06   | OpenTelemetry-Tracing für Snapshot → Control → Adapter              | LH-MON-003              |
 | ✅     | RM-M2-07   | Erweiterte Prometheus-Metriken für Solverzeit und Optimierungsläufe | LH-MON-002              |
