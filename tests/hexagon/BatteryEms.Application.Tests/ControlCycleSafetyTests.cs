@@ -197,6 +197,26 @@ public sealed class ControlCycleSafetyTests
         Assert.Equal("max-charge-power", cmd.Reason);
     }
 
+    [Fact]
+    public async Task Non_finite_dispatch_target_yields_safe_stop()
+    {
+        // RM-M3-05 cycle precheck: a NaN/Inf dispatch target would
+        // propagate into the kernel and either trip the Constraint
+        // comparisons or surface as a native non-finite status. The
+        // cycle catches it BEFORE the kernel call so neither path
+        // gets a chance to chain a blind fallback with the same
+        // invalid value.
+        var (cycle, snapshots, _, _, _) = BuildCycle(
+            optimizer: new FixedOptimizer(double.NaN));
+        snapshots.Update(TestFixtures.CreateTelemetry(), TestFixtures.Now);
+
+        var cmd = await cycle.ExecuteAsync("asset-1", CancellationToken.None);
+
+        Assert.Equal(CommandMode.Stop, cmd.Mode);
+        Assert.Equal(CommandSource.Fallback, cmd.Source);
+        Assert.Equal("dispatch-target-not-finite", cmd.Reason);
+    }
+
     private sealed class BrokenOptimizer : IDispatchOptimizer
     {
         public Task<DispatchResult> OptimizeAsync(DispatchRequest request, CancellationToken cancellationToken)

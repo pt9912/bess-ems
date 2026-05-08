@@ -22,6 +22,11 @@ public sealed partial class ControlCycleUseCase : IControlCycleUseCase
     private readonly IControlCycleMetrics _metrics;
     private readonly ILogger<ControlCycleUseCase> _logger;
     private readonly ControlCycleOptions _options;
+    // RM-M3-05 driven port for the Constraint+Ramp pipeline. Defaults
+    // to ManagedControlKernel when DI does not override; the HOSt
+    // wires NativeFallbackControlKernel when NativeControl:Enabled is
+    // true, but the cycle itself sees only the IControlKernel surface.
+    private readonly IControlKernel _kernel;
 
     private readonly ConcurrentDictionary<string, (double Power, DateTimeOffset At)> _previous =
         new(StringComparer.Ordinal);
@@ -35,7 +40,8 @@ public sealed partial class ControlCycleUseCase : IControlCycleUseCase
         IClock clock,
         IControlCycleMetrics metrics,
         ILogger<ControlCycleUseCase> logger,
-        ControlCycleOptions options)
+        ControlCycleOptions options,
+        IControlKernel? kernel = null)
     {
         ArgumentNullException.ThrowIfNull(assets);
         ArgumentNullException.ThrowIfNull(snapshots);
@@ -56,6 +62,7 @@ public sealed partial class ControlCycleUseCase : IControlCycleUseCase
         _metrics = metrics;
         _logger = logger;
         _options = options;
+        _kernel = kernel ?? new ManagedControlKernel();
     }
 
     public async Task<BatteryCommand> ExecuteAsync(string assetId, CancellationToken cancellationToken)
@@ -124,40 +131,54 @@ public sealed partial class ControlCycleUseCase : IControlCycleUseCase
             return EmitSafeStop(assetId, now, dispatch.Reason, CommandSource.Fallback, decision: "dispatch-invalid");
         }
 
-        var constrained = ConstraintLimiter.Apply(asset, snapshot.Telemetry, dispatch.TargetActivePowerKw);
+        // RM-M3-05 precheck: a non-finite dispatch target would
+        // otherwise propagate into the kernel and either crash the
+        // managed Constraint comparisons or trigger a native
+        // non-finite status. Treat it as a safe-stop so the kernel
+        // never sees a NaN/Inf input.
+        if (!double.IsFinite(dispatch.TargetActivePowerKw))
+        {
+            return EmitSafeStop(assetId, now, "dispatch-target-not-finite",
+                CommandSource.Fallback, decision: "dispatch-target-not-finite");
+        }
 
-        LimitResult ramped;
+        double? previousPower = null;
+        var elapsed = TimeSpan.Zero;
         if (_previous.TryGetValue(assetId, out var prev))
         {
-            var elapsed = now - prev.At;
-            ramped = RampLimiter.Apply(asset, prev.Power, constrained.LimitedActivePowerKw, elapsed);
-        }
-        else
-        {
-            ramped = LimitResult.Unchanged(constrained.LimitedActivePowerKw);
+            previousPower = prev.Power;
+            elapsed = now - prev.At;
         }
 
-        _previous[assetId] = (ramped.LimitedActivePowerKw, now);
+        var kernelInput = new KernelInput(
+            Asset: asset,
+            Telemetry: snapshot.Telemetry,
+            DispatchTargetActivePowerKw: dispatch.TargetActivePowerKw,
+            PreviousActivePowerKw: previousPower,
+            TimeSinceLastCommand: elapsed);
+        var kernelResult = _kernel.Compute(kernelInput);
 
-        var mode = ramped.LimitedActivePowerKw switch
+        _previous[assetId] = (kernelResult.ActivePowerKw, now);
+
+        var mode = kernelResult.ActivePowerKw switch
         {
             > 0 => CommandMode.Discharge,
             < 0 => CommandMode.Charge,
             _ => CommandMode.Idle,
         };
 
-        var reason = constrained.WasLimited
-            ? constrained.LimitReason
-            : ramped.WasLimited
-                ? ramped.LimitReason
-                : dispatch.Reason;
+        // When neither Constraint nor Ramp limited, surface the
+        // dispatch reason rather than the kernel's `within-limits`
+        // boilerplate so operators still see WHY the optimiser chose
+        // this setpoint (carries through from the M2 cycle behaviour).
+        var reason = kernelResult.WasLimited ? kernelResult.Reason : dispatch.Reason;
 
         var command = new BatteryCommand(
             CommandId: $"ctrl-{now.ToUnixTimeMilliseconds()}-{assetId}",
             Timestamp: now,
             AssetId: assetId,
             Mode: mode,
-            ActivePowerKw: ramped.LimitedActivePowerKw,
+            ActivePowerKw: kernelResult.ActivePowerKw,
             ReactivePowerKvar: 0,
             ValidUntil: now + _options.SafeFallbackValidity,
             Reason: reason,

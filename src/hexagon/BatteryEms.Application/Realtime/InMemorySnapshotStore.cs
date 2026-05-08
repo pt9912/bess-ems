@@ -53,9 +53,27 @@ public sealed class InMemorySnapshotStore : ISnapshotStore
             return telemetry.DataQuality;
         }
 
+        // RM-M3-05 prereq (Managed-Precheck-Gap): non-finite SOC/SOH/
+        // temperature must reach the control cycle as an unusable
+        // snapshot — not as out-of-range, because a NaN never lands
+        // in the [0..100] band but would silently slip past the
+        // earlier `is < 0 or > 100` check (NaN comparisons are false
+        // in both directions). The native kernel cannot recover from
+        // non-finite inputs either, so cycling them through Constraint
+        // / Ramp would just produce non-finite outputs.
+        if (!double.IsFinite(telemetry.SocPercent))
+        {
+            return DataQuality.ProtocolError("soc-not-finite");
+        }
+
         if (telemetry.SocPercent is < 0 or > 100)
         {
             return DataQuality.Substituted("soc-out-of-range");
+        }
+
+        if (!double.IsFinite(telemetry.SohPercent))
+        {
+            return DataQuality.ProtocolError("soh-not-finite");
         }
 
         if (telemetry.SohPercent is < 0 or > 100)
@@ -63,9 +81,14 @@ public sealed class InMemorySnapshotStore : ISnapshotStore
             return DataQuality.Substituted("soh-out-of-range");
         }
 
-        if (double.IsNaN(telemetry.ActivePowerKw) || double.IsInfinity(telemetry.ActivePowerKw))
+        if (!double.IsFinite(telemetry.ActivePowerKw))
         {
             return DataQuality.ProtocolError("active-power-not-finite");
+        }
+
+        if (!double.IsFinite(telemetry.TemperatureCelsius))
+        {
+            return DataQuality.ProtocolError("temperature-not-finite");
         }
 
         return DataQuality.Valid;

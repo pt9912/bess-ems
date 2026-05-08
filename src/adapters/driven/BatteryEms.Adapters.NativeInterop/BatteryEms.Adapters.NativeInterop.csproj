@@ -10,6 +10,17 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
 
+  <!-- RM-M3-05: NativeFallbackControlKernel implements the
+       Application.Control.IControlKernel port and falls back to
+       the managed kernel on any native error from a validated
+       input. Reference both Application (for the port) and Domain
+       (for BatteryAsset / BatteryTelemetry which the kernel
+       marshals into the BCC structs). -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\hexagon\BatteryEms.Domain\BatteryEms.Domain.csproj" />
+    <ProjectReference Include="..\..\..\hexagon\BatteryEms.Application\BatteryEms.Application.csproj" />
+  </ItemGroup>
+
   <!-- RM-M3-03: the loader's INativeLibraryGateway seam is internal so
        the production wiring cannot bypass it, and the tests project
        needs visibility for the fake gateway in the load-path tests. -->

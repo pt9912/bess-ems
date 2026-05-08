@@ -84,6 +84,55 @@ public sealed class SnapshotStoreTests
     }
 
     [Fact]
+    [Trait("Category", "Safety")]
+    public void Non_finite_soc_is_protocol_error()
+    {
+        // RM-M3-05 Managed-Precheck-Gap: NaN slips past `is < 0 or
+        // > 100` because every NaN comparison returns false. The
+        // store must catch it explicitly so the cycle never feeds
+        // a NaN SOC into Constraint or the native kernel.
+        var store = new InMemorySnapshotStore(TimeSpan.FromSeconds(10));
+        store.Update(TestFixtures.CreateTelemetry(socPercent: double.NaN), TestFixtures.Now);
+
+        var snapshot = store.GetLatest("asset-1", TestFixtures.Now);
+
+        Assert.NotNull(snapshot);
+        Assert.Equal(DataQualityState.ProtocolError, snapshot!.Quality.Flag);
+        Assert.Equal("soc-not-finite", snapshot.Quality.Reason);
+    }
+
+    [Fact]
+    [Trait("Category", "Safety")]
+    public void Non_finite_soh_is_protocol_error()
+    {
+        var store = new InMemorySnapshotStore(TimeSpan.FromSeconds(10));
+        store.Update(TestFixtures.CreateTelemetry(sohPercent: double.PositiveInfinity), TestFixtures.Now);
+
+        var snapshot = store.GetLatest("asset-1", TestFixtures.Now);
+
+        Assert.NotNull(snapshot);
+        Assert.Equal(DataQualityState.ProtocolError, snapshot!.Quality.Flag);
+        Assert.Equal("soh-not-finite", snapshot.Quality.Reason);
+    }
+
+    [Fact]
+    [Trait("Category", "Safety")]
+    public void Non_finite_temperature_is_protocol_error()
+    {
+        // ConstraintLimiter would forward NaN through the kernel
+        // and produce non-finite outputs; the precheck rejects it
+        // upfront.
+        var store = new InMemorySnapshotStore(TimeSpan.FromSeconds(10));
+        store.Update(TestFixtures.CreateTelemetry(temperatureCelsius: double.NaN), TestFixtures.Now);
+
+        var snapshot = store.GetLatest("asset-1", TestFixtures.Now);
+
+        Assert.NotNull(snapshot);
+        Assert.Equal(DataQualityState.ProtocolError, snapshot!.Quality.Flag);
+        Assert.Equal("temperature-not-finite", snapshot.Quality.Reason);
+    }
+
+    [Fact]
     public void Update_overwrites_previous_snapshot()
     {
         var store = new InMemorySnapshotStore(TimeSpan.FromSeconds(10));

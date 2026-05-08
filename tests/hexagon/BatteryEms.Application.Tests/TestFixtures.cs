@@ -24,6 +24,7 @@ internal static class TestFixtures
     public static BatteryTelemetry CreateTelemetry(
         string assetId = "asset-1",
         double socPercent = 50,
+        double sohPercent = 100,
         double activePowerKw = 0,
         double temperatureCelsius = 22,
         bool available = true,
@@ -32,7 +33,7 @@ internal static class TestFixtures
             Timestamp: Now,
             AssetId: assetId,
             SocPercent: socPercent,
-            SohPercent: 100,
+            SohPercent: sohPercent,
             ActivePowerKw: activePowerKw,
             ReactivePowerKvar: 0,
             DcVoltage: 800,
