@@ -24,14 +24,14 @@
 #   - Mosquitto stays so MQTT command-publish has a broker to talk to;
 #     no MQTT telemetry publisher is wired (HIL is Modbus-only).
 #
-# Known limitation: the HIL simulator is PCS-/grid-oriented and
-# exposes no SOC/SOH/availability registers. The control cycle
-# therefore evaluates the asset as unavailable and emits safe-stop
-# every tick — exactly the behaviour the HIL plan documents. Use
-# this stack for Modbus-adapter sanity (telemetry reads, command
-# wire format), not for a running closed-loop demo. Full
-# closed-loop control needs HIL-BESS registers or a defaulting hook
-# in the host (open M3 work).
+# Closed-loop demo: the HIL simulator now exposes available, SOC
+# (real integrator: dSOC/dt = -P/capacity), SOH and cell-
+# temperature alongside the PCS/grid measurements, and bess-ems
+# reads them through the HIL profile. The control cycle leaves
+# safe-stop and emits commands; without a loaded schedule the
+# decision settles at "no-active-commitment" and the EMS holds
+# the asset at 0 kW. Drive a real Discharge by POSTing a market
+# commitment to /markets/day-ahead/optimize first.
 services:
   bess-ems:
     image: bess-ems-runtime:latest

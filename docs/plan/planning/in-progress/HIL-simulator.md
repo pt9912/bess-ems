@@ -105,7 +105,7 @@ referenziert wird.
 | Einheiten | P/Q in MW/MVAR | intern kW/kvar | `scale_factor: 1000` im HIL-Profil verwenden |
 | Reactive Power | HIL akzeptiert P- und Q-Setpoints | `ModbusCommandSink` schreibt aktuell primär `active_power_setpoint_kw` | optionalen Schreibpfad für `reactive_power_setpoint_kvar` ergänzen |
 | Betriebsmodus | HIL hat kein `operating_mode`-Register | `ModbusCommandSink` schreibt `operating_mode`, falls vorhanden | bereits kompatibel, solange HIL-Profil kein `operating_mode` enthält |
-| BESS-Telemetrie | HIL liefert PCS-/Grid-Werte, aber kein SOC/SOH/Temperatur/Availability-Profil | `BatteryTelemetry` erwartet BESS-Zustand | erster HIL-Test bleibt PCS-/Modbus-Adaptertest; Control-Loop-HIL erst nach HIL-BESS-Registern oder Defaults |
+| BESS-Telemetrie | HIL liefert PCS-/Grid-Werte; SOC/SOH/Temperatur/Availability als zusätzliche Input-Register nachgezogen (Schwesterprojekt: SOC-Integrator `dSOC/dt = -P/capacity`, SOH/Temp statisch, Available=1.0). | `BatteryTelemetry` erwartet BESS-Zustand | **Erledigt:** HIL-Profil deckt alle nötigen Felder ab, Closed-Loop-Demo gegen `deploy/compose.hil.yml` läuft ohne `asset-unavailable`. |
 
 ---
 
