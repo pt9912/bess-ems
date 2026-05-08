@@ -6,7 +6,7 @@ unter `open/`, bis M3 aktiviert wird.
 **Bezug:**
 [`../in-progress/roadmap.md`](../in-progress/roadmap.md) (M3,
 RM-M3-01..13), [`../done/plan-RM-M2-optimization.md`](../done/plan-RM-M2-optimization.md)
-(OP-OPEN-05/06), [`plan-RM-M2-migration.md`](plan-RM-M2-migration.md)
+(OP-OPEN-05/06), [`../done/plan-RM-M2-migration.md`](../done/plan-RM-M2-migration.md)
 (Migrationspfad als Vorbedingung fuer schema-veraendernde Folgearbeit),
 [`docs/user/quality.md`](../../../user/quality.md) (Native-Gates ab M3),
 [`spec/architecture.md`](../../../../spec/architecture.md) (§4.2, §13),
@@ -67,13 +67,14 @@ Weiterbetrieb verlangen.
   nativen Safety-Slice. PID wird erst gezogen, wenn Constraint/Ramp lokal,
   ueber P/Invoke und im Replay-Gate stabil sind.
 - **M3-abhaengige Folgearbeit:** Optimistic Schedule Replace
-  (OP-OPEN-05), Optimization-Lock-Eviction (OP-OPEN-06) und
-  Persistenz-Migrations-Tooling, sobald diese Tracks aktiviert werden.
+  (OP-OPEN-05), Optimization-Lock-Eviction (OP-OPEN-06) und erste echte
+  Folgemigrationen ueber das vorhandene Migrations-Tooling, sobald diese
+  Tracks aktiviert werden.
 - **Explizit kein Verhaltenstausch:** Die .NET-Implementierung bleibt
   produktionsfaehig, testbar und das Vergleichsoracle fuer Native. M3
   darf keine fachliche Abkuerzung einfuehren, die nur im Native-Pfad lebt.
-- **Nicht in diesem Plan:** HIL-Simulator bleibt eigener offener Plan
-  [`HIL-simulator.md`](HIL-simulator.md); Regelleistung/OPC-UA bleibt M4;
+- **Nicht in diesem Plan:** HIL-Simulator bleibt eigener abgeschlossener Plan
+  [`../done/HIL-simulator.md`](../done/HIL-simulator.md); Regelleistung/OPC-UA bleibt M4;
   MPC/Solver-Sidecar bleibt M5; Operator UI/Multi-Asset-Skalierung bleibt
   M6.
 
@@ -83,16 +84,17 @@ Weiterbetrieb verlangen.
 
 M3 kann starten, wenn die M2-Pflichtgates stabil gruen sind und ein
 Native-Control-Slice priorisiert wird. Der Persistenz-Migrationspfad aus
-[`plan-RM-M2-migration.md`](plan-RM-M2-migration.md) ist **keine**
-Vorbedingung fuer RM-M3-01..13, solange diese nur Native-/Interop-Code
-beruehren. Er wird zur Vorbedingung, sobald OP-OPEN-05, OP-OPEN-06 oder
-eine andere schema-veraendernde M3-Arbeit aktiviert wird.
+[`../done/plan-RM-M2-migration.md`](../done/plan-RM-M2-migration.md) ist
+bereits abgeschlossen und **keine** Vorbedingung fuer RM-M3-01..13,
+solange diese nur Native-/Interop-Code beruehren. Er wird erst konsumiert,
+sobald OP-OPEN-05, OP-OPEN-06 oder eine andere schema-veraendernde
+M3-Arbeit aktiviert wird.
 
 Mindest-Check vor Aktivierung:
 
 | Check | Erwartung |
 | ----- | --------- |
-| M2-Baseline | `make lint`, `make arch-check`, `make test`, `make coverage-gate`, `make build`, `make runtime` und das ab M2 geforderte Replay-Gate `make test-replay` sind auf `main` gruen. Falls `make test-replay` noch nicht existiert oder RM-M2-10 nicht abgeschlossen ist, ist M3 noch nicht aktivierungsbereit; eine Ausnahme braucht einen expliziten Roadmap-/Plan-Entscheid. |
+| M2-Baseline | `make lint`, `make arch-check`, `make test`, `make coverage-gate`, `make build` und `make runtime` sind auf `main` gruen. RM-M2-10 ist abgeschlossen; die Telemetrie- und Solver-Replay-Nachweise laufen derzeit ueber die bestehenden Testprojekte im `make test`-/CI-Pfad. Falls spaeter ein dediziertes `make test-replay` eingefuehrt wird, darf es zusaetzlich Gate werden, ist aber keine aktuelle M3-Aktivierungsvoraussetzung. |
 | Referenzpfad | Managed Control Kernel ist eindeutig lokalisierbar und kann von Native-Parity-Tests direkt aufgerufen werden. |
 | Build-Toolchain | Linux-C++-Build in Docker ist verfuegbar; lokale Host-Toolchain ist Komfort, aber keine Voraussetzung. |
 | Migrationsbedarf | Kein RM-M3-01..13-Slice verlangt eine DB-Schema-Aenderung. Falls doch: erst RM-M3-FUP-01 ziehen. |
@@ -388,10 +390,10 @@ absolut; Status, Mode und Reason-Codes muessen exakt matchen.
 
 | Status | ID              | Paket                                      | Aktivierungsbedingung | DoD |
 | ------ | --------------- | ------------------------------------------ | --------------------- | --- |
-| ⬜     | RM-M3-FUP-01    | Persistenz-Migrationspfad aktivieren       | OP-OPEN-05/06 oder erste echte Schema-Aenderung | `plan-RM-M2-migration.md` zieht nach `in-progress`; MIG-02..05 liefern d-migrate+DbUp, `__schema_versions`, RunOnce-Migrationen und Host-Cut-over. |
+| ⬜     | RM-M3-FUP-01    | Erste echte Folgemigration ueber vorhandenen Migrationspfad aktivieren | OP-OPEN-05/06 oder erste echte Schema-Aenderung | Der abgeschlossene Migrationspfad aus [`../done/plan-RM-M2-migration.md`](../done/plan-RM-M2-migration.md) wird konsumiert: `schema/schema.yaml` wird angepasst, eine echte `Migrations/RunOnce/0002_*.sql` wird erzeugt/committed, Drafts bleiben nicht eingebettet, `schema-validate`/`schema-drift-check` bleiben gruen und der Runtime-Migrator appliziert die Aenderung idempotent. |
 | ⬜     | RM-M3-FUP-02    | Optimistic Schedule Replace (OP-OPEN-05)   | Multi-Replica-Optimize oder schema-veraendernder Schedule-Track | `IScheduleRepository.Replace(schedule, expectedBaseVersion)` plus Dapper-`WHERE version = @expected`; Versionskonflikt wird als `Failed` Run mit Reason `concurrent-version-conflict` auditierbar. |
 | ⬜     | RM-M3-FUP-03    | Optimization-Lock-Eviction (OP-OPEN-06)    | Ephemere Asset-IDs, Multi-Tenant-Rotation oder wachsende Test-ID-Sets | `_locks` in `DefaultScheduleOptimizationUseCase` bekommt LRU/TTL-Eviction mit konfigurierbarer Schwelle und Metrik `bess_optimization_lock_table_size`. |
-| ⬜     | RM-M3-FUP-04    | Telemetrie-Replay-Harness                  | RM-M2-10 wird priorisiert | Versionierte Telemetrie-Goldens werden abgespielt und resultierende Commands gegen Referenzdaten verglichen; Solver-Replay aus M2 bleibt unveraendert. |
+| ⬜     | RM-M3-FUP-04    | Replay-Carve-outs nach RM-M2-10            | Externe Fixtures, Operator-Replay, Multi-Asset-Replay oder Production-Replay werden gebraucht | Der in RM-M2-10 gelieferte Telemetrie-Replay-Harness bleibt bestehen. M3+ ergaenzt nur konkrete Folge-Slices wie JSON-File-Loader unter `tests/fixtures/replay/`, Operator-CLI/Make-Target, Multi-Asset-Replay-Koordination oder Compare-against-Production-Replay; Solver-Replay aus M2 bleibt unveraendert. |
 
 ---
 
