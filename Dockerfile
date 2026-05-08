@@ -261,6 +261,28 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=15s --retries=5 \
 ENTRYPOINT ["dotnet", "BatteryEms.Host.dll"]
 
 # ---------------------------------------------------------------------------
+# native-build (RM-M3-06 part 1): Build + smoke-test the native
+# control core. This stage is intentionally NOT chained into the
+# .NET test or runtime stages — RM-M3-06 part 2 wires the .so into
+# /app/native/ in the runtime image once the routing in RM-M3-04/05
+# can consume it. For now `make native-build` only proves that the
+# C++ source compiles cleanly under -Werror and that the smoke test
+# in tests/test_compute.cpp still passes.
+# ---------------------------------------------------------------------------
+FROM debian:bookworm-slim AS native-build
+RUN apt-get update \
+ && apt-get install --yes --no-install-recommends \
+        build-essential \
+        cmake \
+ && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+COPY native/battery_control_core/ native/battery_control_core/
+RUN cmake -S native/battery_control_core -B /build/native \
+        -DCMAKE_BUILD_TYPE=Release \
+ && cmake --build /build/native --parallel \
+ && ctest --test-dir /build/native --output-on-failure
+
+# ---------------------------------------------------------------------------
 # Future stages (activated in later waves):
 #   FROM lint AS test-integration -> Welle 3: modbus/mqtt/postgres integration
 # ---------------------------------------------------------------------------

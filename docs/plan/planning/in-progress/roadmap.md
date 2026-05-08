@@ -45,9 +45,10 @@ unter `in-progress/`.
 > reproduzierbar grün, Compose-Stack (bess-ems + Postgres + Mosquitto
 > + bess-field-sim) liefert `/health = ok` inkl. Postgres-Probe.
 > **Aktive Phase:** M3 — Native Control Core (Library); Slice-Plan
-> [`plan-RM-M3.md`](plan-RM-M3.md), RM-M3-01 (C-ABI-Header) und
-> RM-M3-02 (C++ Constraint+Ramp + Smoke-Tests) ✅. Als Nächstes
-> RM-M3-06 Teil 1 (Native-Build-Stage in Docker, ohne Runtime-Pfad).
+> [`plan-RM-M3.md`](plan-RM-M3.md), RM-M3-01 (C-ABI-Header), RM-M3-02
+> (C++ Constraint+Ramp + Smoke-Tests) und RM-M3-06 Teil 1 (Native-
+> Build-Stage `make native-build`) ✅. Als Nächstes RM-M3-03
+> (ABI-Versionsfunktion + .NET-Startup-Check).
 >
 > **M2-Welle 1 (Optimization-Slice, abgeschlossen):**
 > [`../done/plan-RM-M2-optimization.md`](../done/plan-RM-M2-optimization.md)
@@ -99,7 +100,7 @@ unter `in-progress/`.
 | ------ | ----------- | ---------------------------------- | ----- | ---------- |
 | ✅     | M1          | MVP — sichere Regelpipeline        | 1     | [Abgeschlossen](../done/plan-RM-M1.md) |
 | ✅     | M2          | Marktausbau und Optimierung        | 1 → 2 | Abgeschlossen ([Optimization-Slice](../done/plan-RM-M2-optimization.md), RM-M2-01..10, [Migrations-Tooling](../done/plan-RM-M2-migration.md), [HIL](../done/HIL-simulator.md)) |
-| 🟡     | M3          | Native Control Core (Library)      | 2     | [`plan-RM-M3.md`](plan-RM-M3.md) — RM-M3-01..13 in Arbeit (Slice-Plan); RM-M3-01 (C-ABI-Header) und RM-M3-02 (C++ Constraint+Ramp + Smoke-Tests) ✅ |
+| 🟡     | M3          | Native Control Core (Library)      | 2     | [`plan-RM-M3.md`](plan-RM-M3.md) — RM-M3-01..13 in Arbeit (Slice-Plan); RM-M3-01, RM-M3-02 und RM-M3-06 Teil 1 ✅ |
 | ⬜     | M4          | Regelleistung und OPC-UA           | 2     | folgt mit Aktivierung |
 | ⬜     | M5          | MPC, Solver-Sidecar, Replay        | 3     | folgt mit Aktivierung |
 | ⬜     | M6          | Skalierung, UI, Edge / Multi-Asset | 4     | folgt mit Aktivierung |
@@ -244,7 +245,7 @@ bleibt Fallback und Referenz.
 | ⬜     | RM-M3-03   | ABI-Versionsfunktion + Startup-Check in .NET                        | LH-NATIVE-005              |
 | ⬜     | RM-M3-04   | P/Invoke-Bindings (`BatteryEms.Adapters.NativeInterop`)              | LH-NATIVE-001              |
 | ⬜     | RM-M3-05   | Routing: Native bevorzugt, .NET-Fallback bei Fehler/Abwesenheit     | LH-ARCH-006, LH-NF-002     |
-| ⬜     | RM-M3-06   | Multi-Stage Dockerfile mit Native-Build-Stage                       | LH-DEPLOY-003/004, LH-NATIVE-006 |
+| 🟡     | RM-M3-06   | Multi-Stage Dockerfile mit Native-Build-Stage                       | LH-DEPLOY-003/004, LH-NATIVE-006 |
 | ⬜     | RM-M3-07   | Interop-Tests (Struct Layout, ABI, Werte-Parität gg. .NET-Referenz) | LH-TEST-005                |
 | ⬜     | RM-M3-08   | C++-Unit-Tests (Constraint, Ramp, NaN/Inf, Vorzeichen, neg. dt)     | LH-TEST-001                |
 | ⬜     | RM-M3-09   | Native-Quality-Gates: `native-lint`, Sanitizer, Native-Coverage     | LH-TEST-005, LH-NATIVE-*   |

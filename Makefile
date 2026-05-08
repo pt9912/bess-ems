@@ -21,6 +21,7 @@ DOCKER_BUILD = $(DOCKER) build $(BUILD_CONTEXT) \
 .PHONY: help \
 	lint arch-check gates \
 	test test-safety test-integration test-hil-modbus test-hil-closed-loop test-container coverage-gate \
+	native-build \
 	simulator-test simulator-race simulator-lint simulator-coverage-gate \
 	build ci runtime fullbuild lock-refresh \
 	schema-validate schema-generate schema-drift-check
@@ -195,6 +196,16 @@ test-hil-modbus:
 # `make ci` enthalten — gleiches Opt-in-Modell wie test-hil-modbus.
 test-hil-closed-loop:
 	scripts/hil-closed-loop-smoke.sh
+
+# --- Welle M3 native control core (active) ---------------------------------
+
+# RM-M3-06 part 1: build + smoke-test the native library inside a
+# dedicated Docker stage. Does NOT install the .so into the runtime
+# image (that's RM-M3-06 part 2 once routing in RM-M3-04/05 can
+# consume it) and is NOT in `make ci` yet; gate wiring follows with
+# RM-M3-09/11.
+native-build:
+	$(DOCKER_BUILD) --target native-build -t $(IMAGE_PREFIX)-native-build:latest
 
 # --- Welle 5 (partially active) --------------------------------------------
 

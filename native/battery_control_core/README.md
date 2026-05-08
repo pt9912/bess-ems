@@ -30,7 +30,7 @@ paths referenced by `docs/user/quality.md` §5.2 and the M3 plan
 | ------------------------------ | ------ |
 | RM-M3-01 C-ABI header          | ✅      |
 | RM-M3-02 C++ impl (Constraint+Ramp) | ✅      |
-| RM-M3-06 part 1 build skeleton | ⬜      |
+| RM-M3-06 part 1 build skeleton | ✅ (CMakeLists + Dockerfile native-build stage; `make native-build` runs cmake + ctest) |
 | RM-M3-08 C++ unit tests        | 🟡 (smoke set in src/test_compute.cpp; framework + sanitizer pending) |
 | RM-M3-13 PID                   | ⬜      |
 
