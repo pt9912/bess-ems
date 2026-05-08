@@ -1,18 +1,21 @@
 using Xunit;
 
+// Belt to the [Collection("Postgres")] suspenders below: forbids
+// cross-class parallelism across the entire assembly. Without it
+// a future test class that forgets the [Collection] attribute
+// would silently parallelise against the schema-resetting suite
+// — a class of CI flake that's hard to bisect. Both mechanisms
+// stay in place: the collection is the precise serialisation,
+// the assembly attribute is the safety net.
+[assembly: CollectionBehavior(DisableTestParallelization = true)]
+
 namespace BatteryEms.Persistence.IntegrationTests;
 
-// All integration tests in this assembly share the single Postgres
-// instance from tests/integration/compose.yml. Test classes that
-// reset the schema (BessDbMigratorIntegrationTests via DROP SCHEMA)
-// would race with classes that assume the migrator-built state
-// (PersistenceRoundtripTests). Joining them in one collection
-// disables xUnit's default cross-class parallelism so each class
-// owns the database in turn.
+// Defines the named collection used by every test class in this
+// assembly that touches Postgres. The collection itself carries no
+// state — xUnit's serialisation guarantee comes from collection
+// membership alone — so this is a marker, not a fixture.
 [CollectionDefinition("Postgres")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage(
-    "Naming", "CA1711",
-    Justification = "xUnit collection fixtures conventionally end with 'Collection'.")]
-public sealed class PostgresCollection : ICollectionFixture<object>
+public sealed class PostgresCollectionMarker
 {
 }

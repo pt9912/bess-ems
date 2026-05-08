@@ -63,7 +63,12 @@ services:
       Bess__MqttBrokerPort: "1883"
       Bess__MqttClientId: bess-ems-host
       Worker__CycleInterval: "00:00:01"
-      ApiTokens__Tokens__0__Token: dev-operator-token
+      # No baked-in token — `compose up` fails fast unless the
+      # operator sets BESS_HIL_OPERATOR_TOKEN explicitly. Even for
+      # a demo file a hard-coded token is a footgun: the dev-stack
+      # variant in deploy/compose.yml ships one (M1 carry-over),
+      # but the HIL stack is new and gets the safer default.
+      ApiTokens__Tokens__0__Token: ${BESS_HIL_OPERATOR_TOKEN:?BESS_HIL_OPERATOR_TOKEN must be set (e.g. export BESS_HIL_OPERATOR_TOKEN=$(openssl rand -hex 16))}
       ApiTokens__Tokens__0__Operator: operator-1
       ApiTokens__Tokens__0__Role: operator
     ports:

@@ -133,7 +133,11 @@ public sealed partial class BessDbMigrator
             {
                 throw new InvalidOperationException(
                     $"Migration script '{name}' does not match the required ????_*.sql naming "
-                    + "convention; the migrator cannot determine its sequence position.");
+                    + "convention (exactly 4 digits then '_' then a non-empty basename); the "
+                    + "migrator cannot determine its sequence position. The 4-digit ceiling is "
+                    + "a hard limit because DbUp sorts script names alphabetically — a 5-digit "
+                    + "prefix would sort before 4-digit ones (lexicographically '1' < '9') and "
+                    + "break the apply order.");
             }
             var number = int.Parse(match.Groups["num"].Value, CultureInfo.InvariantCulture);
             if (!numbers.Add(number))
