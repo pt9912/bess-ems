@@ -1,12 +1,12 @@
 # Plan: HIL-Simulator-Integration
 
-**Dokumenttyp:** Offener Detailplan / M2-Folgewelle
-**Status:** Vorgemerkt für RM-M2-Folgewelle. Der Aktivierungs-Trigger
+**Dokumenttyp:** Aktiver Detailplan / M2-Folgewelle
+**Status:** Unter `in-progress/`. Der Aktivierungs-Trigger
 (LP-Solver-Adapter steht und liefert ein Resultat, das gegen ein
-dynamisches PCS-/PQ-Capability-Modell sanity-geprüft werden kann) ist
-mit dem Abschluss von OP-05 in
+dynamisches PCS-/PQ-Capability-Modell sanity-geprüft werden kann)
+ist mit dem Abschluss von OP-05 in
 [`../done/plan-RM-M2-optimization.md`](../done/plan-RM-M2-optimization.md)
-erfüllt. Der Plan bleibt unter `open/`, bis er aktiv aufgenommen wird.
+erfüllt; HIL-01..09 sind noch nicht angefasst.
 **Quelle:** `bess-hil-simulator`-Schwesterprojekt (Checkout-Pfad
 projekt-/operatorabhängig).
 **Bezug:** [`../in-progress/roadmap.md`](../in-progress/roadmap.md)

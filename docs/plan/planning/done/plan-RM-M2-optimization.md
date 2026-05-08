@@ -221,7 +221,7 @@ ersetzen.
 ## Folgewelle: HIL-Simulator (nach RM-M2-OP-05)
 
 Sobald RM-M2-OP-05 (LP-Solver-Adapter) ein Resultat liefert, zieht die
-HIL-Welle aus [`../open/HIL-simulator.md`](../open/HIL-simulator.md)
+HIL-Welle aus [`../in-progress/HIL-simulator.md`](../in-progress/HIL-simulator.md)
 nach `in-progress/`. HIL prüft das LP-Resultat gegen ein dynamisches
 PCS-/PQ-Capability-Modell des externen Images
 `bess-hil-simulator:local`. Die in HIL-01..05 nötigen
