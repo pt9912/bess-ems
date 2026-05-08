@@ -38,6 +38,84 @@ public sealed class ModbusCommandSinkTests
     }
 
     [Fact]
+    public async Task WriteAsync_writes_reactive_power_setpoint_when_mapped()
+    {
+        // RM-M2-HIL-05: when the mapping declares a writable
+        // reactive_power_setpoint_kvar register, the sink writes Q
+        // alongside P. Existing M1 mappings that omit it stay
+        // unchanged (the missing-register positive cover is in
+        // WriteAsync_writes_setpoint_and_mode_registers above).
+        var mapping = ModbusFixtures.VendorNeutralMapping() with
+        {
+            Registers = new List<ModbusRegisterMapping>
+            {
+                new("active_power_setpoint_kw", 200, "int16", 0.1, -100, 100, true, "cyclic", "none", null, null, null),
+                new("reactive_power_setpoint_kvar", 204, "int16", 0.1, -100, 100, true, "cyclic", "none", null, null, null),
+            },
+        };
+        var client = new FakeModbusClient();
+        var sink = new ModbusCommandSink(
+            client, mapping, ModbusFixtures.SampleAsset(),
+            ModbusFixtures.Defaults(), new ModbusFixtures.FixedClock());
+
+        var command = new BatteryCommand(
+            CommandId: "c-q",
+            Timestamp: ModbusFixtures.Now,
+            AssetId: "asset-1",
+            Mode: CommandMode.Discharge,
+            ActivePowerKw: 25,
+            ReactivePowerKvar: -5.5,
+            ValidUntil: ModbusFixtures.Now + TimeSpan.FromSeconds(5),
+            Reason: "schedule",
+            Source: CommandSource.Optimization);
+
+        var result = await sink.WriteAsync(command, CancellationToken.None);
+
+        Assert.True(result.Success);
+        var qWrite = Assert.Single(client.Writes, w => w.Address == 204);
+        // -5.5 kvar at scale_factor 0.1 → wire value -55 → int16 sign-
+        // extended to ushort 0xFFC9.
+        Assert.Equal(unchecked((ushort)(short)-55), qWrite.Values[0]);
+    }
+
+    [Fact]
+    public async Task WriteAsync_treats_null_reactive_power_as_zero()
+    {
+        // The control loop sometimes hands in a P-only command with Q
+        // null. The HIL device must still receive 0 kvar so it does
+        // not retain a stale non-zero Q from a previous command.
+        var mapping = ModbusFixtures.VendorNeutralMapping() with
+        {
+            Registers = new List<ModbusRegisterMapping>
+            {
+                new("active_power_setpoint_kw", 200, "int16", 0.1, -100, 100, true, "cyclic", "none", null, null, null),
+                new("reactive_power_setpoint_kvar", 204, "int16", 0.1, -100, 100, true, "cyclic", "none", null, null, null),
+            },
+        };
+        var client = new FakeModbusClient();
+        var sink = new ModbusCommandSink(
+            client, mapping, ModbusFixtures.SampleAsset(),
+            ModbusFixtures.Defaults(), new ModbusFixtures.FixedClock());
+
+        var command = new BatteryCommand(
+            CommandId: "c-no-q",
+            Timestamp: ModbusFixtures.Now,
+            AssetId: "asset-1",
+            Mode: CommandMode.Discharge,
+            ActivePowerKw: 10,
+            ReactivePowerKvar: null,
+            ValidUntil: ModbusFixtures.Now + TimeSpan.FromSeconds(5),
+            Reason: "schedule",
+            Source: CommandSource.Optimization);
+
+        var result = await sink.WriteAsync(command, CancellationToken.None);
+
+        Assert.True(result.Success);
+        var qWrite = Assert.Single(client.Writes, w => w.Address == 204);
+        Assert.Equal((ushort)0, qWrite.Values[0]);
+    }
+
+    [Fact]
     public async Task WriteAsync_rejects_non_cyclic_setpoint_cadence()
     {
         var mapping = ModbusFixtures.VendorNeutralMapping() with

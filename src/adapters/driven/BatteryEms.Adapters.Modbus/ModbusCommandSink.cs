@@ -103,6 +103,19 @@ public sealed class ModbusCommandSink : IBatteryCommandSink
                 .WriteHoldingRegistersAsync(unitId, setpoint.Address, setpointWords, cts.Token)
                 .ConfigureAwait(false);
 
+            // RM-M2-HIL-05: optional Q setpoint. Only writes when the
+            // mapping declares a writable reactive_power_setpoint_kvar
+            // register. Null Q on the command is treated as 0 kvar so
+            // the device never sees a stale Q from a previous command.
+            var qSetpoint = FindRegister("reactive_power_setpoint_kvar");
+            if (qSetpoint is not null)
+            {
+                var qWords = RegisterDecoder.Encode(qSetpoint, effective.ReactivePowerKvar ?? 0);
+                await _client
+                    .WriteHoldingRegistersAsync(unitId, qSetpoint.Address, qWords, cts.Token)
+                    .ConfigureAwait(false);
+            }
+
             var mode = FindRegister("operating_mode");
             if (mode is not null)
             {
