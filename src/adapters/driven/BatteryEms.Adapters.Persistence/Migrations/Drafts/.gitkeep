@@ -1,0 +1,6 @@
+# RM-M2-MIG-02: draft migrations sit here while their underlying
+# OPEN-item is still under discussion. csproj keeps them as
+# Build-Action `None` so they are NOT embedded and NOT executed by
+# the migrator. Move a file from Drafts/ to RunOnce/ once the
+# corresponding OPEN-item is ready to ship (see RM-M2-MIG-06 for
+# the first draft template, schedules optimistic-concurrency).

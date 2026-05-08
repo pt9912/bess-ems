@@ -7,8 +7,20 @@
 
   <ItemGroup>
     <PackageReference Include="Dapper" />
+    <PackageReference Include="dbup-postgresql" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Npgsql" />
+  </ItemGroup>
+
+  <!-- RM-M2-MIG-02: SQL migrations live under Migrations/RunOnce/ and
+       are embedded into the assembly so DbUp can load them from a
+       single resource namespace. The numeric ????_*.sql glob excludes
+       Migrations/Drafts/ files (kept as Build-Action None below)
+       which would otherwise be picked up before they are ready to
+       apply. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Migrations/RunOnce/????_*.sql" />
+    <None Include="Migrations/Drafts/**/*.sql" />
   </ItemGroup>
 
   <ItemGroup>

@@ -14,6 +14,10 @@
     <PackageVersion Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.203" />
     <PackageVersion Include="JsonSchema.Net" Version="9.2.0" />
     <PackageVersion Include="Dapper" Version="2.1.72" />
+    <!-- RM-M2-MIG-02: DbUp applies the versioned SQL migrations
+         emitted by d-migrate (per ADR 0001). SQL-first, embedded-
+         resource loader, no C# DSL — matches the Dapper stack. -->
+    <PackageVersion Include="dbup-postgresql" Version="7.0.1" />
     <PackageVersion Include="FluentModbus" Version="5.3.2" />
     <PackageVersion Include="Google.OrTools" Version="9.15.6755" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.7" />

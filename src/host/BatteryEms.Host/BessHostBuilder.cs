@@ -127,10 +127,16 @@ public static class BessHostBuilder
 
         // Eager DDL initialisation when persistence is wired — fails the
         // start-up if Postgres is unreachable, matching LH-OPS-001.
+        // RM-M2-MIG-05 rewires this to BessDbMigrator.MigrateAsync;
+        // until then BessDbInitializer keeps the M1 idempotent path
+        // alive. The CS0618 suppression is co-located with the call
+        // site so the obsolete-warning fires everywhere else.
         if (!string.IsNullOrWhiteSpace(hostOptions.PersistenceConnectionString))
         {
+#pragma warning disable CS0618
             var initializer = app.Services.GetRequiredService<BessDbInitializer>();
             initializer.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
+#pragma warning restore CS0618
         }
 
         // Seed asset + schedule before the worker starts ticking.

@@ -21,7 +21,17 @@ public static class PersistenceRegistration
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
 
         services.AddSingleton(_ => NpgsqlDataSource.Create(connectionString));
+        // BessDbInitializer is [Obsolete] (RM-M2-MIG-02 superseded it
+        // with BessDbMigrator); the registration stays here until the
+        // MIG-05 cut-over actually rewires BessHostBuilder to call the
+        // migrator and the integration tests stop new'ing the
+        // initializer directly. Suppressed at the one call site that
+        // legitimately needs the obsolete API during the cut-over
+        // window.
+#pragma warning disable CS0618
         services.AddSingleton<BessDbInitializer>();
+#pragma warning restore CS0618
+        services.AddSingleton<BessDbMigrator>();
 
         services.AddSingleton<ITelemetryRepository, DapperTelemetryRepository>();
         services.AddSingleton<ICommandRepository, DapperCommandRepository>();

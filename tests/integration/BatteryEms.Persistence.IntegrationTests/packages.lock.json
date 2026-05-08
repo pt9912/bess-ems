@@ -38,6 +38,14 @@
         "resolved": "3.1.5",
         "contentHash": "tKi7dSTwP4m5m9eXPM2Ime4Kn7xNf4x4zT9sdLO/G4hZVnQCRiMTWoSZqI/pYTVeI27oPPqHBKYI/DjJ9GsYgA=="
       },
+      "dbup-core": {
+        "type": "Transitive",
+        "resolved": "6.1.1",
+        "contentHash": "kgpuyJVEFJHoIj/slnc994Go88aoeZqNDfGHDBr4sh7CsEWwJhOTCt/FJqO4ziUImL5L0NEY0kxxOiNgPKI2Fw==",
+        "dependencies": {
+          "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
+        }
+      },
       "Microsoft.CodeCoverage": {
         "type": "Transitive",
         "resolved": "18.5.1",
@@ -109,7 +117,8 @@
           "BatteryEms.Domain": "[1.0.0, )",
           "Dapper": "[2.1.72, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.7, )",
-          "Npgsql": "[10.0.2, )"
+          "Npgsql": "[10.0.2, )",
+          "dbup-postgresql": "[7.0.1, )"
         }
       },
       "batteryems.application": {
@@ -127,6 +136,16 @@
         "requested": "[2.1.72, )",
         "resolved": "2.1.72",
         "contentHash": "ns4mGqQd9a/MhP8m6w556vVlZIa0/MfUu03zrxjZC/jlr1uVCsUac8bkdB+Fs98Llbd56rRSo1eZH5VVmeGZyw=="
+      },
+      "dbup-postgresql": {
+        "type": "CentralTransitive",
+        "requested": "[7.0.1, )",
+        "resolved": "7.0.1",
+        "contentHash": "mRnmENWWPuuMZ538gOd1mZnzucx6FQk0anmw3EABjGfcbp24FDb9QdGepYrDiaM8K9s5/gd49+5cmBOlniH/lg==",
+        "dependencies": {
+          "Npgsql": "10.0.1",
+          "dbup-core": "6.1.1"
+        }
       },
       "Microsoft.Extensions.DependencyInjection.Abstractions": {
         "type": "CentralTransitive",

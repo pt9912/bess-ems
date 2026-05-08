@@ -22,7 +22,8 @@ DOCKER_BUILD = $(DOCKER) build $(BUILD_CONTEXT) \
 	lint arch-check gates \
 	test test-safety test-integration test-container coverage-gate \
 	simulator-test simulator-race simulator-lint simulator-coverage-gate \
-	build ci runtime fullbuild lock-refresh
+	build ci runtime fullbuild lock-refresh \
+	schema-validate schema-generate
 
 help:
 	@echo "bess-ems Makefile (RM-M1-21)"
@@ -56,6 +57,8 @@ help:
 	@echo ""
 	@echo "Maintenance:"
 	@echo "  make lock-refresh    Refresh packages.lock.json files in Docker (per docs/user/quality.md §1.4)"
+	@echo "  make schema-validate Validate schema/schema.yaml via d-migrate (RM-M2-MIG-02)"
+	@echo "  make schema-generate Generate ?001_initial.sql from schema/schema.yaml (RM-M2-MIG-02)"
 	@echo ""
 	@echo "Welle 5 (Closure, active):"
 	@echo "  make build           Multi-stage runtime image (non-root, /health HEALTHCHECK)"
@@ -74,6 +77,37 @@ help:
 lock-refresh:
 	$(DOCKER) run --rm -v "$$(pwd)":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 \
 		dotnet restore BatteryEms.sln /p:RestoreLockedMode=false
+
+# --- RM-M2-MIG-02: schema tooling (d-migrate) ------------------------------
+
+# d-migrate is invoked via Docker. The image override stays a Make
+# variable so CI can pin a registry-published digest while local
+# development uses the freshly built dev tag. Once the next d-migrate
+# release lands on ghcr.io/pt9912/d-migrate, override is set to
+# `ghcr.io/pt9912/d-migrate:<version>@sha256:<digest>` (parallel to
+# the NuGet lock-file discipline in docs/user/quality.md §1.4).
+D_MIGRATE_IMAGE ?= d-migrate:dev
+SCHEMA_DIR := schema
+SCHEMA_SOURCE := $(SCHEMA_DIR)/schema.yaml
+GENERATED_SQL := src/adapters/driven/BatteryEms.Adapters.Persistence/Migrations/RunOnce/0001_initial.sql
+
+# Static YAML check — runs without a database, returns non-zero on
+# any structural violation. CI gate alongside `make lint`.
+schema-validate:
+	$(DOCKER) run --rm -v "$$(pwd)":/work -w /work $(D_MIGRATE_IMAGE) \
+		schema validate --source $(SCHEMA_SOURCE)
+
+# Re-generate $(GENERATED_SQL) from $(SCHEMA_SOURCE). The committed SQL
+# file is the build artefact; re-running this target on a clean
+# checkout MUST produce a zero-diff git status for the schema file —
+# any drift between the YAML source and the committed SQL is a
+# build error (drift-check gate, runs on PRs that touch the schema).
+schema-generate:
+	$(DOCKER) run --rm -v "$$(pwd)":/work -w /work $(D_MIGRATE_IMAGE) \
+		schema generate \
+		--source $(SCHEMA_SOURCE) \
+		--target postgresql \
+		--output $(GENERATED_SQL)
 
 # --- Welle 1 (active) ------------------------------------------------------
 

@@ -33,7 +33,9 @@ public sealed class PersistenceRoundtripTests : IAsyncLifetime
         var options = PersistenceOptions.FromHostPort(Host, Port, Database, User, Password);
         _dataSource = NpgsqlDataSource.Create(options.ConnectionString);
 
+#pragma warning disable CS0618 // RM-M2-MIG-05 cuts these calls over to BessDbMigrator.
         await new BessDbInitializer(_dataSource).InitializeAsync(CancellationToken.None);
+#pragma warning restore CS0618
 
         // Each test class run starts from a clean slate so assertions on
         // counts/last-row are stable when the compose stack is reused.
@@ -389,7 +391,9 @@ public sealed class PersistenceRoundtripTests : IAsyncLifetime
         var ev = new AuditEvent(Now, "operator-1", "first-run", "single-bess-1", "boot", "ok");
         await new DapperOperatorAuditLog(_dataSource!).AppendAsync(ev, CancellationToken.None);
 
+#pragma warning disable CS0618 // RM-M2-MIG-05 cuts this idempotency-test over to BessDbMigrator.
         await new BessDbInitializer(_dataSource!).InitializeAsync(CancellationToken.None);
+#pragma warning restore CS0618
 
         var afterReinit = await new DapperOperatorAuditLog(_dataSource!).QueryAsync(
             Now - TimeSpan.FromMinutes(1),
