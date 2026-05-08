@@ -2,6 +2,7 @@ using BatteryEms.Application.Api;
 using BatteryEms.Application.Markets;
 using BatteryEms.Application.Persistence;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 
 namespace BatteryEms.Adapters.Persistence;
@@ -31,7 +32,14 @@ public static class PersistenceRegistration
 #pragma warning disable CS0618
         services.AddSingleton<BessDbInitializer>();
 #pragma warning restore CS0618
-        services.AddSingleton<BessDbMigrator>();
+        // BessDbMigrator needs the raw connection string for DbUp
+        // (NpgsqlDataSource.ConnectionString masks the password); a
+        // factory captures the caller's string in the closure rather
+        // than registering it as a separate ambient service.
+        services.AddSingleton(sp => new BessDbMigrator(
+            sp.GetRequiredService<NpgsqlDataSource>(),
+            connectionString,
+            sp.GetRequiredService<ILogger<BessDbMigrator>>()));
 
         services.AddSingleton<ITelemetryRepository, DapperTelemetryRepository>();
         services.AddSingleton<ICommandRepository, DapperCommandRepository>();

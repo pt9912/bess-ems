@@ -93,6 +93,11 @@ RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.cs
     --no-build \
     --no-restore \
     --logger "console;verbosity=normal" \
+ && dotnet test tests/adapters/driven/BatteryEms.Adapters.Persistence.Tests/BatteryEms.Adapters.Persistence.Tests.csproj \
+    --configuration "${BUILD_CONFIGURATION}" \
+    --no-build \
+    --no-restore \
+    --logger "console;verbosity=normal" \
  && dotnet test tests/adapters/driving/BatteryEms.Worker.Tests/BatteryEms.Worker.Tests.csproj \
     --configuration "${BUILD_CONFIGURATION}" \
     --no-build \

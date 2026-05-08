@@ -23,6 +23,15 @@
     <None Include="Migrations/Drafts/**/*.sql" />
   </ItemGroup>
 
+  <!-- RM-M2-MIG-04: BessDbMigrator's continuity-preflight seam is
+       internal so production callers cannot skip the validation; the
+       Adapters.Persistence.Tests project needs visibility for unit
+       tests of EnsureRunOnceContinuityValid + the synthetic-script
+       constructor. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="BatteryEms.Adapters.Persistence.Tests" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\..\hexagon\BatteryEms.Application\BatteryEms.Application.csproj" />
     <ProjectReference Include="..\..\..\hexagon\BatteryEms.Domain\BatteryEms.Domain.csproj" />

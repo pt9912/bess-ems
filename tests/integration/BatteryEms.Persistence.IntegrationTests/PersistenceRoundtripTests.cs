@@ -10,6 +10,7 @@ using Xunit;
 namespace BatteryEms.Persistence.IntegrationTests;
 
 [Trait("Category", "Integration")]
+[Collection("Postgres")]
 public sealed class PersistenceRoundtripTests : IAsyncLifetime
 {
     private static readonly DateTimeOffset Now =

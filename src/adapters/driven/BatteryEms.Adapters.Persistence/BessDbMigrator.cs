@@ -1,8 +1,8 @@
-using System.Reflection;
+using System.Globalization;
+using System.Text.RegularExpressions;
 using DbUp;
 using DbUp.Engine;
 using DbUp.Engine.Output;
-using DbUp.Helpers;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 
@@ -13,52 +13,164 @@ namespace BatteryEms.Adapters.Persistence;
 // them in order against the configured Postgres database, and tracks
 // applied versions in __schema_versions (per RM-M2-MIG-OPEN-03).
 //
-// Two safety properties beyond DbUp's defaults:
-//   1. Preflight numeric continuity check (per RM-M2-MIG-OPEN-04 in the
-//      plan). The runner refuses to apply a script set that doesn't
-//      start at 0001, has gaps, or contains duplicate numbers — DbUp
-//      itself sorts alphabetically and would silently skip a missing
-//      0001 if the next number is 0002. The actual check + tests land
-//      with RM-M2-MIG-04; this class exposes the validation seam now.
+// Two safety properties beyond DbUp's defaults (RM-M2-MIG-04):
+//   1. Numeric-continuity preflight. DbUp sorts scripts alphabetically
+//      and silently skips a gap (e.g. 0001 + 0003 with no 0002), which
+//      would let a developer ship an unrunnable history. This migrator
+//      validates the embedded set BEFORE handing it to DbUp: the first
+//      number must be 0001, every successor must be exactly +1, and no
+//      two scripts may share a prefix.
 //   2. Multi-replica boot-race serialisation via pg_advisory_lock with
-//      the same ADR 0001 key (`hashtextextended('bess-ems:migrations',
-//      0)`). The lock is taken before DbUp runs, released in finally,
-//      and the cancellation-token only aborts the wait — never an
-//      already-acquired lock. The actual lock-around-DbUp wiring lands
-//      with RM-M2-MIG-04; this class exposes the API now.
+//      the ADR 0001 key (`hashtextextended('bess-ems:migrations', 0)`).
+//      The lock is taken on a dedicated session, held across DbUp's
+//      run, and released in finally — DbUp's own connection is
+//      separate so the lock is purely a process-level mutex on the
+//      sentinel resource. Cancellation aborts the wait but never
+//      leaks an already-held lock.
 //
 // API matches the original BessDbInitializer for a drop-in cut-over in
 // MIG-05: same constructor signature, async MigrateAsync(CancellationToken)
-// shape, no return value. Test hosts that already wire BessDbInitializer
-// flip to BessDbMigrator without further surface change.
-public sealed class BessDbMigrator
+// shape, no return value.
+public sealed partial class BessDbMigrator
 {
-    private readonly NpgsqlDataSource _dataSource;
-    private readonly ILogger<BessDbMigrator> _logger;
+    // ADR 0001 §2 + RM-M2-MIG-OPEN-06: a fixed string-derived key so
+    // every replica acquires the same advisory lock; using a hash of
+    // a stable label keeps the bigint argument deterministic across
+    // restarts. `hashtextextended(text, seed)` returns bigint, which
+    // is the form pg_advisory_lock expects.
+    private const string AdvisoryLockKeyExpr =
+        "hashtextextended('bess-ems:migrations', 0)";
 
-    public BessDbMigrator(NpgsqlDataSource dataSource, ILogger<BessDbMigrator> logger)
+    private readonly NpgsqlDataSource _dataSource;
+    // DbUp opens its own NpgsqlConnection from a raw connection string
+    // and needs the password in clear text. NpgsqlDataSource.ConnectionString
+    // intentionally strips the password (defense-in-depth), so the
+    // migrator carries the original string from the caller separately.
+    private readonly string _rawConnectionString;
+    private readonly ILogger<BessDbMigrator> _logger;
+    private readonly IReadOnlyList<string>? _scriptNamesOverride;
+
+    public BessDbMigrator(
+        NpgsqlDataSource dataSource,
+        string connectionString,
+        ILogger<BessDbMigrator> logger)
+        : this(dataSource, connectionString, logger, scriptNamesOverride: null)
     {
-        ArgumentNullException.ThrowIfNull(dataSource);
-        ArgumentNullException.ThrowIfNull(logger);
-        _dataSource = dataSource;
-        _logger = logger;
     }
 
-    public Task MigrateAsync(CancellationToken cancellationToken)
+    // Test seam: lets a unit test feed a synthetic script-name list
+    // through the continuity preflight without touching the real
+    // embedded resources or a database. Production always passes null.
+    internal BessDbMigrator(
+        NpgsqlDataSource dataSource,
+        string connectionString,
+        ILogger<BessDbMigrator> logger,
+        IReadOnlyList<string>? scriptNamesOverride)
+    {
+        ArgumentNullException.ThrowIfNull(dataSource);
+        ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
+        ArgumentNullException.ThrowIfNull(logger);
+        _dataSource = dataSource;
+        _rawConnectionString = connectionString;
+        _logger = logger;
+        _scriptNamesOverride = scriptNamesOverride;
+    }
+
+    public async Task MigrateAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var connectionString = _dataSource.ConnectionString;
-        var assembly = typeof(BessDbMigrator).Assembly;
+        // Preflight: refuses to call DbUp on a malformed script set.
+        // The override path lets unit tests exercise this without an
+        // assembly scan; production reads the embedded resources.
+        var scriptNames = _scriptNamesOverride
+            ?? typeof(BessDbMigrator).Assembly.GetManifestResourceNames()
+                .Where(name => name.Contains(".Migrations.RunOnce.", StringComparison.Ordinal))
+                .ToArray();
+        EnsureRunOnceContinuityValid(scriptNames);
 
-        // RM-M2-MIG-04 follow-up wraps this DeployChanges call in a
-        // pg_advisory_lock and runs the numeric-continuity preflight
-        // before invoking DbUp. The skeleton here keeps the surface
-        // stable so MIG-04 only adds, never reshapes.
+        var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            // Acquire the advisory lock on this session before running
+            // DbUp. Two parallel migrators against the same database
+            // serialise here: the second waits until the first releases.
+            await ExecuteAdvisoryLockAsync(connection, acquire: true, cancellationToken)
+                .ConfigureAwait(false);
+            try
+            {
+                RunDbUp();
+            }
+            finally
+            {
+                // Best-effort release. If the connection is already
+                // dead the lock will be released by Postgres when the
+                // session ends, so swallow transport errors here so
+                // disposal never throws.
+                await TryReleaseAdvisoryLockAsync(connection).ConfigureAwait(false);
+            }
+        }
+    }
+
+    // Preflight: verify the embedded script set starts at 0001, has no
+    // gaps, and contains no duplicate numeric prefixes. Static so unit
+    // tests can call it directly with synthetic script-name arrays.
+    internal static void EnsureRunOnceContinuityValid(IReadOnlyList<string> scriptNames)
+    {
+        ArgumentNullException.ThrowIfNull(scriptNames);
+
+        if (scriptNames.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "No RunOnce migrations are embedded; the migrator refuses to run against an empty script set. "
+                + "If this is a fresh checkout, ensure 0001_initial.sql is committed under "
+                + "src/adapters/driven/BatteryEms.Adapters.Persistence/Migrations/RunOnce/.");
+        }
+
+        var numbers = new SortedSet<int>();
+        var duplicates = new HashSet<int>();
+        foreach (var name in scriptNames)
+        {
+            var match = ScriptNumberRegex().Match(name);
+            if (!match.Success)
+            {
+                throw new InvalidOperationException(
+                    $"Migration script '{name}' does not match the required ????_*.sql naming "
+                    + "convention; the migrator cannot determine its sequence position.");
+            }
+            var number = int.Parse(match.Groups["num"].Value, CultureInfo.InvariantCulture);
+            if (!numbers.Add(number))
+            {
+                duplicates.Add(number);
+            }
+        }
+        if (duplicates.Count > 0)
+        {
+            var dupList = string.Join(", ", duplicates.Select(n => n.ToString("D4", CultureInfo.InvariantCulture)));
+            throw new InvalidOperationException(
+                $"Duplicate migration number(s) detected: {dupList}. Each ????_-prefix must be unique.");
+        }
+
+        // Continuity: must start at 1, every successor exactly +1.
+        var expected = 1;
+        foreach (var n in numbers)
+        {
+            if (n != expected)
+            {
+                throw new InvalidOperationException(
+                    $"Migration sequence has a gap or wrong start: expected {expected:D4} but found {n:D4}. "
+                    + "DbUp would silently skip the gap; the migrator refuses to run.");
+            }
+            expected++;
+        }
+    }
+
+    private void RunDbUp()
+    {
         var upgrader = DeployChanges.To
-            .PostgresqlDatabase(connectionString)
+            .PostgresqlDatabase(_rawConnectionString)
             .WithScriptsEmbeddedInAssembly(
-                assembly,
+                typeof(BessDbMigrator).Assembly,
                 static name => name.Contains(".Migrations.RunOnce.", StringComparison.Ordinal))
             .JournalToPostgresqlTable(schema: null, table: "__schema_versions")
             .LogTo(new DbUpLoggerAdapter(_logger))
@@ -71,8 +183,42 @@ public sealed class BessDbMigrator
                 $"Schema migration failed at script '{result.ErrorScript?.Name}': {result.Error?.Message}",
                 result.Error);
         }
-        return Task.CompletedTask;
     }
+
+    private static async Task ExecuteAdvisoryLockAsync(
+        NpgsqlConnection connection,
+        bool acquire,
+        CancellationToken cancellationToken)
+    {
+        var fn = acquire ? "pg_advisory_lock" : "pg_advisory_unlock";
+        var cmd = connection.CreateCommand();
+        await using (cmd.ConfigureAwait(false))
+        {
+            cmd.CommandText = $"SELECT {fn}({AdvisoryLockKeyExpr});";
+            await cmd.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design", "CA1031",
+        Justification = "Best-effort lock release on shutdown; transport may already be torn down.")]
+    private static async Task TryReleaseAdvisoryLockAsync(NpgsqlConnection connection)
+    {
+        try
+        {
+            await ExecuteAdvisoryLockAsync(connection, acquire: false, CancellationToken.None)
+                .ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // Postgres frees session-level locks automatically on
+            // session end; if the explicit unlock fails, the lock is
+            // released by the time the connection is disposed.
+        }
+    }
+
+    [GeneratedRegex(@"\.Migrations\.RunOnce\.(?<num>\d{4})_[^.]+\.sql$")]
+    private static partial Regex ScriptNumberRegex();
 
     // DbUp's IUpgradeLog routes the migrator's own log lines through
     // ILogger so they show up in the host's structured-log stream
