@@ -44,34 +44,37 @@ abgearbeitet.
 
 ## Code-Klarheit
 
-- [ ] **M2 — `BessDbMigrator.ExecuteAdvisoryLockAsync` Bool-Switch versteckt asymmetrische Cancellation-Semantik.**
-  Datei: `src/adapters/driven/BatteryEms.Adapters.Persistence/BessDbMigrator.cs:97-109`.
-  Acquire **muss** CancellationToken propagieren, Release **darf
-  nicht** (Postgres gibt session-scoped Locks am Sessionende
-  ohnehin frei). Die Bool-Variante hidet das hinter einem
-  Parameter.
-  *Trigger:* keiner — kosmetisch.
-  *Aufwand:* ~10 LOC — Split in `AcquireAdvisoryLockAsync(CT)` und
-  `ReleaseAdvisoryLockAsync()`.
+- [x] **M2 — `BessDbMigrator.ExecuteAdvisoryLockAsync` Bool-Switch versteckt asymmetrische Cancellation-Semantik.** ✅
+  Datei: `src/adapters/driven/BatteryEms.Adapters.Persistence/BessDbMigrator.cs`.
+  In `AcquireAdvisoryLockAsync(NpgsqlConnection, CancellationToken)`
+  und `ReleaseAdvisoryLockAsync(NpgsqlConnection)` gesplittet — die
+  Acquire-Seite trägt den Token explizit (Boot-Cancel muss den Wait
+  abbrechen können), die Release-Seite nimmt **keinen** Token (ein
+  abgebrochenes Unlock würde den Lock bis Sessionende halten, was
+  strikt schlechter ist als unconditional Unlock). Same wire
+  semantics, klarere Intent — alle bisherigen Migrator-Tests
+  weiterhin grün.
 
 ---
 
 ## Test- und CI-Hygiene
 
-- [ ] **Mn2 — `tests/hil/Dockerfile` kopiert `tests/` ungefiltert.**
-  Datei: `tests/hil/Dockerfile:14`.
-  `COPY tests/ tests/` defeated den Docker-Layer-Cache; jede
-  unrelated Test-Edit bustet das HIL-Image-Build.
-  *Aufwand:* ~5 LOC — per-Projekt-COPY oder ein
-  `dotnet sln`-pruned Fileset.
+- [x] **Mn2 — `tests/hil/Dockerfile` kopiert `tests/` ungefiltert.** ✅
+  Datei: `tests/hil/Dockerfile`.
+  COPY-Liste auf das Minimum reduziert: nur das HIL-Test-Projekt
+  (`tests/integration/BatteryEms.Hil.IntegrationTests/`) plus
+  `tests/Directory.Build.props` (NoWarn-Overrides für die
+  Test-only Analyzer-Regeln). Jede unrelated Test-Edit bustet den
+  HIL-Image-Layer jetzt nicht mehr.
 
-- [ ] **Mn4 — `MigrationResourceSetTests` enforceren keine Exklusivität.**
+- [x] **Mn4 — `MigrationResourceSetTests` enforceren keine Exklusivität.** ✅
   Datei: `tests/adapters/driven/BatteryEms.Adapters.Persistence.Tests/MigrationResourceSetTests.cs`.
-  Tests prüfen „RunOnce enthält `0001_initial.sql`" und „Drafts ist
-  leer", aber nicht „nur RunOnce-Pattern-Resourcen sind embedded".
-  Ein versehentliches `<EmbeddedResource Include="**/*.json"/>`
-  käme durch.
-  *Aufwand:* ~10 LOC — Allowlist-Test über das Manifest.
+  Neuer Test `Embedded_resource_set_contains_only_RunOnce_migration_scripts`
+  fenced das Manifest: jede Assembly-Resource muss entweder dem
+  RunOnce-Pattern entsprechen oder auf einer expliziten Allowlist
+  stehen (heute leer für `.g.resources`-Future-Proofing). Ein
+  versehentliches `<EmbeddedResource Include="**/*.json"/>` würde
+  jetzt sofort kippen.
 
 ---
 

@@ -13,7 +13,14 @@ WORKDIR /src
 COPY global.json Directory.Build.props Directory.Packages.props .editorconfig ./
 COPY BatteryEms.sln ./
 COPY src/ src/
-COPY tests/ tests/
+# Carve-out Mn2: copy only what this image actually needs. The
+# HIL integration test (csproj + sources) plus the test-tree
+# Directory.Build.props (NoWarn settings for test-only analyzer
+# rules CA1707/CA2007/CA1062/CA1816/CA1859/CA2000/CA1849/CA1515).
+# Avoids the cache-busting `COPY tests/ tests/` that the original
+# draft used — every unrelated test edit re-built the layer.
+COPY tests/Directory.Build.props tests/Directory.Build.props
+COPY tests/integration/BatteryEms.Hil.IntegrationTests/ tests/integration/BatteryEms.Hil.IntegrationTests/
 COPY config/ config/
 
 RUN dotnet restore tests/integration/BatteryEms.Hil.IntegrationTests/BatteryEms.Hil.IntegrationTests.csproj

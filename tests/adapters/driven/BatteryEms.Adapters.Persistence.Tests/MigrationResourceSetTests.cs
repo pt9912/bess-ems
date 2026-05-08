@@ -36,4 +36,40 @@ public sealed class MigrationResourceSetTests
             .ToArray();
         Assert.Empty(drafts);
     }
+
+    [Fact]
+    public void Embedded_resource_set_contains_only_RunOnce_migration_scripts()
+    {
+        // Carve-out Mn4: belt-and-suspenders allowlist. The two
+        // tests above check positive (RunOnce contains the
+        // expected file) and one negative (no Drafts/* leak), but
+        // neither catches a wholly different leak — e.g. someone
+        // adds <EmbeddedResource Include="**/*.json" /> and ships
+        // an unintended payload through DbUp's filter (it would
+        // skip the json, but the resource set would still grow
+        // silently). This test fences the manifest: every assembly
+        // resource must either match the RunOnce/????_*.sql
+        // pattern or live on the explicit allowlist.
+        var assembly = typeof(BessDbMigrator).Assembly;
+        var resources = assembly.GetManifestResourceNames();
+
+        var allowedNonScript = new[]
+        {
+            // .NET adds these automatically for resx-style strings;
+            // they would never appear here today but are reserved
+            // by the framework if a future class adds a .resx file.
+            ".g.resources",
+        };
+
+        var unexpected = resources
+            .Where(r => !r.Contains(RunOnceMarker, StringComparison.Ordinal))
+            .Where(r => !allowedNonScript.Any(a => r.EndsWith(a, StringComparison.Ordinal)))
+            .ToArray();
+
+        Assert.True(
+            unexpected.Length == 0,
+            "Unexpected manifest resources detected (every embedded resource must "
+            + "be a RunOnce/????_*.sql script or appear on the allowlist): "
+            + string.Join(", ", unexpected));
+    }
 }

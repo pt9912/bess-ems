@@ -92,7 +92,7 @@ public sealed partial class BessDbMigrator
             // Acquire the advisory lock on this session before running
             // DbUp. Two parallel migrators against the same database
             // serialise here: the second waits until the first releases.
-            await ExecuteAdvisoryLockAsync(connection, acquire: true, cancellationToken)
+            await AcquireAdvisoryLockAsync(connection, cancellationToken)
                 .ConfigureAwait(false);
             try
             {
@@ -104,7 +104,7 @@ public sealed partial class BessDbMigrator
                 // dead the lock will be released by Postgres when the
                 // session ends, so swallow transport errors here so
                 // disposal never throws.
-                await TryReleaseAdvisoryLockAsync(connection).ConfigureAwait(false);
+                await ReleaseAdvisoryLockAsync(connection).ConfigureAwait(false);
             }
         }
     }
@@ -186,16 +186,20 @@ public sealed partial class BessDbMigrator
         }
     }
 
-    private static async Task ExecuteAdvisoryLockAsync(
-        NpgsqlConnection connection,
-        bool acquire,
-        CancellationToken cancellationToken)
+    // Carve-out M2: split the former boolean-flag ExecuteAdvisoryLockAsync
+    // into two named operations so the asymmetric cancellation
+    // semantics are visible in the call site. Acquire MUST honour the
+    // caller's CancellationToken (a startup ctrl-C must abort the wait
+    // for the lock); Release MUST NOT take a token (cancelling the
+    // unlock would leave the lock dangling until session end, which is
+    // strictly worse than running unlock unconditionally).
+    private static async Task AcquireAdvisoryLockAsync(
+        NpgsqlConnection connection, CancellationToken cancellationToken)
     {
-        var fn = acquire ? "pg_advisory_lock" : "pg_advisory_unlock";
         var cmd = connection.CreateCommand();
         await using (cmd.ConfigureAwait(false))
         {
-            cmd.CommandText = $"SELECT {fn}({AdvisoryLockKeyExpr});";
+            cmd.CommandText = $"SELECT pg_advisory_lock({AdvisoryLockKeyExpr});";
             await cmd.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
         }
     }
@@ -203,12 +207,16 @@ public sealed partial class BessDbMigrator
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Design", "CA1031",
         Justification = "Best-effort lock release on shutdown; transport may already be torn down.")]
-    private static async Task TryReleaseAdvisoryLockAsync(NpgsqlConnection connection)
+    private static async Task ReleaseAdvisoryLockAsync(NpgsqlConnection connection)
     {
         try
         {
-            await ExecuteAdvisoryLockAsync(connection, acquire: false, CancellationToken.None)
-                .ConfigureAwait(false);
+            var cmd = connection.CreateCommand();
+            await using (cmd.ConfigureAwait(false))
+            {
+                cmd.CommandText = $"SELECT pg_advisory_unlock({AdvisoryLockKeyExpr});";
+                await cmd.ExecuteScalarAsync(CancellationToken.None).ConfigureAwait(false);
+            }
         }
         catch (Exception)
         {
