@@ -14,14 +14,15 @@ abgearbeitet.
 
 ## Adapter-Qualität (Modbus-Pfad)
 
-- [ ] **M3 — `FluentModbusClient.ConnectAsync` synchroner Connect unter Semaphore.**
-  Datei: `src/adapters/driven/BatteryEms.Adapters.Modbus/FluentModbusClient.cs:38-57`.
-  `_client.Connect(...)` läuft synchron unter dem Gate; bei langsamem
-  DNS/TCP-Handshake stehen alle queued Reads/Writes. Mit der Production-
-  Singleton-Verdrahtung blockiert das die Regelschleife.
-  *Trigger:* echte Geräte oder ein zäh anlaufender Simulator.
-  *Aufwand:* ~10 LOC — `Task.Run` um den Connect oder ein
-  FluentModbus-`ConnectAsync`-Pendant verwenden.
+- [x] **M3 — `FluentModbusClient.ConnectAsync` synchroner Connect unter Semaphore.** ✅
+  Datei: `src/adapters/driven/BatteryEms.Adapters.Modbus/FluentModbusClient.cs`.
+  Zwei Hebel: (1) DNS jetzt async via `Dns.GetHostAddressesAsync` und
+  **außerhalb** der Semaphore — parallele First-Connect-Caller serialisieren
+  nicht mehr auf Resolution. (2) Der synchrone `_client.Connect(...)` läuft
+  jetzt in `Task.Run` unter dem Gate — die per-Client-Serialisierung (HIL-
+  Race-Fix) bleibt intakt, der Aufrufer-Sync-Context wird während des
+  TCP-Handshakes nicht mehr gepinnt.
+  Tests: alle Modbus-Unit-Tests grün, HIL-Roundtrip grün.
 
 - [ ] **Mn1 — `ModbusCommandSink` verschluckt Q-Setpoint stillschweigend.**
   Datei: `src/adapters/driven/BatteryEms.Adapters.Modbus/ModbusCommandSink.cs:110-117`.

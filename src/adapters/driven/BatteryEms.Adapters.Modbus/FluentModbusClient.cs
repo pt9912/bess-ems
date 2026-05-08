@@ -40,6 +40,12 @@ public sealed class FluentModbusClient : IModbusClient
             return;
         }
 
+        // Resolve before acquiring the gate so multiple concurrent
+        // first-connect callers don't serialise on DNS. DNS itself
+        // is async, the synchronous TCP connect is the only thing
+        // that has to run under the gate.
+        var address = await ResolveAddressAsync(_host, cancellationToken).ConfigureAwait(false);
+
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -47,8 +53,15 @@ public sealed class FluentModbusClient : IModbusClient
             {
                 return;
             }
-            var address = ResolveAddress(_host);
-            _client.Connect(new IPEndPoint(address, _port), ModbusEndianness.BigEndian);
+            // FluentModbus 5.x exposes only a synchronous Connect.
+            // Offload to the thread pool so the caller's async
+            // context isn't pinned through the TCP handshake; the
+            // gate is still held during the await, so the per-client
+            // serialisation guarantee that fixes the read/write race
+            // (RM-M2-HIL race fix) stays intact.
+            await Task.Run(
+                () => _client.Connect(new IPEndPoint(address, _port), ModbusEndianness.BigEndian),
+                cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -124,24 +137,27 @@ public sealed class FluentModbusClient : IModbusClient
         return ValueTask.CompletedTask;
     }
 
-    private static IPAddress ResolveAddress(string host)
+    private static async Task<IPAddress> ResolveAddressAsync(
+        string host, CancellationToken cancellationToken)
     {
         if (IPAddress.TryParse(host, out var direct))
         {
             return direct;
         }
-        var entry = Dns.GetHostEntry(host);
-        foreach (var addr in entry.AddressList)
+        var addresses = await Dns
+            .GetHostAddressesAsync(host, cancellationToken)
+            .ConfigureAwait(false);
+        foreach (var addr in addresses)
         {
             if (addr.AddressFamily == AddressFamily.InterNetwork)
             {
                 return addr;
             }
         }
-        if (entry.AddressList.Length == 0)
+        if (addresses.Length == 0)
         {
             throw new InvalidOperationException($"Could not resolve host '{host}'.");
         }
-        return entry.AddressList[0];
+        return addresses[0];
     }
 }
