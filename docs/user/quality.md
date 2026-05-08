@@ -243,6 +243,34 @@ werden mit M4 aktiv.
 | OPC-UA gegen Simulator                 | M4       | LH-OPCUA-001..005         |
 | Optimization-Sidecar (gRPC)            | M5       | LH-OPT-006                |
 
+#### 2.2.1 HIL-Pfad (optional, RM-M2-HIL-Welle)
+
+```bash
+make test-hil-modbus   # = docker compose -f tests/hil/compose.yml up
+```
+
+Filter: `Category=HIL`. **Nicht in `make ci` / `make gates` /
+`make test-integration` enthalten** — der M1-Pflichtpfad bleibt der
+deterministische Go-Simulator (`bess-field-sim`). Der HIL-Pfad
+fährt einen separaten Compose-Stack (`tests/hil/compose.yml`) gegen
+das externe `bess-hil-simulator:local`-Image hoch und prüft eine
+P-Sprungantwort: 25 kW Setpoint via `ModbusCommandSink` →
+Konvergenz-Read via `ModbusTelemetrySource` mit ±5 kW Toleranz
+(PCS-Dynamik braucht ~1 s).
+
+| Voraussetzung | Wer liefert |
+| ------------- | ----------- |
+| `bess-hil-simulator:local` lokal gebaut (HIL-OPEN-01) | Schwesterprojekt-Operator |
+| `tests/hil/compose.yml` + `tests/hil/Dockerfile` | bess-ems |
+| `config/examples/adapters/modbus.hil-simulator.json` | bess-ems |
+| `BatteryEms.Hil.IntegrationTests` | bess-ems |
+
+Wann den HIL-Pfad fahren: bei Änderungen am Modbus-Adapter
+(Word-Order, Register-Tabellen, Float-Encoding) oder vor einem
+Release, der dynamisches PCS/PQ-Verhalten gegen ein realistischeres
+Modell sanity-prüfen soll. Der Go-Simulator deckt deterministische
+Fixtures, der HIL-Simulator deckt PCS-Antwort und PQ-Capability.
+
 ### 2.3 Sicherheitsfall-Tests
 
 Pflicht ab M1 (LH-TEST-006). Filter: `Category=Safety`. Werden zusätzlich
@@ -325,6 +353,7 @@ Fall mit Native Core das erfolgreiche Laden der `.so`-Bibliothek
 | Unit (Default)       | `make test`                      | `Category!=Integration & !Replay & !Container & !NativeInterop` |
 | Sicherheitsfälle     | `make test-safety`               | `Category=Safety`          |
 | Integration          | `make test-integration`          | `Category=Integration`     |
+| HIL (optional)       | `make test-hil-modbus`           | `Category=HIL`             |
 | Native Interop       | `make test-native-interop`       | `Category=NativeInterop`   |
 | Replay               | `make test-replay`               | `Category=Replay`          |
 | Container            | `make test-container`            | `Category=Container`       |

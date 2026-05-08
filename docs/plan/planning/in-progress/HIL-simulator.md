@@ -249,7 +249,7 @@ Folgetests:
 | ✅ | HIL-06 | HIL-Compose ergänzen | `tests/hil/compose.yml` startet `bess-hil-simulator:local` headless auf Port 502, stellt CSV-Logs als benanntes Volume `hil-csv` (Mount `/data`) bereit. Eigenes hilnet-Bridge-Network, kein Overlap mit `tests/integration/compose.yml`. |
 | ✅ | HIL-07 | HIL-Integrationstest ergänzen | `tests/integration/BatteryEms.Hil.IntegrationTests/HilModbusRoundtripTests` schreibt 25 kW Setpoint via `ModbusCommandSink`, pollt `ModbusTelemetrySource` bis `active_power_kw` mit ±5 kW konvergiert (PCS-Dynamik braucht ~1 s). Trait `Category=HIL`; das Projekt ist nur im HIL-Compose-Stack verdrahtet, nicht in `make ci` / `make test-integration`. |
 | ✅ | HIL-08 | Make-Gate ergänzen | `make test-hil-modbus` baut + ruft `tests/hil/compose.yml` auf, mit `--exit-code-from hil-test-runner` und `down -v --remove-orphans`-Cleanup. Nicht in `make ci` enthalten. |
-| ⬜ | HIL-09 | Dokumentation ergänzen | `docs/user/quality.md` beschreibt Voraussetzungen, Build, Lauf und Abgrenzung zum Go-Simulator. |
+| ✅ | HIL-09 | Dokumentation ergänzen | `docs/user/quality.md §2.2.1` beschreibt den HIL-Pfad: Voraussetzungen (lokal gebautes `bess-hil-simulator:local` + die vier bess-ems-Artefakte), Lauf-Befehl, Abgrenzung zum Go-Simulator und Trigger-Heuristik (Modbus-Adapter-Touch / Pre-Release-PCS-Sanity). Tag-Steuerungs-Tabelle ergänzt. |
 
 ---
 
