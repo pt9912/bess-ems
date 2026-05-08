@@ -49,7 +49,11 @@
               "enum": ["high_low", "low_high"],
               "description": "Two-word ordering for 32-bit values. 'high_low' (default) matches the existing M1 decoder; 'low_high' covers HIL devices that swap the words (RM-M2-HIL-01, used by HIL-03)."
             },
-            "scale_factor": { "type": "number" },
+            "scale_factor": {
+              "type": "number",
+              "not": { "const": 0 },
+              "description": "engineering_value = raw_value * scale_factor; therefore scale_factor=0 would collapse all reads to 0 and divide writes by zero. Rejected at schema time so an obviously broken profile fails before reaching the loader (carve-out N2)."
+            },
             "range": {
               "type": "array",
               "items": { "type": "number" },

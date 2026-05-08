@@ -795,6 +795,45 @@ public sealed class JsonFileConfigurationLoaderTests
     }
 
     [Fact]
+    public void Modbus_register_with_zero_scale_factor_is_rejected_by_schema()
+    {
+        // Carve-out N2: scale_factor=0 means engineering_value =
+        // raw_value * 0 = 0 (Decode collapses) AND wire_value =
+        // engineering_value / 0 = NaN/Inf (Encode breaks). Both are
+        // obviously broken; the schema rejects so the profile never
+        // reaches the adapter.
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson(
+            """
+            {
+              "profile_name": "p",
+              "unit_id_discovery": "static",
+              "static_unit_id": 1,
+              "registers": [
+                {
+                  "name": "active_power_kw",
+                  "address": 0,
+                  "type": "float32",
+                  "scale_factor": 0,
+                  "range": [-250, 250],
+                  "writable": false,
+                  "write_cadence": "cyclic",
+                  "auth_required": "none"
+                }
+              ]
+            }
+            """);
+        try
+        {
+            Assert.Throws<ConfigurationValidationException>(() => loader.LoadModbusMapping(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void Modbus_register_with_unknown_register_table_value_is_rejected_by_schema()
     {
         // RM-M2-HIL-01: schema's enum locks register_table to

@@ -79,6 +79,66 @@ public sealed class ModbusCommandSinkTests
     }
 
     [Fact]
+    public async Task WriteAsync_surfaces_q_dropped_in_reason_when_mapping_has_no_q_register()
+    {
+        // Carve-out Mn1: a non-zero Q in the command must not vanish
+        // silently when the mapping has no reactive_power_setpoint_
+        // kvar register. The dispatch result still reports success
+        // (the P-write went through) but the Reason flags the loss
+        // so the audit trail captures it.
+        var mapping = ModbusFixtures.VendorNeutralMapping() with
+        {
+            Registers = new List<ModbusRegisterMapping>
+            {
+                new("active_power_setpoint_kw", 200, "int16", 0.1, -100, 100, true, "cyclic", "none", null, null, null),
+                // No reactive_power_setpoint_kvar mapping.
+            },
+        };
+        var sink = new ModbusCommandSink(
+            new FakeModbusClient(), mapping, ModbusFixtures.SampleAsset(),
+            ModbusFixtures.Defaults(), new ModbusFixtures.FixedClock());
+
+        var command = new BatteryCommand(
+            CommandId: "c-q-lost",
+            Timestamp: ModbusFixtures.Now,
+            AssetId: "asset-1",
+            Mode: CommandMode.Discharge,
+            ActivePowerKw: 25,
+            ReactivePowerKvar: -5.5,
+            ValidUntil: ModbusFixtures.Now + TimeSpan.FromSeconds(5),
+            Reason: "schedule",
+            Source: CommandSource.Optimization);
+
+        var result = await sink.WriteAsync(command, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Contains("q-dropped:no-mapping", result.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task WriteAsync_does_not_flag_q_dropped_when_command_q_is_zero()
+    {
+        // Inverse of the test above: zero Q on the command means
+        // no operator intent was lost, so q-dropped should not
+        // appear in the reason.
+        var mapping = ModbusFixtures.VendorNeutralMapping() with
+        {
+            Registers = new List<ModbusRegisterMapping>
+            {
+                new("active_power_setpoint_kw", 200, "int16", 0.1, -100, 100, true, "cyclic", "none", null, null, null),
+            },
+        };
+        var sink = new ModbusCommandSink(
+            new FakeModbusClient(), mapping, ModbusFixtures.SampleAsset(),
+            ModbusFixtures.Defaults(), new ModbusFixtures.FixedClock());
+
+        var result = await sink.WriteAsync(DischargeCommand(), CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.DoesNotContain("q-dropped", result.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task WriteAsync_treats_null_reactive_power_as_zero()
     {
         // The control loop sometimes hands in a P-only command with Q

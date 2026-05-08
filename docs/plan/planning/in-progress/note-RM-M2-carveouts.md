@@ -24,21 +24,21 @@ abgearbeitet.
   TCP-Handshakes nicht mehr gepinnt.
   Tests: alle Modbus-Unit-Tests grün, HIL-Roundtrip grün.
 
-- [ ] **Mn1 — `ModbusCommandSink` verschluckt Q-Setpoint stillschweigend.**
-  Datei: `src/adapters/driven/BatteryEms.Adapters.Modbus/ModbusCommandSink.cs:110-117`.
-  Hat das Mapping keinen `reactive_power_setpoint_kvar`-Eintrag, wird
-  ein non-null Q-Command kommentarlos verworfen — Operator-Intent
-  geht still verloren.
-  *Trigger:* sobald jemand Q über ein P-only-Profil fahren will.
-  *Aufwand:* ~15 LOC — Log-Warn bei Adapter-Wiring oder Surfacing
-  über `CommandDispatchResult.Reason`.
+- [x] **Mn1 — `ModbusCommandSink` verschluckt Q-Setpoint stillschweigend.** ✅
+  Datei: `src/adapters/driven/BatteryEms.Adapters.Modbus/ModbusCommandSink.cs`.
+  `WriteAsync` hängt jetzt `;q-dropped:no-mapping` an die Reason an,
+  wenn ein non-zero `ReactivePowerKvar` an einem Q-losen Mapping
+  ankommt. Dispatch-Result bleibt erfolgreich (P-Write ging durch),
+  aber der Audit-Trail zeigt den Operator-Intent-Verlust. Zwei Tests
+  (positiv non-zero Q + kein Mapping → q-dropped, negativ zero Q →
+  kein Tag).
 
-- [ ] **N2 — `RegisterDecoder.Encode` mit `ScaleFactor=0` asymmetrisch zu `Decode`.**
-  Datei: `src/adapters/driven/BatteryEms.Adapters.Modbus/RegisterDecoder.cs:32`.
-  `Encode` interpretiert raw bits, `Decode` liefert 0. Beide Pfade
-  divergieren bei einem ohnehin illegitimen Wert.
-  *Trigger:* Profil mit `scale_factor: 0` (sollte am Loader sterben).
-  *Aufwand:* ~5 LOC — Reject in `JsonFileConfigurationLoader.LoadModbusMapping`.
+- [x] **N2 — `RegisterDecoder.Encode` mit `ScaleFactor=0` asymmetrisch zu `Decode`.** ✅
+  Datei: `config/schema/modbus-mapping.schema.json`.
+  Schema lehnt `scale_factor: 0` jetzt mit `"not": {"const": 0}` ab —
+  ein offensichtlich kaputtes Profil scheitert vor dem Loader, der
+  Decoder/Encoder-Asymmetrie wird gar nicht erst sichtbar. Loader-
+  Test pinnt das Verhalten.
 
 ---
 

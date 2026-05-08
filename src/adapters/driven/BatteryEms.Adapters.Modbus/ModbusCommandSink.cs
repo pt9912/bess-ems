@@ -107,6 +107,10 @@ public sealed class ModbusCommandSink : IBatteryCommandSink
             // mapping declares a writable reactive_power_setpoint_kvar
             // register. Null Q on the command is treated as 0 kvar so
             // the device never sees a stale Q from a previous command.
+            // Carve-out Mn1: if a non-zero Q arrives at a Q-less
+            // mapping, surface the drop in the dispatch reason so
+            // the audit trail shows the operator's intent was lost.
+            var qDropped = false;
             var qSetpoint = FindRegister("reactive_power_setpoint_kvar");
             if (qSetpoint is not null)
             {
@@ -114,6 +118,10 @@ public sealed class ModbusCommandSink : IBatteryCommandSink
                 await _client
                     .WriteHoldingRegistersAsync(unitId, qSetpoint.Address, qWords, cts.Token)
                     .ConfigureAwait(false);
+            }
+            else if ((effective.ReactivePowerKvar ?? 0) != 0)
+            {
+                qDropped = true;
             }
 
             var mode = FindRegister("operating_mode");
@@ -125,7 +133,8 @@ public sealed class ModbusCommandSink : IBatteryCommandSink
                     .ConfigureAwait(false);
             }
 
-            var reason = limit.WasLimited ? $"adapter-limited:{limit.Reason}" : effective.Reason;
+            var baseReason = limit.WasLimited ? $"adapter-limited:{limit.Reason}" : effective.Reason;
+            var reason = qDropped ? $"{baseReason};q-dropped:no-mapping" : baseReason;
             return CommandDispatchResult.Ok(_clock.UtcNow, reason);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
