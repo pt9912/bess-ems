@@ -29,9 +29,9 @@ paths referenced by `docs/user/quality.md` §5.2 and the M3 plan
 | Slice                          | Status |
 | ------------------------------ | ------ |
 | RM-M3-01 C-ABI header          | ✅      |
-| RM-M3-02 C++ impl (Constraint+Ramp) | ⬜      |
+| RM-M3-02 C++ impl (Constraint+Ramp) | ✅      |
 | RM-M3-06 part 1 build skeleton | ⬜      |
-| RM-M3-08 C++ unit tests        | ⬜      |
+| RM-M3-08 C++ unit tests        | 🟡 (smoke set in src/test_compute.cpp; framework + sanitizer pending) |
 | RM-M3-13 PID                   | ⬜      |
 
 The header is the only artefact merged in RM-M3-01. The build,
