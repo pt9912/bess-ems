@@ -23,7 +23,7 @@ DOCKER_BUILD = $(DOCKER) build $(BUILD_CONTEXT) \
 	test test-safety test-integration test-container coverage-gate \
 	simulator-test simulator-race simulator-lint simulator-coverage-gate \
 	build ci runtime fullbuild lock-refresh \
-	schema-validate schema-generate
+	schema-validate schema-generate schema-drift-check
 
 help:
 	@echo "bess-ems Makefile (RM-M1-21)"
@@ -118,6 +118,14 @@ schema-generate:
 	sed -i 's/| Generated: [0-9TZ:.\-]*$$/| Generated: <stripped — see Makefile schema-generate>/' $(GENERATED_SQL)
 	rm -f $(GENERATED_SQL:.sql=.report.yaml)
 
+# Drift gate (RM-M2-MIG-02): re-generate the SQL from YAML and fail
+# if the result differs from what's committed. Wired into `make ci`
+# so a direct edit of 0001_initial.sql without an echoing YAML
+# update never reaches main.
+schema-drift-check: schema-generate
+	@git diff --exit-code -- $(GENERATED_SQL) \
+		|| (echo "[drift] schema/schema.yaml and $(GENERATED_SQL) have drifted — re-run 'make schema-generate' and commit, or fix the YAML" >&2; exit 1)
+
 # --- Welle 1 (active) ------------------------------------------------------
 
 lint:
@@ -197,8 +205,9 @@ test-container: runtime
 # bricht der Lauf hier ab. Container-Smoke gehört zu `runtime`/`fullbuild`.
 ci: lint arch-check test test-safety coverage-gate \
     simulator-lint simulator-test simulator-race simulator-coverage-gate \
+    schema-validate schema-drift-check \
     test-integration
-	@echo "[ci] M1 mandatory gates green: lint, arch-check, test, test-safety, coverage-gate, simulator-{lint,test,race,coverage-gate}, test-integration"
+	@echo "[ci] M1 mandatory gates green: lint, arch-check, test, test-safety, coverage-gate, simulator-{lint,test,race,coverage-gate}, schema-{validate,drift-check}, test-integration"
 
 # Fresh-clone-naher Komplettlauf: alle CI-Gates plus Runtime-Image und
 # Compose-Smoke. Letzte Stufe vor einem M1-Tag (RM-M1-20).

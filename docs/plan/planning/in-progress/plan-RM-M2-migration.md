@@ -177,30 +177,32 @@ MySQL/SQLite) erzeugt. bess-ems integriert es wie folgt:
 
 | Risiko                                                          | Mitigation                                                                                                  |
 | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Migration `0001_initial.sql` weicht vom heutigen Bootstrap-Stand ab | Temporärer Snapshot-Test in MIG-03: leere DB durch beide Wege → `pg_dump --schema-only`-Diff muss nach Ausschluss/Normalisierung der Journal-Tabelle `__schema_versions` leer sein; Test wird beim Initializer-Removal in MIG-05 ersetzt/entfernt. |
+| Migration `0001_initial.sql` weicht vom heutigen Bootstrap-Stand ab | **Erledigt:** MIG-03 hat den Snapshot-Test geliefert (information_schema-Diff M1-Initializer vs. 0001), bei MIG-05 mit dem Initializer-Removal entfernt. Die laufende Absicherung übernimmt seither `BessDbMigratorIntegrationTests.MigrateAsync_applies_0001_and_records_in_journal`. |
 | Multi-Replica-Boot-Race auf der Tracking-Tabelle                  | MIG-04 erzwingt `pg_advisory_lock` im Migrator und testet zwei parallele `MigrateAsync`-Aufrufe gegen dieselbe DB. |
-| Embedded-Resource-Pfad falsch — Migrationen werden zur Laufzeit nicht gefunden oder Drafts werden versehentlich angewendet | Test in MIG-04 listet die geladenen Migrations-Files explizit auf, vergleicht mit dem `src/adapters/driven/BatteryEms.Adapters.Persistence/Migrations/RunOnce/`-Disk-Stand und stellt sicher, dass `src/adapters/driven/BatteryEms.Adapters.Persistence/Migrations/Drafts/` nicht eingebettet ist. |
+| Embedded-Resource-Pfad falsch — Migrationen werden zur Laufzeit nicht gefunden oder Drafts werden versehentlich angewendet | `MigrationResourceSetTests` (MIG-06) listet das Manifest des Adapter-Assemblys, verlangt mindestens `0001_initial.sql` unter `Migrations/RunOnce/` und schließt jegliche Resource unter `Migrations/Drafts/` aus — fängt eine versehentliche `<EmbeddedResource Include="…/Drafts/…"/>`-Zeile vor dem Datenbank-Apply. |
 | Versionslücke oder doppelte Migrationsnummer läuft bei DbUp alphabetisch trotzdem weiter | Preflight in `BessDbMigrator` validiert `000N`-Kontinuität vor DbUp; MIG-04 testet fehlende `0001`, Lücke `0001`/`0003` und doppelte Nummern. |
 | Bestehende Integrationstests brechen, weil `TruncateAll` jetzt auch `__schema_versions` antastet | `TruncateAllAsync` in `PersistenceRoundtripTests` auf Domain-Tabellen einschränken; Tracking-Tabelle bleibt unberührt. |
 | d-migrate kann die heutige DDL nicht vollständig abbilden oder CLI-Kommandos weichen von der Annahme ab | MIG-01/02 enthalten ein explizites Tool-Verifikations-Gate: Image pullbar/digest-pinnbar, Commands vorhanden, Mini-Schema deckt FK-Cascade, CHECK, Index, `TIMESTAMPTZ`, `BIGSERIAL`, UUID ab. Scheitert das Gate, fällt die ADR auf Hand-SQL + DbUp zurück. |
-| `schema.yaml` und committeter `0001_initial.sql` driften, weil ein Entwickler die SQL-Datei direkt editiert ohne YAML-Update | `make schema-generate`-Drift-Check als CI-Gate: nach Re-Generation muss der git-Diff leer sein, sonst schlägt CI fehl. |
+| `schema.yaml` und committeter `0001_initial.sql` driften, weil ein Entwickler die SQL-Datei direkt editiert ohne YAML-Update | `make schema-drift-check` (verdrahtet in `make ci`): re-generiert das SQL aus dem YAML und ruft `git diff --exit-code` gegen den committeten Stand — direkter Edit ohne YAML-Update bricht den CI-Lauf mit einer aktionablen Fehlermeldung. |
 | d-migrate-Image-Tag schweigend bewegt sich (Mutable-Tag) und erzeugt anderes DDL beim nächsten Build | Image per Digest pinnen (`@sha256:...`) statt nur Version-Tag, parallel zum NuGet-Lock-File-Discipline. ADR-Entscheidung in MIG-01. |
 
-**Reihenfolge:**
+**Reihenfolge (umgesetzt):**
 
-1. MIG-01 (ADR) ist Voraussetzung für alles weitere — die Tooling-Entscheidung treibt die Library-Wahl in MIG-02.
-2. MIG-02 + MIG-03 können parallel: Setup baut nichts vom Inhalt, Snapshot baut nichts vom Setup.
-3. MIG-04 + MIG-05 sequentiell: erst Tests grün, dann Cut-Over.
-4. MIG-06 bleibt ein nicht eingebetteter Draft; die echte `0002` entsteht
-   erst, wenn OPEN-05 als M3-Item aktiviert wird.
+1. MIG-01 (ADR) zuerst — die Tooling-Entscheidung trieb die Library-Wahl in MIG-02.
+2. MIG-02 + MIG-03 nacheinander geliefert (Setup-Skeleton erst, dann Inhalt via reverse-engineering).
+3. MIG-04 + MIG-05 sequentiell: erst Tests grün, dann Cut-Over auf den Migrator inkl. Löschung von `BessDbInitializer` + `BessDbSchema`.
+4. MIG-06 als nicht eingebetteter Draft + Manifest-Resource-Gate; die echte `0002_*.sql` entsteht erst, wenn OPEN-05 als M3-Item aktiviert wird.
 
 ---
 
-## Aktivierungs-Trigger (wann zieht der Plan nach `in-progress/`?)
+## Aktivierungs-Trigger (gezündet)
 
-Sobald **eines** dieser Ereignisse eintritt:
-
-1. **RM-M2-OP-OPEN-05** wird als M3-Item geöffnet (Schedules-Tabelle braucht `UNIQUE (asset_id, type, version)`)
-2. **RM-M2-OP-OPEN-06** wird konkretisiert und braucht eine Hilfstabelle für Lock-Table-Metrics
-3. **Multi-Replica-Deployment** kommt aufs Reissbrett (Boot-Race auf `CREATE TABLE IF NOT EXISTS` wird relevant)
-4. Die **erste echte Schema-Änderung** in einer existierenden Tabelle (Spalte umbenannt, Typ geändert, Index hinzugefügt) wird gefordert
+Der Plan ist nicht spekulativ in `in-progress/` gerutscht — er wurde
+proaktiv gezogen, weil der Migrationspfad als Vorbedingung für die
+M3-Folgepakete OP-OPEN-05/06 verlangt war und der Multi-Replica-
+Boot-Race jetzt sauber adressiert sein soll, bevor die erste echte
+Schema-Änderung anliegt. Die ursprünglich vorgesehenen Trigger
+(M3-Aktivierung von OP-OPEN-05/06, Multi-Replica-Deployment, erste
+echte Schema-Änderung) bleiben damit für nachfolgende Migrationen
+relevant — der Tooling-Pfad ist jetzt vorhanden, sodass keiner
+dieser Auslöser den Migrator nochmal neu denken muss.
