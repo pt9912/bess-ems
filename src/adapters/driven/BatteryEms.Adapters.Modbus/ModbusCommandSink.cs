@@ -32,6 +32,31 @@ public sealed class ModbusCommandSink : IBatteryCommandSink
                 $"M1 simulator path supports unit_id_discovery=static with explicit static_unit_id; got '{mapping.UnitIdDiscovery}'.");
         }
 
+        // RM-M2-HIL-01 mirror of the telemetry-source guard: writes
+        // currently go through holding registers in high_low order.
+        // HIL-03 swaps word order on writable registers; until then,
+        // refuse the configuration eagerly so it cannot silently
+        // produce an off-by-one register payload.
+        foreach (var register in mapping.Registers)
+        {
+            if (!register.Writable)
+            {
+                continue;
+            }
+            if (register.RegisterTable != ModbusRegisterTables.Holding)
+            {
+                throw new NotSupportedException(
+                    $"register '{register.Name}' specifies register_table='{register.RegisterTable}'; "
+                    + "Modbus writes target holding registers — input-register writes are not a Modbus operation.");
+            }
+            if (register.WordOrder != ModbusWordOrders.HighLow)
+            {
+                throw new NotSupportedException(
+                    $"register '{register.Name}' specifies word_order='{register.WordOrder}'; "
+                    + "swapped word order on writes lands with RM-M2-HIL-03. Until then only 'high_low' is supported.");
+            }
+        }
+
         _client = client;
         _mapping = mapping;
         _asset = asset;

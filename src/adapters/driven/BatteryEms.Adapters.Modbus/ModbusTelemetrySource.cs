@@ -31,6 +31,30 @@ public sealed class ModbusTelemetrySource : IBatteryTelemetrySource
                 $"M1 simulator path supports unit_id_discovery=static with explicit static_unit_id; got '{mapping.UnitIdDiscovery}'.");
         }
 
+        // RM-M2-HIL-01: register_table is plumbed through the loader
+        // but the read path still uses ReadHoldingRegistersAsync only;
+        // HIL-02 lifts this guard once the FC04 (input register) read
+        // path lands. Same for word_order — HIL-03 wires low_high.
+        foreach (var register in mapping.Registers)
+        {
+            if (register.Writable)
+            {
+                continue;
+            }
+            if (register.RegisterTable != ModbusRegisterTables.Holding)
+            {
+                throw new NotSupportedException(
+                    $"register '{register.Name}' specifies register_table='{register.RegisterTable}'; "
+                    + "input-register reads land with RM-M2-HIL-02. Until then only 'holding' is supported.");
+            }
+            if (register.WordOrder != ModbusWordOrders.HighLow)
+            {
+                throw new NotSupportedException(
+                    $"register '{register.Name}' specifies word_order='{register.WordOrder}'; "
+                    + "swapped word order lands with RM-M2-HIL-03. Until then only 'high_low' is supported.");
+            }
+        }
+
         _client = client;
         _mapping = mapping;
         _options = options;

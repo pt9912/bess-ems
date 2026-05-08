@@ -39,6 +39,16 @@
           "properties": {
             "address": { "type": "integer", "minimum": 0 },
             "type": { "type": "string", "enum": ["uint16", "int16", "uint32", "int32", "float32", "string"] },
+            "register_table": {
+              "type": "string",
+              "enum": ["holding", "input"],
+              "description": "Modbus register table for reads. 'holding' (default, function code 03) keeps the M1 profile compatible; 'input' (function code 04) targets HIL-style measurement points (RM-M2-HIL-01)."
+            },
+            "word_order": {
+              "type": "string",
+              "enum": ["high_low", "low_high"],
+              "description": "Two-word ordering for 32-bit values. 'high_low' (default) matches the existing M1 decoder; 'low_high' covers HIL devices that swap the words (RM-M2-HIL-01, used by HIL-03)."
+            },
             "scale_factor": { "type": "number" },
             "range": {
               "type": "array",

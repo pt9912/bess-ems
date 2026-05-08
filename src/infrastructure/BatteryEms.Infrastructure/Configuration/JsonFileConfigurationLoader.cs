@@ -111,6 +111,8 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
                 SunspecModel: r.SunspecModel)
             {
                 DevicePoint = BuildDevicePoint(r.DisplayName, r.Unit, r.Exportable, r.Alarm, r.ValueExplanation),
+                RegisterTable = r.RegisterTable ?? ModbusRegisterTables.Holding,
+                WordOrder = r.WordOrder ?? ModbusWordOrders.HighLow,
             });
         }
 
@@ -404,7 +406,12 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
         string? Unit = null,
         bool Exportable = true,
         DevicePointAlarmDto? Alarm = null,
-        Dictionary<string, string>? ValueExplanation = null);
+        Dictionary<string, string>? ValueExplanation = null,
+        // RM-M2-HIL-01: register-table + word-order. Both default to
+        // the M1 values when absent from the JSON, so existing
+        // profiles round-trip unchanged.
+        string? RegisterTable = null,
+        string? WordOrder = null);
 
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "Instantiated by JsonSerializer via reflection.")]

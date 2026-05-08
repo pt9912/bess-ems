@@ -672,6 +672,128 @@ public sealed class JsonFileConfigurationLoaderTests
         }
     }
 
+    [Fact]
+    public void Modbus_register_without_register_table_or_word_order_defaults_to_M1_values()
+    {
+        // RM-M2-HIL-01: existing M1 profiles do not declare
+        // register_table or word_order. The loader must round-trip
+        // them as the documented defaults so the M1 simulator path
+        // and SunSpec profile keep working without a profile rewrite.
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson(
+            """
+            {
+              "profile_name": "p",
+              "unit_id_discovery": "static",
+              "static_unit_id": 1,
+              "registers": [
+                {
+                  "name": "active_power_kw",
+                  "address": 0,
+                  "type": "float32",
+                  "scale_factor": 1,
+                  "range": [-250, 250],
+                  "writable": false,
+                  "write_cadence": "cyclic",
+                  "auth_required": "none"
+                }
+              ]
+            }
+            """);
+        try
+        {
+            var mapping = loader.LoadModbusMapping(path);
+            var register = Assert.Single(mapping.Registers);
+            Assert.Equal(ModbusRegisterTables.Holding, register.RegisterTable);
+            Assert.Equal(ModbusWordOrders.HighLow, register.WordOrder);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Modbus_register_with_explicit_register_table_and_word_order_round_trips_them()
+    {
+        // RM-M2-HIL-01: HIL profiles set the new fields per register.
+        // The loader copies them into the domain configuration so
+        // downstream adapter code (HIL-02 / HIL-03) can branch on
+        // them. The schema enum keeps the values restricted.
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson(
+            """
+            {
+              "profile_name": "p",
+              "unit_id_discovery": "static",
+              "static_unit_id": 1,
+              "registers": [
+                {
+                  "name": "active_power_kw",
+                  "address": 0,
+                  "type": "float32",
+                  "register_table": "input",
+                  "word_order": "low_high",
+                  "scale_factor": 1000,
+                  "range": [-250, 250],
+                  "writable": false,
+                  "write_cadence": "cyclic",
+                  "auth_required": "none"
+                }
+              ]
+            }
+            """);
+        try
+        {
+            var mapping = loader.LoadModbusMapping(path);
+            var register = Assert.Single(mapping.Registers);
+            Assert.Equal(ModbusRegisterTables.Input, register.RegisterTable);
+            Assert.Equal(ModbusWordOrders.LowHigh, register.WordOrder);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Modbus_register_with_unknown_register_table_value_is_rejected_by_schema()
+    {
+        // RM-M2-HIL-01: schema's enum locks register_table to
+        // {holding, input}. A typo or vendor-specific value should
+        // never reach the loader's DTO mapping.
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson(
+            """
+            {
+              "profile_name": "p",
+              "unit_id_discovery": "static",
+              "static_unit_id": 1,
+              "registers": [
+                {
+                  "name": "active_power_kw",
+                  "address": 0,
+                  "type": "float32",
+                  "register_table": "discrete_input",
+                  "scale_factor": 1,
+                  "range": [-250, 250],
+                  "writable": false,
+                  "write_cadence": "cyclic",
+                  "auth_required": "none"
+                }
+              ]
+            }
+            """);
+        try
+        {
+            Assert.Throws<ConfigurationValidationException>(() => loader.LoadModbusMapping(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     private static string WriteTempJson(string content)
     {
         var path = Path.Combine(Path.GetTempPath(), $"bess-cfg-{Guid.NewGuid():N}.json");
