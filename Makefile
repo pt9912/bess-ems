@@ -23,7 +23,7 @@ DOCKER_BUILD = $(DOCKER) build $(BUILD_CONTEXT) \
 	test test-safety test-integration test-container coverage-gate \
 	simulator-test simulator-race simulator-lint simulator-coverage-gate \
 	build ci runtime fullbuild lock-refresh \
-	schema-validate schema-generate schema-snapshot-test
+	schema-validate schema-generate
 
 help:
 	@echo "bess-ems Makefile (RM-M1-21)"
@@ -59,7 +59,6 @@ help:
 	@echo "  make lock-refresh    Refresh packages.lock.json files in Docker (per docs/user/quality.md §1.4)"
 	@echo "  make schema-validate      Validate schema/schema.yaml via d-migrate (RM-M2-MIG-02)"
 	@echo "  make schema-generate      Generate ?001_initial.sql from schema/schema.yaml (RM-M2-MIG-02)"
-	@echo "  make schema-snapshot-test Diff M1 BessDbInitializer DDL vs. 0001_initial.sql (RM-M2-MIG-03)"
 	@echo ""
 	@echo "Welle 5 (Closure, active):"
 	@echo "  make build           Multi-stage runtime image (non-root, /health HEALTHCHECK)"
@@ -118,17 +117,6 @@ schema-generate:
 		--output $(GENERATED_SQL)
 	sed -i 's/| Generated: [0-9TZ:.\-]*$$/| Generated: <stripped — see Makefile schema-generate>/' $(GENERATED_SQL)
 	rm -f $(GENERATED_SQL:.sql=.report.yaml)
-
-# RM-M2-MIG-03: snapshot test that verifies the committed
-# 0001_initial.sql produces the same database schema as the M1
-# BessDbInitializer + BessDbSchema.CreateScript path. Spins up a
-# throw-away Postgres container, applies both DDLs to separate
-# databases, compares column / constraint / index metadata via
-# information_schema queries (pg_dump-level comparison would surface
-# cosmetic diffs — column order, restrict salts — without semantic
-# meaning). Override PG_IMAGE to test against postgres:17.
-schema-snapshot-test:
-	scripts/schema-snapshot-test.sh
 
 # --- Welle 1 (active) ------------------------------------------------------
 

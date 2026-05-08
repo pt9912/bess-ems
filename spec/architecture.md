@@ -626,20 +626,16 @@ Echtzeit-/Schutzanforderungen werden außerhalb des Docker-EMS abgegrenzt
 | Retention          | konfigurierbar, getrennt je Datentyp, kein Auto-Delete von Audit | LH-PERSIST-006 |
 | Persistenzfehler   | definiertes Verhalten, kein undefinierter Regelbetrieb  | LH-PERSIST-006   |
 
-Migrations-Strategie: M1 nutzt einen idempotenten `CREATE TABLE IF NOT
-EXISTS`-Initializer (`BessDbInitializer` + `BessDbSchema.CreateScript`).
-M2 wechselt mit RM-M2-MIG-02 auf einen versionierten Migrationspfad —
+Migrations-Strategie: versionierter Pfad ab M2 (RM-M2-MIG-05) —
 DDL aus einer neutralen `schema.yaml` per `d-migrate` (Build-Time)
 generiert, zur Laufzeit per `DbUp` mit Tracking-Tabelle
 `__schema_versions` angewendet. EF Core Migrations und FluentMigrator
 sind als Alternativen geprüft und in
 [`docs/plan/adr/0001-persistence-migrations.md`](../docs/plan/adr/0001-persistence-migrations.md)
-mit Begründung ausgeschlossen worden. Beide Pfade — der M1-Initializer
-wie der M2-Migrator — bleiben „idempotent beim Worker-Start
-anwendbar"; der Migrator setzt zusätzlich einen
-`pg_advisory_lock(hashtextextended('bess-ems:migrations', 0))` vor
-DbUp, sodass mehrere Repliken sicher boot-rennen können
-(RM-M2-MIG-OPEN-06).
+mit Begründung ausgeschlossen worden. `BessDbMigrator.MigrateAsync` ist
+idempotent beim Worker-Start anwendbar und setzt vor DbUp einen
+`pg_advisory_lock(hashtextextended('bess-ems:migrations', 0))`, sodass
+mehrere Repliken sicher boot-rennen können (RM-M2-MIG-OPEN-06).
 
 ---
 

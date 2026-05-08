@@ -4,6 +4,7 @@ using BatteryEms.Application.Markets;
 using BatteryEms.Application.Persistence;
 using BatteryEms.Application.Time;
 using BatteryEms.Domain;
+using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using Xunit;
 
@@ -20,6 +21,7 @@ public sealed class PersistenceRoundtripTests : IAsyncLifetime
     private static readonly string[] SocFloorViolations = { "soc_floor_violated" };
 
     private NpgsqlDataSource? _dataSource;
+    private string? _connectionString;
 
     private static string Host => Environment.GetEnvironmentVariable("POSTGRES_HOST") ?? "127.0.0.1";
     private static int Port => int.TryParse(Environment.GetEnvironmentVariable("POSTGRES_PORT"), out var p) ? p : 5432;
@@ -32,11 +34,12 @@ public sealed class PersistenceRoundtripTests : IAsyncLifetime
         await WaitForTcpAsync(Host, Port, TimeSpan.FromSeconds(30));
 
         var options = PersistenceOptions.FromHostPort(Host, Port, Database, User, Password);
-        _dataSource = NpgsqlDataSource.Create(options.ConnectionString);
+        _connectionString = options.ConnectionString;
+        _dataSource = NpgsqlDataSource.Create(_connectionString);
 
-#pragma warning disable CS0618 // RM-M2-MIG-05 cuts these calls over to BessDbMigrator.
-        await new BessDbInitializer(_dataSource).InitializeAsync(CancellationToken.None);
-#pragma warning restore CS0618
+        await new BessDbMigrator(
+            _dataSource, _connectionString, NullLogger<BessDbMigrator>.Instance)
+            .MigrateAsync(CancellationToken.None);
 
         // Each test class run starts from a clean slate so assertions on
         // counts/last-row are stable when the compose stack is reused.
@@ -385,16 +388,17 @@ public sealed class PersistenceRoundtripTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Initializer_is_idempotent_on_re_application()
+    public async Task Migrator_preserves_existing_data_on_re_application()
     {
-        // Calling InitializeAsync twice must not throw and must not break
-        // existing data — IF NOT EXISTS DDL is the contract.
+        // A second MigrateAsync call must not break existing data —
+        // DbUp's __schema_versions journal sees the script already
+        // ran and skips re-execution.
         var ev = new AuditEvent(Now, "operator-1", "first-run", "single-bess-1", "boot", "ok");
         await new DapperOperatorAuditLog(_dataSource!).AppendAsync(ev, CancellationToken.None);
 
-#pragma warning disable CS0618 // RM-M2-MIG-05 cuts this idempotency-test over to BessDbMigrator.
-        await new BessDbInitializer(_dataSource!).InitializeAsync(CancellationToken.None);
-#pragma warning restore CS0618
+        await new BessDbMigrator(
+            _dataSource!, _connectionString!, NullLogger<BessDbMigrator>.Instance)
+            .MigrateAsync(CancellationToken.None);
 
         var afterReinit = await new DapperOperatorAuditLog(_dataSource!).QueryAsync(
             Now - TimeSpan.FromMinutes(1),

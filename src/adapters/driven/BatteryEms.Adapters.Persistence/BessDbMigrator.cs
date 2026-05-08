@@ -8,10 +8,10 @@ using Npgsql;
 
 namespace BatteryEms.Adapters.Persistence;
 
-// RM-M2-MIG-02: versioned-migrations runner. Replaces BessDbInitializer.
-// Loads the SQL files embedded as Migrations/RunOnce/????_*.sql, applies
-// them in order against the configured Postgres database, and tracks
-// applied versions in __schema_versions (per RM-M2-MIG-OPEN-03).
+// RM-M2-MIG-02: versioned-migrations runner. Loads the SQL files
+// embedded as Migrations/RunOnce/????_*.sql, applies them in order
+// against the configured Postgres database, and tracks applied
+// versions in __schema_versions (per RM-M2-MIG-OPEN-03).
 //
 // Two safety properties beyond DbUp's defaults (RM-M2-MIG-04):
 //   1. Numeric-continuity preflight. DbUp sorts scripts alphabetically
@@ -28,9 +28,6 @@ namespace BatteryEms.Adapters.Persistence;
 //      sentinel resource. Cancellation aborts the wait but never
 //      leaks an already-held lock.
 //
-// API matches the original BessDbInitializer for a drop-in cut-over in
-// MIG-05: same constructor signature, async MigrateAsync(CancellationToken)
-// shape, no return value.
 public sealed partial class BessDbMigrator
 {
     // ADR 0001 §2 + RM-M2-MIG-OPEN-06: a fixed string-derived key so

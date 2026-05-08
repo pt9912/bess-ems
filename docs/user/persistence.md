@@ -134,7 +134,7 @@ mit aggressiveren Werten), dann den Worker neu anlaufen lassen.
 
 ### Initialisierungsfehler
 
-`BessDbInitializer.InitializeAsync` läuft beim Worker-Start (RM-M1-19).
+`BessDbMigrator.MigrateAsync` läuft beim Worker-Start (RM-M2-MIG-05).
 Schlägt der Aufruf fehl, **darf der Regelbetrieb nicht starten** — das
 ist Architektur-§11 + LH-CONF-003. Die Composition-Root-Wiring (RM-M1-19)
 muss diesen Fehler explizit behandeln.

@@ -59,8 +59,8 @@ public sealed class BessDbMigratorIntegrationTests : IAsyncLifetime
 
         await migrator.MigrateAsync(CancellationToken.None);
 
-        // The 0001 migration creates the bess-ems schema; assert via a
-        // sentinel table from BessDbSchema that DbUp actually executed.
+        // The 0001 migration creates the bess-ems schema; assert via
+        // the telemetry sentinel table that DbUp actually executed.
         Assert.True(await TableExistsAsync(_dataSource!, "telemetry"));
 
         // DbUp records each applied script in __schema_versions; the
