@@ -18,9 +18,9 @@ public static class RegisterDecoder
         {
             "uint16" => (double)words[0],
             "int16" => (short)words[0],
-            "uint32" => Combine32(words),
-            "int32" => unchecked((int)Combine32(words)),
-            "float32" => DecodeFloat32(words),
+            "uint32" => Combine32(words, mapping.WordOrder),
+            "int32" => unchecked((int)Combine32(words, mapping.WordOrder)),
+            "float32" => DecodeFloat32(words, mapping.WordOrder),
             _ => throw new NotSupportedException($"Unsupported register type '{mapping.Type}'."),
         };
         return raw * mapping.ScaleFactor;
@@ -34,22 +34,37 @@ public static class RegisterDecoder
         {
             "uint16" => new[] { (ushort)scaled },
             "int16" => new[] { unchecked((ushort)(short)scaled) },
-            "uint32" => Split32((uint)scaled),
-            "int32" => Split32(unchecked((uint)(int)scaled)),
-            "float32" => SplitFloat32((float)scaled),
+            "uint32" => Split32((uint)scaled, mapping.WordOrder),
+            "int32" => Split32(unchecked((uint)(int)scaled), mapping.WordOrder),
+            "float32" => SplitFloat32((float)scaled, mapping.WordOrder),
             _ => throw new NotSupportedException($"Unsupported register type '{mapping.Type}'."),
         };
     }
 
-    private static uint Combine32(ReadOnlySpan<ushort> words) =>
-        ((uint)words[0] << 16) | words[1];
+    // RM-M2-HIL-03: high_low places the most-significant 16-bit word
+    // first on the wire (M1 default, matches Big-Endian Modbus
+    // convention); low_high places the least-significant word first
+    // (HIL devices that swap halves on float32 / int32 transmission).
+    // The unsupported branch keeps the switch exhaustive — programmatic
+    // construction of an unknown WordOrder fails fast rather than
+    // silently picking either side.
+    private static uint Combine32(ReadOnlySpan<ushort> words, string wordOrder) => wordOrder switch
+    {
+        ModbusWordOrders.HighLow => ((uint)words[0] << 16) | words[1],
+        ModbusWordOrders.LowHigh => ((uint)words[1] << 16) | words[0],
+        _ => throw new NotSupportedException($"Unsupported word_order '{wordOrder}'."),
+    };
 
-    private static float DecodeFloat32(ReadOnlySpan<ushort> words) =>
-        BitConverter.UInt32BitsToSingle(Combine32(words));
+    private static float DecodeFloat32(ReadOnlySpan<ushort> words, string wordOrder) =>
+        BitConverter.UInt32BitsToSingle(Combine32(words, wordOrder));
 
-    private static ushort[] Split32(uint value) =>
-        new[] { (ushort)(value >> 16), (ushort)(value & 0xFFFF) };
+    private static ushort[] Split32(uint value, string wordOrder) => wordOrder switch
+    {
+        ModbusWordOrders.HighLow => new[] { (ushort)(value >> 16), (ushort)(value & 0xFFFF) },
+        ModbusWordOrders.LowHigh => new[] { (ushort)(value & 0xFFFF), (ushort)(value >> 16) },
+        _ => throw new NotSupportedException($"Unsupported word_order '{wordOrder}'."),
+    };
 
-    private static ushort[] SplitFloat32(float value) =>
-        Split32(BitConverter.SingleToUInt32Bits(value));
+    private static ushort[] SplitFloat32(float value, string wordOrder) =>
+        Split32(BitConverter.SingleToUInt32Bits(value), wordOrder);
 }

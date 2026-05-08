@@ -31,12 +31,11 @@ public sealed class ModbusTelemetrySource : IBatteryTelemetrySource
                 $"M1 simulator path supports unit_id_discovery=static with explicit static_unit_id; got '{mapping.UnitIdDiscovery}'.");
         }
 
-        // RM-M2-HIL-02: read path now branches on register_table
+        // RM-M2-HIL-02: read path branches on register_table
         // (Holding → FC03, Input → FC04). The schema already restricts
         // the JSON value to {holding, input}, but programmatic
         // construction (test fixtures) can hand in anything; the
-        // explicit reject keeps the read-path if/else total. word_order
-        // =low_high stays gated until HIL-03 wires the swapped decoder.
+        // explicit reject keeps the read-path if/else total.
         foreach (var register in mapping.Registers)
         {
             if (register.Writable)
@@ -49,12 +48,6 @@ public sealed class ModbusTelemetrySource : IBatteryTelemetrySource
                 throw new NotSupportedException(
                     $"register '{register.Name}' specifies register_table='{register.RegisterTable}'; "
                     + $"only '{ModbusRegisterTables.Holding}' and '{ModbusRegisterTables.Input}' are supported.");
-            }
-            if (register.WordOrder != ModbusWordOrders.HighLow)
-            {
-                throw new NotSupportedException(
-                    $"register '{register.Name}' specifies word_order='{register.WordOrder}'; "
-                    + "swapped word order lands with RM-M2-HIL-03. Until then only 'high_low' is supported.");
             }
         }
 

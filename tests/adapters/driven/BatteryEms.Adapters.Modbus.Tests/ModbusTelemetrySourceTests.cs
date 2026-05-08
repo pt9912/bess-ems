@@ -213,29 +213,4 @@ public sealed class ModbusTelemetrySourceTests
                 new FakeModbusClient(), mapping, ModbusFixtures.Defaults(), new ModbusFixtures.FixedClock()));
     }
 
-    [Fact]
-    public void Constructor_rejects_low_high_word_order_until_HIL_03_lands()
-    {
-        // RM-M2-HIL-01: word_order=low_high decoder support lands in
-        // HIL-03; until then, accepting it would produce silently
-        // mis-decoded 32-bit values.
-        var mapping = new ModbusMappingConfiguration(
-            ProfileName: "p",
-            UnitIdDiscovery: "static",
-            StaticUnitId: 1,
-            Registers: new List<ModbusRegisterMapping>
-            {
-                new ModbusRegisterMapping(
-                    "active_power_kw", 0, "float32", 1, -100, 100,
-                    false, "cyclic", "none", null, null, null)
-                {
-                    WordOrder = ModbusWordOrders.LowHigh,
-                },
-            });
-
-        var ex = Assert.Throws<NotSupportedException>(() =>
-            new ModbusTelemetrySource(
-                new FakeModbusClient(), mapping, ModbusFixtures.Defaults(), new ModbusFixtures.FixedClock()));
-        Assert.Contains("RM-M2-HIL-03", ex.Message, StringComparison.Ordinal);
-    }
 }
