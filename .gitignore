@@ -31,3 +31,10 @@ Thumbs.db
 .env
 .env.local
 *.local.json
+
+# RM-M2-MIG-02/03: d-migrate companion artefacts. The .sql files
+# under Migrations/RunOnce/ are committed (they're the migration
+# payload); the .report.yaml siblings are transient and contain
+# generation timestamps, so they are regenerated on every
+# `make schema-generate` and never tracked.
+src/adapters/driven/BatteryEms.Adapters.Persistence/Migrations/**/*.report.yaml

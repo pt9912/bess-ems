@@ -1,0 +1,304 @@
+# bess-ems persistence schema — kanonische Quelle für die
+# versionierten DDL-Migrationen unter
+# src/adapters/driven/BatteryEms.Adapters.Persistence/Migrations/RunOnce/.
+#
+# Initial befüllt per `d-migrate schema reverse` aus einer leeren
+# Postgres-Instanz, die mit BessDbSchema.CreateScript initialisiert
+# wurde (RM-M2-MIG-03). Die Hand-Pflege betrifft Punkte, die
+# d-migrate beim Reverse aktuell nicht 1:1 erfasst:
+#   - composite primary keys, bei denen ein zusätzlicher composite
+#     UNIQUE-Constraint existiert (optimization_objective_breakdowns)
+#   - composite UNIQUE-Constraints generell
+#   - explizite `required: true` für PK-Spalten (technisch redundant,
+#     weil PK NOT NULL impliziert; hier explizit belassen für lesbare
+#     YAML)
+#
+# Re-generieren via `make schema-generate`; ein Drift gegen das
+# committete 0001_initial.sql ist ein Build-Fehler (CI-Gate).
+schema_format: 1.0
+name: bess-ems
+version: 1.0.0
+tables:
+  audit_events:
+    columns:
+      action:
+        type: text
+        required: true
+      id:
+        type: biginteger
+        generation:
+          type: identity
+          mode: by_default
+          sequence_name: public.audit_events_id_seq
+          legacy_serial_syntax: true
+      operator_id:
+        type: text
+        required: true
+      outcome:
+        type: text
+        required: true
+      reason:
+        type: text
+        required: true
+      recorded_at:
+        type: datetime
+        timezone: true
+        required: true
+      target_asset_id:
+        type: text
+    primary_key:
+    - id
+    indices:
+    - name: idx_audit_recorded_at
+      columns:
+      - name: recorded_at
+        direction: desc
+  commands:
+    columns:
+      active_power_kw:
+        type: float
+        required: true
+      asset_id:
+        type: text
+        required: true
+      command_id:
+        type: text
+      dispatch_reason:
+        type: text
+        required: true
+      dispatch_success:
+        type: boolean
+        required: true
+      dispatched_at:
+        type: datetime
+        timezone: true
+        required: true
+      issued_at:
+        type: datetime
+        timezone: true
+        required: true
+      mode:
+        type: text
+        required: true
+      reactive_power_kvar:
+        type: float
+      reason:
+        type: text
+        required: true
+      source:
+        type: text
+        required: true
+      valid_until:
+        type: datetime
+        timezone: true
+        required: true
+    primary_key:
+    - command_id
+    indices:
+    - name: idx_commands_asset_issued_at
+      columns:
+      - asset_id
+      - name: issued_at
+        direction: desc
+  optimization_objective_breakdowns:
+    columns:
+      name:
+        type: text
+        required: true
+      position:
+        type: integer
+        required: true
+      run_id:
+        type: uuid
+        required: true
+      unit:
+        type: text
+        required: true
+      value:
+        type: float
+        required: true
+    primary_key:
+    - run_id
+    - name
+    constraints:
+    # Explicit FK name matches the implicit Postgres-auto-name from the
+    # M1 BessDbSchema.CreateScript so the MIG-03 pg_dump snapshot
+    # diffs cleanly. The inline column-level `references:` form would
+    # default to `fk_<table>_<column>`, breaking that match.
+    - name: optimization_objective_breakdowns_run_id_fkey
+      type: foreign_key
+      columns: [run_id]
+      references:
+        table: optimization_runs
+        columns: [run_id]
+        on_delete: cascade
+    - name: optimization_objective_breakdowns_run_id_position_key
+      type: unique
+      columns: [run_id, position]
+  optimization_runs:
+    columns:
+      asset_id:
+        type: text
+        required: true
+      constraint_violations_json:
+        type: text
+        required: true
+        default: "[]"
+      created_at:
+        type: datetime
+        timezone: true
+        required: true
+      horizon_end:
+        type: datetime
+        timezone: true
+        required: true
+      horizon_start:
+        type: datetime
+        timezone: true
+        required: true
+      inputs_json:
+        type: text
+        required: true
+        default: "[]"
+      objective_value:
+        type: float
+        required: true
+      produced_schedule_asset_id:
+        type: text
+      produced_schedule_type:
+        type: text
+      produced_schedule_version:
+        type: integer
+      run_id:
+        type: uuid
+      solver_name:
+        type: text
+        required: true
+      solver_runtime_seconds:
+        type: float
+        required: true
+      status:
+        type: text
+        required: true
+      termination_reason:
+        type: text
+        max_length: 256
+        required: true
+      time_step_seconds:
+        type: float
+        required: true
+      warnings_json:
+        type: text
+        required: true
+        default: "[]"
+    primary_key:
+    - run_id
+    indices:
+    - name: idx_optimization_runs_asset_created_at
+      columns:
+      - asset_id
+      - created_at
+  schedule_windows:
+    columns:
+      asset_id:
+        type: text
+      target_power_kw:
+        type: float
+        required: true
+      type:
+        type: text
+      window_end:
+        type: datetime
+        timezone: true
+        required: true
+      window_start:
+        type: datetime
+        timezone: true
+    primary_key:
+    - asset_id
+    - type
+    - window_start
+    constraints:
+    - name: schedule_windows_asset_id_type_fkey
+      type: foreign_key
+      columns:
+      - asset_id
+      - type
+      references:
+        table: schedules
+        columns:
+        - asset_id
+        - type
+        on_delete: cascade
+  schedules:
+    columns:
+      asset_id:
+        type: text
+      market_bid_area:
+        type: text
+        required: true
+      type:
+        type: text
+      version:
+        type: integer
+        required: true
+    primary_key:
+    - asset_id
+    - type
+  telemetry:
+    columns:
+      active_power_kw:
+        type: float
+        required: true
+      asset_id:
+        type: text
+        required: true
+      available:
+        type: boolean
+        required: true
+      data_quality_reason:
+        type: text
+        required: true
+      data_quality_state:
+        type: text
+        required: true
+      dc_current:
+        type: float
+        required: true
+      dc_voltage:
+        type: float
+        required: true
+      fault_status:
+        type: text
+        required: true
+      id:
+        type: biginteger
+        generation:
+          type: identity
+          mode: by_default
+          sequence_name: public.telemetry_id_seq
+          legacy_serial_syntax: true
+      reactive_power_kvar:
+        type: float
+        required: true
+      recorded_at:
+        type: datetime
+        timezone: true
+        required: true
+      soc_percent:
+        type: float
+        required: true
+      soh_percent:
+        type: float
+        required: true
+      temperature_celsius:
+        type: float
+        required: true
+    primary_key:
+    - id
+    indices:
+    - name: idx_telemetry_asset_recorded_at
+      columns:
+      - asset_id
+      - name: recorded_at
+        direction: desc

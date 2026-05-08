@@ -23,7 +23,7 @@ DOCKER_BUILD = $(DOCKER) build $(BUILD_CONTEXT) \
 	test test-safety test-integration test-container coverage-gate \
 	simulator-test simulator-race simulator-lint simulator-coverage-gate \
 	build ci runtime fullbuild lock-refresh \
-	schema-validate schema-generate
+	schema-validate schema-generate schema-snapshot-test
 
 help:
 	@echo "bess-ems Makefile (RM-M1-21)"
@@ -57,8 +57,9 @@ help:
 	@echo ""
 	@echo "Maintenance:"
 	@echo "  make lock-refresh    Refresh packages.lock.json files in Docker (per docs/user/quality.md §1.4)"
-	@echo "  make schema-validate Validate schema/schema.yaml via d-migrate (RM-M2-MIG-02)"
-	@echo "  make schema-generate Generate ?001_initial.sql from schema/schema.yaml (RM-M2-MIG-02)"
+	@echo "  make schema-validate      Validate schema/schema.yaml via d-migrate (RM-M2-MIG-02)"
+	@echo "  make schema-generate      Generate ?001_initial.sql from schema/schema.yaml (RM-M2-MIG-02)"
+	@echo "  make schema-snapshot-test Diff M1 BessDbInitializer DDL vs. 0001_initial.sql (RM-M2-MIG-03)"
 	@echo ""
 	@echo "Welle 5 (Closure, active):"
 	@echo "  make build           Multi-stage runtime image (non-root, /health HEALTHCHECK)"
@@ -102,12 +103,32 @@ schema-validate:
 # checkout MUST produce a zero-diff git status for the schema file —
 # any drift between the YAML source and the committed SQL is a
 # build error (drift-check gate, runs on PRs that touch the schema).
+#
+# The post-generation sed strips two non-deterministic outputs that
+# would otherwise break the zero-diff promise: (1) the `Generated:
+# <timestamp>` line that d-migrate writes into every header; (2) the
+# `*.report.yaml` companion file (also timestamp-bearing) which is
+# .gitignore'd anyway but removed here so a stray un-ignored copy
+# can't leak into a commit.
 schema-generate:
 	$(DOCKER) run --rm -v "$$(pwd)":/work -w /work $(D_MIGRATE_IMAGE) \
 		schema generate \
 		--source $(SCHEMA_SOURCE) \
 		--target postgresql \
 		--output $(GENERATED_SQL)
+	sed -i 's/| Generated: [0-9TZ:.\-]*$$/| Generated: <stripped — see Makefile schema-generate>/' $(GENERATED_SQL)
+	rm -f $(GENERATED_SQL:.sql=.report.yaml)
+
+# RM-M2-MIG-03: snapshot test that verifies the committed
+# 0001_initial.sql produces the same database schema as the M1
+# BessDbInitializer + BessDbSchema.CreateScript path. Spins up a
+# throw-away Postgres container, applies both DDLs to separate
+# databases, compares column / constraint / index metadata via
+# information_schema queries (pg_dump-level comparison would surface
+# cosmetic diffs — column order, restrict salts — without semantic
+# meaning). Override PG_IMAGE to test against postgres:17.
+schema-snapshot-test:
+	scripts/schema-snapshot-test.sh
 
 # --- Welle 1 (active) ------------------------------------------------------
 
