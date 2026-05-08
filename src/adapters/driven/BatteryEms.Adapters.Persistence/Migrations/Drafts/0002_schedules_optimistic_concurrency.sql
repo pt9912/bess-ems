@@ -1,0 +1,21 @@
+-- DRAFT — not embedded into the assembly (csproj declares
+-- Migrations/Drafts/**/*.sql as Build-Action None; only
+-- Migrations/RunOnce/????_*.sql ships through DbUp).
+--
+-- Activation trigger: RM-M2-OP-OPEN-05 (`IScheduleRepository.Replace`
+-- needs optimistic-concurrency for multi-replica deployments). When
+-- OPEN-05 is pulled into M3, the file moves from Drafts/ to
+-- RunOnce/, the schema.yaml is updated to match (M3 review decides
+-- whether the constraint below stays — it is logically implied by
+-- the PK in the current single-row-per-(asset,type) model and may
+-- be omitted at activation), and `make schema-generate` regenerates
+-- the SQL from YAML to keep the YAML→SQL drift-check honest.
+--
+-- This draft body therefore demonstrates the workflow only; the
+-- DbUp pipeline never reads it.
+
+-- BEGIN;
+-- ALTER TABLE "schedules"
+--     ADD CONSTRAINT "schedules_asset_id_type_version_key"
+--     UNIQUE ("asset_id", "type", "version");
+-- COMMIT;
