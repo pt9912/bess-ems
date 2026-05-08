@@ -87,7 +87,7 @@ lock-refresh:
 # release lands on ghcr.io/pt9912/d-migrate, override is set to
 # `ghcr.io/pt9912/d-migrate:<version>@sha256:<digest>` (parallel to
 # the NuGet lock-file discipline in docs/user/quality.md §1.4).
-D_MIGRATE_IMAGE ?= d-migrate:dev
+D_MIGRATE_IMAGE ?= ghcr.io/pt9912/d-migrate:0.9.6@sha256:e4ad469ea9bdd6a2d6138a2ba68096581273d3b64198d9b79fe96376ba3c1940
 SCHEMA_DIR := schema
 SCHEMA_SOURCE := $(SCHEMA_DIR)/schema.yaml
 GENERATED_SQL := src/adapters/driven/BatteryEms.Adapters.Persistence/Migrations/RunOnce/0001_initial.sql
