@@ -42,7 +42,7 @@ services:
       mosquitto:
         condition: service_healthy
       bess-hil-simulator:
-        condition: service_started
+        condition: service_healthy
     environment:
       ASPNETCORE_URLS: http://0.0.0.0:8080
       ASPNETCORE_ENVIRONMENT: Production
@@ -108,6 +108,15 @@ services:
       # CSV-Logs des Simulators landen in einem benannten Volume
       # (gleiche Namensgebung wie der HIL-Test-Stack).
       - hil-csv:/data
+    healthcheck:
+      # Modbus-TCP-Listener bereit-Probe. /dev/tcp ist ein Bash-
+      # Built-in; das Simulator-Image basiert auf
+      # mcr.microsoft.com/dotnet/runtime:8.0 (Debian) und hat bash.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/502"]
+      interval: 2s
+      timeout: 1s
+      retries: 15
+      start_period: 5s
     networks: [bessnet]
 
 volumes:

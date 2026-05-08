@@ -13,6 +13,15 @@ services:
       # das ./csv überdauert (HIL-OPEN-04: nur optional fürs
       # Debugging persistiert; Assertions laufen über Modbus).
       - hil-csv:/data
+    healthcheck:
+      # Modbus-TCP-Listener bereit-Probe. `bash`-Trick statt nc/curl,
+      # weil das Image weder netcat noch curl mitbringt; /dev/tcp
+      # ist ein Bash-Built-in.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/502"]
+      interval: 2s
+      timeout: 1s
+      retries: 15
+      start_period: 5s
     networks: [hilnet]
 
   hil-test-runner:
@@ -21,7 +30,7 @@ services:
       dockerfile: tests/hil/Dockerfile
     depends_on:
       bess-hil-simulator:
-        condition: service_started
+        condition: service_healthy
     environment:
       - MODBUS_HOST=bess-hil-simulator
       - MODBUS_PORT=502

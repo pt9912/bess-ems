@@ -1,14 +1,14 @@
 # Note: RM-M2-Folgewellen-Carveouts (Pre-Push-Review)
 
 **Dokumenttyp:** Notiz / Follow-up-Liste
-**Status:** Offen — Punkte aus dem Pre-Push-Review der M2-Folgewellen
-RM-M2-MIG (Persistence-Migrations) und RM-M2-HIL (HIL-Simulator),
-die der Reviewer als nicht-blockend für den Push klassifiziert
-hat. Pflegen, abhaken oder beim nächsten passenden Slice
-mitnehmen.
+**Status:** In Arbeit — Punkte aus dem Pre-Push-Review der
+M2-Folgewellen RM-M2-MIG (Persistence-Migrations) und RM-M2-HIL
+(HIL-Simulator), die der Reviewer als nicht-blockend für den Push
+klassifiziert hat. Wird der unten empfohlenen Reihenfolge nach
+abgearbeitet.
 **Bezug:** [`../done/plan-RM-M2-migration.md`](../done/plan-RM-M2-migration.md),
 [`../done/HIL-simulator.md`](../done/HIL-simulator.md),
-[`../in-progress/roadmap.md`](../in-progress/roadmap.md)
+[`roadmap.md`](roadmap.md)
 
 ---
 
@@ -76,14 +76,14 @@ mitnehmen.
 
 ## Operational Readiness
 
-- [ ] **Mn3 — `bess-hil-simulator` Service hat keinen Healthcheck.**
+- [x] **Mn3 — `bess-hil-simulator` Service hat keinen Healthcheck.** ✅
   Dateien: `tests/hil/compose.yml`, `deploy/compose.hil.yml`.
-  `condition: service_started` lässt den Sidecar als „up" gelten,
-  bevor der Modbus-TCP-Listener bereit ist; `bess-ems` rennt beim
-  ersten Cycle in ein ECONNREFUSED-Rauschen.
-  *Aufwand:* ~5 Zeilen pro Compose-Datei — TCP-Probe (`nc -z
-  localhost 502`) als healthcheck, abhängiger Service auf
-  `condition: service_healthy` umstellen.
+  Beide Compose-Dateien: TCP-Probe via Bash-Built-in
+  `exec 3<>/dev/tcp/localhost/502` als healthcheck (interval 2s,
+  retries 15, start_period 5s) — kein `nc`/`curl` im Simulator-
+  Image nötig. Abhängige Services auf `condition: service_healthy`
+  umgestellt. Smoke-getestet: `Health: healthy` reproduzierbar,
+  `make test-hil-modbus` weiter grün.
 
 ---
 
