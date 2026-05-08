@@ -1,0 +1,113 @@
+# RM-M2-HIL: dev/demo full-simulation stack — bess-ems against the
+# external bess-hil-simulator instead of the deterministic Go
+# field-simulator from compose.yml.
+#
+# Use this when the goal is end-to-end PCS-dynamic behaviour
+# (Modbus setpoint → physics step → measured power roundtrip)
+# rather than the M1-Pflichtgate fixtures. Production-shaped
+# defaults still apply (token, asset, Postgres credentials are M1
+# stand-ins; override via env / secrets).
+#
+# Prerequisites:
+#   - bess-hil-simulator:local image built locally (sister project,
+#     HIL-OPEN-01).
+#   - bess-ems-runtime:latest image built via `make build`.
+#
+# Usage:
+#   docker compose -f deploy/compose.hil.yml up
+#
+# Differences vs deploy/compose.yml:
+#   - bess-ems gets an active Modbus wiring (HIL profile + host/port);
+#     the production compose leaves Modbus on the NoOp adapter.
+#   - Go field-sim is dropped; bess-hil-simulator carries the Modbus
+#     role on port 502.
+#   - Mosquitto stays so MQTT command-publish has a broker to talk to;
+#     no MQTT telemetry publisher is wired (HIL is Modbus-only).
+#
+# Known limitation: the HIL simulator is PCS-/grid-oriented and
+# exposes no SOC/SOH/availability registers. The control cycle
+# therefore evaluates the asset as unavailable and emits safe-stop
+# every tick — exactly the behaviour the HIL plan documents. Use
+# this stack for Modbus-adapter sanity (telemetry reads, command
+# wire format), not for a running closed-loop demo. Full
+# closed-loop control needs HIL-BESS registers or a defaulting hook
+# in the host (open M3 work).
+services:
+  bess-ems:
+    image: bess-ems-runtime:latest
+    pull_policy: never
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+      bess-hil-simulator:
+        condition: service_started
+    environment:
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      ASPNETCORE_ENVIRONMENT: Production
+      Bess__SchemaDirectory: /app/config/schema
+      Bess__AssetConfigPath: /app/config/examples/asset.single-bess.json
+      Bess__PersistenceConnectionString: Host=postgres;Port=5432;Database=bessems;Username=bessems;Password=bessems;Include Error Detail=true
+      Bess__ScheduleSolver__Backend: or_tools
+      # Active Modbus driven-adapter wiring against the HIL simulator.
+      # All three fields must be set together; the HIL profile uses
+      # input registers + low_high float32 word order and shifts
+      # wire addresses by +1 to match the simulator's NModbus
+      # DataStore convention.
+      Bess__ModbusMappingPath: /app/config/examples/adapters/modbus.hil-simulator.json
+      Bess__ModbusHost: bess-hil-simulator
+      Bess__ModbusPort: "502"
+      Bess__MqttMappingPath: /app/config/examples/adapters/mqtt.simulator.json
+      Bess__MqttBrokerHost: mosquitto
+      Bess__MqttBrokerPort: "1883"
+      Bess__MqttClientId: bess-ems-host
+      Worker__CycleInterval: "00:00:01"
+      ApiTokens__Tokens__0__Token: dev-operator-token
+      ApiTokens__Tokens__0__Operator: operator-1
+      ApiTokens__Tokens__0__Role: operator
+    ports:
+      - "8080:8080"
+    networks: [bessnet]
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: bessems
+      POSTGRES_USER: bessems
+      POSTGRES_PASSWORD: bessems
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bessems -d bessems"]
+      interval: 2s
+      timeout: 1s
+      retries: 10
+    networks: [bessnet]
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    healthcheck:
+      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-p", "1883", "-t", "healthcheck", "-m", "ping"]
+      interval: 2s
+      timeout: 1s
+      retries: 10
+    networks: [bessnet]
+
+  bess-hil-simulator:
+    image: bess-hil-simulator:local
+    pull_policy: never
+    expose:
+      - "502"
+    volumes:
+      # CSV-Logs des Simulators landen in einem benannten Volume
+      # (gleiche Namensgebung wie der HIL-Test-Stack).
+      - hil-csv:/data
+    networks: [bessnet]
+
+volumes:
+  hil-csv:
+
+networks:
+  bessnet:
+    driver: bridge
