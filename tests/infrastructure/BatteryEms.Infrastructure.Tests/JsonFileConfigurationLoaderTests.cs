@@ -757,6 +757,33 @@ public sealed class JsonFileConfigurationLoaderTests
     }
 
     [Fact]
+    public void Loads_HIL_modbus_profile_example()
+    {
+        // RM-M2-HIL-04: pin the committed example HIL profile against
+        // the loader so a future schema or DTO change can't quietly
+        // break it. Asserts the HIL-distinctive fields (input-table
+        // measurements, low_high float32 word order, MW/MVAR-to-
+        // kW/kvar scaling, and a writable holding setpoint).
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var mapping = loader.LoadModbusMapping(
+            Path.Combine(ExamplesDirectory, "adapters", "modbus.hil-simulator.json"));
+
+        Assert.Equal("bess-hil-simulator", mapping.ProfileName);
+        Assert.Equal(7, mapping.Registers.Count);
+
+        var p = mapping.Registers.First(r => r.Name == "active_power_kw");
+        Assert.Equal(ModbusRegisterTables.Input, p.RegisterTable);
+        Assert.Equal(ModbusWordOrders.LowHigh, p.WordOrder);
+        Assert.Equal("float32", p.Type);
+        Assert.Equal(1000, p.ScaleFactor);
+        Assert.False(p.Writable);
+
+        var setpoint = mapping.Registers.First(r => r.Name == "active_power_setpoint_kw");
+        Assert.Equal(ModbusRegisterTables.Holding, setpoint.RegisterTable);
+        Assert.True(setpoint.Writable);
+    }
+
+    [Fact]
     public void Modbus_register_with_unknown_register_table_value_is_rejected_by_schema()
     {
         // RM-M2-HIL-01: schema's enum locks register_table to
