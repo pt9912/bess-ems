@@ -23,4 +23,19 @@ internal interface INativeLibraryGateway
     // the loader stays free of P/Invoke plumbing and tests can
     // inject any uint without the cdecl-delegate dance.
     uint CallAbiVersion(nint handle);
+
+    // RM-M3-04: invokes battery_control_core_compute on the loaded
+    // handle. Same shape contract as CallAbiVersion — production
+    // resolves and caches the export internally; tests substitute
+    // a deterministic command without touching a .so.
+    int CallCompute(
+        nint handle,
+        in BccSnapshot snapshot,
+        in BccLimits limits,
+        in BccRequest request,
+        out BccCommand command);
+
+    // RM-M3-04: releases the handle. NativeLibrary.Free is the
+    // production wiring; tests can no-op.
+    void Free(nint handle);
 }

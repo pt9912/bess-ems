@@ -273,5 +273,28 @@ public sealed class NativeControlLoaderTests
             if (CallAbiVersionException is not null) { throw CallAbiVersionException; }
             return CallAbiVersionResult;
         }
+
+        // Loader tests never reach Compute / Free — the loader's
+        // job ends at the ABI handshake. The kernel-specific tests
+        // use a separate fake gateway in NativeControlKernelTests.
+        public int CallCompute(
+            nint handle,
+            in BccSnapshot snapshot,
+            in BccLimits limits,
+            in BccRequest request,
+            out BccCommand command)
+        {
+            command = default;
+            throw new InvalidOperationException(
+                "NativeControlLoaderTests' FakeGateway should never see a CallCompute "
+                + "(the loader does not invoke compute). Use NativeControlKernelTests' "
+                + "FakeGateway for kernel-side coverage.");
+        }
+
+        public void Free(nint handle)
+        {
+            // No-op: the loader test fixtures don't manage the handle
+            // lifetime explicitly.
+        }
     }
 }

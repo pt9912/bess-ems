@@ -9,6 +9,13 @@ namespace BatteryEms.Adapters.NativeInterop;
 internal sealed class SystemNativeLibraryGateway : INativeLibraryGateway
 {
     private const string AbiVersionExport = "battery_control_core_abi_version";
+    private const string ComputeExport    = "battery_control_core_compute";
+
+    // The cdecl delegates are cached after the first lookup so the
+    // hot Compute path doesn't pay a GetExport / GetDelegate cost
+    // on every regulation tick.
+    private AbiVersionDelegate? _abiVersion;
+    private ComputeDelegate?    _compute;
 
     public bool FileExists(string path) => File.Exists(path);
 
@@ -16,11 +23,34 @@ internal sealed class SystemNativeLibraryGateway : INativeLibraryGateway
 
     public uint CallAbiVersion(nint handle)
     {
-        var fn = NativeLibrary.GetExport(handle, AbiVersionExport);
-        var del = Marshal.GetDelegateForFunctionPointer<AbiVersionDelegate>(fn);
+        var del = _abiVersion ??= Marshal
+            .GetDelegateForFunctionPointer<AbiVersionDelegate>(
+                NativeLibrary.GetExport(handle, AbiVersionExport));
         return del();
     }
 
+    public int CallCompute(
+        nint handle,
+        in BccSnapshot snapshot,
+        in BccLimits limits,
+        in BccRequest request,
+        out BccCommand command)
+    {
+        var del = _compute ??= Marshal
+            .GetDelegateForFunctionPointer<ComputeDelegate>(
+                NativeLibrary.GetExport(handle, ComputeExport));
+        return del(in snapshot, in limits, in request, out command);
+    }
+
+    public void Free(nint handle) => NativeLibrary.Free(handle);
+
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate uint AbiVersionDelegate();
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate int ComputeDelegate(
+        in BccSnapshot snapshot,
+        in BccLimits limits,
+        in BccRequest request,
+        out BccCommand command);
 }
