@@ -4,17 +4,9 @@
 #
 # Initial befüllt per `d-migrate schema reverse` aus einer leeren
 # Postgres-Instanz, die mit BessDbSchema.CreateScript initialisiert
-# wurde (RM-M2-MIG-03). Die Hand-Pflege betrifft Punkte, die
-# d-migrate beim Reverse aktuell nicht 1:1 erfasst:
-#   - composite primary keys, bei denen ein zusätzlicher composite
-#     UNIQUE-Constraint existiert (optimization_objective_breakdowns)
-#   - composite UNIQUE-Constraints generell
-#   - explizite `required: true` für PK-Spalten (technisch redundant,
-#     weil PK NOT NULL impliziert; hier explizit belassen für lesbare
-#     YAML)
-#
-# Re-generieren via `make schema-generate`; ein Drift gegen das
-# committete 0001_initial.sql ist ein Build-Fehler (CI-Gate).
+# wurde (RM-M2-MIG-03). Re-generieren via `make schema-generate`;
+# ein Drift gegen das committete 0001_initial.sql ist ein Build-
+# Fehler (CI-Gate).
 schema_format: 1.0
 name: bess-ems
 version: 1.0.0
@@ -26,6 +18,7 @@ tables:
         required: true
       id:
         type: biginteger
+        required: true
         generation:
           type: identity
           mode: by_default
@@ -63,6 +56,7 @@ tables:
         required: true
       command_id:
         type: text
+        required: true
       dispatch_reason:
         type: text
         required: true
@@ -121,20 +115,20 @@ tables:
     - run_id
     - name
     constraints:
-    # Explicit FK name matches the implicit Postgres-auto-name from the
-    # M1 BessDbSchema.CreateScript so the MIG-03 pg_dump snapshot
-    # diffs cleanly. The inline column-level `references:` form would
-    # default to `fk_<table>_<column>`, breaking that match.
     - name: optimization_objective_breakdowns_run_id_fkey
       type: foreign_key
-      columns: [run_id]
+      columns:
+      - run_id
       references:
         table: optimization_runs
-        columns: [run_id]
+        columns:
+        - run_id
         on_delete: cascade
     - name: optimization_objective_breakdowns_run_id_position_key
       type: unique
-      columns: [run_id, position]
+      columns:
+      - run_id
+      - position
   optimization_runs:
     columns:
       asset_id:
@@ -171,6 +165,7 @@ tables:
         type: integer
       run_id:
         type: uuid
+        required: true
       solver_name:
         type: text
         required: true
@@ -202,11 +197,13 @@ tables:
     columns:
       asset_id:
         type: text
+        required: true
       target_power_kw:
         type: float
         required: true
       type:
         type: text
+        required: true
       window_end:
         type: datetime
         timezone: true
@@ -214,6 +211,7 @@ tables:
       window_start:
         type: datetime
         timezone: true
+        required: true
     primary_key:
     - asset_id
     - type
@@ -234,11 +232,13 @@ tables:
     columns:
       asset_id:
         type: text
+        required: true
       market_bid_area:
         type: text
         required: true
       type:
         type: text
+        required: true
       version:
         type: integer
         required: true
@@ -273,6 +273,7 @@ tables:
         required: true
       id:
         type: biginteger
+        required: true
         generation:
           type: identity
           mode: by_default

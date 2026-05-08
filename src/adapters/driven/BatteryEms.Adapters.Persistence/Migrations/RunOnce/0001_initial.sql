@@ -16,7 +16,7 @@ CREATE TABLE "audit_events" (
 CREATE TABLE "commands" (
     "active_power_kw" DOUBLE PRECISION NOT NULL,
     "asset_id" TEXT NOT NULL,
-    "command_id" TEXT,
+    "command_id" TEXT NOT NULL,
     "dispatch_reason" TEXT NOT NULL,
     "dispatch_success" BOOLEAN NOT NULL,
     "dispatched_at" TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -40,7 +40,7 @@ CREATE TABLE "optimization_runs" (
     "produced_schedule_asset_id" TEXT,
     "produced_schedule_type" TEXT,
     "produced_schedule_version" INTEGER,
-    "run_id" UUID,
+    "run_id" UUID NOT NULL,
     "solver_name" TEXT NOT NULL,
     "solver_runtime_seconds" DOUBLE PRECISION NOT NULL,
     "status" TEXT NOT NULL,
@@ -51,9 +51,9 @@ CREATE TABLE "optimization_runs" (
 );
 
 CREATE TABLE "schedules" (
-    "asset_id" TEXT,
+    "asset_id" TEXT NOT NULL,
     "market_bid_area" TEXT NOT NULL,
-    "type" TEXT,
+    "type" TEXT NOT NULL,
     "version" INTEGER NOT NULL,
     PRIMARY KEY ("asset_id", "type")
 );
@@ -88,11 +88,11 @@ CREATE TABLE "optimization_objective_breakdowns" (
 );
 
 CREATE TABLE "schedule_windows" (
-    "asset_id" TEXT,
+    "asset_id" TEXT NOT NULL,
     "target_power_kw" DOUBLE PRECISION NOT NULL,
-    "type" TEXT,
+    "type" TEXT NOT NULL,
     "window_end" TIMESTAMP WITH TIME ZONE NOT NULL,
-    "window_start" TIMESTAMP WITH TIME ZONE,
+    "window_start" TIMESTAMP WITH TIME ZONE NOT NULL,
     CONSTRAINT "schedule_windows_asset_id_type_fkey" FOREIGN KEY ("asset_id", "type") REFERENCES "schedules" ("asset_id", "type") ON DELETE CASCADE,
     PRIMARY KEY ("asset_id", "type", "window_start")
 );
