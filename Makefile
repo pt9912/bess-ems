@@ -20,7 +20,7 @@ DOCKER_BUILD = $(DOCKER) build $(BUILD_CONTEXT) \
 
 .PHONY: help \
 	lint arch-check gates \
-	test test-safety test-integration test-hil-modbus test-container coverage-gate \
+	test test-safety test-integration test-hil-modbus test-hil-closed-loop test-container coverage-gate \
 	simulator-test simulator-race simulator-lint simulator-coverage-gate \
 	build ci runtime fullbuild lock-refresh \
 	schema-validate schema-generate schema-drift-check
@@ -55,6 +55,7 @@ help:
 	@echo "  make simulator-coverage-gate Go coverage gate (90% line)"
 	@echo "  make test-integration        Modbus roundtrip vs Go-Simulator via docker compose"
 	@echo "  make test-hil-modbus         Optional: HIL roundtrip vs bess-hil-simulator:local (RM-M2-HIL-08)"
+	@echo "  make test-hil-closed-loop    Optional: Closed-loop optimize→dispatch→HIL smoke (Carve-out Demo-01)"
 	@echo ""
 	@echo "Maintenance:"
 	@echo "  make lock-refresh    Refresh packages.lock.json files in Docker (per docs/user/quality.md §1.4)"
@@ -185,6 +186,15 @@ test-hil-modbus:
 	exit_code=$$?; \
 	$(DOCKER) compose -f tests/hil/compose.yml down -v --remove-orphans >/dev/null 2>&1; \
 	exit $$exit_code
+
+# RM-M2 Carve-out Demo-01: Closed-Loop-Smoke. Bringt deploy/compose.
+# hil.yml hoch (bess-ems + Postgres + Mosquitto + bess-hil-simulator),
+# postet einen Day-Ahead-Optimize-Request und prüft dass die
+# Discharge-Order durch die EMS-Pipeline an HIL-Modbus gelangt.
+# Verlangt BESS_HIL_OPERATOR_TOKEN in der Umgebung. Nicht in
+# `make ci` enthalten — gleiches Opt-in-Modell wie test-hil-modbus.
+test-hil-closed-loop:
+	scripts/hil-closed-loop-smoke.sh
 
 # --- Welle 5 (partially active) --------------------------------------------
 

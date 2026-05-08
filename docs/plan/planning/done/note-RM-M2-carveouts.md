@@ -1,14 +1,13 @@
 # Note: RM-M2-Folgewellen-Carveouts (Pre-Push-Review)
 
 **Dokumenttyp:** Notiz / Follow-up-Liste
-**Status:** In Arbeit — Punkte aus dem Pre-Push-Review der
-M2-Folgewellen RM-M2-MIG (Persistence-Migrations) und RM-M2-HIL
-(HIL-Simulator), die der Reviewer als nicht-blockend für den Push
-klassifiziert hat. Wird der unten empfohlenen Reihenfolge nach
-abgearbeitet.
-**Bezug:** [`../done/plan-RM-M2-migration.md`](../done/plan-RM-M2-migration.md),
-[`../done/HIL-simulator.md`](../done/HIL-simulator.md),
-[`roadmap.md`](roadmap.md)
+**Status:** Abgeschlossen — alle sieben Carve-outs aus dem Pre-Push-
+Review der M2-Folgewellen RM-M2-MIG (Persistence-Migrations) und
+RM-M2-HIL (HIL-Simulator) wurden in der empfohlenen Reihenfolge
+abgearbeitet (Mn3 → M3 → Mn1 + N2 → M2 + Mn2 + Mn4 → Demo-01).
+**Bezug:** [`plan-RM-M2-migration.md`](plan-RM-M2-migration.md),
+[`HIL-simulator.md`](HIL-simulator.md),
+[`../in-progress/roadmap.md`](../in-progress/roadmap.md)
 
 ---
 
@@ -93,15 +92,18 @@ abgearbeitet.
 
 ## Demo-Polish
 
-- [ ] **Demo-01 — HIL-Closed-Loop-Discharge-Smoke.**
-  Aktuell pendelt der Closed-Loop-Demo gegen `deploy/compose.hil.yml`
-  auf `no-active-commitment` (kein Fahrplan geladen → Idle/0 kW).
-  Ein zusätzlicher Smoke (Bash-Skript oder neuer `[Trait=HIL]`-Test)
-  würde via `POST /markets/day-ahead/optimize` einen Discharge
-  triggern und assertern: HIL-`active_power_kw` reagiert auf den
-  Setpoint, `soc_percent` sinkt monoton.
-  *Trigger:* sobald HIL als Demo gezeigt werden soll.
-  *Aufwand:* ~50 LOC + ein Fixture-Schedule.
+- [x] **Demo-01 — HIL-Closed-Loop-Discharge-Smoke.** ✅
+  Datei: `scripts/hil-closed-loop-smoke.sh`, Make-Target
+  `make test-hil-closed-loop`.
+  Bash-Smoke gegen `deploy/compose.hil.yml` mit drei Asserts:
+  (1) `POST /markets/day-ahead/optimize` antwortet mit
+  `status=optimal`, (2) bess-ems emittiert `mode=Discharge` mit
+  positivem `power_kw`, (3) `bess-hil-simulator` logt
+  `[MODBUS] Command received` mit non-zero P. Trap räumt den
+  Stack immer ab. Verlangt `BESS_HIL_OPERATOR_TOKEN` in der
+  Umgebung. Smoke-getestet end-to-end gegen die echte HIL-
+  Pipeline: optimize → dispatch → Modbus-Setpoint im Simulator
+  durchgehend grün.
 
 ---
 
