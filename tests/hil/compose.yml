@@ -1,0 +1,36 @@
+# RM-M2-HIL-06: optionaler Hardware-in-the-Loop-Stack. Wird über
+# `make test-hil-modbus` getriggert und ist NICHT in `make ci` /
+# `make test-integration` verdrahtet — der externe
+# `bess-hil-simulator:local`-Container muss vorab lokal verfügbar
+# sein (HIL-OPEN-01: lokal bauen aus dem Schwesterprojekt).
+services:
+  bess-hil-simulator:
+    image: bess-hil-simulator:local
+    expose:
+      - "502"
+    volumes:
+      # CSV-Logs des Simulators landen in einem benannten Volume,
+      # das ./csv überdauert (HIL-OPEN-04: nur optional fürs
+      # Debugging persistiert; Assertions laufen über Modbus).
+      - hil-csv:/data
+    networks: [hilnet]
+
+  hil-test-runner:
+    build:
+      context: ../..
+      dockerfile: tests/hil/Dockerfile
+    depends_on:
+      bess-hil-simulator:
+        condition: service_started
+    environment:
+      - MODBUS_HOST=bess-hil-simulator
+      - MODBUS_PORT=502
+      - HIL_MAPPING=config/examples/adapters/modbus.hil-simulator.json
+    networks: [hilnet]
+
+volumes:
+  hil-csv:
+
+networks:
+  hilnet:
+    driver: bridge

@@ -20,7 +20,7 @@ DOCKER_BUILD = $(DOCKER) build $(BUILD_CONTEXT) \
 
 .PHONY: help \
 	lint arch-check gates \
-	test test-safety test-integration test-container coverage-gate \
+	test test-safety test-integration test-hil-modbus test-container coverage-gate \
 	simulator-test simulator-race simulator-lint simulator-coverage-gate \
 	build ci runtime fullbuild lock-refresh \
 	schema-validate schema-generate schema-drift-check
@@ -54,6 +54,7 @@ help:
 	@echo "  make simulator-lint          golangci-lint with SOLID profile"
 	@echo "  make simulator-coverage-gate Go coverage gate (90% line)"
 	@echo "  make test-integration        Modbus roundtrip vs Go-Simulator via docker compose"
+	@echo "  make test-hil-modbus         Optional: HIL roundtrip vs bess-hil-simulator:local (RM-M2-HIL-08)"
 	@echo ""
 	@echo "Maintenance:"
 	@echo "  make lock-refresh    Refresh packages.lock.json files in Docker (per docs/user/quality.md §1.4)"
@@ -172,6 +173,17 @@ test-integration:
 	$(DOCKER) compose -f tests/integration/compose.yml up --build --abort-on-container-exit --exit-code-from test-runner; \
 	exit_code=$$?; \
 	$(DOCKER) compose -f tests/integration/compose.yml down -v --remove-orphans >/dev/null 2>&1; \
+	exit $$exit_code
+
+# RM-M2-HIL-08: optionales HIL-Gate. Bringt den externen
+# `bess-hil-simulator:local`-Container hoch (siehe HIL-OPEN-01:
+# muss vorab lokal gebaut sein) und führt nur das HIL-Test-Projekt
+# aus. NICHT in `make ci` / `make test-integration` verdrahtet —
+# der M1-Pflichtpfad bleibt auf bess-field-sim.
+test-hil-modbus:
+	$(DOCKER) compose -f tests/hil/compose.yml up --build --abort-on-container-exit --exit-code-from hil-test-runner; \
+	exit_code=$$?; \
+	$(DOCKER) compose -f tests/hil/compose.yml down -v --remove-orphans >/dev/null 2>&1; \
 	exit $$exit_code
 
 # --- Welle 5 (partially active) --------------------------------------------
