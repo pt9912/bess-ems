@@ -4,7 +4,7 @@
 **Status:** Abgeschlossen — alle Arbeitspakete OP-01..09 ✅. M3-Folgearbeit
 für die offenen Punkte OP-OPEN-05 (Optimistic-Concurrency in
 `IScheduleRepository.Replace`) und OP-OPEN-06 (Lock-Table-Eviction)
-hängt am laufenden [`../in-progress/plan-RM-M2-migration.md`](../in-progress/plan-RM-M2-migration.md).
+hängt am laufenden [`../done/plan-RM-M2-migration.md`](../done/plan-RM-M2-migration.md).
 **Bezug:** [`../in-progress/roadmap.md`](../in-progress/roadmap.md)
 (RM-M2-03, RM-M2-04, RM-M2-05, RM-M2-09),
 [`plan-RM-M1.md`](plan-RM-M1.md)
@@ -221,7 +221,7 @@ ersetzen.
 ## Folgewelle: HIL-Simulator (nach RM-M2-OP-05)
 
 Sobald RM-M2-OP-05 (LP-Solver-Adapter) ein Resultat liefert, zieht die
-HIL-Welle aus [`../in-progress/HIL-simulator.md`](../in-progress/HIL-simulator.md)
+HIL-Welle aus [`../done/HIL-simulator.md`](../done/HIL-simulator.md)
 nach `in-progress/`. HIL prüft das LP-Resultat gegen ein dynamisches
 PCS-/PQ-Capability-Modell des externen Images
 `bess-hil-simulator:local`. Die in HIL-01..05 nötigen

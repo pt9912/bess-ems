@@ -1,11 +1,11 @@
 # Plan RM-M2 Persistence-Migrations: vom Idempotent-Init zum versionierten Migrationspfad
 
-**Dokumenttyp:** Aktiver Detailplan / M2-Folgewelle
-**Status:** In Umsetzung — MIG-01..06 lokal abgeschlossen, Plan
-liegt zwischen `open/` und `done/`, bis die Closure-Commits gepusht
-und gegen die OP-OPEN-05/06-Aktivierung in M3 verprobt sind.
+**Dokumenttyp:** Abgeschlossener Detailplan / M2-Folgewelle
+**Status:** Abgeschlossen — MIG-01..06 ✅, gepusht in Commits
+`c738d16..badca4d`. M3-Folgearbeit (OP-OPEN-05/06) konsumiert den
+hier gebauten Pfad.
 **Bezug:**
-[`roadmap.md`](roadmap.md),
+[`../in-progress/roadmap.md`](../in-progress/roadmap.md),
 [`../done/plan-RM-M2-optimization.md`](../done/plan-RM-M2-optimization.md)
 (§Open RM-M2-OP-OPEN-05/06 — die ersten echten Konsumenten dieses Plans),
 [`../done/plan-RM-M1.md`](../done/plan-RM-M1.md) (RM-M1-13 hat

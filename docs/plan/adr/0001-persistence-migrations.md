@@ -2,10 +2,10 @@
 
 **Status:** Accepted — Tooling-Entscheidung steht; produktive
 Verdrahtung wartet auf den ersten Aktivierungs-Trigger aus
-[`../planning/in-progress/plan-RM-M2-migration.md`](../planning/in-progress/plan-RM-M2-migration.md).
+[`../planning/done/plan-RM-M2-migration.md`](../planning/done/plan-RM-M2-migration.md).
 **Datum:** 2026-05-07
 **Bezug:**
-[`../planning/in-progress/plan-RM-M2-migration.md`](../planning/in-progress/plan-RM-M2-migration.md)
+[`../planning/done/plan-RM-M2-migration.md`](../planning/done/plan-RM-M2-migration.md)
 (RM-M2-MIG-01..06),
 [`../planning/done/plan-RM-M2-optimization.md`](../planning/done/plan-RM-M2-optimization.md)
 (§Open RM-M2-OP-OPEN-05/06 — die ersten echten Konsumenten),
@@ -40,7 +40,7 @@ Drei Limitierungen blockieren M3:
 Diese ADR fixiert das Tooling, **bevor** M3 die ersten nicht-additiven
 Schema-Änderungen mitbringt. Implementierung folgt erst, wenn einer
 der Aktivierungs-Trigger aus
-[`../planning/in-progress/plan-RM-M2-migration.md`](../planning/in-progress/plan-RM-M2-migration.md)
+[`../planning/done/plan-RM-M2-migration.md`](../planning/done/plan-RM-M2-migration.md)
 zündet.
 
 ---
@@ -250,7 +250,7 @@ Wartepfad abbrechen, aber keinen gehaltenen Lock offenlassen.
    DbUp, `BessDbMigrator`-Skelett, Make-Targets,
    §11-Spec-Ergänzung. Aktiviert sich mit dem ersten Trigger
    aus
-   [`../planning/in-progress/plan-RM-M2-migration.md`](../planning/in-progress/plan-RM-M2-migration.md).
+   [`../planning/done/plan-RM-M2-migration.md`](../planning/done/plan-RM-M2-migration.md).
 3. **MIG-03..06:** Snapshot, Idempotenz/Lock-Test, Cut-Over,
    `0002`-Vorlage. Sequenz und DoD im Plan.
 

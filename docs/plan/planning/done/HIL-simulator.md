@@ -1,12 +1,13 @@
 # Plan: HIL-Simulator-Integration
 
-**Dokumenttyp:** Aktiver Detailplan / M2-Folgewelle
-**Status:** Unter `in-progress/`. Der Aktivierungs-Trigger
-(LP-Solver-Adapter steht und liefert ein Resultat, das gegen ein
-dynamisches PCS-/PQ-Capability-Modell sanity-geprüft werden kann)
-ist mit dem Abschluss von OP-05 in
-[`../done/plan-RM-M2-optimization.md`](../done/plan-RM-M2-optimization.md)
-erfüllt; HIL-01..09 sind noch nicht angefasst.
+**Dokumenttyp:** Abgeschlossener Detailplan / M2-Folgewelle
+**Status:** Abgeschlossen — HIL-01..09 ✅, gepusht in Commits
+`9db1a05..badca4d` (bess-ems) plus `d0b3269` im
+`bess-hil-simulator`-Schwesterprojekt. Closed-Loop-Demo läuft
+gegen `deploy/compose.hil.yml`. M3-Folgearbeit (BESS-Telemetrie-
+Tiefe, HIL-CSV-Persistenz, weitere Dynamiken) hängt nicht mehr
+am Migrationspfad und kann zu einem Zeitpunkt der Wahl gezogen
+werden.
 **Quelle:** `bess-hil-simulator`-Schwesterprojekt (Checkout-Pfad
 projekt-/operatorabhängig).
 **Bezug:** [`../in-progress/roadmap.md`](../in-progress/roadmap.md)

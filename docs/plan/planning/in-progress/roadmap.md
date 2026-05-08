@@ -76,15 +76,14 @@ unter `in-progress/`.
 > adressiert oder als Carve-out mit Trigger in den jeweiligen
 > RM-M2-Tabellenzeilen festgehalten.
 >
-> **M2-Folgewellen (in-progress):**
-> [`HIL-simulator.md`](HIL-simulator.md) (HIL gegen
-> `bess-hil-simulator:local`) — Aktivierungs-Trigger
-> (LP-Solver-Adapter steht) mit OP-05 erfüllt, Plan unter
-> `in-progress/`; HIL-01..09 noch nicht angefasst.
-> [`plan-RM-M2-migration.md`](plan-RM-M2-migration.md)
-> (versionierte Persistence-Migrations) — MIG-01..06 lokal
-> umgesetzt, Plan unter `in-progress/` bis Closure-Commits gepusht
-> und gegen die OP-OPEN-05/06-Aktivierung in M3 verprobt sind. Plus mehrere Carve-out-Slices innerhalb der RM-M2-Zeilen
+> **M2-Folgewellen (abgeschlossen):**
+> [`HIL-simulator.md`](../done/HIL-simulator.md) (HIL gegen
+> `bess-hil-simulator:local`, HIL-01..09 ✅) und
+> [`plan-RM-M2-migration.md`](../done/plan-RM-M2-migration.md)
+> (versionierte Persistence-Migrations, MIG-01..06 ✅) sind beide
+> gepusht. Der Migrationspfad ist startbar für die ersten echten
+> Schema-Änderungen; der HIL-Pfad fährt Closed-Loop gegen das
+> dynamische PCS/PQ-Modell. Plus mehrere Carve-out-Slices innerhalb der RM-M2-Zeilen
 > (LH-OPT-004 #4 Marktverpflichtungs-Strafkosten unter RM-M2-04,
 > Adapter-Spans / DB-Spans / Trace-ID-Persistenz unter RM-M2-06,
 > JSON-Loader / Operator-Replay-CLI / Multi-Asset-Replay unter
@@ -97,7 +96,7 @@ unter `in-progress/`.
 | Status | Meilenstein | Titel                              | Phase | Detailplan |
 | ------ | ----------- | ---------------------------------- | ----- | ---------- |
 | ✅     | M1          | MVP — sichere Regelpipeline        | 1     | [Abgeschlossen](../done/plan-RM-M1.md) |
-| ✅     | M2          | Marktausbau und Optimierung        | 1 → 2 | Abgeschlossen ([Optimization-Slice](../done/plan-RM-M2-optimization.md) plus RM-M2-01..10 in der Tabelle unten); [Migrations-Tooling](plan-RM-M2-migration.md) und [HIL](HIL-simulator.md) liegen unter `in-progress/` (MIG-01..06 lokal umgesetzt; HIL-01..09 noch offen) |
+| ✅     | M2          | Marktausbau und Optimierung        | 1 → 2 | Abgeschlossen ([Optimization-Slice](../done/plan-RM-M2-optimization.md), RM-M2-01..10, [Migrations-Tooling](../done/plan-RM-M2-migration.md), [HIL](../done/HIL-simulator.md)) |
 | ⬜     | M3          | Native Control Core (Library)      | 2     | folgt mit Aktivierung |
 | ⬜     | M4          | Regelleistung und OPC-UA           | 2     | folgt mit Aktivierung |
 | ⬜     | M5          | MPC, Solver-Sidecar, Replay        | 3     | folgt mit Aktivierung |
@@ -189,16 +188,16 @@ Reserve, Peak-Shaving) hängen jeweils an einer eigenen Vorbedingung —
 Begründung in der RM-M2-04-Tabellenzeile unten.
 
 **Folgewelle:** Der Hardware-in-the-Loop-Pfad gegen das externe
-`bess-hil-simulator:local`-Image liegt unter `in-progress/`.
-Detail-Plan:
-[`HIL-simulator.md`](HIL-simulator.md). Der Aktivierungs-Trigger
-(LP-Solver-Adapter aus OP-05) ist erfüllt; HIL prüft gegen das
-LP-Resultat ein dynamisches PCS-/PQ-Capability-Modell, sobald die
-Arbeitspunkte HIL-01..09 abgearbeitet werden. Modbus-Adapter-Erweiterungen aus dem HIL-Plan
-(Input Registers, Word-Order, Q-Setpoint) sind gleichzeitig
-Vorarbeit für RM-M4 (OPC-UA / Vendor-Profile mit MW-Skalierung).
-HIL ist und bleibt **kein M2-Pflichtgate** — `make gates` und
-`make test-integration` bleiben auf den Go-`bess-field-sim` ausgerichtet.
+`bess-hil-simulator:local`-Image ist abgeschlossen. Detail-Plan:
+[`HIL-simulator.md`](../done/HIL-simulator.md). HIL-01..09 sind
+gelandet, der Closed-Loop-Demo läuft via `make test-hil-modbus`
+und über `deploy/compose.hil.yml` gegen die echte PCS/PQ-Dynamik
+des Schwesterprojekt-Simulators. Modbus-Adapter-Erweiterungen aus
+dem HIL-Plan (Input Registers, Word-Order, Q-Setpoint) sind
+gleichzeitig Vorarbeit für RM-M4 (OPC-UA / Vendor-Profile mit
+MW-Skalierung). HIL ist und bleibt **kein M2-Pflichtgate** —
+`make gates` und `make test-integration` bleiben auf den
+Go-`bess-field-sim` ausgerichtet.
 
 ### Liefergegenstände
 
