@@ -769,7 +769,9 @@ public sealed class JsonFileConfigurationLoaderTests
             Path.Combine(ExamplesDirectory, "adapters", "modbus.hil-simulator.json"));
 
         Assert.Equal("bess-hil-simulator", mapping.ProfileName);
-        Assert.Equal(7, mapping.Registers.Count);
+        // 5 grid measurements + 4 BESS state regs (available / soc /
+        // soh / temperature) + 2 holding setpoints = 11 registers.
+        Assert.Equal(11, mapping.Registers.Count);
 
         var p = mapping.Registers.First(r => r.Name == "active_power_kw");
         Assert.Equal(ModbusRegisterTables.Input, p.RegisterTable);
@@ -781,6 +783,15 @@ public sealed class JsonFileConfigurationLoaderTests
         var setpoint = mapping.Registers.First(r => r.Name == "active_power_setpoint_kw");
         Assert.Equal(ModbusRegisterTables.Holding, setpoint.RegisterTable);
         Assert.True(setpoint.Writable);
+
+        // The closed-loop demo registers must surface the BESS state
+        // BatteryTelemetry expects (available + SOC + SOH + temp);
+        // skipping any of them sends the control cycle into a
+        // safe-stop loop on the HIL stack.
+        Assert.Contains(mapping.Registers, r => r.Name == "available");
+        Assert.Contains(mapping.Registers, r => r.Name == "soc_percent");
+        Assert.Contains(mapping.Registers, r => r.Name == "soh_percent");
+        Assert.Contains(mapping.Registers, r => r.Name == "temperature_celsius");
     }
 
     [Fact]
