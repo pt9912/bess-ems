@@ -43,7 +43,20 @@ public sealed class FluentModbusClient : IModbusClient
         var memory = await _client
             .ReadHoldingRegistersAsync<ushort>(unitId, startAddress, count, cancellationToken)
             .ConfigureAwait(false);
+        return CopyToArray(memory);
+    }
 
+    public async Task<ushort[]> ReadInputRegistersAsync(int unitId, int startAddress, int count, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var memory = await _client
+            .ReadInputRegistersAsync<ushort>(unitId, startAddress, count, cancellationToken)
+            .ConfigureAwait(false);
+        return CopyToArray(memory);
+    }
+
+    private static ushort[] CopyToArray(Memory<ushort> memory)
+    {
         var span = memory.Span;
         var result = new ushort[span.Length];
         for (var i = 0; i < span.Length; i++)

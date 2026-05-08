@@ -8,7 +8,14 @@ internal sealed class FakeModbusClient : IModbusClient
 
     public Dictionary<int, ushort[]> ReadResponses { get; } = new();
 
+    // RM-M2-HIL-02: separate canned responses for FC04 input
+    // registers; tests use this to assert that ModbusTelemetrySource
+    // routed the register to the correct read function.
+    public Dictionary<int, ushort[]> InputReadResponses { get; } = new();
+
     public List<(int UnitId, int Address, ushort[] Values)> Writes { get; } = new();
+
+    public List<(string Table, int Address, int Count)> Reads { get; } = new();
 
     public Func<Task>? OnRead { get; set; }
 
@@ -39,7 +46,23 @@ internal sealed class FakeModbusClient : IModbusClient
             await OnRead.Invoke().ConfigureAwait(false);
         }
         cancellationToken.ThrowIfCancellationRequested();
+        Reads.Add(("holding", startAddress, count));
         if (!ReadResponses.TryGetValue(startAddress, out var response))
+        {
+            return new ushort[count];
+        }
+        return response;
+    }
+
+    public async Task<ushort[]> ReadInputRegistersAsync(int unitId, int startAddress, int count, CancellationToken cancellationToken)
+    {
+        if (OnRead is not null)
+        {
+            await OnRead.Invoke().ConfigureAwait(false);
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        Reads.Add(("input", startAddress, count));
+        if (!InputReadResponses.TryGetValue(startAddress, out var response))
         {
             return new ushort[count];
         }

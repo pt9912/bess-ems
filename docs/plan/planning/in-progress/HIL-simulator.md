@@ -242,7 +242,7 @@ Folgetests:
 | Status | ID | Punkt | DoD |
 | ------ | -- | ----- | --- |
 | ✅ | HIL-01 | Modbus-Mapping um Registertabelle erweitern | Schema, Loader, Domain-Konfiguration und Adapter unterstützen `register_table=input|holding`; bestehende M1-Profile bleiben kompatibel. Adapter-Guards (`ModbusTelemetrySource` / `ModbusCommandSink`) werfen explizit bei `input` bzw. `low_high` und verweisen auf HIL-02/03; dadurch verhindert ein vorgezogenes HIL-Profil ein silent-misdecode. 5 neue Tests, integration-suite weiterhin grün. |
-| ⬜ | HIL-02 | Input-Register-Leseport ergänzen | `IModbusClient` und `FluentModbusClient` können Input Registers lesen; `ModbusTelemetrySource` wählt anhand `register_table`. |
+| ✅ | HIL-02 | Input-Register-Leseport ergänzen | `IModbusClient.ReadInputRegistersAsync` neu, `FluentModbusClient` ruft `ModbusTcpClient.ReadInputRegistersAsync<ushort>` (FC04). `ModbusTelemetrySource` wählt im Read-Loop anhand `register.RegisterTable` zwischen FC03/FC04 — Holding bleibt M1-Default. Mixed-Profile-Test (zwei FC04-Floats + ein FC03-Sentinel) belegt das Routing über `FakeModbusClient.Reads`-Log. HIL-01-Guard für `input` aufgehoben, neu: Reject auf unbekannte register_table-Werte. |
 | ⬜ | HIL-03 | Float-Word-Order konfigurierbar machen | `RegisterDecoder`/Encoder unterstützen mindestens `high_low` und `low_high`; Tests decken beide Varianten ab. |
 | ⬜ | HIL-04 | HIL-Modbus-Profil anlegen | `config/examples/adapters/modbus.hil-simulator.json` validiert gegen Schema und beschreibt HIL-Punkte mit Gerätepunkt-Metadaten. |
 | ⬜ | HIL-05 | Optionalen Q-Setpoint schreiben | `ModbusCommandSink` schreibt `reactive_power_setpoint_kvar`, wenn das Mapping ein writable Register dafür enthält. |

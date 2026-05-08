@@ -31,21 +31,24 @@ public sealed class ModbusTelemetrySource : IBatteryTelemetrySource
                 $"M1 simulator path supports unit_id_discovery=static with explicit static_unit_id; got '{mapping.UnitIdDiscovery}'.");
         }
 
-        // RM-M2-HIL-01: register_table is plumbed through the loader
-        // but the read path still uses ReadHoldingRegistersAsync only;
-        // HIL-02 lifts this guard once the FC04 (input register) read
-        // path lands. Same for word_order — HIL-03 wires low_high.
+        // RM-M2-HIL-02: read path now branches on register_table
+        // (Holding → FC03, Input → FC04). The schema already restricts
+        // the JSON value to {holding, input}, but programmatic
+        // construction (test fixtures) can hand in anything; the
+        // explicit reject keeps the read-path if/else total. word_order
+        // =low_high stays gated until HIL-03 wires the swapped decoder.
         foreach (var register in mapping.Registers)
         {
             if (register.Writable)
             {
                 continue;
             }
-            if (register.RegisterTable != ModbusRegisterTables.Holding)
+            if (register.RegisterTable != ModbusRegisterTables.Holding
+                && register.RegisterTable != ModbusRegisterTables.Input)
             {
                 throw new NotSupportedException(
                     $"register '{register.Name}' specifies register_table='{register.RegisterTable}'; "
-                    + "input-register reads land with RM-M2-HIL-02. Until then only 'holding' is supported.");
+                    + $"only '{ModbusRegisterTables.Holding}' and '{ModbusRegisterTables.Input}' are supported.");
             }
             if (register.WordOrder != ModbusWordOrders.HighLow)
             {
@@ -130,9 +133,19 @@ public sealed class ModbusTelemetrySource : IBatteryTelemetrySource
                 continue;
             }
 
-            var words = await _client
-                .ReadHoldingRegistersAsync(unitId, register.Address, RegisterDecoder.WordCount(register.Type), cancellationToken)
-                .ConfigureAwait(false);
+            var wordCount = RegisterDecoder.WordCount(register.Type);
+            // RM-M2-HIL-02: branch on register_table — FC03 for the
+            // existing M1 holding-register profile, FC04 for the HIL
+            // input-register measurements. The constructor narrowed
+            // RegisterTable to {Holding, Input}, so this if/else is
+            // total.
+            var words = register.RegisterTable == ModbusRegisterTables.Input
+                ? await _client
+                    .ReadInputRegistersAsync(unitId, register.Address, wordCount, cancellationToken)
+                    .ConfigureAwait(false)
+                : await _client
+                    .ReadHoldingRegistersAsync(unitId, register.Address, wordCount, cancellationToken)
+                    .ConfigureAwait(false);
             result[register.Name] = RegisterDecoder.Decode(register, words);
         }
 
