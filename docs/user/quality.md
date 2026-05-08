@@ -486,13 +486,21 @@ Aktiv ab **M3** (LH-NATIVE-005, RM-M3-03).
 
 | Gate                                                | Ort                              |
 | --------------------------------------------------- | -------------------------------- |
-| `battery_control_core_abi_version()` exportiert     | `native/include/battery_control_core.h` |
-| `.NET`-Startup-Check vergleicht erwartete ABI       | `BatteryEms.Adapters.NativeInterop` |
-| Mismatch -> .NET-Fallback, Health/Logs/Metrik nennen `abi-mismatch` | Integrationstest in M3 |
+| `battery_control_core_abi_version()` exportiert     | `native/battery_control_core/include/battery_control_core.h` |
+| `.NET`-Startup-Check vergleicht erwartete ABI       | `BatteryEms.Adapters.NativeInterop` (`NativeControlLoader.TryLoad`) |
+| Mismatch → .NET-Fallback, Health/Logs/Metrik nennen `abi-mismatch` | Integrationstest in M3 |
+
+Der Loader liefert fünf dokumentierte Endzustände: `disabled` (Opt-in
+nicht gesetzt), `library-missing` (Pfad existiert nicht),
+`load-failed` (dlopen oder Symbol-Lookup wirft), `abi-mismatch`
+(major != erwartet oder minor < erwartet) und `loaded`. Major muss
+exakt matchen, minor darf höher sein (additive Backward-Compat).
 
 Ein Startabbruch bei erwarteter, aber inkompatibler Library ist keine
-M3-Default-Policy. Er braucht einen expliziten Produktions-Optionswert und
-einen eigenen Integrationstest.
+M3-Default-Policy. Er braucht den expliziten
+`NativeControlOptions.AbortOnAbiMismatch`-Wert (Default `false`) und
+einen eigenen Integrationstest. Solange das Flag false ist, fällt
+der Host bei `abi-mismatch` auf den Managed-Pfad zurück.
 
 ### 5.3 Adapter-Mapping-Schema
 

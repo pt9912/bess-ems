@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>BatteryEms.Adapters.NativeInterop</RootNamespace>
+    <AssemblyName>BatteryEms.Adapters.NativeInterop</AssemblyName>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+  <!-- RM-M3-03: the loader's INativeLibraryGateway seam is internal so
+       the production wiring cannot bypass it, and the tests project
+       needs visibility for the fake gateway in the load-path tests. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="BatteryEms.Adapters.NativeInterop.Tests" />
+  </ItemGroup>
+
+</Project>
