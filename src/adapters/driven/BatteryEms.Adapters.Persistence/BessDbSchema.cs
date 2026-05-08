@@ -99,10 +99,20 @@ internal static class BessDbSchema
             constraint_violations_json TEXT NOT NULL DEFAULT '[]',
             warnings_json TEXT NOT NULL DEFAULT '[]',
             solver_runtime_seconds DOUBLE PRECISION NOT NULL,
-            -- 256-char cap matches the domain TerminationCode max (64) plus
-            -- a generous Detail allowance so a deviating writer cannot push
-            -- a megabyte of payload through the column (3rd-pass review #12).
-            termination_reason TEXT NOT NULL CHECK (length(termination_reason) <= 256),
+            -- 256-char cap matches the domain TerminationCode max (64)
+            -- plus a generous Detail allowance so a deviating writer
+            -- cannot push a megabyte of payload through the column
+            -- (3rd-pass review #12). Expressed as VARCHAR(256) instead
+            -- of TEXT + CHECK(length(...)) so the upcoming versioned-
+            -- migration tool (RM-M2-MIG-02) can round-trip this column
+            -- through the neutral schema YAML without an unsupported
+            -- function-call CHECK expression. Postgres treats varchar(N)
+            -- and text identically internally (same storage, same
+            -- query plans); the only observable change is the error
+            -- class on overflow inserts (string-data-right-truncation
+            -- instead of check-constraint-violation), which the
+            -- application doesn't pivot on.
+            termination_reason VARCHAR(256) NOT NULL,
             created_at TIMESTAMPTZ NOT NULL,
             inputs_json TEXT NOT NULL DEFAULT '[]',
             produced_schedule_asset_id TEXT,
