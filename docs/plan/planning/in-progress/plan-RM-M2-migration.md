@@ -117,19 +117,27 @@ dem ADR erhalten.
 
 Beide M3-Folgepakete aus dem
 [Optimization-Plan](../done/plan-RM-M2-optimization.md) hängen
-**direkt** von diesem Migrationspfad ab:
+**direkt** von diesem Migrationspfad ab; mit MIG-05 grün ist der
+Migrationspfad freigeschaltet, beide OPEN-Items können als RM-M3-OP-…
+aktiviert werden.
 
 - **OP-OPEN-05** (Optimistic-Concurrency in `IScheduleRepository.Replace`):
-  braucht `UNIQUE (asset_id, type, version)` auf der `schedules`-Tabelle
-  und eine zusätzliche `expected_version`-Semantik in der Replace-SQL.
-  Das ist die erste echte (nicht-Snapshot-) Migration und der Validator
-  des Tooling-Pfads.
+  Die erste echte (nicht-Snapshot-) Migration und damit der Validator
+  des Tooling-Pfads. Stub liegt bereits unter
+  [`Migrations/Drafts/0002_schedules_optimistic_concurrency.sql`](../../../../src/adapters/driven/BatteryEms.Adapters.Persistence/Migrations/Drafts/0002_schedules_optimistic_concurrency.sql)
+  (MIG-06, Build-Action `None`, vom Migrator nicht geladen). Der M3-
+  Review entscheidet, ob die ursprünglich angedachte
+  `UNIQUE (asset_id, type, version)`-Spalte tatsächlich verdrahtet
+  wird — sie ist im aktuellen Single-Row-pro-(asset,type)-Modell mit
+  PK `(asset_id, type)` logisch impliziert; der Replace-Pfad braucht
+  zwingend nur die `expected_version`-Semantik in der Dapper-SQL
+  (`UPDATE … WHERE version = @expected`, 0 affected rows ⇒
+  `concurrent-version-conflict`).
 - **OP-OPEN-06** (Lock-Table-Eviction): falls die LRU/TTL-Eviction eine
   Hilfstabelle für Telemetrie braucht (z.B. „letzte Optimize-Aktivität
-  pro Asset"), kommt das ebenfalls als Folge-Migration.
-
-Sobald MIG-05 grün ist, können beide OPEN-Items als RM-M3-OP-… aktiviert
-werden.
+  pro Asset"), kommt das ebenfalls als Folge-Migration. Bis zur M3-
+  Aktivierung wird kein Stub vorgeschattet — Schema offen, weil das
+  Eviction-Design noch nicht geschlossen ist.
 
 ---
 
