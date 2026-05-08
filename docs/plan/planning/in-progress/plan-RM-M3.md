@@ -1,10 +1,13 @@
 # Plan RM-M3 Native Control Core + M2-Folgearbeit
 
-**Dokumenttyp:** Offener Detailplan / M3
-**Status:** Verfeinert / implementierungsbereit als Slice-Plan; bleibt
-unter `open/`, bis M3 aktiviert wird.
+**Dokumenttyp:** Aktiver Detailplan / M3
+**Status:** In Arbeit — RM-M3-01 (C-ABI-Header) wird als Erstes gezogen,
+restliche Pakete folgen in der unten dokumentierten Slice-Reihenfolge.
+Aktivierungsbedingungen vor Beginn verifiziert: M2-Baseline grün auf
+`main`, Referenzpfad lokalisierbar, Build-Toolchain via Docker
+verfügbar, kein Migrationsbedarf für RM-M3-01..13.
 **Bezug:**
-[`../in-progress/roadmap.md`](../in-progress/roadmap.md) (M3,
+[`roadmap.md`](roadmap.md) (M3,
 RM-M3-01..13), [`../done/plan-RM-M2-optimization.md`](../done/plan-RM-M2-optimization.md)
 (OP-OPEN-05/06), [`../done/plan-RM-M2-migration.md`](../done/plan-RM-M2-migration.md)
 (Migrationspfad als Vorbedingung fuer schema-veraendernde Folgearbeit),
@@ -318,7 +321,7 @@ eine Native Library fuer die Tests gebaut oder bewusst simuliert wurde.
 
 | Status | ID       | Paket                                                              | Abhaengigkeit | DoD |
 | ------ | -------- | ------------------------------------------------------------------ | ------------- | --- |
-| ⬜     | RM-M3-01 | C-ABI `battery_control_core.h`                                     | M2 done       | Header definiert stabile Structs fuer Snapshot, Limits, Request und Command inklusive expliziter Feldtypen, Alignment-/Packing-Regeln, Einheiten und Vorzeichenkonvention (Entladen positiv). Header ist C-kompatibel, C++-kompilierbar, versioniert und enthaelt keine ABI-relevanten Includes ausser Standard-C-Integer/Float-Typen. Numerische Status- und Reason-Codes sind ab Merge ABI. |
+| ✅     | RM-M3-01 | C-ABI `battery_control_core.h`                                     | M2 done       | Header `native/battery_control_core/include/battery_control_core.h` definiert die vier Structs (`bcc_snapshot_t`, `bcc_limits_t`, `bcc_request_t`, `bcc_command_t`), 6 Statuscodes, 13 Reason-Codes (1:1 zu den heutigen managed Reason-Strings) und 4 Mode-Werte (passend zu `BatteryEms.Domain.CommandMode`). ABI-Version 0.1.0 als gepacktes uint32 via `battery_control_core_abi_version()`. Booleans als int32_t 0/1, keine ABI-relevanten Includes ausser `<stdint.h>`, `extern "C"`-Block für C++-Kompatibilität. Discharge-positive Vorzeichenkonvention dokumentiert. Header parst sauber unter `gcc -xc -fsyntax-only -Wall -Wextra -pedantic -std=c11` und `g++ -xc++ -std=c++17`. README `native/battery_control_core/README.md` hält Slice-Status für die folgenden M3-Pakete. |
 | ⬜     | RM-M3-02 | C++-Implementierung Constraint + Ramp + Statuscode-Fehlerpfade     | RM-M3-01      | Native Kern bildet zuerst die .NET-Referenzlogik aus `ConstraintLimiter.Apply` und `RampLimiter.Apply` ab; PID folgt danach in RM-M3-13 als eigener inkrementeller Slice, sobald Constraint/Ramp-Parity stabil ist. Statuscodes decken ok, limited, invalid-input, non-finite, negative-dt und unsupported-state ab; keine Exception verlaesst den Export-Pfad. |
 | ⬜     | RM-M3-03 | ABI-Versionsfunktion + Startup-Check in .NET                      | RM-M3-01      | Native Library exportiert ABI-Version; `BatteryEms.Adapters.NativeInterop` liefert einen minimalen Loader-/Startup-Check, der bei `NativeControl:Enabled=false` nicht laedt, bei fehlender Library `library-missing`, bei Ladefehler `load-failed`, bei inkompatibler Major/Minor-Version `abi-mismatch` und bei kompatibler Library `loaded` meldet. `docs/user/quality.md` §5.2 bleibt zur M3-Default-Policy synchron: ABI-Mismatch fuehrt zu .NET-Fallback mit klarer Health-/Log-/Metric-Signalisierung; Startabbruch bleibt nur eine explizite Produktions-Policy mit eigenem Optionswert und Test. Noch keine produktive Compute-Bindings oder Routing-Aktivierung. |
 | ⬜     | RM-M3-04 | P/Invoke-Bindings (`BatteryEms.Adapters.NativeInterop`)            | RM-M3-01..03  | Neuer Driven Adapter referenziert nur Application-Ports/Domain; Compute-Bindings und P/Invoke-Structs fuer Snapshot, Limits, Request und Command pruefen erwartete ABI-Major/Minor-Kompatibilitaet vor jedem produktiven Native-Call. Struct-Layout-Tests pruefen Groesse, Offsets, Calling Convention, Charset-Unabhaengigkeit und Marshal-Verhalten auf Linux x64. Loader-Pfad ist konfigurierbar und defaultet im Container auf `/app/native/libbattery_control_core.so`. |
