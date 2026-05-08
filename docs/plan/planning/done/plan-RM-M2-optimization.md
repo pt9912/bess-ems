@@ -4,7 +4,7 @@
 **Status:** Abgeschlossen — alle Arbeitspakete OP-01..09 ✅. M3-Folgearbeit
 für die offenen Punkte OP-OPEN-05 (Optimistic-Concurrency in
 `IScheduleRepository.Replace`) und OP-OPEN-06 (Lock-Table-Eviction)
-hängt am ebenfalls offenen [`../open/plan-RM-M2-migration.md`](../open/plan-RM-M2-migration.md).
+hängt am laufenden [`../in-progress/plan-RM-M2-migration.md`](../in-progress/plan-RM-M2-migration.md).
 **Bezug:** [`../in-progress/roadmap.md`](../in-progress/roadmap.md)
 (RM-M2-03, RM-M2-04, RM-M2-05, RM-M2-09),
 [`plan-RM-M1.md`](plan-RM-M1.md)
