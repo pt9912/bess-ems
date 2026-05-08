@@ -198,6 +198,47 @@ public sealed class ControlCycleSafetyTests
     }
 
     [Fact]
+    public async Task Non_finite_kernel_result_yields_safe_stop_and_does_not_poison_cache()
+    {
+        // RM-M3-05 review M-2: a kernel that ever returns NaN/Inf
+        // (in practice a future native bug or a contaminated input
+        // that slipped past the precheck) MUST NOT poison the cycle's
+        // _previous-power cache. Otherwise the next ramp comparison
+        // sees NaN bounds and silently emits "within-limits" with the
+        // requested value (or holds NaN), turning one bad tick into
+        // a multi-tick degradation. The cycle treats a non-finite
+        // kernel result as a safe-stop and leaves the cache as it
+        // was — verified by the second tick still ramping from the
+        // last-good 0 kW rather than NaN.
+        var assets = new InMemoryBatteryAssetRegistry(new[] { TestFixtures.CreateAsset() });
+        var snapshots = new InMemorySnapshotStore(TimeSpan.FromSeconds(10));
+        var stops = new InMemoryOperatorStopRegistry();
+        var clock = new FakeClock();
+        var nanKernel = new NanKernel();
+        var cycle = new ControlCycleUseCase(
+            assets, snapshots,
+            new DefaultScheduleTracker(new InMemoryScheduleRepository()),
+            stops, new FixedOptimizer(20),
+            clock, NoOpControlCycleMetrics.Instance,
+            NullLogger<ControlCycleUseCase>.Instance,
+            ControlCycleOptions.Default,
+            nanKernel);
+        snapshots.Update(TestFixtures.CreateTelemetry(), TestFixtures.Now);
+
+        var first = await cycle.ExecuteAsync("asset-1", CancellationToken.None);
+
+        Assert.Equal(CommandMode.Stop, first.Mode);
+        Assert.Equal(CommandSource.Fallback, first.Source);
+        Assert.Equal("kernel-non-finite-result", first.Reason);
+
+        // Switch to a clean kernel and prove the cache is unpoisoned —
+        // the second tick still produces a valid command.
+        nanKernel.ReturnNaN = false;
+        var second = await cycle.ExecuteAsync("asset-1", CancellationToken.None);
+        Assert.True(double.IsFinite(second.ActivePowerKw));
+    }
+
+    [Fact]
     public async Task Non_finite_dispatch_target_yields_safe_stop()
     {
         // RM-M3-05 cycle precheck: a NaN/Inf dispatch target would
@@ -227,5 +268,19 @@ public sealed class ControlCycleSafetyTests
     {
         public Task<DispatchResult> OptimizeAsync(DispatchRequest request, CancellationToken cancellationToken)
             => Task.FromResult(new DispatchResult("fixed", targetPowerKw, "fixed-target", IsValid: true));
+    }
+
+    // Test-only kernel that returns a NaN result on demand so the
+    // cycle's M-2 cache-poisoning guard can be exercised.
+    private sealed class NanKernel : IControlKernel
+    {
+        public bool ReturnNaN { get; set; } = true;
+
+        public KernelResult Compute(KernelInput input) =>
+            new(
+                ActivePowerKw: ReturnNaN ? double.NaN : 0.0,
+                Reason: "test",
+                WasLimited: false,
+                Source: KernelResultSource.Managed);
     }
 }

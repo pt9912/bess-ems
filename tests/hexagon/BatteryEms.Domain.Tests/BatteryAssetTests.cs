@@ -114,4 +114,48 @@ public sealed class BatteryAssetTests
         Assert.False(asset.Equals("not-an-asset"));
         Assert.False(asset.Equals(new object()));
     }
+
+    // RM-M3-05 review M-1: every numeric limit must reject NaN/Inf
+    // at construction. NaN comparisons in C# return false in both
+    // directions, so without an explicit !double.IsFinite guard a
+    // NaN limit would slip past the existing range checks and
+    // propagate into the kernel's Constraint comparisons (which
+    // would also be all false → "within-limits" with a NaN result).
+    [Theory]
+    [InlineData("capacityKwh")]
+    [InlineData("maxChargePowerKw")]
+    [InlineData("maxDischargePowerKw")]
+    [InlineData("minSocPercent")]
+    [InlineData("maxSocPercent")]
+    [InlineData("chargeEfficiency")]
+    [InlineData("dischargeEfficiency")]
+    [InlineData("maxRampKwPerSecond")]
+    [InlineData("minOperatingTemperatureCelsius")]
+    [InlineData("maxOperatingTemperatureCelsius")]
+    public void Non_finite_limit_is_rejected(string param)
+    {
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            BuildWithNanFor(param));
+        Assert.Equal(param, ex.ParamName);
+    }
+
+    [Theory]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void Infinite_max_charge_power_is_rejected(double value) =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => new BatteryAsset(
+            "asset-1", 100, value, 50, 10, 90, 0.95, 0.95, 25, -20, 55));
+
+    private static BatteryAsset BuildWithNanFor(string param) => new(
+        assetId: "asset-1",
+        capacityKwh: param == "capacityKwh" ? double.NaN : 100,
+        maxChargePowerKw: param == "maxChargePowerKw" ? double.NaN : 50,
+        maxDischargePowerKw: param == "maxDischargePowerKw" ? double.NaN : 50,
+        minSocPercent: param == "minSocPercent" ? double.NaN : 10,
+        maxSocPercent: param == "maxSocPercent" ? double.NaN : 90,
+        chargeEfficiency: param == "chargeEfficiency" ? double.NaN : 0.95,
+        dischargeEfficiency: param == "dischargeEfficiency" ? double.NaN : 0.95,
+        maxRampKwPerSecond: param == "maxRampKwPerSecond" ? double.NaN : 25,
+        minOperatingTemperatureCelsius: param == "minOperatingTemperatureCelsius" ? double.NaN : -20,
+        maxOperatingTemperatureCelsius: param == "maxOperatingTemperatureCelsius" ? double.NaN : 55);
 }

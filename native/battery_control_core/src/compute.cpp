@@ -24,6 +24,20 @@
 
 #include <cmath>
 
+// RM-M3-05 review M-3: the C-ABI puts bcc_status_t / bcc_reason_t
+// values into int32_t fields on bcc_command_t. Both enums today
+// fit in [0..12], so any C/C++ ABI where int >= 32 bits stores
+// them safely in 4 bytes. Pin the assumption with static_assert
+// so a future enum that grows beyond int32_t would refuse to
+// compile rather than silently truncate when round-tripped
+// through the marshalling layer.
+static_assert(sizeof(int32_t) >= sizeof(bcc_status_t),
+    "bcc_status_t must fit into the int32_t status field of bcc_command_t");
+static_assert(sizeof(int32_t) >= sizeof(bcc_reason_t),
+    "bcc_reason_t must fit into the int32_t reason_code field of bcc_command_t");
+static_assert(sizeof(int32_t) >= sizeof(bcc_mode_t),
+    "bcc_mode_t must fit into the int32_t mode field of bcc_command_t");
+
 namespace {
 
 constexpr int32_t to_i32(bcc_status_t s) { return static_cast<int32_t>(s); }

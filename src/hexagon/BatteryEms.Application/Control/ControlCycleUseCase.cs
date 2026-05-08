@@ -158,6 +158,20 @@ public sealed partial class ControlCycleUseCase : IControlCycleUseCase
             TimeSinceLastCommand: elapsed);
         var kernelResult = _kernel.Compute(kernelInput);
 
+        // RM-M3-05 review M-2: a non-finite kernel result must NOT
+        // re-enter the per-asset previous-power cache; otherwise a
+        // single bad tick poisons every subsequent ramp comparison
+        // (NaN bounds defeat the `requested < lower` guard) and
+        // turns into a multi-tick safe-stop loop. Treat the tick
+        // as a safe-stop and keep the previous value untouched.
+        if (!double.IsFinite(kernelResult.ActivePowerKw))
+        {
+            return EmitSafeStop(assetId, now,
+                "kernel-non-finite-result",
+                CommandSource.Fallback,
+                decision: "kernel-non-finite-result");
+        }
+
         _previous[assetId] = (kernelResult.ActivePowerKw, now);
 
         var mode = kernelResult.ActivePowerKw switch

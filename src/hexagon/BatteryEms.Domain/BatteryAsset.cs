@@ -42,6 +42,24 @@ public sealed class BatteryAsset
         double maxOperatingTemperatureCelsius)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(assetId);
+        // RM-M3-05 review M-1: NaN comparisons are always false in C#,
+        // so a NaN limit slips past every `< 0`, `>= max`, `<= 0 or > 1`
+        // guard below — the bad value would propagate into the kernel
+        // and either silently pass through Constraint (every comparison
+        // with a NaN bound is false → "within-limits" with a NaN
+        // result) or trip the native non-finite check. Reject every
+        // numeric limit at construction so neither path can see one.
+        ThrowIfNotFinite(capacityKwh, nameof(capacityKwh));
+        ThrowIfNotFinite(maxChargePowerKw, nameof(maxChargePowerKw));
+        ThrowIfNotFinite(maxDischargePowerKw, nameof(maxDischargePowerKw));
+        ThrowIfNotFinite(minSocPercent, nameof(minSocPercent));
+        ThrowIfNotFinite(maxSocPercent, nameof(maxSocPercent));
+        ThrowIfNotFinite(chargeEfficiency, nameof(chargeEfficiency));
+        ThrowIfNotFinite(dischargeEfficiency, nameof(dischargeEfficiency));
+        ThrowIfNotFinite(maxRampKwPerSecond, nameof(maxRampKwPerSecond));
+        ThrowIfNotFinite(minOperatingTemperatureCelsius, nameof(minOperatingTemperatureCelsius));
+        ThrowIfNotFinite(maxOperatingTemperatureCelsius, nameof(maxOperatingTemperatureCelsius));
+
         if (capacityKwh <= 0)
             throw new ArgumentOutOfRangeException(nameof(capacityKwh), "CapacityKwh must be positive.");
         if (maxChargePowerKw < 0)
@@ -78,4 +96,13 @@ public sealed class BatteryAsset
         obj is BatteryAsset other && string.Equals(AssetId, other.AssetId, StringComparison.Ordinal);
 
     public override int GetHashCode() => AssetId.GetHashCode(StringComparison.Ordinal);
+
+    private static void ThrowIfNotFinite(double value, string paramName)
+    {
+        if (!double.IsFinite(value))
+        {
+            throw new ArgumentOutOfRangeException(paramName,
+                $"{paramName} must be a finite double; got {value}.");
+        }
+    }
 }

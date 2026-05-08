@@ -517,6 +517,8 @@ stabil dokumentiert sein.
 | M2-Folgearbeit wird versehentlich mit Native-Kern vermischt | FUP-Trigger bleiben explizit; Schema-Aenderungen ziehen zuerst RM-M3-FUP-01. |
 | In-Process-Native kann den Host bei Speicherfehlern crashen | Sehr kleine ABI, Sanitizer, C++-Unit-Tests und Default-Fallback bei gemeldeten Fehlern; groessere Solver-/MPC-Kerne bleiben Sidecar-Thema. |
 | Quality-Doku und Plan driften zur ABI-Mismatch-Policy auseinander | RM-M3-03 haelt `docs/user/quality.md` §5.2 und Architektur §13.4 beim ABI-Policy-Slice synchron; RM-M3-12 bleibt der finale Contract-Sync vor produktivem Routing. |
+| `NativeControlLoader` retainiert das `nint handle` heute nicht — RM-M3-D2 muss eine Loader-API-Erweiterung mitbringen, die den Handle vom Loader an den Kernel weiterreicht (Pre-Push-Review M3 m-3). | M3-D2-Slice nimmt entweder eine zweite `TryLoadWithHandle`-Methode oder macht den Loader stateful + IDisposable; die Wahl wird im D2-PR-Body festgelegt, das M3-A/B/C-Wave-Review hat das Wissen explizit dokumentiert. |
+| `ControlCycleUseCase` akzeptiert `IControlKernel? kernel = null` und konstruiert bei DI-Vergessen still den `ManagedControlKernel` (Pre-Push-Review M3 m-4). | M3-D2 zieht das Optional weg und macht den Parameter Required; Host registriert `ManagedControlKernel` explizit als Default. Heute kein Bug, aber im Native-Default-Profil eine Stille-Fehler-Quelle. |
 
 ---
 

@@ -25,13 +25,22 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # duplication.
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Same flag set the standalone compile check used in RM-M3-01/02.
-# RM-M3-09 (native-coverage gate / sanitizers) will broaden this.
+# Same flag set the standalone compile check used in RM-M3-01/02
+# plus three RM-M3-05 review (m-2) additions: -Wshadow catches a
+# inner-vs-outer name reuse that would silently produce wrong
+# values; -Wnull-dereference catches deref'd pointers that
+# RM-M3-02's input validation would otherwise quietly mask;
+# -Wdouble-promotion catches a stray float literal silently
+# promoted into the double pipeline. RM-M3-09 (native-coverage
+# gate / sanitizers) broadens further.
 add_compile_options(
     -Wall
     -Wextra
     -Wpedantic
-    -Werror)
+    -Werror
+    -Wshadow
+    -Wnull-dereference
+    -Wdouble-promotion)
 
 # The native library: shared so the .NET P/Invoke side (RM-M3-04)
 # can dlopen it directly. SONAME tracks the project version so a
