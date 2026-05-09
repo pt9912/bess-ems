@@ -8,7 +8,7 @@ als Folge-Slice mit klar benannten Triggern (§4) offen, aber nicht
 für M3 gewählt. Zwei unabhängige Review-Pässe durchlaufen.
 **Datum:** 2026-05-09
 **Bezug:**
-[`../planning/in-progress/plan-RM-M3.md`](../planning/in-progress/plan-RM-M3.md)
+[`../planning/done/plan-RM-M3.md`](../planning/done/plan-RM-M3.md)
 (RM-M3-01..13, insbesondere RM-M3-09-Closure mit dem C-Pivot und
 RM-M3-13-Closure mit dem PID-Slice),
 [`../../../spec/architecture.md`](../../../spec/architecture.md)

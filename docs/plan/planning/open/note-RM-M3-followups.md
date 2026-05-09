@@ -1,10 +1,10 @@
 # Notiz: M3-Follow-up-Slices (Trigger-Watch)
 
 **Dokumenttyp:** Vorabklärung / Trigger-Watch
-**Status:** Offen — vier vor-Trigger Follow-up-Items aus der M3-Closure
+**Status:** Offen — acht vor-Trigger Follow-up-Items aus der M3-Closure, in zwei Blöcken
 **Bezug:**
-[`../done/plan-RM-M3-D2.md`](../done/plan-RM-M3-D2.md) (M3-D2-Slice „Out of Scope"-Block, der diese vier Items als separate Folge-Slices benannt hat),
-[`../in-progress/plan-RM-M3.md`](../in-progress/plan-RM-M3.md),
+[`../done/plan-RM-M3.md`](../done/plan-RM-M3.md) (Master-Slice-Plan, geschlossen — die M2-Folgewellen-Tabelle „M2-Folgearbeit Mit M3-Trigger" ist Quelle für Block B),
+[`../done/plan-RM-M3-D2.md`](../done/plan-RM-M3-D2.md) (M3-D2-Slice „Out of Scope"-Block — Quelle für Block A),
 [`../in-progress/roadmap.md`](../in-progress/roadmap.md),
 [`../../adr/0003-native-kernel-language.md`](../../adr/0003-native-kernel-language.md) (Sprach-Pivot-Trigger §4),
 [`../../adr/0004-native-kernel-process-isolation.md`](../../adr/0004-native-kernel-process-isolation.md) (Out-of-Process-Pivot-Trigger §4)
@@ -13,21 +13,36 @@
 
 ## Zweck
 
-Die M3-Closure hat den Native Control Core von in-tree-Implementierung
-über volle Quality-Gates bis zur produktiven DI-Aktivierung gezogen
-(RM-M3-01..13 + M3-D2). Vier Follow-up-Items wurden im
-`plan-RM-M3-D2.md`-Slice explizit als „Out of Scope / separate
+Die M3-Closure hat den Native Control Core von in-tree-
+Implementierung über volle Quality-Gates bis zur produktiven
+DI-Aktivierung gezogen (RM-M3-01..13 + M3-D2). Acht Follow-up-
+Items wurden im Zuge der Closure als „Out of Scope / separate
 Folge-Slice" benannt. Damit sie beim nächsten Trigger-Watch
-sichtbar bleiben — statt in einem geschlossenen Plan unter `done/`
-zu verschwinden — sind sie hier zentral mit Trigger-Bedingung,
-Scope-Skizze und Aktivierungs-Pfad geführt.
+sichtbar bleiben — statt in geschlossenen Plänen unter `done/`
+zu verschwinden — sind sie hier zentral in zwei Blöcken geführt:
 
-Kein Item zündet aktuell. Diese Notiz ist **Trigger-Watch-Material**,
-kein Slice-Plan: der konkrete Plan entsteht erst, wenn ein
-Trigger zündet, und zwar im Format `plan-RM-M3-D3.md` (für M3-
-Folge-Slices) oder einer eigenen ADR (für die Architektur-Pivots).
+- **Block A (Items 1–4):** M3-Closure-Out-of-Scope-Items aus dem
+  `plan-RM-M3-D2.md`-Slice — Architektur-/Operations-Themen die
+  beim Bauen der Native-Aktivierung als bewusste Verschiebungen
+  formuliert wurden.
+- **Block B (Items 5–8):** M2-Folgewellen mit M3-Trigger aus
+  dem `plan-RM-M3.md`-Master-Plan — Carve-outs aus der
+  M2-Optimization- und Migration-/Replay-Welle, die mit
+  konkreten externen Triggern in M3+ landen würden.
+
+Kein Item zündet aktuell. Diese Notiz ist **Trigger-Watch-
+Material**, kein Slice-Plan: der konkrete Plan entsteht erst,
+wenn ein Trigger zündet, und zwar im Format `plan-RM-M3-D3.md`
+(für M3-Folge-Slices), `plan-RM-M3-FUP-NN.md` (für die M2-
+Folgewellen) oder einer eigenen ADR (für die Architektur-Pivots).
 
 ---
+
+# Block A — M3-Closure-Out-of-Scope
+
+Quelle: `plan-RM-M3-D2.md` „Out of Scope"-Block. Architektur-/
+Operations-Themen, die beim Bauen der M3-D2-Aktivierung als
+bewusste Verschiebungen formuliert wurden.
 
 ## Item 1: M3-D3 — PID-Routing in den Regelzyklus
 
@@ -190,6 +205,102 @@ prüfen.
 
 ---
 
+# Block B — M2-Folgewellen mit M3-Trigger
+
+Quelle: `plan-RM-M3.md` Tabelle „M2-Folgearbeit Mit M3-Trigger"
+(RM-M3-FUP-01..04). Konkrete Carve-outs aus M2-Optimization
+([`../done/plan-RM-M2-optimization.md`](../done/plan-RM-M2-optimization.md))
+und M2-Migration ([`../done/plan-RM-M2-migration.md`](../done/plan-RM-M2-migration.md))
+sowie aus M2-10 (Telemetrie-Replay), die mit konkreten externen
+Triggern in M3+ landen würden. Anders als Block A (Architektur-/
+Operations-Themen aus M3-D2) sind die Block-B-Items
+**fachlich-konkret** — Schema-Migration, Schedule-Repository-
+Erweiterung, Optimization-Lock-Eviction, Replay-Werkzeuge —
+mit klar benannten DoD-Sätzen aus dem ursprünglichen Plan.
+
+## Item 5: RM-M3-FUP-01 — Erste echte Folgemigration aktivieren
+
+**Trigger:** OP-OPEN-05 oder OP-OPEN-06 wird konkretisiert, oder
+eine andere echte Schema-Änderung wird gebraucht. Heute fährt der
+Migrationspfad aus
+[`../done/plan-RM-M2-migration.md`](../done/plan-RM-M2-migration.md)
+nur den `0001_initial.sql`-Snapshot; eine zweite Migration ist
+noch nicht erzeugt.
+
+**DoD (aus plan-RM-M3.md übernommen):** Der abgeschlossene
+Migrationspfad wird konsumiert: `schema/schema.yaml` wird
+angepasst, eine echte `Migrations/RunOnce/0002_*.sql` wird
+erzeugt/committed, Drafts bleiben nicht eingebettet,
+`schema-validate`/`schema-drift-check` bleiben grün und der
+Runtime-Migrator appliziert die Änderung idempotent.
+
+**Aktivierungs-Pfad:** eigener `plan-RM-M3-FUP-01.md` mit dem
+Auslöser-Trigger im Body, oder als Carve-out-Slice innerhalb des
+auslösenden Plans (z. B. wenn OP-OPEN-05 zündet, wird FUP-01 Teil
+des OP-OPEN-05-Slices).
+
+---
+
+## Item 6: RM-M3-FUP-02 — Optimistic Schedule Replace (OP-OPEN-05)
+
+**Trigger:** Multi-Replica-Optimize oder ein schema-verändernder
+Schedule-Track. Heute ist der `IScheduleRepository` ohne Versions-
+Concurrency-Control, was bei mehreren Optimize-Replicas zu
+Last-Write-Wins führen würde.
+
+**DoD (aus plan-RM-M3.md):** `IScheduleRepository.Replace(schedule,
+expectedBaseVersion)` plus Dapper-`WHERE version = @expected`;
+Versionskonflikt wird als `Failed` Run mit Reason
+`concurrent-version-conflict` auditierbar.
+
+**Aktivierungs-Pfad:** eigener `plan-RM-M3-FUP-02.md`. Triggert
+zusammen mit FUP-01 (Schema-Änderung) — FUP-02 produziert eine
+Schema-Erweiterung (`schedules.version`-Constraint) die dem
+Migrationspfad einen ersten echten Konsumenten gibt.
+
+---
+
+## Item 7: RM-M3-FUP-03 — Optimization-Lock-Eviction (OP-OPEN-06)
+
+**Trigger:** Ephemere Asset-IDs (Test-Setups mit dynamisch
+erzeugten IDs), Multi-Tenant-Rotation (Mandant-Wechsel auf
+einem Host) oder wachsende Test-ID-Sets. Heute hält
+`DefaultScheduleOptimizationUseCase` einen `_locks`-Dictionary
+ohne Eviction — bei langlebigen Hosts mit vielen ID-Variationen
+würde die Hashtabelle unbeschränkt wachsen.
+
+**DoD (aus plan-RM-M3.md):** `_locks` in
+`DefaultScheduleOptimizationUseCase` bekommt LRU/TTL-Eviction
+mit konfigurierbarer Schwelle und Metrik
+`bess_optimization_lock_table_size`.
+
+**Aktivierungs-Pfad:** eigener `plan-RM-M3-FUP-03.md`. Kleine
+Slice (~2 PT), könnte zusammen mit einem Multi-Tenant-Slice
+gebündelt werden.
+
+---
+
+## Item 8: RM-M3-FUP-04 — Replay-Carve-outs nach RM-M2-10
+
+**Trigger:** Externe Fixtures (JSON-File-Loader für externe
+Replay-Datensätze), Operator-Replay (CLI-Werkzeug für ad-hoc
+Replay), Multi-Asset-Replay (Koordination mehrerer Asset-Streams)
+oder Production-Replay (Compare-against-Production-Replay) werden
+konkret gebraucht.
+
+**DoD (aus plan-RM-M3.md):** Der in RM-M2-10 gelieferte
+Telemetrie-Replay-Harness bleibt bestehen. M3+ ergänzt nur
+konkrete Folge-Slices wie JSON-File-Loader unter
+`tests/fixtures/replay/`, Operator-CLI/Make-Target,
+Multi-Asset-Replay-Koordination oder Compare-against-Production-
+Replay; Solver-Replay aus M2 bleibt unverändert.
+
+**Aktivierungs-Pfad:** wahrscheinlich mehrere Mini-Slices, jeder
+für eine konkrete Replay-Variante. Eigene `plan-RM-M3-FUP-04-*.md`-
+Dateien je Variante.
+
+---
+
 ## Trigger-Watch-Disziplin
 
 Diese Notiz wird **nicht aktiv abgearbeitet**. Sie wird gescannt:
@@ -204,10 +315,14 @@ Diese Notiz wird **nicht aktiv abgearbeitet**. Sie wird gescannt:
 Beim Zünden eines Triggers:
 
 1. Item aus dieser Notiz extrahieren.
-2. Eigenen Slice-Plan in `docs/plan/planning/open/` anlegen
-   (`plan-RM-M3-D3.md` für PID-Routing, `plan-RM-M3-FUP-*.md` für
-   Operations-Items, neue ADR + zugehöriger Plan für Architektur-
-   Pivots).
+2. Eigenen Slice-Plan in `docs/plan/planning/open/` anlegen:
+   - Block A: `plan-RM-M3-D3.md` (PID-Routing), Operations-/
+     Observability-Slices für Profile-Defaults und Health-Endpoint,
+     neue ADR + zugehöriger Plan für die Architektur-Pivots.
+   - Block B: `plan-RM-M3-FUP-NN.md` pro FUP-Item (oder
+     Carve-out-Sektion innerhalb des auslösenden Plans, falls der
+     Trigger ein anderer Plan ist — z. B. ein OP-OPEN-05-Slice
+     der FUP-01 + FUP-02 in einem Zug zieht).
 3. Item-Eintrag hier mit Verweis auf den neuen Plan markieren oder
    nach `done/` verschieben sobald der Slice abgeschlossen ist.
 4. Roadmap-„Aktueller Stand"-Block ergänzen.

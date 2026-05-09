@@ -9,7 +9,7 @@ explizit (LH-RT-004 / LH-NF-005). Zwei unabhängige Review-Pässe
 durchlaufen.
 **Datum:** 2026-05-09
 **Bezug:**
-[`../planning/in-progress/plan-RM-M3.md`](../planning/in-progress/plan-RM-M3.md)
+[`../planning/done/plan-RM-M3.md`](../planning/done/plan-RM-M3.md)
 (RM-M3-03..05 ABI-Loader/P-Invoke/Routing, RM-M3-13 PID-Slice mit
 state-tragender Surface),
 [`../../../spec/architecture.md`](../../../spec/architecture.md)

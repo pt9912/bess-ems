@@ -3,7 +3,7 @@
 **Dokumenttyp:** Slice-Plan
 **Status:** Abgeschlossen — alle 7 Arbeitspakete (M3-D2-01..07) grün, alle Akzeptanzkriterien erfüllt, `make gates` / `make ci` / `make runtime` reproduzierbar grün.
 **Bezug:**
-[`../in-progress/plan-RM-M3.md`](../in-progress/plan-RM-M3.md) (M3-D2 als „Separater Folge-Slice
+[`plan-RM-M3.md`](plan-RM-M3.md) (M3-D2 als „Separater Folge-Slice
 nach abgeschlossenen RM-M3-03/05/06/07/10/11/12"),
 [`../../adr/0003-native-kernel-language.md`](../../adr/0003-native-kernel-language.md)
 (Sprache C bleibt für M3-D2),

@@ -1,19 +1,17 @@
 # Plan RM-M3 Native Control Core + M2-Folgearbeit
 
-**Dokumenttyp:** Aktiver Detailplan / M3
-**Status:** In Arbeit — RM-M3-01 (C-ABI-Header) wird als Erstes gezogen,
-restliche Pakete folgen in der unten dokumentierten Slice-Reihenfolge.
-Aktivierungsbedingungen vor Beginn verifiziert: M2-Baseline grün auf
-`main`, Referenzpfad lokalisierbar, Build-Toolchain via Docker
-verfügbar, kein Migrationsbedarf für RM-M3-01..13.
+**Dokumenttyp:** Detailplan / M3 (abgeschlossen)
+**Status:** Abgeschlossen — RM-M3-01..13 alle ✅, M3-D2-Aktivierungs-Slice geschlossen ([`plan-RM-M3-D2.md`](plan-RM-M3-D2.md)). RM-M3-FUP-01..04 sind als trigger-getriebene M2-Folgewellen offen und in [`../open/note-RM-M3-followups.md`](../open/note-RM-M3-followups.md) Block B sichtbar geführt — kein aktiver Trigger heute. ADRs [0003](../../adr/0003-native-kernel-language.md) (Sprache C) und [0004](../../adr/0004-native-kernel-process-isolation.md) (In-Process P/Invoke) sind die Architektur-Anker der Closure.
 **Bezug:**
-[`roadmap.md`](roadmap.md) (M3,
-RM-M3-01..13), [`../done/plan-RM-M2-optimization.md`](../done/plan-RM-M2-optimization.md)
-(OP-OPEN-05/06), [`../done/plan-RM-M2-migration.md`](../done/plan-RM-M2-migration.md)
-(Migrationspfad als Vorbedingung fuer schema-veraendernde Folgearbeit),
-[`docs/user/quality.md`](../../../user/quality.md) (Native-Gates ab M3),
-[`spec/architecture.md`](../../../../spec/architecture.md) (§4.2, §13),
-[`spec/lastenheft.md`](../../../../spec/lastenheft.md) (LH-NATIVE-*,
+[`../in-progress/roadmap.md`](../in-progress/roadmap.md) (M3-Statuszeile),
+[`plan-RM-M3-D2.md`](plan-RM-M3-D2.md) (Aktivierungs-Slice),
+[`../open/note-RM-M3-followups.md`](../open/note-RM-M3-followups.md) (Trigger-Watch für FUPs + M3-D2-Out-of-Scope-Items),
+[`plan-RM-M2-optimization.md`](plan-RM-M2-optimization.md)
+(OP-OPEN-05/06 als FUP-Trigger), [`plan-RM-M2-migration.md`](plan-RM-M2-migration.md)
+(Migrationspfad als FUP-Vorbedingung),
+[`../../../user/quality.md`](../../../user/quality.md) (Native-Gates),
+[`../../../../spec/architecture.md`](../../../../spec/architecture.md) (§4.2, §13),
+[`../../../../spec/lastenheft.md`](../../../../spec/lastenheft.md) (LH-NATIVE-*,
 LH-ARCH-006, LH-TEST-005)
 
 ---
@@ -77,7 +75,7 @@ Weiterbetrieb verlangen.
   produktionsfaehig, testbar und das Vergleichsoracle fuer Native. M3
   darf keine fachliche Abkuerzung einfuehren, die nur im Native-Pfad lebt.
 - **Nicht in diesem Plan:** HIL-Simulator bleibt eigener abgeschlossener Plan
-  [`../done/HIL-simulator.md`](../done/HIL-simulator.md); Regelleistung/OPC-UA bleibt M4;
+  [`HIL-simulator.md`](HIL-simulator.md); Regelleistung/OPC-UA bleibt M4;
   MPC/Solver-Sidecar bleibt M5; Operator UI/Multi-Asset-Skalierung bleibt
   M6.
 
@@ -87,7 +85,7 @@ Weiterbetrieb verlangen.
 
 M3 kann starten, wenn die M2-Pflichtgates stabil gruen sind und ein
 Native-Control-Slice priorisiert wird. Der Persistenz-Migrationspfad aus
-[`../done/plan-RM-M2-migration.md`](../done/plan-RM-M2-migration.md) ist
+[`plan-RM-M2-migration.md`](plan-RM-M2-migration.md) ist
 bereits abgeschlossen und **keine** Vorbedingung fuer RM-M3-01..13,
 solange diese nur Native-/Interop-Code beruehren. Er wird erst konsumiert,
 sobald OP-OPEN-05, OP-OPEN-06 oder eine andere schema-veraendernde
@@ -283,7 +281,7 @@ Export-Baseline fuer RM-M3-01:
 | M3-B Constraint/Ramp Native | C++-Port von `ConstraintLimiter` und `RampLimiter`, Statuscodes, C++-Unit-Tests, Sanitizer. | C++-Tests erreichen alle Constraint-/Ramp-Reason-Codes und alle Fehlerstatus; keine P/Invoke-Abhaengigkeit. |
 | M3-C Interop + Fallback | `BatteryEms.Adapters.NativeInterop`, Loader, P/Invoke-Structs, Konfiguration, Routing hinter expliziter Test-/Profilkonfiguration, Managed-Fallback. | Fehlende `.so`, ABI-Mismatch und native Fehler aus gueltigem .NET-Kontext fallen deterministisch auf Managed zurueck; produktive Default-Aktivierung bleibt gesperrt. |
 | M3-D Parity + Gates | Golden-Datensatz, Interop-/Parity-Runner, Native-Coverage, danach CI-/Make-Integration. | Parity und Coverage laufen zuerst standalone reproduzierbar; erst RM-M3-11 verdrahtet sie in `make gates`/`make ci`; noch keine produktive Profilaktivierung in diesem Slice. |
-| M3-D2 Produktive Profilaktivierung ✅ | Eigener Slice-Plan: [`../done/plan-RM-M3-D2.md`](../done/plan-RM-M3-D2.md). Aktivierungsbedingungen RM-M3-03/05/06/07/10/11/12 alle ✅, ADRs 0003 (Sprache C) + 0004 (In-Process P/Invoke) als Architektur-Anker. Vier Out-of-Scope-Folge-Items (M3-D3 PID-Routing, Production-Profil-Defaults zentralisieren, NativeControl-Health-Endpoint, Out-of-Process/Sprach-Pivot) sind in [`../open/note-RM-M3-followups.md`](../open/note-RM-M3-followups.md) trigger-getrieben gelistet. | Geschlossen: `AddBessNativeControl(IConfiguration)`-Extension in `BatteryEms.Adapters.NativeInterop` registriert `IControlKernel` als Singleton; Default `Enabled=false` → `ManagedControlKernel`, `Enabled=true` + `Loaded` → `NativeFallbackControlKernel` mit echter `.so`, `Enabled=true` + Nicht-Loaded → Managed-Fallback (Default-Policy) bzw. throw bei `AbortOnAbiMismatch=true`. `NativeControlLoadResult.Handle` (M3-D2-01) reicht den OS-Handle vom Loader an den Kernel weiter, ohne zweiten dlopen. Host-Wiring in `BessHostBuilder.BuildApp` zwischen `AddBessApplicationInMemoryStores` und `AddBessWorker`. `appsettings.json` enthält die Default-Section mit `Enabled=false`; ein produktionsnahes Native-Profil setzt `NativeControl:Enabled=true` (z. B. via Env `NativeControl__Enabled=true`). 5 Unit-Tests pinnen die DI-Pfade, 3 Integrationstests gegen die echte `.so` belegen `NativeFallbackControlKernel`-Registrierung + Source=Native im Compute-Result + Disabled-Short-Circuit. `make gates` / `make ci` / `make runtime` bleiben grün. |
+| M3-D2 Produktive Profilaktivierung ✅ | Eigener Slice-Plan: [`plan-RM-M3-D2.md`](plan-RM-M3-D2.md). Aktivierungsbedingungen RM-M3-03/05/06/07/10/11/12 alle ✅, ADRs 0003 (Sprache C) + 0004 (In-Process P/Invoke) als Architektur-Anker. Vier Out-of-Scope-Folge-Items (M3-D3 PID-Routing, Production-Profil-Defaults zentralisieren, NativeControl-Health-Endpoint, Out-of-Process/Sprach-Pivot) sind in [`../open/note-RM-M3-followups.md`](../open/note-RM-M3-followups.md) trigger-getrieben gelistet. | Geschlossen: `AddBessNativeControl(IConfiguration)`-Extension in `BatteryEms.Adapters.NativeInterop` registriert `IControlKernel` als Singleton; Default `Enabled=false` → `ManagedControlKernel`, `Enabled=true` + `Loaded` → `NativeFallbackControlKernel` mit echter `.so`, `Enabled=true` + Nicht-Loaded → Managed-Fallback (Default-Policy) bzw. throw bei `AbortOnAbiMismatch=true`. `NativeControlLoadResult.Handle` (M3-D2-01) reicht den OS-Handle vom Loader an den Kernel weiter, ohne zweiten dlopen. Host-Wiring in `BessHostBuilder.BuildApp` zwischen `AddBessApplicationInMemoryStores` und `AddBessWorker`. `appsettings.json` enthält die Default-Section mit `Enabled=false`; ein produktionsnahes Native-Profil setzt `NativeControl:Enabled=true` (z. B. via Env `NativeControl__Enabled=true`). 5 Unit-Tests pinnen die DI-Pfade, 3 Integrationstests gegen die echte `.so` belegen `NativeFallbackControlKernel`-Registrierung + Source=Native im Compute-Result + Disabled-Short-Circuit. `make gates` / `make ci` / `make runtime` bleiben grün. |
 | M3-E PID-Slice | PID erst nach stabiler Constraint/Ramp-Parity; eigener ABI-/Struct-Delta nur falls noetig. | PID-Parity gegen `PidController.Step`; negative `dt`, non-finite State und Anti-Windup-Faelle getestet. |
 | M3-FUP | OP-OPEN-05/06 und Migrationen nur bei Trigger. | Keine Schema- oder Multi-Replica-Arbeit blockiert den Native-Kern ohne konkreten Bedarf. |
 
@@ -393,7 +391,7 @@ absolut; Status, Mode und Reason-Codes muessen exakt matchen.
 
 | Status | ID              | Paket                                      | Aktivierungsbedingung | DoD |
 | ------ | --------------- | ------------------------------------------ | --------------------- | --- |
-| ⬜     | RM-M3-FUP-01    | Erste echte Folgemigration ueber vorhandenen Migrationspfad aktivieren | OP-OPEN-05/06 oder erste echte Schema-Aenderung | Der abgeschlossene Migrationspfad aus [`../done/plan-RM-M2-migration.md`](../done/plan-RM-M2-migration.md) wird konsumiert: `schema/schema.yaml` wird angepasst, eine echte `Migrations/RunOnce/0002_*.sql` wird erzeugt/committed, Drafts bleiben nicht eingebettet, `schema-validate`/`schema-drift-check` bleiben gruen und der Runtime-Migrator appliziert die Aenderung idempotent. |
+| ⬜     | RM-M3-FUP-01    | Erste echte Folgemigration ueber vorhandenen Migrationspfad aktivieren | OP-OPEN-05/06 oder erste echte Schema-Aenderung | Der abgeschlossene Migrationspfad aus [`plan-RM-M2-migration.md`](plan-RM-M2-migration.md) wird konsumiert: `schema/schema.yaml` wird angepasst, eine echte `Migrations/RunOnce/0002_*.sql` wird erzeugt/committed, Drafts bleiben nicht eingebettet, `schema-validate`/`schema-drift-check` bleiben gruen und der Runtime-Migrator appliziert die Aenderung idempotent. |
 | ⬜     | RM-M3-FUP-02    | Optimistic Schedule Replace (OP-OPEN-05)   | Multi-Replica-Optimize oder schema-veraendernder Schedule-Track | `IScheduleRepository.Replace(schedule, expectedBaseVersion)` plus Dapper-`WHERE version = @expected`; Versionskonflikt wird als `Failed` Run mit Reason `concurrent-version-conflict` auditierbar. |
 | ⬜     | RM-M3-FUP-03    | Optimization-Lock-Eviction (OP-OPEN-06)    | Ephemere Asset-IDs, Multi-Tenant-Rotation oder wachsende Test-ID-Sets | `_locks` in `DefaultScheduleOptimizationUseCase` bekommt LRU/TTL-Eviction mit konfigurierbarer Schwelle und Metrik `bess_optimization_lock_table_size`. |
 | ⬜     | RM-M3-FUP-04    | Replay-Carve-outs nach RM-M2-10            | Externe Fixtures, Operator-Replay, Multi-Asset-Replay oder Production-Replay werden gebraucht | Der in RM-M2-10 gelieferte Telemetrie-Replay-Harness bleibt bestehen. M3+ ergaenzt nur konkrete Folge-Slices wie JSON-File-Loader unter `tests/fixtures/replay/`, Operator-CLI/Make-Target, Multi-Asset-Replay-Koordination oder Compare-against-Production-Replay; Solver-Replay aus M2 bleibt unveraendert. |
