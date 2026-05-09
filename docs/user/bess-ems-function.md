@@ -59,14 +59,62 @@ Die EMS-Funktion lässt sich in sechs wiederkehrende Schritte gliedern:
 
 ## 2. Eingaben
 
-| Quelle             | Typische Daten                                     | Zweck im EMS                                              |
-| ------------------ | -------------------------------------------------- | --------------------------------------------------------- |
-| Netzanschlusspunkt | Wirkleistung, Blindleistung, Spannung, Frequenz    | Rückmeldung, ob der Zielwert am PCC erreicht wird         |
-| Batterie/BMS       | SOC, SOH, Zell-/Rack-Limits, Temperaturen, Freigaben, Alarme | Schutzgrenzen und verfügbare Lade-/Entladeleistung |
-| PCS/Wechselrichter | aktueller P/Q-Wert, Status, Fehler, Verfügbarkeit  | Umsetzung und Plausibilisierung des Dispatchs             |
-| Markt/Fahrplan     | Day-Ahead-Fahrplan, Intraday-Änderungen, Abrufe    | wirtschaftliche oder vertragliche Zielvorgabe             |
-| Prognosen          | Last, Erzeugung, Preise, Verfügbarkeit             | vorausschauende Optimierung statt reiner Momentanregelung |
-| Operator           | Betriebsmodus, Sperren, manuelle Limits, Freigaben | Prioritäten und betriebliche Leitplanken                  |
+| Quelle             | Typische Daten                                               | Zweck im EMS                                              |
+| ------------------ | ------------------------------------------------------------ | --------------------------------------------------------- |
+| Netzanschlusspunkt | Wirkleistung, Blindleistung, Spannung, Frequenz              | Rückmeldung, ob der Zielwert am PCC erreicht wird         |
+| Batterie/BMS       | SOC, SOH, Zell-/Rack-Limits, Temperaturen, Freigaben, Alarme | Schutzgrenzen und verfügbare Lade-/Entladeleistung        |
+| PCS/Wechselrichter | aktueller P/Q-Wert, Status, Fehler, Verfügbarkeit            | Umsetzung und Plausibilisierung des Dispatchs             |
+| Markt/Fahrplan     | Day-Ahead-Fahrplan, Intraday-Änderungen, Abrufe              | wirtschaftliche oder vertragliche Zielvorgabe             |
+| Prognosen          | Last, Erzeugung, Preise, Verfügbarkeit                       | vorausschauende Optimierung statt reiner Momentanregelung |
+| Operator           | Betriebsmodus, Sperren, manuelle Limits, Freigaben           | Prioritäten und betriebliche Leitplanken                  |
+
+### 2.1 Rollen der Kernkomponenten
+
+- **BMS (Battery Management System)**  
+  Batterieüberwachung/-steuerung, Alarmierung bei abnormalen Zuständen, und
+  Bereitstellung von SOC, SOH, Limits sowie Freigaben für das EMS.
+- **Auxiliary System**  
+  Überwacht Umgebungs- und Sicherheitszustände wie Temperatur,
+  unautorisierten Zugriff, USV-Zustand und HVAC und meldet Auffälligkeiten.
+- **PCS (Power Conversion System)**  
+  Setzt EMS-Kommandos um, steuert Lade- und Entladeleistung und
+  übernimmt die AC/DC-Umsetzung.
+- **EMS (Energy Management System)**  
+  Steuert den Leistungsfluss, überwacht den SoC im Betrieb, unterstützt
+  Remote Monitoring und KPI-Management sowie lokales und cloud-basiertes
+  Logging und Management.
+
+```mermaid
+flowchart LR
+  subgraph "BESS-Landschaft"
+    BMS[BMS<br/>Batteriezustand & Limits]
+    AUX[Auxiliary<br/>Umgebung, USV, HVAC, Zutritt]
+    PCS[PCS<br/>AC/DC-Umrichter]
+    EMS[EMS<br/>Dispatch & Optimierung]
+    BAT[Batterie]
+  end
+
+  subgraph "Monitoring-Ebene"
+    SCADA[Remote Monitoring<br/>und KPI-Dashboard]
+    CLOUD[Cloud-/Historian-Lager<br/>Logging]
+  end
+
+  BAT --> BMS
+  BAT --> PCS
+  PCS --> BMS
+  AUX --> BMS
+  AUX --> EMS
+  BMS --> EMS
+  PCS --> EMS
+  EMS --> PCS
+  EMS --> BMS
+  EMS --> SCADA
+  EMS --> CLOUD
+  SCADA --> EMS
+
+  Grid[Netzanschlusspunkt<br/>PCC] --> PCS
+  PCS --> Grid
+```
 
 ---
 
@@ -76,6 +124,10 @@ Das EMS entscheidet nicht nur, **ob** geladen oder entladen wird, sondern
 auch **wie stark**, **wie lange** und **unter welchen Grenzen**.
 
 Typische Entscheidungslogik:
+
+- Das EMS verarbeitet kontinuierlich eintreffende Datenströme (Messwerte,
+  Prognosen, Markt- und Statusinformationen), um Lade- und Entladezyklen
+  laufend zu optimieren.
 
 - Bei niedrigen Preisen oder lokaler Überschusserzeugung laden.
 - Bei hohen Preisen oder Lastspitzen entladen.
@@ -112,17 +164,22 @@ technischen Systeme. Das BMS liefert dafür Schutzgrenzen, Freigaben und
 Batteriezustand; P/Q-Sollwerte werden an PCS beziehungsweise
 Feldadapter ausgegeben.
 
-| Zielsystem              | Ausgabe                                       | Bedeutung                                         |
-| ----------------------- | --------------------------------------------- | ------------------------------------------------- |
-| PCS / Wechselrichter    | `P`-Sollwert                                  | Laden oder Entladen der Batterie                  |
-| PCS / Wechselrichter    | `Q`-Sollwert                                  | Blindleistungsbereitstellung, falls aktiv         |
-| Persistenz / Monitoring | Telemetrie, Commands, Audit-Events            | Nachvollziehbarkeit und Betriebsauswertung        |
-| Operator-Oberfläche     | Status, Fehler, aktueller Modus               | Transparenz für Leitwarte und Betrieb             |
+| Zielsystem              | Ausgabe                            | Bedeutung                                  |
+| ----------------------- | ---------------------------------- | ------------------------------------------ |
+| PCS / Wechselrichter    | `P`-Sollwert                       | Laden oder Entladen der Batterie           |
+| PCS / Wechselrichter    | `Q`-Sollwert                       | Blindleistungsbereitstellung, falls aktiv  |
+| Persistenz / Monitoring | Telemetrie, Commands, Audit-Events | Nachvollziehbarkeit und Betriebsauswertung |
+| Operator-Oberfläche     | Status, Fehler, aktueller Modus    | Transparenz für Leitwarte und Betrieb      |
 
-Intern gilt die BESS-EMS-Vorzeichenkonvention des Systems: positive
-Wirkleistung bedeutet Entladen beziehungsweise Einspeisen aus der
-Batterie, negative Wirkleistung bedeutet Laden beziehungsweise Bezug in
-die Batterie, `0 kW` bedeutet kein aktiver Lade- oder Entladebefehl.
+Zur Vermeidung von Mehrdeutigkeit gilt im weiteren Verlauf die interne
+BESS-EMS-Konvention dieses Dokuments:
+
+- `+P` bedeutet Entladen bzw. Einspeisen an das Netz
+- `-P` bedeutet Laden bzw. Bezug in die Batterie
+- `0 kW` bedeutet kein aktiver Lade- oder Entladebefehl
+- `+Q` bzw. `-Q` folgen der je nach Netzanschlusspunkt vereinbarten
+  Blindleistungsdefinition
+
 Abweichende Gerätekonventionen werden in Protokolladaptern umgesetzt,
 damit Fahrpläne, Optimierung, Limiter, Commands und Persistenz intern
 dieselbe Konvention verwenden.
@@ -155,8 +212,46 @@ Praktisch bedeutet das:
 - Keine Sollwerte außerhalb freigegebener Batterie- oder PCS-Limits.
 - Kein Normalbetrieb bei kritischen Alarmen.
 - Begrenzung von Rampen und Sprüngen.
+- Konkreter Notfall-/Fallbackmodus bei Störungen (z. B. Datenqualitäts-
+  degradiert, Kommunikationsausfall, kritischer Alarm): sichere
+  Leistungs-Sollwerte ausgeben (`P=0`, `Q=0`) und auf manuellen
+  Freigabestatus warten.
 - Nachvollziehbare Command- und Audit-Historie.
 - Definiertes Verhalten bei Kommunikations- oder Datenqualitätsfehlern.
+
+## 6.1 Notfall- und Wiederanlaufablauf (vereinfacht)
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'background':'#f8fafc','primaryColor':'#dbeafe','primaryTextColor':'#0f172a','primaryBorderColor':'#1e40af','lineColor':'#8f872a','secondaryColor':'#fef3c7','tertiaryColor':'#dcfce7','noteBkgColor':'#fef3c7','noteTextColor':'#0f172a','noteBorderColor':'#a16207','actorBkg':'#dbeafe','actorBorder':'#1e40af','actorTextColor':'#0f172a','actorLineColor':'#475569','signalColor':'#0f172a','signalTextColor':'#0f172a','sequenceNumberColor':'#ffffff','labelTextColor':'#0f172a','loopTextColor':'#0f172a','edgeLabelBackground':'#f8fafc'}}}%%
+flowchart TD
+  A[Normaler Regelbetrieb] --> B{Zustand gesund?}
+  B -- ja --> C[Optimierung und Dispatch aktiv]
+  C --> B
+  B -- nein --> D[Safe-Monitoring]
+  D --> E[P und Q auf 0]
+  E --> F[Alarmkontext loggen und Operator informieren]
+  F --> G{Manuelle Freigabe und Leitplanken erfüllt?}
+  G -- ja --> H[Grenzwerte prüfen, SOC SOH PCS BMS]
+  H --> I[Wiederanlauf mit Rampenlimit]
+  I --> B
+  G -- nein --> E
+  D -->|Timeout| B
+```
+
+## 6.2 Typische Auslöser für den sicheren Zustand
+
+| Ereignis (Beispiel)                               | Typische Auswirkung                        | Reaktion im Safe-Mode                              |
+| ------------------------------------------------- | ------------------------------------------ | -------------------------------------------------- |
+| Kritischer BMS-Alarm                              | Batterie- oder Zellschutz greift           | `P=0`, `Q=0`, keine aktiven Dispatch-Befehle       |
+| PCS-Fehler, Freigabe weg                          | Leistungsabgabe kann nicht sicher erfolgen | Leistung auf 0, Anlagenzustand sichern             |
+| Kommunikationsverlust EMS↔BMS/PCS                 | Zustand/limits nicht verlässlich           | Fallback-Befehle halten, Monitoring alarmieren     |
+| Unplausible Messung (z. B. Sprünge, Timeout)      | Optimierung wird unzuverlässig             | Fallback beibehalten, Operator informieren         |
+| Datenqualität unter Grenzwert                     | Risiko falscher Dispatch-Berechnung        | Kein automatischer Re-Enable bis Freigabe          |
+| Scharfes Netzereignis (Frequenz-/Spannungsabwurf) | Netzvorgaben / Schutzlogik erzwingen       | Lokale Grenzwerte respektieren, ggf. 0er Sollwerte |
+
+Ein Rückkehrkriterium ist immer: **kritische Bedingungen beseitigt**,  
+**manuelle Freigabe liegt vor** und **Grenzprüfungen (SOC/SOH, Temperatur,
+BMS/PCS-Limits) sind bestanden**.
 
 ---
 
