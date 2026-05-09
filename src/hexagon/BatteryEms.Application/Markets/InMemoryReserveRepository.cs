@@ -3,6 +3,12 @@ using BatteryEms.Domain;
 
 namespace BatteryEms.Application.Markets;
 
+// M4-default reserve store. Today's usage pattern is seeded-at-startup
+// and never modified: the bag grows once during boot and is read on
+// every optimise call. RM-M4-02 leaves eviction out — once a write
+// path arrives (operator API, hourly roll-forward seeder, etc.) the
+// unbounded ConcurrentBag becomes a leak; switch to a TTL/LRU
+// structure at that point.
 public sealed class InMemoryReserveRepository : IReserveRepository
 {
     private readonly ConcurrentBag<ReserveBand> _bands = new();

@@ -56,6 +56,11 @@ public sealed class ReserveBand
             throw new ArgumentOutOfRangeException(
                 nameof(powerKw), "PowerKw is a magnitude (>= 0); use Direction to express sign.");
         }
+        // FCR is symmetric per the EU PRL/FCR product spec; AFRR and
+        // MFRR are tendered as separate Up and Down bands. Some TSO
+        // products tender symmetric AFRR; if that lands as a real
+        // requirement, relax the matcher to accept Symmetric for
+        // AFRR/MFRR rather than carve out a new ReserveProduct.
         var matchesProduct = product switch
         {
             ReserveProduct.Fcr => direction == ReserveDirection.Symmetric,

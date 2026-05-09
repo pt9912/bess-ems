@@ -302,6 +302,36 @@ public sealed class OrToolsScheduleOptimizerReserveTests
             $"step 1 (band-excluded) should discharge at 50 kW, got {w[1].TargetPowerKw}");
     }
 
+    [Theory]
+    [InlineData(ScheduleType.DayAhead)]
+    [InlineData(ScheduleType.Intraday)]
+    public async Task Reserve_clamp_holds_for_both_schedule_types(ScheduleType scheduleType)
+    {
+        // Plan-DoD pin: "Day-Ahead- und Intraday-Optimierung Reserve-
+        // Bänder nicht verletzen". The optimiser is currently
+        // ScheduleType-agnostic in its LP body — this test inoculates
+        // against a future ScheduleType-conditional branch silently
+        // invalidating Intraday coverage.
+        var asset = TestFixtures.CreateAsset(capacityKwh: 1000, maxChargePowerKw: 50, maxDischargePowerKw: 50);
+        var horizon = NewHorizon(TimeSpan.FromHours(1), PaidToChargeThenExpensive.Length);
+        var fcr = new ReserveBand(
+            asset.AssetId, ReserveProduct.Fcr, ReserveDirection.Symmetric,
+            horizon.Start, horizon.End, 10);
+
+        var optimizer = Build();
+        var request = new ScheduleOptimizationRequest(
+            NewCommand(asset, PaidToChargeThenExpensive, TimeSpan.FromHours(1), scheduleType),
+            "DE-LU", baseScheduleVersion: 0, reserves: new[] { fcr });
+        var result = await optimizer.OptimizeAsync(request, CancellationToken.None);
+
+        Assert.Equal(OptimizationSolverStatus.Optimal, result.Run.Status);
+        var w = result.ProducedSchedule!.Windows;
+        Assert.True(w[0].TargetPowerKw >= -40 - Tolerance,
+            $"{scheduleType}: FCR=10 should clamp charge cap to 40 kW, got {w[0].TargetPowerKw}");
+        Assert.True(w[1].TargetPowerKw <= 40 + Tolerance,
+            $"{scheduleType}: FCR=10 should clamp discharge cap to 40 kW, got {w[1].TargetPowerKw}");
+    }
+
     private static OrToolsScheduleOptimizer Build() => new(
         new ScheduleSolverOptions(),
         new TestFixtures.FrozenClock(TestFixtures.HorizonStart),
@@ -327,9 +357,10 @@ public sealed class OrToolsScheduleOptimizerReserveTests
     private static ScheduleOptimizationCommand NewCommand(
         BatteryAsset asset,
         IReadOnlyList<double> prices,
-        TimeSpan timeStep) => new(
+        TimeSpan timeStep,
+        ScheduleType scheduleType = ScheduleType.DayAhead) => new(
         assetId: asset.AssetId,
-        scheduleType: ScheduleType.DayAhead,
+        scheduleType: scheduleType,
         asset: asset,
         horizonStart: TestFixtures.HorizonStart,
         horizonEnd: TestFixtures.HorizonStart + TimeSpan.FromTicks(timeStep.Ticks * prices.Count),

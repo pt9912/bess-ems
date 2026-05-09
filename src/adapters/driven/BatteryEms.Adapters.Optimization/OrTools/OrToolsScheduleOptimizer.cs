@@ -29,6 +29,14 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
     // surface floating-point noise like -1.4e-12 EUR (review #18).
     private const double ObjectiveZeroEpsilon = 1e-9;
 
+    // RM-M4-02: tolerance for the over-commit precheck on per-step
+    // reserve caps. A reserve set whose mathematical sum equals the
+    // asset's nameplate can land at -1e-16 from cancellation noise when
+    // sub-kW magnitudes are involved; treating those as 0 (not as
+    // over-commit) keeps the precheck honest without hiding genuine
+    // over-commits (which sit at far larger negative magnitudes).
+    private const double ReserveCapEpsilon = 1e-9;
+
     private readonly ScheduleSolverOptions _options;
     private readonly IClock _clock;
     private readonly ILogger<OrToolsScheduleOptimizer> _logger;
@@ -125,7 +133,7 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
         var (effChargeMax, effDischargeMax) = ComputeReserveCaps(request, n);
         for (var t = 0; t < n; t++)
         {
-            if (effChargeMax[t] < 0 || effDischargeMax[t] < 0)
+            if (effChargeMax[t] < -ReserveCapEpsilon || effDischargeMax[t] < -ReserveCapEpsilon)
             {
                 return BuildFailedResult(request,
                     terminationCode: "reserve-exceeds-capacity",
@@ -134,6 +142,11 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
                     warning: $"Held reserve at step {t} exceeds asset capacity " +
                         $"(charge_cap={effChargeMax[t]:F3} kW, discharge_cap={effDischargeMax[t]:F3} kW).");
             }
+            // Clamp tiny negative noise to exact 0 before the LP variable
+            // upper bound is set — GLOP would otherwise reject a NumVar
+            // with ub < lb (lb is 0).
+            if (effChargeMax[t] < 0) { effChargeMax[t] = 0; }
+            if (effDischargeMax[t] < 0) { effDischargeMax[t] = 0; }
         }
 
         // GLOP ships with the Google.OrTools NuGet, so CreateSolver is
@@ -332,18 +345,29 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
         return new ScheduleOptimizationResult(run, producedSchedule: null);
     }
 
-    // Computes per-step objective coefficients on charge/discharge from
-    // every active component that contributes to those variables. Each
-    // component adds to the running totals, then SetCoefficient is called
-    // exactly once per (variable, step) — OR-Tools' SetCoefficient
-    // overwrites, so accumulating in arrays first keeps the contributions
     // RM-M4-02: per-step max-charge/max-discharge caps after deducting
-    // held reserves (LH-MKT-004). A reserve covers step t if its
-    // half-open window contains the step's start instant; multiple
+    // held reserves (LH-MKT-004). Step-mapping is a point-sample at
+    // `stepStart`: a band covers step t if its half-open window
+    // [Start, End) contains the step's start instant. Multiple
     // reserves of the same Direction sum (e.g. FCR 5 kW + AFRR-Up
     // 3 kW at the same step). Symmetric reserves withhold capacity on
-    // both sides; Up only on discharge; Down only on charge. The
-    // returned arrays may carry negative values when reserves over-
+    // both sides; Up only on discharge; Down only on charge.
+    //
+    // Why: For 15-min reserve windows aligned to wall-clock quarters
+    // and a TimeStep that's a multiple of 15 min, the point-sample is
+    // an identity. For misaligned configurations (e.g. TimeStep=1h
+    // with bands starting at :30) the model silently misses sub-step
+    // bands. A future "any-overlap with proportional deduction" or an
+    // alignment precondition is a separate slice (see plan-RM-M4
+    // §Bewusst draußen).
+    //
+    // The defensive `band.AssetId == asset.AssetId` filter looks
+    // redundant against `IReserveRepository.FindActive(assetId, …)`,
+    // but the optimiser may be called with a hand-built request from
+    // tests or future callers that bypass the use case — the check
+    // keeps the cap math agnostic to caller hygiene.
+    //
+    // Returned arrays may carry negative values when reserves over-
     // commit a step — the caller surfaces that as
     // `reserve-exceeds-capacity` rather than letting it become an
     // LP-infeasible cap.
@@ -396,6 +420,11 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
         return (effChargeMax, effDischargeMax);
     }
 
+    // Computes per-step objective coefficients on charge/discharge from
+    // every active component that contributes to those variables. Each
+    // component adds to the running totals, then SetCoefficient is called
+    // exactly once per (variable, step) — OR-Tools' SetCoefficient
+    // overwrites, so accumulating in arrays first keeps the contributions
     // explicit and avoids read-modify-write against the solver state.
     private (double[] chargeCoef, double[] dischargeCoef) ComputeChargeDischargeCoefficients(
         ScheduleOptimizationRequest request,

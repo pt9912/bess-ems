@@ -36,8 +36,11 @@ public sealed class ScheduleOptimizationRequest
     public int BaseScheduleVersion { get; }
 
     // RM-M4-02 LH-MKT-004: held reserve bands the optimiser must honour
-    // by deducting capacity per overlapping horizon step. Empty when no
-    // reserves are held; that path is bit-identical to the M2 optimiser.
+    // by deducting capacity per horizon step the band's window covers
+    // (point-sample at step start; misaligned sub-step bands are not
+    // partially deducted today — see plan-RM-M4 §Bewusst draußen).
+    // Empty when no reserves are held; that path is bit-identical to
+    // the M2 optimiser.
     public IReadOnlyList<ReserveBand> Reserves { get; }
 
     public ScheduleOptimizationRequest(
