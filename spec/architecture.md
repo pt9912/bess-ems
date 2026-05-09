@@ -161,7 +161,7 @@ Case → Driven Ports → Driven Adapter**.
         │ ICommandRepository, IScheduleRepository,         │
         │ IAuditLog, IScheduleOptimizer, IClock,           │
         │ IOptimizationRunRepository, IDispatchOptimizer,  │
-        │ INativeBatteryControlKernel, ITelemetryExporter  │
+        │ IControlKernel, ITelemetryExporter               │
         └─────────┬───────────┬─────────────┬──────────────┘
                   │           │             │
         ┌─────────▼──┐ ┌──────▼──────┐ ┌────▼─────────────┐
@@ -204,7 +204,7 @@ bess-ems/
 │   └── infrastructure/
 │       └── BatteryEms.Infrastructure/        # Cross-cutting: Config-Loader, DI-Wiring, Health
 ├── native/
-│   └── battery_control_core/                 # ab M3, eigene C-ABI-Bibliothek
+│   └── battery_control_core/                 # ab M3, eigene C-Bibliothek mit C-ABI-Header
 └── tests/
     ├── hexagon/
     │   ├── BatteryEms.Domain.Tests/
@@ -248,7 +248,7 @@ hier.
 | `IScheduleOptimizer`              | Optimization (LP/MILP/heuristisch ab M2)        | Fahrpläne über Horizon erzeugen oder aktualisieren          | LH-OPT-001..009       |
 | `IDispatchOptimizer`              | Optimization (NoOp im MVP, MPC später)          | Single-Step-Dispatch im Regelzyklus                        | LH-OPT-007, LH-CTRL-005 |
 | `IOptimizationRunRepository`       | Persistence                                     | Optimierungsläufe und Objective Breakdown speichern         | LH-PERSIST-007        |
-| `INativeBatteryControlKernel`     | NativeInterop (ab M3)                           | Constraint/Ramp/PID schnell ausführen                      | LH-NATIVE-001/004     |
+| `IControlKernel`                  | Application (`ManagedControlKernel`) und NativeInterop (`NativeFallbackControlKernel`, ab M3) | Constraint/Ramp/PID ausführen; Native bevorzugt mit deterministischem Managed-Fallback bei nativem Fehler | LH-NATIVE-001/004     |
 | `IClock`                          | Infrastructure                                  | UTC-Zeit, deterministisch in Tests                         | LH-MKT-007            |
 | `ITelemetryExporter`              | Telemetry                                       | Logs/Metrics/Traces nach außen                             | LH-MON-001/002/003    |
 | `IConfigurationProvider`          | Infrastructure                                  | validierte Konfiguration bereitstellen                     | LH-CONF-001..003      |
@@ -702,10 +702,24 @@ Phase 4 (optional)   : Shared Memory / CPU Pinning / Edge Controller
 
 ### 13.4 Fallback
 
-`BatteryEms.Adapters.NativeInterop` exportiert dasselbe Interface wie die
-.NET-Referenzimplementierung. Bei fehlender Bibliothek, ABI-Mismatch oder
-Native-Fehler greift automatisch die .NET-Variante; der Regelkreis bleibt
-funktionsfähig (LH-ARCH-006).
+`BatteryEms.Adapters.NativeInterop` (`NativeFallbackControlKernel`)
+implementiert denselben `IControlKernel`-Driven-Port wie die
+.NET-Referenzimplementierung (`ManagedControlKernel`). Bei
+fehlender Bibliothek, ABI-Mismatch oder nativem Fehler aus
+validem .NET-Kontext (`BCC_STATUS_INVALID_INPUT` /
+`BCC_STATUS_NON_FINITE` / `BCC_STATUS_NEGATIVE_DT` /
+`BCC_STATUS_UNSUPPORTED_STATE`) ruft der Adapter im selben Tick
+die Managed-Referenz und nutzt deren Ergebnis (Source =
+`NativeFallbackToManaged`); der Regelkreis bleibt funktionsfähig
+(LH-ARCH-006).
+
+Diese Default-Policy gilt verbindlich für M3. Eine produktive
+Deployment-Variante darf zusätzlich
+`NativeControlOptions.AbortOnAbiMismatch=true` setzen — dann führt
+ein ABI-Mismatch beim Startup-Check zu einem harten Fehler statt
+zum Managed-Fallback. Die Abort-Policy ist explizit Opt-in,
+hat einen eigenen Integrationstest und überspielt nicht den
+Default-Fallback-Vertrag (siehe `docs/user/quality.md` §5.2).
 
 ---
 

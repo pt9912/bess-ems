@@ -1,0 +1,332 @@
+{
+  "schema_version": "v1",
+  "tolerance_active_power_kw": 1e-12,
+  "asset_baseline": "M1 single-bess: ±50 kW, SOC band 10..90 %, ramp 25 kW/s, temperature −20..55 °C",
+  "cases": [
+    {
+      "name": "simulator-typical-discharge-no-prev",
+      "description": "10 kW discharge from idle, no previous → ramp skipped, within limits. M1 simulator default operating point.",
+      "snapshot": { "soc_percent": 50, "active_power_kw": 0, "temperature_celsius": 22 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": 10, "previous_active_power_kw": null, "dt_seconds": 1.0 },
+      "expected": { "active_power_kw": 10, "reason": "within-limits", "was_limited": false, "mode": "discharge" }
+    },
+    {
+      "name": "simulator-typical-charge-no-prev",
+      "description": "−10 kW charge from idle, no previous → ramp skipped, within limits.",
+      "snapshot": { "soc_percent": 50, "active_power_kw": 0, "temperature_celsius": 22 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": -10, "previous_active_power_kw": null, "dt_seconds": 1.0 },
+      "expected": { "active_power_kw": -10, "reason": "within-limits", "was_limited": false, "mode": "charge" }
+    },
+    {
+      "name": "simulator-typical-idle",
+      "description": "0 kW dispatch — kernel maps zero output to BCC_MODE_IDLE, not STOP (STOP is a managed-state-machine decision).",
+      "snapshot": { "soc_percent": 50, "active_power_kw": 0, "temperature_celsius": 22 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": 0, "previous_active_power_kw": null, "dt_seconds": 1.0 },
+      "expected": { "active_power_kw": 0, "reason": "within-limits", "was_limited": false, "mode": "idle" }
+    },
+    {
+      "name": "simulator-discharge-25kw-from-idle",
+      "description": "25 kW discharge from idle (prev=0, dt=1) — within ramp window [−25, 25], unclamped.",
+      "snapshot": { "soc_percent": 50, "active_power_kw": 0, "temperature_celsius": 22 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": 25, "previous_active_power_kw": 0, "dt_seconds": 1.0 },
+      "expected": { "active_power_kw": 25, "reason": "within-limits", "was_limited": false, "mode": "discharge" }
+    },
+    {
+      "name": "simulator-charge-15kw-with-prev",
+      "description": "−15 kW charge from prev=−5 (asymmetric ramp, sign-stable).",
+      "snapshot": { "soc_percent": 60, "active_power_kw": -5, "temperature_celsius": 20 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": -15, "previous_active_power_kw": -5, "dt_seconds": 1.0 },
+      "expected": { "active_power_kw": -15, "reason": "within-limits", "was_limited": false, "mode": "charge" }
+    },
+    {
+      "name": "boundary-target-equal-max-discharge",
+      "description": "Target == max_discharge_power exactly → unchanged, OK (boundary check: < vs <= semantics in apply_constraint).",
+      "snapshot": { "soc_percent": 50, "active_power_kw": 0, "temperature_celsius": 22 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": 50, "previous_active_power_kw": null, "dt_seconds": 1.0 },
+      "expected": { "active_power_kw": 50, "reason": "within-limits", "was_limited": false, "mode": "discharge" }
+    },
+    {
+      "name": "boundary-target-equal-neg-max-charge",
+      "description": "Target == −max_charge_power exactly → unchanged, OK.",
+      "snapshot": { "soc_percent": 50, "active_power_kw": 0, "temperature_celsius": 22 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": -50, "previous_active_power_kw": null, "dt_seconds": 1.0 },
+      "expected": { "active_power_kw": -50, "reason": "within-limits", "was_limited": false, "mode": "charge" }
+    },
+    {
+      "name": "boundary-soc-exactly-at-max-blocks-charge",
+      "description": "SOC == max_soc exactly with charge request → blocked (`<` is strict in managed; `>=` for soc is the trigger).",
+      "snapshot": { "soc_percent": 90, "active_power_kw": 0, "temperature_celsius": 22 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": -10, "previous_active_power_kw": null, "dt_seconds": 1.0 },
+      "expected": { "active_power_kw": 0, "reason": "soc-at-max-charge-blocked", "was_limited": true, "mode": "idle" }
+    },
+    {
+      "name": "boundary-soc-exactly-at-min-blocks-discharge",
+      "description": "SOC == min_soc exactly with discharge request → blocked.",
+      "snapshot": { "soc_percent": 10, "active_power_kw": 0, "temperature_celsius": 22 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": 10, "previous_active_power_kw": null, "dt_seconds": 1.0 },
+      "expected": { "active_power_kw": 0, "reason": "soc-at-min-discharge-blocked", "was_limited": true, "mode": "idle" }
+    },
+    {
+      "name": "boundary-temp-exactly-at-max-allowed",
+      "description": "Temp == max_temperature exactly → still allowed (constraint uses `>`, not `>=`).",
+      "snapshot": { "soc_percent": 50, "active_power_kw": 0, "temperature_celsius": 55 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": 10, "previous_active_power_kw": null, "dt_seconds": 1.0 },
+      "expected": { "active_power_kw": 10, "reason": "within-limits", "was_limited": false, "mode": "discharge" }
+    },
+    {
+      "name": "boundary-temp-exactly-at-min-allowed",
+      "description": "Temp == min_temperature exactly → still allowed.",
+      "snapshot": { "soc_percent": 50, "active_power_kw": 0, "temperature_celsius": -20 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": 10, "previous_active_power_kw": null, "dt_seconds": 1.0 },
+      "expected": { "active_power_kw": 10, "reason": "within-limits", "was_limited": false, "mode": "discharge" }
+    },
+    {
+      "name": "clamp-max-discharge-power",
+      "description": "75 kW > 50 kW max_discharge → clamped to 50, reason max-discharge-power.",
+      "snapshot": { "soc_percent": 50, "active_power_kw": 0, "temperature_celsius": 22 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": 75, "previous_active_power_kw": null, "dt_seconds": 1.0 },
+      "expected": { "active_power_kw": 50, "reason": "max-discharge-power", "was_limited": true, "mode": "discharge" }
+    },
+    {
+      "name": "clamp-max-charge-power",
+      "description": "−75 kW < −50 kW (charge clamp) → clamped to −50, reason max-charge-power.",
+      "snapshot": { "soc_percent": 50, "active_power_kw": 0, "temperature_celsius": 22 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": -75, "previous_active_power_kw": null, "dt_seconds": 1.0 },
+      "expected": { "active_power_kw": -50, "reason": "max-charge-power", "was_limited": true, "mode": "charge" }
+    },
+    {
+      "name": "block-soc-above-max-charge",
+      "description": "SOC well above max_soc → charge blocked.",
+      "snapshot": { "soc_percent": 95, "active_power_kw": 0, "temperature_celsius": 22 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": -10, "previous_active_power_kw": null, "dt_seconds": 1.0 },
+      "expected": { "active_power_kw": 0, "reason": "soc-at-max-charge-blocked", "was_limited": true, "mode": "idle" }
+    },
+    {
+      "name": "block-soc-below-min-discharge",
+      "description": "SOC well below min_soc → discharge blocked.",
+      "snapshot": { "soc_percent": 5, "active_power_kw": 0, "temperature_celsius": 22 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": 10, "previous_active_power_kw": null, "dt_seconds": 1.0 },
+      "expected": { "active_power_kw": 0, "reason": "soc-at-min-discharge-blocked", "was_limited": true, "mode": "idle" }
+    },
+    {
+      "name": "block-temperature-above-max",
+      "description": "Temperature above max_temperature → 0 kW with temperature reason.",
+      "snapshot": { "soc_percent": 50, "active_power_kw": 0, "temperature_celsius": 60 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": 10, "previous_active_power_kw": null, "dt_seconds": 1.0 },
+      "expected": { "active_power_kw": 0, "reason": "temperature-out-of-range", "was_limited": true, "mode": "idle" }
+    },
+    {
+      "name": "block-temperature-below-min",
+      "description": "Temperature below min_temperature → 0 kW with temperature reason.",
+      "snapshot": { "soc_percent": 50, "active_power_kw": 0, "temperature_celsius": -25 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": 10, "previous_active_power_kw": null, "dt_seconds": 1.0 },
+      "expected": { "active_power_kw": 0, "reason": "temperature-out-of-range", "was_limited": true, "mode": "idle" }
+    },
+    {
+      "name": "ramp-up-clamp",
+      "description": "prev=10, dt=1, max_ramp=25 → window [−15, 35]. Target 50 clips to 35.",
+      "snapshot": { "soc_percent": 50, "active_power_kw": 10, "temperature_celsius": 22 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": 50, "previous_active_power_kw": 10, "dt_seconds": 1.0 },
+      "expected": { "active_power_kw": 35, "reason": "ramp-up-clamped", "was_limited": true, "mode": "discharge" }
+    },
+    {
+      "name": "ramp-down-clamp",
+      "description": "prev=10, dt=1, max_ramp=25 → window [−15, 35]. Target −20 clips to −15.",
+      "snapshot": { "soc_percent": 50, "active_power_kw": 10, "temperature_celsius": 22 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": -20, "previous_active_power_kw": 10, "dt_seconds": 1.0 },
+      "expected": { "active_power_kw": -15, "reason": "ramp-down-clamped", "was_limited": true, "mode": "charge" }
+    },
+    {
+      "name": "ramp-inside-window-no-clamp",
+      "description": "prev=10, dt=1, max_ramp=25 → window [−15, 35]. Target 20 inside window → unchanged.",
+      "snapshot": { "soc_percent": 50, "active_power_kw": 10, "temperature_celsius": 22 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": 20, "previous_active_power_kw": 10, "dt_seconds": 1.0 },
+      "expected": { "active_power_kw": 20, "reason": "within-limits", "was_limited": false, "mode": "discharge" }
+    },
+    {
+      "name": "ramp-fractional-dt-up-clamp",
+      "description": "prev=10, dt=0.25, max_ramp=25 → window [3.75, 16.25]. Target 20 clips to 16.25 (FP-multiplication path).",
+      "snapshot": { "soc_percent": 50, "active_power_kw": 10, "temperature_celsius": 22 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": 20, "previous_active_power_kw": 10, "dt_seconds": 0.25 },
+      "expected": { "active_power_kw": 16.25, "reason": "ramp-up-clamped", "was_limited": true, "mode": "discharge" }
+    },
+    {
+      "name": "ramp-not-permitted-dt-zero-changing-target",
+      "description": "dt=0 with prev=10, target=25 → ramp not permitted, output held at previous.",
+      "snapshot": { "soc_percent": 50, "active_power_kw": 10, "temperature_celsius": 22 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": 25, "previous_active_power_kw": 10, "dt_seconds": 0.0 },
+      "expected": { "active_power_kw": 10, "reason": "ramp-not-permitted", "was_limited": true, "mode": "discharge" }
+    },
+    {
+      "name": "ramp-dt-zero-equal-target-ok",
+      "description": "dt=0 but target == previous → OK within-limits (the held-equal branch in apply_ramp).",
+      "snapshot": { "soc_percent": 50, "active_power_kw": 10, "temperature_celsius": 22 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": 10, "previous_active_power_kw": 10, "dt_seconds": 0.0 },
+      "expected": { "active_power_kw": 10, "reason": "within-limits", "was_limited": false, "mode": "discharge" }
+    },
+    {
+      "name": "combined-constraint-and-ramp-constraint-reason-wins",
+      "description": "prev=10, target=100. Constraint clamps to 50 (max-discharge-power), ramp clamps to 35. Plan: final power = ramp result (35), reason follows constraint (max-discharge-power).",
+      "snapshot": { "soc_percent": 50, "active_power_kw": 10, "temperature_celsius": 22 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": 100, "previous_active_power_kw": 10, "dt_seconds": 1.0 },
+      "expected": { "active_power_kw": 35, "reason": "max-discharge-power", "was_limited": true, "mode": "discharge" }
+    },
+    {
+      "name": "first-tick-no-prev-skips-ramp",
+      "description": "has_previous=false → ramp limiter skipped entirely; constraint reason carries through.",
+      "snapshot": { "soc_percent": 50, "active_power_kw": 0, "temperature_celsius": 22 },
+      "limits": {
+        "max_charge_power_kw": 50, "max_discharge_power_kw": 50,
+        "min_soc_percent": 10, "max_soc_percent": 90,
+        "max_ramp_kw_per_second": 25,
+        "min_temperature_celsius": -20, "max_temperature_celsius": 55
+      },
+      "request": { "target_active_power_kw": 40, "previous_active_power_kw": null, "dt_seconds": 1.0 },
+      "expected": { "active_power_kw": 40, "reason": "within-limits", "was_limited": false, "mode": "discharge" }
+    }
+  ]
+}

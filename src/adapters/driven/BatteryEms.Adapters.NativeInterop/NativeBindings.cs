@@ -114,3 +114,75 @@ public static class BccMode
     public const int Charge    = 2;
     public const int Discharge = 3;
 }
+
+// RM-M3-13 PID slice (ABI minor 0.2). The structs below mirror the
+// `bcc_pid_*_t` types in battery_control_core.h one-to-one; layout
+// pins live in StructLayoutTests.PidLayout. Anti-windup mode values
+// match the bcc_pid_anti_windup_t enum.
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance", "CA1815",
+    Justification = "P/Invoke marshaling struct; value-equality is not part of the contract.")]
+[StructLayout(LayoutKind.Sequential)]
+public struct BccPidState
+{
+    public double Integral;       // 0
+    public double PreviousError;  // 8
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance", "CA1815",
+    Justification = "P/Invoke marshaling struct; value-equality is not part of the contract.")]
+[StructLayout(LayoutKind.Sequential)]
+public struct BccPidOptions
+{
+    public double Kp;                  // 0
+    public double Ki;                  // 8
+    public double Kd;                  // 16
+    public double OutputMin;           // 24
+    public double OutputMax;           // 32
+    public double DeadbandAbsolute;    // 40
+    public int    AntiWindupMode;      // 48 (4 bytes + 4 trailing padding → 56 total)
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance", "CA1815",
+    Justification = "P/Invoke marshaling struct; value-equality is not part of the contract.")]
+[StructLayout(LayoutKind.Sequential)]
+public struct BccPidInput
+{
+    public double Setpoint;     // 0
+    public double Measurement;  // 8
+    public double DtSeconds;    // 16
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance", "CA1815",
+    Justification = "P/Invoke marshaling struct; value-equality is not part of the contract.")]
+[StructLayout(LayoutKind.Sequential)]
+public struct BccPidCommand
+{
+    public double Output;             // 0
+    public double NextIntegral;       // 8
+    public double NextPreviousError;  // 16
+    public int    Status;             // 24
+    public int    ReasonCode;         // 28
+    public int    WasClamped;         // 32
+    public int    WasIntegralFrozen;  // 36 (40 total)
+}
+
+public static class BccPidAntiWindupMode
+{
+    public const int ConditionalIntegration = 0;
+}
+
+// RM-M3-13 reason codes for the PID kernel. Numeric values are
+// append-only on top of the M3-A reason set; ABI minor bump 0.1
+// → 0.2 on the native side.
+public static class BccPidReason
+{
+    public const int OutputClampedHigh = 13;
+    public const int OutputClampedLow  = 14;
+    public const int IntegratorOverflow = 15;
+    public const int InvalidOptions     = 16;
+}

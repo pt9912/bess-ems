@@ -23,6 +23,16 @@ public sealed record NativeControlLoadResult
     // name, ...). Null when the status carries no extra context.
     public string? Detail { get; init; }
 
+    // OS handle returned by NativeLibrary.Load when the load+ABI
+    // handshake succeeded. Filled only for `Loaded`; null on every
+    // other status. M3-D2 hands this to the DI factory so a
+    // NativeControlKernel can be constructed without a second
+    // dlopen — the caller then owns the handle and Free's it via
+    // the kernel's Dispose path. For non-Loaded statuses no handle
+    // is open (the loader closes the dlopen on its own error
+    // paths) so callers must not assume a handle exists.
+    public nint? Handle { get; init; }
+
     public bool IsLoaded => Status == NativeControlStatus.Loaded;
 
     public static NativeControlLoadResult Disabled() =>
@@ -47,13 +57,14 @@ public sealed record NativeControlLoadResult
         };
 
     public static NativeControlLoadResult Loaded(
-        string path, uint reported, uint expected) =>
+        string path, uint reported, uint expected, nint handle) =>
         new()
         {
             Status = NativeControlStatus.Loaded,
             LibraryPath = path,
             AbiVersion = reported,
             ExpectedAbiVersion = expected,
+            Handle = handle,
         };
 
     public static string FormatVersion(uint version)

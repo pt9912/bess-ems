@@ -21,7 +21,8 @@ DOCKER_BUILD = $(DOCKER) build $(BUILD_CONTEXT) \
 .PHONY: help \
 	lint arch-check gates \
 	test test-safety test-integration test-hil-modbus test-hil-closed-loop test-container coverage-gate \
-	native-build \
+	native-build test-native-interop test-native-parity \
+	native-lint native-sanitizer native-coverage-report native-coverage-gate native-coverage-exclusions \
 	simulator-test simulator-race simulator-lint simulator-coverage-gate \
 	build ci runtime fullbuild lock-refresh \
 	schema-validate schema-generate schema-drift-check
@@ -47,7 +48,8 @@ help:
 	@echo "  make coverage-gate Line-coverage gate, 90% per M1 production assembly"
 	@echo ""
 	@echo "Aggregated:"
-	@echo "  make gates       Aggregated mandatory M1 gates for the current wave"
+	@echo "  make gates       Aggregated mandatory gates: M1 + M3 native"
+	@echo "  make ci          Sequential CI run of all mandatory gates incl. schema + integration"
 	@echo ""
 	@echo "Welle 3 (Simulator + Adapters, partially active):"
 	@echo "  make simulator-test          Go simulator unit tests"
@@ -57,6 +59,16 @@ help:
 	@echo "  make test-integration        Modbus roundtrip vs Go-Simulator via docker compose"
 	@echo "  make test-hil-modbus         Optional: HIL roundtrip vs bess-hil-simulator:local (RM-M2-HIL-08)"
 	@echo "  make test-hil-closed-loop    Optional: Closed-loop optimize→dispatch→HIL smoke (Carve-out Demo-01)"
+	@echo ""
+	@echo "Welle M3 (active):"
+	@echo "  make native-build               Build + smoke-test native control core (RM-M3-06 part 1)"
+	@echo "  make test-native-interop        Layout / ABI / non-finite contract against real .so (RM-M3-07)"
+	@echo "  make test-native-parity         Replay-based native↔.NET parity gate, cases.v1.json (RM-M3-10)"
+	@echo "  make native-lint                clang-tidy gate, --warnings-as-errors=* (RM-M3-09)"
+	@echo "  make native-sanitizer           ASan + UBSan run on native test suite (RM-M3-09)"
+	@echo "  make native-coverage-report     Build gcovr report and print it (RM-M3-09)"
+	@echo "  make native-coverage-gate       100% line coverage gate, override BCC_COVERAGE_THRESHOLD (RM-M3-09)"
+	@echo "  make native-coverage-exclusions Audit GCOVR_EXCL blocks for Why: justifications (RM-M3-09)"
 	@echo ""
 	@echo "Maintenance:"
 	@echo "  make lock-refresh    Refresh packages.lock.json files in Docker (per docs/user/quality.md §1.4)"
@@ -150,8 +162,12 @@ coverage-gate:
 
 # --- Aggregated gates ------------------------------------------------------
 
-gates: lint arch-check test test-safety coverage-gate simulator-lint simulator-test simulator-race simulator-coverage-gate
-	@echo "[gates] M1 mandatory gates green: lint, arch-check, test, test-safety, coverage-gate, simulator-{lint,test,race,coverage-gate}"
+gates: lint arch-check test test-safety coverage-gate \
+	simulator-lint simulator-test simulator-race simulator-coverage-gate \
+	native-build native-lint native-sanitizer \
+	native-coverage-gate native-coverage-exclusions \
+	test-native-interop test-native-parity
+	@echo "[gates] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, simulator-{lint,test,race,coverage-gate}) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity})"
 
 # --- Welle 3 (partially active) --------------------------------------------
 
@@ -207,6 +223,87 @@ test-hil-closed-loop:
 native-build:
 	$(DOCKER_BUILD) --target native-build -t $(IMAGE_PREFIX)-native-build:latest
 
+# RM-M3-07 / RM-M3-11: native-interop integration tests against the
+# real libbattery_control_core.so — layout, ABI handshake, and
+# non-finite-input contract (Category!=Parity). Werte-Parität is
+# the separate test-native-parity gate.
+test-native-interop:
+	$(DOCKER_BUILD) --target test-native-interop -t $(IMAGE_PREFIX)-test-native-interop:latest
+
+# RM-M3-10 / RM-M3-11: replay-based native↔.NET parity gate.
+# Loads tests/fixtures/native_parity/cases.v1.json and asserts
+# both kernels match the documented expectations for every case.
+test-native-parity:
+	$(DOCKER_BUILD) --target test-native-parity -t $(IMAGE_PREFIX)-test-native-parity:latest
+
+# RM-M3-09 native-quality gates. Each runs in its own dedicated
+# Docker stage on the same Ubuntu Noble base as the runtime image so
+# clang-tidy, sanitizer and gcovr findings reflect the production
+# toolchain. None of these are wired into `make ci` / `make gates`
+# yet — that's RM-M3-11's scope.
+
+# native-lint: clang-tidy with --warnings-as-errors=* against the
+# project's `.clang-tidy` config. Fails on any finding.
+native-lint:
+	$(DOCKER_BUILD) --target native-lint -t $(IMAGE_PREFIX)-native-lint:latest
+
+# native-sanitizer: rebuild .so + tests with ASan + UBSan and run
+# the doctest suite with -fno-sanitize-recover=all (any detection
+# is fatal). Catches use-after-free, undefined behaviour and
+# misaligned pointer derefs as the kernel surface grows.
+native-sanitizer:
+	$(DOCKER_BUILD) --target native-sanitizer -t $(IMAGE_PREFIX)-native-sanitizer:latest
+
+# native-coverage-report: gcovr report (developer-facing). Builds
+# the report stage and prints it on stdout; the threshold check
+# is the separate native-coverage-gate target. Renamed from the
+# earlier `native-coverage` to align with the RM-M3-11 plan
+# vocabulary (native-coverage-report vs native-coverage-gate).
+BCC_COVERAGE_THRESHOLD ?= 100
+
+native-coverage-report:
+	$(DOCKER_BUILD) --target native-coverage -t $(IMAGE_PREFIX)-native-coverage:latest
+	$(DOCKER) run --rm $(IMAGE_PREFIX)-native-coverage:latest
+
+# native-coverage-gate: 100 % line on native/battery_control_core/src/.
+# Override BCC_COVERAGE_THRESHOLD locally during a refactor; CI keeps
+# the default.
+native-coverage-gate:
+	$(DOCKER_BUILD) --target native-coverage-gate \
+		--build-arg BCC_COVERAGE_THRESHOLD=$(BCC_COVERAGE_THRESHOLD) \
+		-t $(IMAGE_PREFIX)-native-coverage-gate:latest
+
+# native-coverage-exclusions: enumerate every GCOVR_EXCL_START block
+# in native/battery_control_core/src/ together with its mandatory
+# `// Why:` justification. Every exclusion MUST contain a Why: line
+# inside the START..STOP block; the audit script fails non-zero if
+# any block is missing it. Operators run this manually or as part
+# of a review checklist; RM-M3-11 wires it into the aggregated gate.
+native-coverage-exclusions:
+	@echo "[native-coverage-exclusions] auditing native/battery_control_core/src/ for GCOVR_EXCL blocks..."
+	@awk ' \
+		FNR == 1 { in_block = 0; has_why = 0; block_start = 0 } \
+		/GCOVR_EXCL_START/ { in_block = 1; has_why = 0; block_start = FNR; printf "\n--- %s:%d  GCOVR_EXCL_START\n", FILENAME, FNR; next } \
+		/GCOVR_EXCL_STOP/ { \
+			if (in_block) { \
+				printf "--- %s:%d  GCOVR_EXCL_STOP\n", FILENAME, FNR; \
+				if (!has_why) { \
+					printf "ERROR: GCOVR_EXCL_START at %s:%d has no `// Why:` justification\n", FILENAME, block_start > "/dev/stderr"; \
+					err = 1; \
+				} \
+			} \
+			in_block = 0; next \
+		} \
+		in_block { \
+			print "    " $$0; \
+			if ($$0 ~ /\/\/[[:space:]]*Why:/) { has_why = 1 } \
+		} \
+		END { exit err }' \
+		native/battery_control_core/src/*.c \
+		|| (echo "[native-coverage-exclusions] FAIL — at least one excluded region lacks a Why: justification" >&2; exit 1)
+	@echo ""
+	@echo "[native-coverage-exclusions] OK — every excluded region has a Why: justification"
+
 # --- Welle 5 (partially active) --------------------------------------------
 
 # Runtime image: multi-stage publish + non-root aspnet image with /health
@@ -218,12 +315,24 @@ build:
 # Requires: `make build` (bess-ems image) and `make -C simulators/bess-field-sim build`
 # (bess-field-sim image). The target rebuilds them itself so a fresh
 # checkout reaches a healthy stack with one command.
+#
+# RM-M3-06 part 2: also verify libbattery_control_core.so is in place
+# at the runtime-image path NativeControlOptions.LibraryPath defaults
+# to (/app/native/libbattery_control_core.so) and that the dynamic
+# linker can resolve every dependency. The build-time ldd gate in
+# the Dockerfile already covers unresolved-deps failures; this
+# in-container check covers post-build mishaps (e.g. a volume mount
+# shadowing the path) and proves the production deployment shape
+# stays M3-D2-ready without enabling the routing yet.
 runtime: build
 	$(SIMULATOR_MAKE) build
 	$(DOCKER) compose -f deploy/compose.yml up -d --wait --wait-timeout 60
 	@echo "[runtime] stack is up; probing /health"
 	$(DOCKER) compose -f deploy/compose.yml exec -T bess-ems curl --fail --silent --show-error http://localhost:8080/health
-	@echo "[runtime] /health ok; tearing down"
+	@echo "[runtime] /health ok; verifying native control library is in place"
+	$(DOCKER) compose -f deploy/compose.yml exec -T bess-ems test -f /app/native/libbattery_control_core.so
+	$(DOCKER) compose -f deploy/compose.yml exec -T bess-ems sh -c 'ldd /app/native/libbattery_control_core.so > /tmp/ldd 2>&1; if grep -q "not found" /tmp/ldd; then cat /tmp/ldd >&2; exit 1; fi'
+	@echo "[runtime] native control library at /app/native/ resolves cleanly; tearing down"
 	$(DOCKER) compose -f deploy/compose.yml down -v --remove-orphans
 
 # Container smoke: same as `runtime` but used as a gate target — the
@@ -239,8 +348,11 @@ test-container: runtime
 ci: lint arch-check test test-safety coverage-gate \
     simulator-lint simulator-test simulator-race simulator-coverage-gate \
     schema-validate schema-drift-check \
+    native-build native-lint native-sanitizer \
+    native-coverage-gate native-coverage-exclusions \
+    test-native-interop test-native-parity \
     test-integration
-	@echo "[ci] M1 mandatory gates green: lint, arch-check, test, test-safety, coverage-gate, simulator-{lint,test,race,coverage-gate}, schema-{validate,drift-check}, test-integration"
+	@echo "[ci] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, simulator-*) + M2 schema (validate, drift-check) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + test-integration"
 
 # Fresh-clone-naher Komplettlauf: alle CI-Gates plus Runtime-Image und
 # Compose-Smoke. Letzte Stufe vor einem M1-Tag (RM-M1-20).

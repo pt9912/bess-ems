@@ -77,62 +77,56 @@ Repository-Root und ist Teil des Lint-Gates. Der Build kopiert die
 Datei explizit ins Lint-Image — fehlt sie im Container, fallen die
 Severities lautlos zurück und das Gate schweigt.
 
-### 1.2 C/C++ Native Core
+### 1.2 C Native Core
 
-Die nativen Komponenten (`battery_control_core` und Folge-Module) liegen
-unter `native/`. Statische Analyse läuft über die `native-lint`-Stage:
+Die nativen Komponenten liegen unter
+`native/battery_control_core/` (Implementierung in C, Header in C
+mit `extern "C"`-Block für Mixed-Language-Konsumenten; Test-Harness
+in C++ mit doctest, siehe §2.4). Statische Analyse läuft über die
+`native-lint`-Stage:
 
 ```bash
 make native-lint   # = docker build --target native-lint
 ```
 
-Die Stage führt für `native/` aus:
+Die Stage führt für `native/battery_control_core/src/` aus:
 
 | Tool          | Zweck                                                         |
 | ------------- | ------------------------------------------------------------- |
-| `clang-format --dry-run -Werror` | Layout-Konformität gemäß `.clang-format`   |
-| `clang-tidy` (auf `compile_commands.json`) | regelbasierte statische Analyse |
-| `lizard`      | Komplexität, Funktionslänge, Parameteranzahl                  |
-| Compiler-Flags `-Wall -Wextra -Wpedantic -Werror` | jede Warnung ist Fehler   |
+| `clang-tidy` (auf `compile_commands.json` mit `--warnings-as-errors=*`) | regelbasierte statische Analyse gegen `.clang-tidy`-Profil: `-* + bugprone-* + clang-analyzer-* + readability-function-cognitive-complexity` (Threshold 20); `bugprone-easily-swappable-parameters` mit dokumentierter Begründung deaktiviert; `HeaderFilterRegex` schließt FetchContent-Quellen aus |
+| Compiler-Flags `-Wall -Wextra -Wpedantic -Werror -Wshadow -Wnull-dereference -Wdouble-promotion` | jede Warnung ist Fehler |
 
-Standard-Schwellen `lizard`:
+Komplexitätsmetriken auf Funktionsebene (Cognitive-Complexity)
+laufen heute über die clang-tidy-Regel
+`readability-function-cognitive-complexity` mit Schwelle 20;
+eine zusätzliche Metrik-Stage (z. B. `lizard`) ist als Folge-Slice
+denkbar, aber nicht Bestandteil der RM-M3-09-Closure.
 
-- CCN ≤ 10
-- Funktionslänge ≤ 50
-- Parameteranzahl ≤ 5
-
-Konfigurierbar per Make-Variable, analog zu `cmake-xray`-Pattern:
-
-```bash
-make native-lint \
-  LIZARD_MAX_CCN=10 \
-  LIZARD_MAX_LENGTH=50 \
-  LIZARD_MAX_PARAMETERS=5
-```
-
-`clang-tidy`-Profil (Auswahl, vollständige Liste in
-`native/.clang-tidy`):
+`clang-tidy`-Profil (vollständige Liste in
+`native/battery_control_core/.clang-tidy`):
 
 | Check-Gruppe              | Zweck                                                  |
 | ------------------------- | ------------------------------------------------------ |
-| `bugprone-*`              | klassische Bug-Patterns                                |
-| `cert-*`                  | CERT C++ Coding Standard                               |
-| `cppcoreguidelines-*`     | C++ Core Guidelines                                    |
-| `misc-*`                  | Allgemeine Hygiene                                     |
-| `performance-*`           | unnötige Kopien, Move-Semantik                         |
-| `readability-*`           | Lesbarkeit, Bezeichnerregeln                           |
-| `modernize-*`             | C++20-Idiome (selektiv aktiviert)                      |
+| `bugprone-*`              | klassische Bug-Patterns (mit Ausnahme `bugprone-easily-swappable-parameters`, dokumentierte Begründung im Config-Header) |
+| `clang-analyzer-*`        | statische Programmanalyse (Null-Deref, uninitialisierte Variablen, Dead Stores) |
+| `readability-function-cognitive-complexity` | Cognitive-Complexity-Limit pro Funktion |
 
-`// NOLINT`-Kommentare sind nur mit `Why:`-Begründung in der gleichen
-Zeile zulässig; `NOLINTBEGIN/END`-Blöcke benötigen einen separaten
-Kommentar mit Begründung. Pfadweise Carveouts (z. B. Tests gegen
-`bugprone-magic-numbers`) sind in `.clang-tidy` über
-`HeaderFilterRegex`/`CheckOptions` dokumentiert.
+`// NOLINT`-Kommentare sind im Native-Core nicht zulässig — die
+Lint-Stage ist hart auf `--warnings-as-errors=*`. Eine bewusste
+Ausnahme erfordert eine `.clang-tidy`-Profiländerung mit `Why:`-
+Kommentar im Config-Header und einen ADR-Vermerk; pfadweise
+`HeaderFilterRegex` schließt FetchContent-Quellen aus dem
+Lint-Scope, nicht aus der Disziplin.
 
-**Sanitizer-Build**: für die `test`-Stage des Native Core wird ein
-zweiter Buildpfad mit aktivierten Sanitizern erzeugt
-(`-fsanitize=address,undefined`, separate Stage `native-test-sanitize`).
-Verletzungen brechen den Build (LH-TEST-005-nahe).
+**Sanitizer-Build**: parallel zur `native-build`-Stage erzeugt die
+`native-sanitizer`-Stage einen Debug-Build mit
+`-fsanitize=address,undefined -fno-sanitize-recover=all` und
+führt den doctest-Suite-Lauf aus; jeder ASan/UBSan-Treffer ist
+ein Hard-Fail des Gates (RM-M3-09).
+
+```bash
+make native-sanitizer   # = docker build --target native-sanitizer
+```
 
 ### 1.3 Konfigurationsdateien
 
@@ -302,24 +296,34 @@ fehlender Test gilt als Coverage-Fehler unabhängig vom Coverage-Gate.
 
 ### 2.4 Native-Interop-Tests
 
-Aktiv ab **M3** (LH-TEST-005). Filter: `Category=NativeInterop`.
+Aktiv ab **M3** (LH-TEST-005). Verteilt auf zwei getrennte
+Make-Targets, deren xunit-Trait-Filter sicherstellen dass jeder
+Gate-Failure auf seine Kategorie attributiert:
 
 ```bash
-make test-native-interop   # = docker build --target test-native-interop
+make test-native-interop   # Layout / ABI / non-finite contract (Category!=Parity)
+make test-native-parity    # Replay-basierte Native↔Managed-Parität (Category=Parity)
 ```
 
-Pflicht-Inhalte:
+`make test-native-interop` (RM-M3-07) deckt:
 
-| Prüfung                              | LH-Bezug                |
-| ------------------------------------ | ----------------------- |
-| Struct-Layout (sequential, sizes)    | LH-NATIVE-003           |
-| ABI-Versionsabfrage beim Start       | LH-NATIVE-005           |
-| Fehlercodes (NaN/Inf, neg. dt)       | LH-NATIVE-004           |
-| P/Invoke-Ladefähigkeit im Container  | LH-NATIVE-006, LH-DEPLOY-004 |
-| Werte-Parität gg. .NET-Referenz      | RM-M3-07, LH-ARCH-006   |
+| Prüfung                                             | LH-Bezug                |
+| --------------------------------------------------- | ----------------------- |
+| Struct-Layout (Sequential, Größen 24/56/32/24 Bytes, Offsets, Konstanten) | LH-NATIVE-003 |
+| ABI-Handshake `NativeControlLoader.TryLoad` mit echter `.so` | LH-NATIVE-005     |
+| Loader-Pfade `Disabled` / `LibraryMissing` / `Loaded` mit echtem Gateway | LH-NATIVE-005 |
+| Native-Contract bei nicht-finiten Inputs (Snapshot/Limits/Request/Previous) | LH-NATIVE-004 |
+| Negatives `dt` mit `has_previous=1` → `BCC_STATUS_NEGATIVE_DT` | LH-NATIVE-004 |
 
-C++-Unit-Tests (`native/tests/`, Catch2 oder GoogleTest) decken die
-nativen Kerne separat ab; Verletzung bricht den Build.
+`make test-native-parity` (RM-M3-10) deckt den replay-basierten
+Parity-Vergleich gegen den versionierten Datensatz unter
+`tests/fixtures/native_parity/cases.v1.json`; Details in §6.
+
+Die nativen Unit-Tests (`native/battery_control_core/tests/`,
+doctest 2.4.11 via FetchContent mit `URL_HASH SHA256`-Pinning)
+decken die Constraint/Ramp-Pfade des C-Kernels separat ab und
+laufen als ctest-Eintrag im `native-build`-Stage. Verletzung
+bricht den Build.
 
 ### 2.5 Replay-Tests
 
@@ -354,7 +358,8 @@ Fall mit Native Core das erfolgreiche Laden der `.so`-Bibliothek
 | Sicherheitsfälle     | `make test-safety`               | `Category=Safety`          |
 | Integration          | `make test-integration`          | `Category=Integration`     |
 | HIL (optional)       | `make test-hil-modbus`           | `Category=HIL`             |
-| Native Interop       | `make test-native-interop`       | `Category=NativeInterop`   |
+| Native Interop       | `make test-native-interop`       | `Category!=Parity` im NativeInterop-IntegrationTests-Projekt |
+| Native Parity        | `make test-native-parity`        | `Category=Parity` im NativeInterop-IntegrationTests-Projekt |
 | Replay               | `make test-replay`               | `Category=Replay`          |
 | Container            | `make test-container`            | `Category=Container`       |
 
@@ -411,28 +416,37 @@ Artefakte:
 
 ### 3.2 Native-Coverage
 
-Aktiv ab **M3**. Werkzeug: `gcov` + `gcovr`, getrennter Build mit
-`-DBESS_ENABLE_COVERAGE=ON`.
+Aktiv ab **M3** (RM-M3-09). Werkzeug: `gcov` + `gcovr`,
+getrennter Build mit `-DBCC_ENABLE_COVERAGE=ON` (umgesetzt über
+die `bcc_enable_coverage`-Helper-Funktion in
+`native/battery_control_core/CMakeLists.txt`).
 
 ```bash
-make native-coverage-gate   COVERAGE_THRESHOLD=100
-make native-coverage-report
+make native-coverage-gate    BCC_COVERAGE_THRESHOLD=100   # Threshold-Check
+make native-coverage-report                              # nur Report (entwicklerseitig)
 ```
 
-Coverage-Range: alles unter `native/src/`. Tests unter `native/tests/`
-sind nicht Teil des Nenners. Pflichtthreshold: **100 % Line-Coverage**,
-weil der Native Core eng abgegrenzt ist und im Regelpfad sicherheits-
-kritisch wirkt. Ausnahmen über `// LCOV_EXCL_*` sind nur mit
-`Why:`-Kommentar zulässig.
+Coverage-Range: alles unter `native/battery_control_core/src/`.
+Tests unter `native/battery_control_core/tests/` sowie
+FetchContent-`_deps/`-Quellen sind nicht Teil des Nenners.
+Pflicht-Threshold: **100 % Line-Coverage**, weil der Native Core
+eng abgegrenzt ist und im Regelpfad sicherheitskritisch wirkt.
 
-Vor Coverage- oder Release-Prüfung muss zusätzlich gelten:
+**Coverage-Ausnahmen-Disziplin:** Ausnahmen über `// GCOVR_EXCL_START`
+… `// GCOVR_EXCL_STOP`-Blöcke sind nur mit `// Why:`-Kommentar
+innerhalb des Blocks zulässig. Geprüft über ein dediziertes
+Make-Target:
 
 ```bash
-rg "LCOV""_EXCL_" native/src | wc -l    # muss in CI dokumentiert sein
+make native-coverage-exclusions
 ```
 
-Geprüft wird über ein dediziertes Make-Target
-`make native-coverage-exclusions`; Default-Toleranz: 0.
+Es enumeriert jeden Block und versagt non-zero, wenn ein Block
+keinen `Why:`-Kommentar enthält. Zur RM-M3-09-Closure ist die
+Anzahl der Exclusions im `src/`-Tree gleich **null** (der frühere
+C++-`catch (...)`-Defense-in-Depth-Block wurde mit dem C-Pivot
+entfernt; ein zukünftiger PID-Slice (RM-M3-13) darf eine neue
+Ausnahme nur mit `Why:`-Kommentar einführen).
 
 ### 3.3 Monorepo-Gate
 
@@ -448,13 +462,21 @@ bleiben.
 Das Runtime-Image ist gehärtet und folgt dem Multi-Stage-Pattern aus
 [`spec/architecture.md`](../../spec/architecture.md) §15:
 
-- Final-Image: `mcr.microsoft.com/dotnet/aspnet:8.0` (kein SDK)
-- Native-Build-Stage erzeugt `libbattery_control_core.so` aus `native/`
-  reproduzierbar (LH-NATIVE-006, LH-DEPLOY-004), falls Native Core
-  konfiguriert ist
-- App läuft als nicht-root User (`appuser`)
+- Final-Image: `mcr.microsoft.com/dotnet/aspnet:10.0` (Ubuntu 24.04 Noble, kein SDK)
+- `native-build`-Stage erzeugt `libbattery_control_core.so` aus
+  `native/battery_control_core/` reproduzierbar; das Runtime-Image
+  COPYed sie nach `/app/native/libbattery_control_core.so`
+  (Default in `NativeControlOptions.LibraryPath`). Ein Build-Time
+  `ldd`-Gate fail't das Image, falls die `.so` nicht-auflösbare
+  Dynamic-Deps zieht. Aktuelle `.so` (RM-M3-09 closure) ist
+  C-only, hat null `NEEDED`-Einträge und keine libstdc++-Linkage.
+  (LH-NATIVE-006, LH-DEPLOY-004)
+- App läuft als nicht-root User `app` (UID 1654, in der
+  aspnet-Base bereits angelegt)
 - Exposed Port: `8080`
-- Healthcheck im Compose-Manifest auf `/health`
+- Healthcheck im Compose-Manifest auf `/health`; `make runtime`
+  prüft zusätzlich `test -f /app/native/libbattery_control_core.so`
+  plus `ldd` im laufenden Container
 
 Smoke-Test (LH-DEPLOY-001/002, LH-TEST-007):
 
@@ -568,8 +590,8 @@ ADR und ergänzt die Regelmenge in dieser Sektion.
 
 ## 6. Native-/.NET-Parity
 
-Aktiv ab **M3** (RM-M3-07). Pflicht-Gate, das Native Core und
-.NET-Referenzimplementierung gegeneinander vergleicht.
+Aktiv ab **M3** (RM-M3-10). Pflicht-Gate, das den Native Core und
+die .NET-Referenzimplementierung gegeneinander vergleicht.
 
 ```bash
 make test-native-parity
@@ -577,15 +599,37 @@ make test-native-parity
 
 Prinzip:
 
-- Replay-Datensatz aus `tests/replay/testdata/parity/` läuft einmal
-  durch die .NET-Variante (`ManagedBatteryControlKernel`) und einmal
-  durch die Native Variante (`NativeBatteryControlKernel`).
-- Vergleich der erzeugten Commands pro Tick mit definierter
-  Toleranz (Default: 1e-6 kW absolut).
-- Toleranz-Erweiterungen brauchen ADR-Eintrag.
+- Versionierter Golden-Datensatz unter
+  `tests/fixtures/native_parity/cases.v1.json` (Schema-Doku in
+  `tests/fixtures/native_parity/README.md`). Jeder Case ist ein
+  `(snapshot, limits, request, expected)`-Tupel mit
+  `expected.{active_power_kw, reason, was_limited, mode}`.
+- Pro Case läuft sowohl `ManagedControlKernel`
+  (`BatteryEms.Application.Control`) als auch der Native-Kern via
+  `NativeControlKernel`
+  (`BatteryEms.Adapters.NativeInterop`); Reason-Code-Mapping über
+  `NativeFallbackControlKernel.MapReason`.
+- Toleranz aus dem Fixture-Header
+  (`tolerance_active_power_kw`, Default `1e-12`); in der Praxis
+  bit-exakt, weil beide Pfade dieselbe FP-Sequenz auf identischen
+  `double`-Werten ausführen. Die Toleranz dient als Headroom gegen
+  zukünftige Plattformen mit abweichender FMA-Kontraktion.
+- Toleranz-Erweiterungen oder Schema-Bumps benötigen ein neues
+  `cases.v2.json` plus parallele Test-Klasse — In-Place-Bump ist
+  Parity-History-Erase und verboten.
+- **Bewusst nicht im Datensatz** (Plan-Vorgabe + README-
+  Begründung): negatives `dt`, nicht-finite Snapshot/Limits/
+  Request-Felder, Stale-Snapshot, `Available=false`,
+  `ValidUntil`-Ablauf — diese bleiben Managed-Control- bzw.
+  Native-Contract-Tests in `BatteryEms.Application.Tests` /
+  `NativeAbiNegativeTests` und werden nicht als Parity mit
+  ungültigen Inputs modelliert.
 
-Der Native-Pfad ist niemals exklusiv: das System bleibt durch die
-.NET-Referenz lauffähig (LH-ARCH-006, AR-P-009).
+Der Native-Pfad ist niemals exklusiv: bei ABI-Mismatch oder
+nativem Fehler aus validem .NET-Kontext fällt der Adapter
+deterministisch auf die Managed-Referenz zurück, der Regelkreis
+bleibt funktionsfähig (LH-ARCH-006, AR-P-009; siehe §5.2 für die
+Loader-Endzustände).
 
 ---
 

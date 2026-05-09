@@ -10,12 +10,14 @@ internal sealed class SystemNativeLibraryGateway : INativeLibraryGateway
 {
     private const string AbiVersionExport = "battery_control_core_abi_version";
     private const string ComputeExport    = "battery_control_core_compute";
+    private const string PidStepExport    = "battery_control_core_pid_step";
 
     // The cdecl delegates are cached after the first lookup so the
     // hot Compute path doesn't pay a GetExport / GetDelegate cost
     // on every regulation tick.
     private AbiVersionDelegate? _abiVersion;
     private ComputeDelegate?    _compute;
+    private PidStepDelegate?    _pidStep;
 
     public bool FileExists(string path) => File.Exists(path);
 
@@ -42,6 +44,19 @@ internal sealed class SystemNativeLibraryGateway : INativeLibraryGateway
         return del(in snapshot, in limits, in request, out command);
     }
 
+    public int CallPidStep(
+        nint handle,
+        in BccPidState state,
+        in BccPidOptions options,
+        in BccPidInput input,
+        out BccPidCommand command)
+    {
+        var del = _pidStep ??= Marshal
+            .GetDelegateForFunctionPointer<PidStepDelegate>(
+                NativeLibrary.GetExport(handle, PidStepExport));
+        return del(in state, in options, in input, out command);
+    }
+
     public void Free(nint handle) => NativeLibrary.Free(handle);
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -53,4 +68,11 @@ internal sealed class SystemNativeLibraryGateway : INativeLibraryGateway
         in BccLimits limits,
         in BccRequest request,
         out BccCommand command);
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate int PidStepDelegate(
+        in BccPidState state,
+        in BccPidOptions options,
+        in BccPidInput input,
+        out BccPidCommand command);
 }

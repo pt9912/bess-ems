@@ -1,0 +1,43 @@
+---
+# RM-M3-09 native-lint configuration. Mirrors the project's overall
+# discipline: a minimal but actionable check set with WarningsAsErrors
+# left empty so the gate is enforced via `--warnings-as-errors=*` on
+# the command line and a 0-finding threshold in the Dockerfile stage,
+# instead of clang-tidy crashing on configuration boilerplate.
+#
+# Selected check families:
+#   bugprone-*           — common bug patterns (mixing of signed/
+#                           unsigned, narrowing, branch clones, ...).
+#   clang-analyzer-*     — static analysis (null-deref, uninit memory,
+#                           dead store, etc.).
+#   readability-function-cognitive-complexity — keeps Constraint/Ramp/
+#                           PID readable as the kernel grows; threshold
+#                           of 20 leaves room for the Constraint+Ramp
+#                           combination but flags any deeper nesting
+#                           that should be extracted before merge.
+#
+# Disabled: bugprone-easily-swappable-parameters fires on every
+# function with adjacent same-typed parameters (e.g. apply_ramp's
+# previous/requested/dt/max_ramp doubles). Inside this translation
+# unit the call sites are derived from named struct fields, so a
+# silent swap would be visible in review; the check's value-vs-noise
+# ratio is poor here. A future signature refactor (RM-M3-13 PID
+# slice) is the right place to revisit parameter shape.
+#
+# HeaderFilterRegex restricts findings to our own headers; FetchContent
+# sources (doctest, etc.) are intentionally not analysed — pinning the
+# upstream hash is the supply-chain control, not clang-tidy.
+Checks: >
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  readability-function-cognitive-complexity,
+  -bugprone-easily-swappable-parameters
+WarningsAsErrors: ''
+HeaderFilterRegex: 'native/battery_control_core/(include|src)/'
+FormatStyle: none
+CheckOptions:
+  - key: readability-function-cognitive-complexity.Threshold
+    value: '20'
+  - key: readability-function-cognitive-complexity.DescribeBasicIncrements
+    value: 'false'

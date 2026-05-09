@@ -55,6 +55,23 @@ public sealed class NativeControlKernel : IDisposable
             _handle, in snapshot, in limits, in request, out command);
     }
 
+    // RM-M3-13 PID slice. Mirrors Compute one-to-one — the handle is
+    // shared across both exports because the .so carries them both,
+    // and the routing layer (managed precheck + state-management)
+    // lives in the M3-D2 IPidKernel / ManagedPidKernel pair, not
+    // here. This thin wrapper keeps the cross-boundary shape
+    // marshal-only.
+    public int PidStep(
+        in BccPidState state,
+        in BccPidOptions options,
+        in BccPidInput input,
+        out BccPidCommand command)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return _gateway.CallPidStep(
+            _handle, in state, in options, in input, out command);
+    }
+
     public void Dispose()
     {
         if (_disposed) { return; }

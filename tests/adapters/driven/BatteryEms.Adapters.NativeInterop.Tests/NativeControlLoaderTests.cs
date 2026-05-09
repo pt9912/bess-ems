@@ -160,6 +160,24 @@ public sealed class NativeControlLoaderTests
         Assert.True(result.IsLoaded);
         Assert.Equal(NativeControlLoader.ExpectedAbiVersion, result.AbiVersion);
         Assert.Equal(NativeControlLoader.ExpectedAbiVersion, result.ExpectedAbiVersion);
+        // M3-D2-01: a successful load now carries the OS handle so a
+        // DI factory can construct NativeControlKernel without a
+        // second dlopen.
+        Assert.NotNull(result.Handle);
+        Assert.Equal((nint)0x1234, result.Handle!.Value);
+    }
+
+    [Fact]
+    public void Non_loaded_results_do_not_carry_a_handle()
+    {
+        // M3-D2-01: only Loaded carries a handle; every other status
+        // must leave Handle null so a caller can't accidentally
+        // construct a kernel from a half-broken load.
+        Assert.Null(NativeControlLoadResult.Disabled().Handle);
+        Assert.Null(NativeControlLoadResult.LibraryMissing("/x").Handle);
+        Assert.Null(NativeControlLoadResult.LoadFailed("/x", "boom").Handle);
+        Assert.Null(NativeControlLoadResult.AbiMismatch(
+            "/x", reported: 0u, expected: NativeControlLoader.ExpectedAbiVersion).Handle);
     }
 
     [Fact]
@@ -222,7 +240,8 @@ public sealed class NativeControlLoaderTests
         // (regardless of the abort flag) must pass through.
         var result = NativeControlLoadResult.Loaded(
             "/x", NativeControlLoader.ExpectedAbiVersion,
-            NativeControlLoader.ExpectedAbiVersion);
+            NativeControlLoader.ExpectedAbiVersion,
+            handle: (nint)0x1234);
         var options = new NativeControlOptions
         {
             Enabled = true,
@@ -289,6 +308,20 @@ public sealed class NativeControlLoaderTests
                 "NativeControlLoaderTests' FakeGateway should never see a CallCompute "
                 + "(the loader does not invoke compute). Use NativeControlKernelTests' "
                 + "FakeGateway for kernel-side coverage.");
+        }
+
+        public int CallPidStep(
+            nint handle,
+            in BccPidState state,
+            in BccPidOptions options,
+            in BccPidInput input,
+            out BccPidCommand command)
+        {
+            command = default;
+            throw new InvalidOperationException(
+                "NativeControlLoaderTests' FakeGateway should never see a CallPidStep "
+                + "(the loader's job ends at the ABI handshake). Use the kernel-side "
+                + "FakeGateway for PidStep coverage.");
         }
 
         public void Free(nint handle)

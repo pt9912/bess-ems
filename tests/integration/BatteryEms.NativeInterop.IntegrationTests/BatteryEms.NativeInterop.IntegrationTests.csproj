@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>BatteryEms.NativeInterop.IntegrationTests</RootNamespace>
+    <AssemblyName>BatteryEms.NativeInterop.IntegrationTests</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!-- RM-M3-07 interop tests load the real
+       libbattery_control_core.so produced by the native-build
+       stage and compare its output against the managed reference
+       (ManagedControlKernel) for a documented set of
+       Snapshot/Limits/Request triples. The project therefore
+       references the Domain (asset/telemetry types), the
+       Application (managed kernel + IControlKernel port) and the
+       NativeInterop adapter (loader + bindings + kernel facade). -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\hexagon\BatteryEms.Domain\BatteryEms.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\hexagon\BatteryEms.Application\BatteryEms.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\adapters\driven\BatteryEms.Adapters.NativeInterop\BatteryEms.Adapters.NativeInterop.csproj" />
+  </ItemGroup>
+
+  <!-- RM-M3-10: copy the versioned native↔managed parity dataset
+       into the test output. ParityFixtureLoader resolves the path
+       via AppContext.BaseDirectory, so the runtime layout has to
+       carry fixtures/native_parity/cases.v1.json next to the test
+       assembly. PreserveNewest avoids unnecessary rebuilds when
+       the JSON has not changed. -->
+  <ItemGroup>
+    <None Include="..\..\fixtures\native_parity\cases.v1.json"
+          Link="fixtures\native_parity\cases.v1.json"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

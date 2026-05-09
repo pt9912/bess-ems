@@ -239,6 +239,43 @@ RUN dotnet publish src/host/BatteryEms.Host/BatteryEms.Host.csproj \
     --output /publish
 
 # ---------------------------------------------------------------------------
+# native-build (RM-M3-06 part 1): Build + smoke-test the native
+# control core. The runtime stage below COPYs the built .so into
+# /app/native/ (RM-M3-06 part 2), so this stage MUST be defined
+# before runtime — the BuildKit graph rejects forward references.
+# `make native-build` exercises just this stage; the .so is also
+# consumed by `test-native-interop` (RM-M3-07) and `runtime`.
+#
+# Base choice: the .NET SDK image, NOT a vanilla Debian slim. Two
+# reasons.
+#   1. ABI alignment. The runtime image (mcr.microsoft.com/dotnet/
+#      aspnet:10.0) is Ubuntu 24.04 LTS (Noble, glibc 2.39); a .so
+#      built on a newer-glibc base (e.g. debian:trixie-slim,
+#      glibc 2.41) is forward-incompatible and breaks the dynamic
+#      linker on Noble the moment a stdlib symbol from glibc 2.40+
+#      appears. Building on the SDK image — same Noble base as the
+#      runtime — guarantees ABI compatibility by construction.
+#   2. CVE hygiene. Microsoft patches dotnet/sdk:10.0 on the same
+#      cadence as dotnet/aspnet:10.0; pinning to a frozen Debian
+#      base would silently accumulate vulnerabilities (no scanner
+#      gate yet, so the drift would not surface).
+# build-essential + cmake are the only extras the SDK image lacks
+# for the C++ build.
+# ---------------------------------------------------------------------------
+FROM ${DOTNET_SDK_IMAGE} AS native-build
+RUN apt-get update \
+ && apt-get install --yes --no-install-recommends \
+        build-essential \
+        cmake \
+ && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+COPY native/battery_control_core/ native/battery_control_core/
+RUN cmake -S native/battery_control_core -B /build/native \
+        -DCMAKE_BUILD_TYPE=Release \
+ && cmake --build /build/native --parallel \
+ && ctest --test-dir /build/native --output-on-failure
+
+# ---------------------------------------------------------------------------
 # runtime: minimal aspnet-only image, non-root user, port 8080,
 # Container HEALTHCHECK against /health (LH-DEPLOY-001/002, LH-NF-004).
 # ---------------------------------------------------------------------------
@@ -256,6 +293,25 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=publish --chown=app:app /publish /app
 COPY --chown=app:app config/ /app/config/
+# RM-M3-06 part 2: drop the native control library at the path the
+# host's NativeControlOptions.LibraryPath default
+# (/app/native/libbattery_control_core.so) expects. The .so is built
+# in the `native-build` stage on the .NET SDK image, which shares
+# the Ubuntu 24.04 (Noble) base of dotnet/aspnet:10.0 — ABI is
+# aligned by construction (see the native-build stage rationale).
+# NativeControl remains opt-in (Enabled=false default); the
+# production routing activation is M3-D2's scope. The build-time
+# ldd check below fails the image build if a future PID/state slice
+# introduces an unresolved transitive dependency the runtime image
+# does not ship.
+COPY --from=native-build --chown=app:app /build/native/libbattery_control_core.so /app/native/libbattery_control_core.so
+RUN ldd /app/native/libbattery_control_core.so > /tmp/ldd-out 2>&1 \
+ && if grep -q "not found" /tmp/ldd-out; then \
+        echo "[runtime] native control library has unresolved dependencies:" >&2; \
+        cat /tmp/ldd-out >&2; \
+        exit 1; \
+    fi \
+ && rm /tmp/ldd-out
 # Non-root runtime: aspnet:10.0 already ships an "app" user (UID 1654)
 # precisely for this purpose; reusing it keeps the image small and
 # avoids fighting the base image's reserved UIDs.
@@ -266,15 +322,83 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=15s --retries=5 \
 ENTRYPOINT ["dotnet", "BatteryEms.Host.dll"]
 
 # ---------------------------------------------------------------------------
-# native-build (RM-M3-06 part 1): Build + smoke-test the native
-# control core. This stage is intentionally NOT chained into the
-# .NET test or runtime stages — RM-M3-06 part 2 wires the .so into
-# /app/native/ in the runtime image once the routing in RM-M3-04/05
-# can consume it. For now `make native-build` only proves that the
-# C++ source compiles cleanly under -Werror and that the smoke test
-# in tests/test_compute.cpp still passes.
+# test-native-interop (RM-M3-07): drives the layout / ABI handshake
+# / non-finite-input contract subset of
+# BatteryEms.NativeInterop.IntegrationTests against the real
+# libbattery_control_core.so produced by the native-build stage.
+# The .so is COPYed into a known path and the tests locate it via
+# BESS_NATIVE_LIB_PATH (same discovery hook used on a developer
+# workstation).
+#
+# RM-M3-11 split: parity tests are filtered OUT here (Category!=Parity)
+# and run via the separate test-native-parity stage instead — that
+# way each gate's failure attributes cleanly to its category and
+# `gates` / `ci` can list both names.
 # ---------------------------------------------------------------------------
-FROM debian:bookworm-slim AS native-build
+FROM lint AS test-native-interop
+ARG BUILD_CONFIGURATION
+COPY --from=native-build /build/native/libbattery_control_core.so /native/libbattery_control_core.so
+ENV BESS_NATIVE_LIB_PATH=/native/libbattery_control_core.so
+RUN dotnet test tests/integration/BatteryEms.NativeInterop.IntegrationTests/BatteryEms.NativeInterop.IntegrationTests.csproj \
+    --configuration "${BUILD_CONFIGURATION}" \
+    --no-build \
+    --no-restore \
+    --filter "Category!=Parity" \
+    --logger "console;verbosity=normal"
+
+# ---------------------------------------------------------------------------
+# test-native-parity (RM-M3-10): runs the replay-based native↔.NET
+# parity gate. Same project + same .so as test-native-interop, but
+# filtered to the [Trait("Category", "Parity")] subset which loads
+# tests/fixtures/native_parity/cases.v1.json and asserts native and
+# managed kernels agree on every documented case.
+# ---------------------------------------------------------------------------
+FROM lint AS test-native-parity
+ARG BUILD_CONFIGURATION
+COPY --from=native-build /build/native/libbattery_control_core.so /native/libbattery_control_core.so
+ENV BESS_NATIVE_LIB_PATH=/native/libbattery_control_core.so
+RUN dotnet test tests/integration/BatteryEms.NativeInterop.IntegrationTests/BatteryEms.NativeInterop.IntegrationTests.csproj \
+    --configuration "${BUILD_CONFIGURATION}" \
+    --no-build \
+    --no-restore \
+    --filter "Category=Parity" \
+    --logger "console;verbosity=normal"
+
+# ---------------------------------------------------------------------------
+# native-lint (RM-M3-09): clang-tidy against the native control core
+# using the project's `.clang-tidy` config. CMAKE_EXPORT_COMPILE_COMMANDS
+# emits the compile_commands.json clang-tidy needs to see the same
+# -Werror / -W* flags the production build uses. The gate fails on any
+# finding (`--warnings-as-errors=*`); FetchContent sources are filtered
+# out via HeaderFilterRegex in `.clang-tidy`. clang-tidy is pulled from
+# the same Ubuntu Noble base the runtime image uses.
+# ---------------------------------------------------------------------------
+FROM ${DOTNET_SDK_IMAGE} AS native-lint
+RUN apt-get update \
+ && apt-get install --yes --no-install-recommends \
+        build-essential \
+        cmake \
+        clang-tidy \
+ && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+COPY native/battery_control_core/ native/battery_control_core/
+RUN cmake -S native/battery_control_core -B /build/native-lint \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+ && clang-tidy \
+        -p /build/native-lint \
+        --warnings-as-errors=* \
+        native/battery_control_core/src/compute.c
+
+# ---------------------------------------------------------------------------
+# native-sanitizer (RM-M3-09): rebuild the .so + test binary with
+# AddressSanitizer + UndefinedBehaviorSanitizer instrumentation and
+# run the doctest suite under -fno-sanitize-recover=all. Hits any
+# undefined behaviour, use-after-free, heap/stack overflows, or
+# misaligned pointer dereferences that the value-only kernel might
+# acquire as the surface grows (PID state in RM-M3-13 most notably).
+# ---------------------------------------------------------------------------
+FROM ${DOTNET_SDK_IMAGE} AS native-sanitizer
 RUN apt-get update \
  && apt-get install --yes --no-install-recommends \
         build-essential \
@@ -282,10 +406,72 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
 COPY native/battery_control_core/ native/battery_control_core/
-RUN cmake -S native/battery_control_core -B /build/native \
-        -DCMAKE_BUILD_TYPE=Release \
- && cmake --build /build/native --parallel \
- && ctest --test-dir /build/native --output-on-failure
+RUN cmake -S native/battery_control_core -B /build/native-san \
+        -DCMAKE_BUILD_TYPE=Debug \
+        -DBCC_ENABLE_SANITIZERS=ON \
+ && cmake --build /build/native-san --parallel \
+ && ctest --test-dir /build/native-san --output-on-failure
+
+# ---------------------------------------------------------------------------
+# native-coverage (RM-M3-09): instrumented build + gcovr report.
+# CMAKE_BUILD_TYPE=Debug + BCC_ENABLE_COVERAGE=ON adds --coverage to
+# both compile and link steps so .gcno / .gcda files land alongside
+# the object code. After ctest runs, gcovr aggregates the .gcda data,
+# filtering to the production source tree and excluding the
+# FetchContent _deps directory (doctest is test infrastructure, not
+# production code under coverage). The TOTAL line is extracted into
+# summary.txt for the threshold check stage to parse.
+# ---------------------------------------------------------------------------
+FROM ${DOTNET_SDK_IMAGE} AS native-coverage
+RUN apt-get update \
+ && apt-get install --yes --no-install-recommends \
+        build-essential \
+        cmake \
+        gcovr \
+ && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+COPY native/battery_control_core/ native/battery_control_core/
+RUN cmake -S native/battery_control_core -B /build/native-cov \
+        -DCMAKE_BUILD_TYPE=Debug \
+        -DBCC_ENABLE_COVERAGE=ON \
+ && cmake --build /build/native-cov --parallel \
+ && ctest --test-dir /build/native-cov --output-on-failure \
+ && mkdir -p /build/native-cov/coverage \
+ && gcovr \
+        --root /src/native/battery_control_core \
+        --filter /src/native/battery_control_core/src \
+        --object-directory /build/native-cov \
+        --exclude /build/native-cov/_deps \
+        > /build/native-cov/coverage/coverage.txt \
+ && grep '^TOTAL' /build/native-cov/coverage/coverage.txt \
+        > /build/native-cov/coverage/summary.txt
+RUN printf '%s\n' \
+    '#!/usr/bin/env sh' \
+    'set -eu' \
+    'printf "==> /build/native-cov/coverage/summary.txt <==\n"' \
+    'cat /build/native-cov/coverage/summary.txt' \
+    'printf "\n==> /build/native-cov/coverage/coverage.txt <==\n"' \
+    'cat /build/native-cov/coverage/coverage.txt' \
+    > /usr/local/bin/show-native-coverage \
+ && chmod +x /usr/local/bin/show-native-coverage
+ENTRYPOINT ["/usr/local/bin/show-native-coverage"]
+
+# ---------------------------------------------------------------------------
+# native-coverage-gate (RM-M3-09): threshold check on top of the
+# coverage report. The threshold is parameterised so a future slice
+# can lower it briefly during a refactor — RM-M3-09 demands 100 %
+# line coverage on src/, which is the default. Anything below
+# triggers a non-zero exit and breaks `make native-coverage-gate`.
+# ---------------------------------------------------------------------------
+FROM native-coverage AS native-coverage-gate
+ARG BCC_COVERAGE_THRESHOLD=100
+RUN coverage_percent="$(awk '$1 == "TOTAL" { gsub("%", "", $4); print $4 }' /build/native-cov/coverage/summary.txt)" \
+ && test -n "${coverage_percent}" \
+ && echo "[native-coverage-gate] line coverage: ${coverage_percent}% (threshold: ${BCC_COVERAGE_THRESHOLD}%)" >&2 \
+ && if [ "${coverage_percent}" -lt "${BCC_COVERAGE_THRESHOLD}" ]; then \
+        echo "error: native coverage below threshold: ${coverage_percent}% < ${BCC_COVERAGE_THRESHOLD}%" >&2; \
+        exit 1; \
+    fi
 
 # ---------------------------------------------------------------------------
 # Future stages (activated in later waves):

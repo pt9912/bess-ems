@@ -63,7 +63,7 @@ extern "C" {
  * extension.
  */
 #define BCC_ABI_VERSION_MAJOR 0
-#define BCC_ABI_VERSION_MINOR 1
+#define BCC_ABI_VERSION_MINOR 2
 #define BCC_ABI_VERSION_PATCH 0
 
 #define BCC_ABI_VERSION_PACK(major, minor, patch) \
@@ -117,7 +117,12 @@ typedef enum bcc_reason {
     BCC_REASON_NON_FINITE_INPUT            = 9,
     BCC_REASON_NON_FINITE_OUTPUT           = 10,
     BCC_REASON_NEGATIVE_DT                 = 11,
-    BCC_REASON_UNSUPPORTED_STATE           = 12
+    BCC_REASON_UNSUPPORTED_STATE           = 12,
+    /* RM-M3-13 PID slice (ABI minor bump 0.1 → 0.2). Append-only. */
+    BCC_REASON_PID_OUTPUT_CLAMPED_HIGH     = 13, /* PID clamped at OutputMax. */
+    BCC_REASON_PID_OUTPUT_CLAMPED_LOW      = 14, /* PID clamped at OutputMin. */
+    BCC_REASON_PID_INTEGRATOR_OVERFLOW     = 15, /* Integrator state overflowed to ±Inf. */
+    BCC_REASON_PID_INVALID_OPTIONS         = 16  /* OutputMin > OutputMax or DeadbandAbsolute < 0. */
 } bcc_reason_t;
 
 /* ------------------------------------------------------------------
@@ -217,6 +222,94 @@ bcc_status_t battery_control_core_compute(
     const bcc_limits_t   *limits,
     const bcc_request_t  *request,
     bcc_command_t        *out_command);
+
+/* ------------------------------------------------------------------
+ * RM-M3-13 PID slice (ABI minor 0.2). Mirrors
+ * BatteryEms.Domain.PidController.Step one-to-one:
+ *
+ *   - State threaded through: integral plus previous-error scalar.
+ *   - Options carry the PID gains, output bounds, deadband and
+ *     anti-windup mode. OutputMin/OutputMax are mandatory; the
+ *     managed reference rejects skipping them and the native side
+ *     mirrors that contract through bcc_pid_invalid_options on
+ *     OutputMin > OutputMax.
+ *   - Input is the (setpoint, measurement, dt) triple. dt > 0 is
+ *     required; dt <= 0 returns BCC_STATUS_NEGATIVE_DT.
+ *   - Command carries the post-clamp output, the next state
+ *     threaded back to the caller, plus was_clamped /
+ *     was_integral_frozen observability flags. Mode is omitted —
+ *     PID does not classify charge/discharge/idle, the caller
+ *     decides downstream from the output sign.
+ *
+ * Status / reason mapping for pid_step (in addition to the
+ * compute-shared codes):
+ *
+ *   OK / WITHIN_LIMITS          : all valid, output not clamped.
+ *   LIMITED / PID_OUTPUT_CLAMPED_HIGH : output clamped at OutputMax.
+ *   LIMITED / PID_OUTPUT_CLAMPED_LOW  : output clamped at OutputMin.
+ *   INVALID_INPUT / NON_FINITE_INPUT  : NaN/Inf in any input or
+ *                                       state field.
+ *   INVALID_INPUT / PID_INVALID_OPTIONS : OutputMin > OutputMax or
+ *                                         DeadbandAbsolute < 0.
+ *   NON_FINITE / PID_INTEGRATOR_OVERFLOW : integrator update
+ *                                          overflowed to ±Inf.
+ *   NON_FINITE / NON_FINITE_OUTPUT    : pre-clamp output non-finite
+ *                                       from the P or D term (very
+ *                                       extreme gains / measurements).
+ *   NEGATIVE_DT / NEGATIVE_DT         : dt <= 0.
+ *   UNSUPPORTED_STATE / UNSUPPORTED_STATE : anti_windup_mode value
+ *                                           not in bcc_pid_anti_windup_t.
+ *
+ * Anti-windup freezing (was_integral_frozen=1) is NOT a status
+ * change — the integrator is held but the output stays observable
+ * and may still be OK or LIMITED depending on the clamp.
+ * ------------------------------------------------------------------ */
+
+typedef enum bcc_pid_anti_windup {
+    /* Freeze the integrator when the candidate output is past the
+     * saturation bound AND the integrator step (Ki·error) has the
+     * same sign as the violation. Mirrors
+     * BatteryEms.Domain.PidAntiWindupMode.ConditionalIntegration. */
+    BCC_PID_ANTI_WINDUP_CONDITIONAL_INTEGRATION = 0
+} bcc_pid_anti_windup_t;
+
+typedef struct bcc_pid_state {
+    double integral;        /* must be finite at entry. */
+    double previous_error;  /* must be finite at entry. */
+} bcc_pid_state_t;
+
+typedef struct bcc_pid_options {
+    double  kp;                      /* finite. */
+    double  ki;                      /* finite. */
+    double  kd;                      /* finite. */
+    double  output_min;              /* finite, <= output_max. */
+    double  output_max;              /* finite, >= output_min. */
+    double  deadband_absolute;       /* finite, >= 0; 0 disables the deadband. */
+    int32_t anti_windup_mode;        /* bcc_pid_anti_windup_t value. */
+    /* 4-byte trailing padding to align the 56-byte struct to 8 B. */
+} bcc_pid_options_t;
+
+typedef struct bcc_pid_input {
+    double setpoint;     /* finite. */
+    double measurement;  /* finite. */
+    double dt_seconds;   /* > 0; dt <= 0 yields BCC_STATUS_NEGATIVE_DT. */
+} bcc_pid_input_t;
+
+typedef struct bcc_pid_command {
+    double  output;              /* post-clamp output, finite. */
+    double  next_integral;       /* state to thread to the next call. */
+    double  next_previous_error; /* state to thread to the next call. */
+    int32_t status;              /* bcc_status_t value. */
+    int32_t reason_code;         /* bcc_reason_t value. */
+    int32_t was_clamped;         /* 0/1: output was clipped to bounds. */
+    int32_t was_integral_frozen; /* 0/1: anti-windup held the integrator. */
+} bcc_pid_command_t;
+
+bcc_status_t battery_control_core_pid_step(
+    const bcc_pid_state_t   *state,
+    const bcc_pid_options_t *options,
+    const bcc_pid_input_t   *input,
+    bcc_pid_command_t       *out_command);
 
 #ifdef __cplusplus
 } /* extern "C" */

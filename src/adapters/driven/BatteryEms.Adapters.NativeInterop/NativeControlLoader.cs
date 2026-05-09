@@ -31,7 +31,7 @@ public sealed partial class NativeControlLoader
     // Loaded_when_library_reports_compatible_abi verifies the two
     // sides agree.
     public const uint ExpectedAbiMajor = 0;
-    public const uint ExpectedAbiMinor = 1;
+    public const uint ExpectedAbiMinor = 2;
     public const uint ExpectedAbiPatch = 0;
 
     public static uint ExpectedAbiVersion =>
@@ -115,7 +115,7 @@ public sealed partial class NativeControlLoader
         }
 
         var loaded = NativeControlLoadResult.Loaded(
-            options.LibraryPath, reportedVersion, ExpectedAbiVersion);
+            options.LibraryPath, reportedVersion, ExpectedAbiVersion, handle);
         LogLoaded(options.LibraryPath, reportedVersion);
         return loaded;
     }

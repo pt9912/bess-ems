@@ -1,5 +1,6 @@
 using BatteryEms.Adapters.Modbus;
 using BatteryEms.Adapters.Mqtt;
+using BatteryEms.Adapters.NativeInterop;
 using BatteryEms.Adapters.Optimization;
 using BatteryEms.Adapters.Optimization.OrTools;
 using BatteryEms.Adapters.Persistence;
@@ -66,6 +67,18 @@ public static class BessHostBuilder
         // use cases). The persistence-backed alternatives below replace
         // the in-memory repositories when a connection string is set.
         builder.Services.AddBessApplicationInMemoryStores();
+
+        // M3-D2: explicit IControlKernel registration. Default profile
+        // (NativeControl:Enabled=false in appsettings.json) wires the
+        // ManagedControlKernel — bit-identisch zum Pre-M3-D2-Verhalten,
+        // wo `ControlCycleUseCase` auf `new ManagedControlKernel()` im
+        // Konstruktor zurückfiel. Das produktionsnahe Native-Profil
+        // (`NativeControl:Enabled=true`, `LibraryPath=/app/native/...`)
+        // schaltet auf `NativeFallbackControlKernel` um, mit
+        // deterministischem Managed-Fallback bei Native-Fehlern und
+        // opt-in `AbortOnAbiMismatch` als Production-Policy
+        // (siehe `docs/user/quality.md` §5.2 + ADR 0003/0004).
+        builder.Services.AddBessNativeControl(builder.Configuration);
 
         // Composition-root only: persistence adapter swap.
         if (!string.IsNullOrWhiteSpace(hostOptions.PersistenceConnectionString))

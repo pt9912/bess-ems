@@ -35,6 +35,17 @@ internal interface INativeLibraryGateway
         in BccRequest request,
         out BccCommand command);
 
+    // RM-M3-13: invokes battery_control_core_pid_step on the loaded
+    // handle. Mirrors CallCompute's shape — production caches the
+    // delegate, tests inject a deterministic command. The export
+    // is only available on libraries reporting ABI minor >= 2.
+    int CallPidStep(
+        nint handle,
+        in BccPidState state,
+        in BccPidOptions options,
+        in BccPidInput input,
+        out BccPidCommand command);
+
     // RM-M3-04: releases the handle. NativeLibrary.Free is the
     // production wiring; tests can no-op.
     void Free(nint handle);

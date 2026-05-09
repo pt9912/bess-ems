@@ -97,6 +97,9 @@ public sealed class NativeControlKernelTests
         public int ComputeReturn { get; set; }
         public BccCommand ComputeCommandToReturn { get; set; }
         public nint LastComputeHandle { get; private set; }
+        public int PidStepReturn { get; set; }
+        public BccPidCommand PidStepCommandToReturn { get; set; }
+        public nint LastPidStepHandle { get; private set; }
         public int FreeCalls { get; private set; }
         public nint LastFreeHandle { get; private set; }
 
@@ -114,6 +117,18 @@ public sealed class NativeControlKernelTests
             LastComputeHandle = handle;
             command = ComputeCommandToReturn;
             return ComputeReturn;
+        }
+
+        public int CallPidStep(
+            nint handle,
+            in BccPidState state,
+            in BccPidOptions options,
+            in BccPidInput input,
+            out BccPidCommand command)
+        {
+            LastPidStepHandle = handle;
+            command = PidStepCommandToReturn;
+            return PidStepReturn;
         }
 
         public void Free(nint handle)

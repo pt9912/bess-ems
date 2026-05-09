@@ -44,13 +44,36 @@ unter `in-progress/`.
 > 10 Liefergegenstände RM-M2-01..10 grün). `make fullbuild`
 > reproduzierbar grün, Compose-Stack (bess-ems + Postgres + Mosquitto
 > + bess-field-sim) liefert `/health = ok` inkl. Postgres-Probe.
-> **Aktive Phase:** M3 — Native Control Core (Library); Slice-Plan
-> [`plan-RM-M3.md`](plan-RM-M3.md). Erledigt: RM-M3-01..05 plus
-> RM-M3-06 Teil 1. RM-M3-05 schließt den Loop: `IControlKernel`-Port
-> mit Managed- und Native+Fallback-Implementierung, Managed-Precheck-
-> Gap aus den Aktivierungsbedingungen geschlossen (non-finite
-> SOC/SOH/Temperatur/Dispatch-Target). Als Nächstes RM-M3-07
-> (Interop-/Parity-Tests gegen die echte `.so`).
+> **Phase M3 abgeschlossen:** alle RM-M3-01..13 ✅. Hervorhebungen
+> der jüngsten Slices: Sprach-Pivot der Kernel-Implementierung von
+> C++ auf C (`catch (...)`-Block + libstdc++-Linkage entfallen,
+> `.so` bei 15 KB ohne `NEEDED`-Einträge), doctest 2.4.11 als
+> Test-Framework via `FetchContent` mit URL_HASH-Pinning, vier
+> Native-Quality-Gates (`native-lint`, `native-sanitizer`,
+> `native-coverage-gate`, `native-coverage-exclusions`) auf 100 %
+> Line-Coverage ohne Exclusion, versionierter Replay-Parity-
+> Datensatz unter `tests/fixtures/native_parity/cases.v1.json` mit
+> 25 Cases, sowie der PID-Native-Slice (RM-M3-13) mit additiver
+> ABI-Minor-Bump 0.1 → 0.2: vier neue PID-Structs, neuer Export
+> `battery_control_core_pid_step`, vier neue Reason-Codes, voller
+> Anti-Windup-/Deadband-Vertrag aus dem managed
+> `PidController.Step` 1:1 abgebildet inklusive negativ-Ki-
+> Direction-Logik, plus 21 Wire-Tests durch P/Invoke gegen die
+> echte `.so`. `make gates` und `make ci` sind komplett grün.
+> **M3-D2 abgeschlossen** ([`../done/plan-RM-M3-D2.md`](../done/plan-RM-M3-D2.md)):
+> `AddBessNativeControl(IConfiguration)`-Extension registriert
+> `IControlKernel` als Singleton, Default `Enabled=false` →
+> `ManagedControlKernel`, `Enabled=true` mit echter `.so` →
+> `NativeFallbackControlKernel`, deterministischer Managed-
+> Fallback bei Native-Fehler, opt-in `AbortOnAbiMismatch` als
+> Production-Policy. ADRs [0003](../../adr/0003-native-kernel-language.md)
+> (Sprache C) und [0004](../../adr/0004-native-kernel-process-isolation.md)
+> (In-Process P/Invoke) sind die Architektur-Anker. **Offen:**
+> ein zukünftiger PID-Routing-Slice (M3-D3) sobald ein konkreter
+> PID-Konsument im Regelzyklus vorhanden ist (PidController.Step
+> ist heute nicht verdrahtet); RM-M3-FUP-01..04-Carve-outs
+> (Migrationen, OP-OPEN-05/06, Replay-Folge-Slices) bleiben
+> trigger-getrieben offen.
 >
 > **M2-Welle 1 (Optimization-Slice, abgeschlossen):**
 > [`../done/plan-RM-M2-optimization.md`](../done/plan-RM-M2-optimization.md)
@@ -102,7 +125,7 @@ unter `in-progress/`.
 | ------ | ----------- | ---------------------------------- | ----- | ---------- |
 | ✅     | M1          | MVP — sichere Regelpipeline        | 1     | [Abgeschlossen](../done/plan-RM-M1.md) |
 | ✅     | M2          | Marktausbau und Optimierung        | 1 → 2 | Abgeschlossen ([Optimization-Slice](../done/plan-RM-M2-optimization.md), RM-M2-01..10, [Migrations-Tooling](../done/plan-RM-M2-migration.md), [HIL](../done/HIL-simulator.md)) |
-| 🟡     | M3          | Native Control Core (Library)      | 2     | [`plan-RM-M3.md`](plan-RM-M3.md) — RM-M3-01..13 in Arbeit (Slice-Plan); RM-M3-01..05 und RM-M3-06 Teil 1 ✅ |
+| ✅     | M3          | Native Control Core (Library)      | 2     | [`plan-RM-M3.md`](plan-RM-M3.md) — alle RM-M3-01..13 ✅ inkl. C-Pivot, doctest, vier Native-Quality-Gates, replay-basierter Parity, Doku-Sync und PID-Slice mit ABI-Minor-Bump 0.1→0.2; produktive Routing-Aktivierung (M3-D2) und FUP-Slices bleiben offen |
 | ⬜     | M4          | Regelleistung und OPC-UA           | 2     | folgt mit Aktivierung |
 | ⬜     | M5          | MPC, Solver-Sidecar, Replay        | 3     | folgt mit Aktivierung |
 | ⬜     | M6          | Skalierung, UI, Edge / Multi-Asset | 4     | folgt mit Aktivierung |
@@ -243,18 +266,18 @@ bleibt Fallback und Referenz.
 | Status | ID         | Inhalt                                                              | LH-Bezug                   |
 | ------ | ---------- | ------------------------------------------------------------------- | -------------------------- |
 | ✅     | RM-M3-01   | C-ABI `battery_control_core.h` (Snapshot/Limits/Command Structs)    | LH-NATIVE-002/003          |
-| ✅     | RM-M3-02   | C++-Implementierung Constraint + Ramp + Statuscode-Fehlerpfade      | LH-NATIVE-001/004          |
+| ✅     | RM-M3-02   | Implementierung Constraint + Ramp + Statuscode-Fehlerpfade (Sprach-Pivot C++ → C unter RM-M3-09) | LH-NATIVE-001/004 |
 | ✅     | RM-M3-03   | ABI-Versionsfunktion + Startup-Check in .NET                        | LH-NATIVE-005              |
 | ✅     | RM-M3-04   | P/Invoke-Bindings (`BatteryEms.Adapters.NativeInterop`)              | LH-NATIVE-001              |
 | ✅     | RM-M3-05   | Routing: Native bevorzugt, .NET-Fallback bei Fehler/Abwesenheit     | LH-ARCH-006, LH-NF-002     |
-| 🟡     | RM-M3-06   | Multi-Stage Dockerfile mit Native-Build-Stage                       | LH-DEPLOY-003/004, LH-NATIVE-006 |
-| ⬜     | RM-M3-07   | Interop-Tests (Struct Layout, ABI, Werte-Parität gg. .NET-Referenz) | LH-TEST-005                |
-| ⬜     | RM-M3-08   | C++-Unit-Tests (Constraint, Ramp, NaN/Inf, Vorzeichen, neg. dt)     | LH-TEST-001                |
-| ⬜     | RM-M3-09   | Native-Quality-Gates: `native-lint`, Sanitizer, Native-Coverage     | LH-TEST-005, LH-NATIVE-*   |
-| ⬜     | RM-M3-10   | Native/.NET-Parity-Gate über Replay-Datensatz                       | LH-ARCH-006, LH-TEST-005   |
-| ⬜     | RM-M3-11   | Makefile-Erweiterung um native Targets (`native-lint`, `test-native-interop`, `test-native-parity`, `native-coverage-gate`, `native-coverage-report`, `native-coverage-exclusions`); `gates`/`ci` ziehen native Gates mit | LH-NATIVE-*, LH-TEST-005   |
-| ⬜     | RM-M3-12   | Doku-/Contract-Sync fuer Native-Policy und Adaptername              | LH-NATIVE-004/005, LH-OPS-001 |
-| ⬜     | RM-M3-13   | PID Native-Slice nach stabiler Constraint/Ramp-Parity               | LH-NATIVE-001/004, LH-TEST-005 |
+| ✅     | RM-M3-06   | Multi-Stage Dockerfile mit Native-Build-Stage (Teil 1 Build-Stage; Teil 2 Runtime-Image-Pfad `/app/native/` + Container-Smoke) | LH-DEPLOY-003/004, LH-NATIVE-006 |
+| ✅     | RM-M3-07   | Interop-Tests (Struct Layout, ABI, non-finite-Contract gegen echte `.so`) | LH-TEST-005          |
+| ✅     | RM-M3-08   | Native-Unit-Tests via doctest 2.4.11 (FetchContent + URL_HASH SHA256-Pinning) | LH-TEST-001        |
+| ✅     | RM-M3-09   | Native-Quality-Gates: `native-lint` (clang-tidy), Sanitizer (ASan + UBSan), `native-coverage-gate` (gcovr, 100 % line) | LH-TEST-005, LH-NATIVE-* |
+| ✅     | RM-M3-10   | Native/.NET-Parity-Gate über versionierten Replay-Datensatz `cases.v1.json` (25 Cases) | LH-ARCH-006, LH-TEST-005 |
+| ✅     | RM-M3-11   | Makefile-Erweiterung um native Targets (`native-lint`, `test-native-interop`, `test-native-parity`, `native-coverage-gate`, `native-coverage-report`, `native-coverage-exclusions`); `gates`/`ci` ziehen native Gates mit | LH-NATIVE-*, LH-TEST-005 |
+| 🟡     | RM-M3-12   | Doku-/Contract-Sync fuer Native-Policy und Adaptername              | LH-NATIVE-004/005, LH-OPS-001 |
+| ✅     | RM-M3-13   | PID Native-Slice nach stabiler Constraint/Ramp-Parity (ABI 0.1→0.2 additiv, 4 neue Structs, 4 Reason-Codes, neuer Export `battery_control_core_pid_step`, 100 % Coverage, 21 Wire-Tests durch P/Invoke) | LH-NATIVE-001/004, LH-TEST-005 |
 
 ### Abnahmekriterien
 

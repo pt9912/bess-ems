@@ -229,6 +229,26 @@ public sealed class NativeFallbackControlKernelTests
             return ComputeReturn;
         }
 
+        // RM-M3-13: NativeFallbackControlKernel does not call PidStep
+        // — PID routing/fallback is M3-D2's IPidKernel surface — but
+        // the gateway interface still requires the method, so keep
+        // a tripwire here that fails loud if a future refactor ever
+        // wires Compute through to PidStep by accident.
+        public int CallPidStep(
+            nint handle,
+            in BccPidState state,
+            in BccPidOptions options,
+            in BccPidInput input,
+            out BccPidCommand command)
+        {
+            command = default;
+            throw new InvalidOperationException(
+                "NativeFallbackControlKernelTests' RecordingGateway should never see "
+                + "a CallPidStep — the M3 fallback kernel is Constraint+Ramp only. "
+                + "Use the kernel-side FakeGateway in NativeControlKernelTests for "
+                + "PidStep coverage.");
+        }
+
         public void Free(nint handle) => FreeCalls++;
     }
 

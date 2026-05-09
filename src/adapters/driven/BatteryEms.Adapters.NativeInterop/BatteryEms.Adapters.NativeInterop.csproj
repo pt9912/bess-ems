@@ -8,6 +8,14 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <!-- M3-D2: AddBessNativeControl is a DI extension over
+         IConfiguration; both abstractions packages are needed so
+         host composition can wire the NativeFallbackControlKernel
+         without dragging the full Microsoft.Extensions.Hosting
+         transitive set. -->
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
   </ItemGroup>
 
   <!-- RM-M3-05: NativeFallbackControlKernel implements the
@@ -23,9 +31,14 @@
 
   <!-- RM-M3-03: the loader's INativeLibraryGateway seam is internal so
        the production wiring cannot bypass it, and the tests project
-       needs visibility for the fake gateway in the load-path tests. -->
+       needs visibility for the fake gateway in the load-path tests.
+       RM-M3-07: the integration tests reuse the canonical
+       NativeFallbackControlKernel.MapReason mapping so any future
+       change to the BCC-reason → managed-string contract propagates
+       to the parity assertions instead of silently diverging. -->
   <ItemGroup>
     <InternalsVisibleTo Include="BatteryEms.Adapters.NativeInterop.Tests" />
+    <InternalsVisibleTo Include="BatteryEms.NativeInterop.IntegrationTests" />
   </ItemGroup>
 
 </Project>
