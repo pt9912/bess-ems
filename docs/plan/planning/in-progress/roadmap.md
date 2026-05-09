@@ -282,7 +282,7 @@ bleibt Fallback und Referenz.
 | ✅     | RM-M3-09   | Native-Quality-Gates: `native-lint` (clang-tidy), Sanitizer (ASan + UBSan), `native-coverage-gate` (gcovr, 100 % line) | LH-TEST-005, LH-NATIVE-* |
 | ✅     | RM-M3-10   | Native/.NET-Parity-Gate über versionierten Replay-Datensatz `cases.v1.json` (25 Cases) | LH-ARCH-006, LH-TEST-005 |
 | ✅     | RM-M3-11   | Makefile-Erweiterung um native Targets (`native-lint`, `test-native-interop`, `test-native-parity`, `native-coverage-gate`, `native-coverage-report`, `native-coverage-exclusions`); `gates`/`ci` ziehen native Gates mit | LH-NATIVE-*, LH-TEST-005 |
-| 🟡     | RM-M3-12   | Doku-/Contract-Sync fuer Native-Policy und Adaptername              | LH-NATIVE-004/005, LH-OPS-001 |
+| ✅     | RM-M3-12   | Doku-/Contract-Sync fuer Native-Policy und Adaptername (quality.md, architecture.md, roadmap.md, plan-RM-M3.md auf kanonischen Adaptername `BatteryEms.Adapters.NativeInterop`, Header-Pfad `native/battery_control_core/include/battery_control_core.h`, Coverage-Scope `native/battery_control_core/src/`, Port `IControlKernel`, Sprache C; M3-Default-Policy = Managed-Fallback, opt-in `AbortOnAbiMismatch` als Production-Policy synchron) | LH-NATIVE-004/005, LH-OPS-001 |
 | ✅     | RM-M3-13   | PID Native-Slice nach stabiler Constraint/Ramp-Parity (ABI 0.1→0.2 additiv, 4 neue Structs, 4 Reason-Codes, neuer Export `battery_control_core_pid_step`, 100 % Coverage, 21 Wire-Tests durch P/Invoke) | LH-NATIVE-001/004, LH-TEST-005 |
 
 ### Abnahmekriterien
