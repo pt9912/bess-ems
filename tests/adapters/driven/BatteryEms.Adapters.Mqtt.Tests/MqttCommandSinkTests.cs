@@ -28,7 +28,7 @@ public sealed class MqttCommandSinkTests
         var write = sink.WriteAsync(SampleCommand(), CancellationToken.None);
 
         await TestHelpers.WaitUntil(
-            () => client.Publishes.Count > 0 && client.SubscribedTopics.Contains("battery/asset-1/command/ack"),
+            () => client.Publishes.Count > 0 && client.SubscribedTopicNames.Contains("battery/asset-1/command/ack", StringComparer.Ordinal),
             TimeSpan.FromSeconds(1));
 
         await client.DeliverAsync(
@@ -72,7 +72,7 @@ public sealed class MqttCommandSinkTests
         var write = sink.WriteAsync(SampleCommand("cmd-rej"), CancellationToken.None);
 
         await TestHelpers.WaitUntil(
-            () => client.Publishes.Count > 0 && client.SubscribedTopics.Contains("battery/asset-1/command/ack"),
+            () => client.Publishes.Count > 0 && client.SubscribedTopicNames.Contains("battery/asset-1/command/ack", StringComparer.Ordinal),
             TimeSpan.FromSeconds(1));
 
         await client.DeliverAsync(
@@ -95,7 +95,7 @@ public sealed class MqttCommandSinkTests
         var write = sink.WriteAsync(SampleCommand("cmd-real"), CancellationToken.None);
 
         await TestHelpers.WaitUntil(
-            () => client.Publishes.Count > 0 && client.SubscribedTopics.Contains("battery/asset-1/command/ack"),
+            () => client.Publishes.Count > 0 && client.SubscribedTopicNames.Contains("battery/asset-1/command/ack", StringComparer.Ordinal),
             TimeSpan.FromSeconds(1));
 
         await client.DeliverAsync(
@@ -116,7 +116,7 @@ public sealed class MqttCommandSinkTests
 
         var write = sink.WriteAsync(SampleCommand("cmd-mal"), CancellationToken.None);
         await TestHelpers.WaitUntil(
-            () => client.Publishes.Count > 0 && client.SubscribedTopics.Contains("battery/asset-1/command/ack"),
+            () => client.Publishes.Count > 0 && client.SubscribedTopicNames.Contains("battery/asset-1/command/ack", StringComparer.Ordinal),
             TimeSpan.FromSeconds(1));
 
         // Malformed JSON must not throw and must not satisfy the pending TCS;
@@ -168,7 +168,7 @@ public sealed class MqttCommandSinkTests
         var write = sink.WriteAsync(overrange, CancellationToken.None);
 
         await TestHelpers.WaitUntil(
-            () => client.Publishes.Count > 0 && client.SubscribedTopics.Contains("battery/asset-1/command/ack"),
+            () => client.Publishes.Count > 0 && client.SubscribedTopicNames.Contains("battery/asset-1/command/ack", StringComparer.Ordinal),
             TimeSpan.FromSeconds(1));
 
         await client.DeliverAsync(

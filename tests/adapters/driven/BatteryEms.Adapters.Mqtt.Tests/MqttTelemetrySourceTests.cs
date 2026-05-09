@@ -45,7 +45,7 @@ public sealed class MqttTelemetrySourceTests
         var consumer = ReadFirstOrCancel(source, cts.Token);
 
         await TestHelpers.WaitUntil(() => client.SubscribedTopics.Count > 0, TimeSpan.FromSeconds(1));
-        Assert.Contains("battery/single-bess-1/telemetry", client.SubscribedTopics);
+        Assert.Contains("battery/single-bess-1/telemetry", client.SubscribedTopicNames);
         Assert.Equal(1, client.ConnectCallCount);
 
         await cts.CancelAsync();

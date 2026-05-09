@@ -9,9 +9,12 @@ namespace BatteryEms.Adapters.Mqtt;
 // process: each topic registers once at the broker and any number of
 // adapter-side handlers fan-out from ApplicationMessageReceivedAsync.
 //
-// SECURITY: M1 wires the simulator counterpart (plan-RM-M1-simulator.md
-// §65) over anonymous plaintext TCP. TLS, credentials, and broker auth
-// are M2 work; do not point this client at production brokers.
+// SECURITY: this client speaks anonymous plaintext TCP to the broker.
+// TLS, broker credentials and certificate validation are intentionally
+// out of the RM-M4-06 slice (D-01). The Production-readiness slice is
+// tracked as F-04 in note-RM-M4-followups.md and is mandatory before
+// pointing this client at a real broker; until F-04 fires, restrict
+// usage to local simulators and CI/HIL test brokers.
 public sealed class MqttNetClient : IMqttClient
 {
     private readonly MQTTnet.IMqttClient _inner;
@@ -64,7 +67,11 @@ public sealed class MqttNetClient : IMqttClient
         }
     }
 
-    public async Task SubscribeAsync(string topicFilter, Func<MqttMessage, Task> handler, CancellationToken cancellationToken)
+    public async Task SubscribeAsync(
+        string topicFilter,
+        MqttQualityOfService qos,
+        Func<MqttMessage, Task> handler,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(topicFilter);
         ArgumentNullException.ThrowIfNull(handler);
@@ -89,12 +96,17 @@ public sealed class MqttNetClient : IMqttClient
         }
 
         var options = new MqttClientSubscribeOptionsBuilder()
-            .WithTopicFilter(topicFilter, MqttQualityOfServiceLevel.AtMostOnce)
+            .WithTopicFilter(topicFilter, ToMqttNet(qos))
             .Build();
         await _inner.SubscribeAsync(options, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task PublishAsync(string topic, byte[] payload, bool retained, CancellationToken cancellationToken)
+    public async Task PublishAsync(
+        string topic,
+        byte[] payload,
+        MqttQualityOfService qos,
+        bool retained,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(topic);
         ArgumentNullException.ThrowIfNull(payload);
@@ -103,10 +115,18 @@ public sealed class MqttNetClient : IMqttClient
             .WithTopic(topic)
             .WithPayload(payload)
             .WithRetainFlag(retained)
-            .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtMostOnce)
+            .WithQualityOfServiceLevel(ToMqttNet(qos))
             .Build();
         await _inner.PublishAsync(message, cancellationToken).ConfigureAwait(false);
     }
+
+    private static MqttQualityOfServiceLevel ToMqttNet(MqttQualityOfService qos) => qos switch
+    {
+        MqttQualityOfService.AtMostOnce => MqttQualityOfServiceLevel.AtMostOnce,
+        MqttQualityOfService.AtLeastOnce => MqttQualityOfServiceLevel.AtLeastOnce,
+        MqttQualityOfService.ExactlyOnce => MqttQualityOfServiceLevel.ExactlyOnce,
+        _ => throw new ArgumentOutOfRangeException(nameof(qos), qos, "Unknown MqttQualityOfService."),
+    };
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031", Justification = "Handlers must not propagate exceptions back into MQTTnet's dispatcher loop; per-handler errors are isolated.")]
     private async Task OnApplicationMessageReceivedAsync(MqttApplicationMessageReceivedEventArgs e)

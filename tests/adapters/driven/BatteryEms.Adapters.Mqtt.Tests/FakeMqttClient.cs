@@ -9,9 +9,14 @@ internal sealed class FakeMqttClient : IMqttClient
 
     public bool IsConnected { get; private set; }
 
-    public List<(string Topic, byte[] Payload, bool Retained)> Publishes { get; } = new();
+    public List<(string Topic, byte[] Payload, MqttQualityOfService Qos, bool Retained)> Publishes { get; } = new();
 
-    public List<string> SubscribedTopics { get; } = new();
+    public List<(string Topic, MqttQualityOfService Qos)> SubscribedTopics { get; } = new();
+
+    // Convenience projection so existing tests that only care about
+    // the topic string can keep their shape. New per-channel-QoS
+    // tests assert against SubscribedTopics directly.
+    public IEnumerable<string> SubscribedTopicNames => SubscribedTopics.Select(t => t.Topic);
 
     public int ConnectCallCount { get; private set; }
 
@@ -36,10 +41,14 @@ internal sealed class FakeMqttClient : IMqttClient
         }
     }
 
-    public Task SubscribeAsync(string topicFilter, Func<MqttMessage, Task> handler, CancellationToken cancellationToken)
+    public Task SubscribeAsync(
+        string topicFilter,
+        MqttQualityOfService qos,
+        Func<MqttMessage, Task> handler,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        SubscribedTopics.Add(topicFilter);
+        SubscribedTopics.Add((topicFilter, qos));
         _handlers.AddOrUpdate(
             topicFilter,
             _ => new List<Func<MqttMessage, Task>> { handler },
@@ -54,14 +63,19 @@ internal sealed class FakeMqttClient : IMqttClient
         return Task.CompletedTask;
     }
 
-    public async Task PublishAsync(string topic, byte[] payload, bool retained, CancellationToken cancellationToken)
+    public async Task PublishAsync(
+        string topic,
+        byte[] payload,
+        MqttQualityOfService qos,
+        bool retained,
+        CancellationToken cancellationToken)
     {
         if (OnPublish is not null)
         {
             await OnPublish.Invoke().ConfigureAwait(false);
         }
         cancellationToken.ThrowIfCancellationRequested();
-        Publishes.Add((topic, payload, retained));
+        Publishes.Add((topic, payload, qos, retained));
     }
 
     public ValueTask DisposeAsync()

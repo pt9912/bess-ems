@@ -79,7 +79,10 @@ public sealed class MqttCommandSink : IBatteryCommandSink
         try
         {
             var payload = JsonSerializer.SerializeToUtf8Bytes(ToWire(effective), MqttJson.Options);
-            await _client.PublishAsync(_commandTopic, payload, _commandRetained, cancellationToken).ConfigureAwait(false);
+            await _client.PublishAsync(
+                _commandTopic, payload,
+                _options.QoSOrDefault.CommandPublish,
+                _commandRetained, cancellationToken).ConfigureAwait(false);
 
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCts.CancelAfter(_options.CommandAckTimeout);
@@ -133,7 +136,11 @@ public sealed class MqttCommandSink : IBatteryCommandSink
         {
             return;
         }
-        await _client.SubscribeAsync(_ackTopic, OnAckAsync, cancellationToken).ConfigureAwait(false);
+        await _client.SubscribeAsync(
+            _ackTopic,
+            _options.QoSOrDefault.CommandAckSubscribe,
+            OnAckAsync,
+            cancellationToken).ConfigureAwait(false);
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031", Justification = "ACK decode errors must not escape the dispatcher; they are surfaced as ack-decode-error timeouts on the affected commands.")]

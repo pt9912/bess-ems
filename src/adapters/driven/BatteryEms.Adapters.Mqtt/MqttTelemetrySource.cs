@@ -68,7 +68,11 @@ public sealed class MqttTelemetrySource : IBatteryTelemetrySource
         }
 
         await _client.ConnectAsync(cancellationToken).ConfigureAwait(false);
-        await _client.SubscribeAsync(_telemetryTopic, OnMessageAsync, cancellationToken).ConfigureAwait(false);
+        await _client.SubscribeAsync(
+            _telemetryTopic,
+            _options.QoSOrDefault.TelemetrySubscribe,
+            OnMessageAsync,
+            cancellationToken).ConfigureAwait(false);
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031", Justification = "Adapter boundary captures arbitrary protocol/decoding errors and surfaces them via AdapterStatus so the worker can degrade gracefully.")]

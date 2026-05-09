@@ -84,7 +84,15 @@ unter `in-progress/`.
 > ist abgeschlossen.
 >
 > **M4 gestartet:** [`plan-RM-M4.md`](plan-RM-M4.md) ist nach
-> `in-progress/` migriert. **RM-M4-01 ✅** (Intraday-Reoptimierung
+> `in-progress/` migriert. **RM-M4-06 ✅** (MQTT QoS +
+> Command-ACK-Korrelation): `MqttQualityOfService`-Enum +
+> `MqttQosOptions` mit per-Channel-Defaults, `IMqttClient`-Port um
+> QoS-Parameter erweitert, `MqttNetClient` mappt zu MQTTnet,
+> CommandSink/TelemetrySource ziehen per-Channel-QoS durch;
+> ACK-Mismatch- und Multiple-Pending-Korrelation gepinnt; SECURITY-
+> Kommentar auf F-04 umgestellt; 9 neue Adapter-Pins. **`MqttNetClient`
+> bleibt nicht-Production-tauglich bis F-04 (TLS/Auth) zündet.**
+> **RM-M4-01 ✅** (Intraday-Reoptimierung
 > Resthorizont): neuer Driving Port `IIntradayReoptimizationUseCase`,
 > Per-asset Lock, Baseline-Pflicht (D-01), Window-Boundary-Alignment
 > (D-02), Reserve-Bands für Resthorizont (RM-M4-02-Pfad), Combine
@@ -158,7 +166,7 @@ unter `in-progress/`.
 | ✅     | M1          | MVP — sichere Regelpipeline        | 1     | [Abgeschlossen](../done/plan-RM-M1.md) |
 | ✅     | M2          | Marktausbau und Optimierung        | 1 → 2 | Abgeschlossen ([Optimization-Slice](../done/plan-RM-M2-optimization.md), RM-M2-01..10, [Migrations-Tooling](../done/plan-RM-M2-migration.md), [HIL](../done/HIL-simulator.md)) |
 | ✅     | M3          | Native Control Core (Library)      | 2     | [`../done/plan-RM-M3.md`](../done/plan-RM-M3.md) — alle RM-M3-01..13 ✅ inkl. C-Pivot, doctest, vier Native-Quality-Gates, replay-basierter Parity, Doku-Sync und PID-Slice mit ABI-Minor-Bump 0.1→0.2; M3-D2 produktive Routing-Aktivierung ✅ ([`../done/plan-RM-M3-D2.md`](../done/plan-RM-M3-D2.md)); offene Follow-up-Slices (acht Items in zwei Blöcken) in [`../open/note-RM-M3-followups.md`](../open/note-RM-M3-followups.md) — Block A M3-Closure-Out-of-Scope, Block B M2-Folgewellen mit M3-Trigger; alle trigger-getrieben, kein aktiver Trigger heute |
-| 🟡     | M4          | Regelleistung und OPC-UA           | 2     | [`plan-RM-M4.md`](plan-RM-M4.md) — RM-M4-01 (Intraday-Reoptimierung) ✅, RM-M4-02 (Reservierungs-Modell + Solver-Constraints) ✅, andere Pakete (RM-M4-03 Aktivierungssignal, 04..08 OPC-UA/MQTT) trigger-/abhängigkeitsgetrieben offen; Folgearbeiten F-01/F-02 in `note-RM-M4-followups.md` |
+| 🟡     | M4          | Regelleistung und OPC-UA           | 2     | [`plan-RM-M4.md`](plan-RM-M4.md) — RM-M4-01 ✅, RM-M4-02 ✅, RM-M4-06 ✅; andere Pakete (RM-M4-03 Aktivierungssignal, 04/05/07/08 OPC-UA) trigger-/abhängigkeitsgetrieben offen; Folgearbeiten F-01..F-05 in `note-RM-M4-followups.md` (F-04 TLS/Auth ist Pflicht-Slice vor Production-MQTT) |
 | ⬜     | M5          | MPC, Solver-Sidecar, Replay        | 3     | folgt mit Aktivierung |
 | ⬜     | M6          | Skalierung, UI, Edge / Multi-Asset | 4     | folgt mit Aktivierung |
 
@@ -336,7 +344,7 @@ bleibt Fallback und Referenz.
 | ⬜     | RM-M4-03   | Regelleistungs-Aktivierungssignal-Verarbeitung mit Priorisierung    | LH-MKT-005, LH-MKT-006  |
 | ⬜     | RM-M4-04   | OPC-UA-Adapter (Lesen, Schreiben, Subscriptions, StatusCode)        | LH-OPCUA-001..004       |
 | ⬜     | RM-M4-05   | OPC-UA-Security (Zertifikate, Security Mode/Policy)                 | LH-OPCUA-005            |
-| ⬜     | RM-M4-06   | MQTT QoS und Command-ACK-Korrelation                                | LH-MQTT-004/005         |
+| ✅     | RM-M4-06   | MQTT QoS und Command-ACK-Korrelation — `MqttQualityOfService`-Enum + `MqttQosOptions`-Record mit per-Channel-Defaults (CommandPublish/CommandAckSubscribe/Status/Fault = `AtLeastOnce`, Telemetry = `AtMostOnce`). `MqttAdapterOptions.QoS` mit `QoSOrDefault`-Fallback. `IMqttClient.PublishAsync`/`SubscribeAsync` mit QoS-Parameter; `MqttNetClient` mappt zu MQTTnet-Symbol. CommandSink/TelemetrySource ziehen per-Channel-QoS durch. ACK-Mismatch-Pin: fremde CommandId silent gedropt → Pending in `ack-timeout`-Failed. Multiple-Pending-Pin: CommandId-basierte Korrelation. SECURITY-Kommentar auf F-04 umgestellt. 9 neue Mqtt-Adapter-Pins. **Design-Entscheidungen D-01..D-04** in der Plan-Zeile, **Folgearbeiten F-03 (Persistente ACK), F-04 (TLS/Auth — Pflicht-Slice vor Production), F-05 (MQTTv5)** in `note-RM-M4-followups.md`. | LH-MQTT-004/005         |
 | ⬜     | RM-M4-07   | Versionierte OPC-UA-Mappings in Config                              | LH-CONF-002             |
 | ⬜     | RM-M4-08   | Integrationstests OPC-UA gg. Simulator                              | LH-TEST-003 (n. MVP-Teil) |
 

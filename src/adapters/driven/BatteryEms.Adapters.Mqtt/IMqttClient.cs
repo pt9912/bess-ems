@@ -16,7 +16,16 @@ public interface IMqttClient : IAsyncDisposable
     // topic add additional handlers; the wrapper is responsible for
     // dispatching to all registered handlers and for issuing the
     // broker-level subscription only once per filter.
-    Task SubscribeAsync(string topicFilter, Func<MqttMessage, Task> handler, CancellationToken cancellationToken);
+    Task SubscribeAsync(
+        string topicFilter,
+        MqttQualityOfService qos,
+        Func<MqttMessage, Task> handler,
+        CancellationToken cancellationToken);
 
-    Task PublishAsync(string topic, byte[] payload, bool retained, CancellationToken cancellationToken);
+    Task PublishAsync(
+        string topic,
+        byte[] payload,
+        MqttQualityOfService qos,
+        bool retained,
+        CancellationToken cancellationToken);
 }
