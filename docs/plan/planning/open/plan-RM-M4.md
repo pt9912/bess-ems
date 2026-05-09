@@ -27,8 +27,8 @@ Der Plan trennt bewusst drei fachliche Ebenen:
 - **Planung:** Intraday- und Regelleistungsreservierungen verändern
   versionierte Fahrpläne und Solver-Constraints.
 - **Regelkreis:** Aktivierungssignale dürfen den normalen Fahrplan
-  übersteuern, aber niemals Emergency Stop, Geräte-, Wechselrichter-,
-  Netz- oder SOC-/Ramp-Grenzen.
+  übersteuern, aber niemals Emergency Stop oder Safety-Limits
+  (Geräte-/Wechselrichter-/Netzgrenzen, SOC-Grenzen und Ramp-Limits).
 - **Feldintegration:** OPC-UA liefert Telemetrie und Command-Schreibpfade
   über `IBatteryTelemetrySource` und `IBatteryCommandSink`, ohne die
   zentrale Regelpipeline zu verändern.
@@ -49,9 +49,9 @@ Adapterfähigkeit, die dafür benötigt wird.
 - Solver-Constraints, die Reservierungen für Day-Ahead und Intraday
   einhalten.
 - Aktivierungssignal-Verarbeitung mit Priorität nach LH-MKT-006:
-  Emergency Stop, Sicherheitsgrenzen, Regelleistungsaktivierung,
-  verbindliche Marktverpflichtungen, Intraday, Day-Ahead, lokale
-  Optimierung.
+  Emergency Stop, Safety-Limits, Regelleistungsaktivierung,
+  verbindliche Marktverpflichtung, Intraday-Fahrplan,
+  Day-Ahead-Fahrplan, lokale Optimierung.
 - OPC-UA-Lese-, Schreib- und Subscription-Pfade über die bestehenden
   Adapter-Ports.
 - OPC-UA-StatusCode-Auswertung: schlechte Werte werden als ungültig
@@ -91,9 +91,13 @@ Aktivierungssemantik behaupten.
 | M3-Closure | Native Control Core und produktives Routing sind abgeschlossen; M4 verändert den Control-Kernel nicht ohne eigenen Slice. |
 | Marktmodell | `MarketCommitment` und Priorisierung aus M2 bleiben kompatibel; Regelleistungsaktivierung ergänzt den bestehenden Prioritätspfad. |
 | Optimierung | Bestehender Schedule-Optimizer kann um Resthorizont- und Reserve-Constraints erweitert werden, ohne Day-Ahead-Semantik zu brechen. |
+| Schedule-Write-Atomizität | Resthorizont-Reoptimierung nutzt einen eindeutigen Commit-Lock pro `(asset_id, schedule_type)` plus optimistic compare-and-swap auf der erwarteten Schedule-Version. Kollidierende Writer brechen ohne Replace ab und müssen den aktuellen Schedule neu laden. |
 | Adapter-Port | OPC-UA kann über `IBatteryTelemetrySource` und `IBatteryCommandSink` modelliert werden. Abweichungen brauchen Plan-Update vor Code. |
 | Testumgebung | Ein OPC-UA-Simulator ist als CI- oder Docker-Pfad verfügbar oder wird als erstes M4-Arbeitspaket gebaut. |
 | Produktannahme | Relevantes Regelleistungsprodukt, Zeitschritt, Aktivierungsrichtung und Leistungsinterpretation sind dokumentiert. |
+| Produktiv-Gate | Default bleibt `Regelleistung:ProductionActivationEnabled=false`. Produktive RL-Aktivierung darf nur starten, wenn Produktannahme, Profilfreigabe, Jitter-Kalibrierung, Zeitbasis-Health, Dedupe-Store-Health und Security-Profil grün sind; sonst werden Aktivierungen als nicht dispatch-relevant markiert. |
+| Zeitbasis | Aktivierungssignale werden auf UTC-Zeitstempel gegen `IClock.UtcNow` validiert; Produktionsprofile brauchen synchronisierte Systemzeit (z. B. NTP) oder blockieren aktive Regelleistungsaktivierung. `max_age`, `future_skew_tolerance` und dedupe-Fenster sind konfigurierbar und pro Profil getestet. Wiederholte Zeitbasis-Verletzungen schalten RL-Aktivierung in `TimebaseDegraded`, bis die Zeitquelle stabil ist. |
+| Runtime-Profil | Host/Deployment setzen ein explizites Runtime-Profil (`Development`, `Test`, `Production`). Sicherheitskritische M4-Optionen validieren gegen dieses Profil; ein fehlendes Profil ist in produktionsnahen Deployments ein Startup-Fehler. |
 
 ---
 
@@ -101,15 +105,15 @@ Aktivierungssemantik behaupten.
 
 | Situation | Erwartetes Verhalten | Mindestnachweis |
 | --------- | -------------------- | --------------- |
-| Intraday-Reoptimierung | Ein bestehender Fahrplan kann ab einem Resthorizont neu bewertet und als neue Version abgelegt werden. Bei Optimiererfehlern, invaliden Inputs oder unzulässigen Constraints bleibt die bisherige gültige Zukunftsversion aktiv. | Use-Case-/Optimizer-Test mit unverändertem Vergangenheitsfenster, neuer Zukunftsversion und Fehlerpfad ohne Schedule-Replace. |
+| Intraday-Reoptimierung | Ein bestehender Fahrplan kann ab einem Resthorizont neu bewertet und als neue Version atomar abgelegt werden. Bei Optimiererfehlern, invaliden Inputs, unzulässigen Constraints oder CAS-Konflikten bleibt die bisherige gültige Zukunftsversion aktiv. | Use-Case-/Optimizer-Test mit unverändertem Vergangenheitsfenster, neuer Zukunftsversion, Fehlerpfad ohne Schedule-Replace und parallelem Writer-Konflikt. |
 | Regelleistungsreservierung | Reservierte Lade- und Entladeleistung wird für Day-Ahead und Intraday blockiert. | Solver-Test, der Reserve-Bänder verletzt hätte und nun begrenzt wird. |
-| Aktivierungssignal aktiv | Der Regelkreis nimmt den Aktivierungs-Setpoint vor Marktcommitments und Fahrplänen, bleibt aber innerhalb Safety-, SOC-, Ramp- und Geräte-Limits. | Control-Cycle-Test mit konkurrierendem Day-Ahead/Intraday-Commitment. |
-| Aktivierungssignal ungültig/stale | Kein normaler Fahrplan wird durch ein unvalides Signal verdrängt; der Zustand ist observierbar. | Negativtest für stale Timestamp, nicht-finite Leistung und fehlende Asset-Zuordnung. |
+| Aktivierungssignal aktiv | Der Regelkreis nimmt den Aktivierungs-Setpoint vor Market Commitments und Fahrplänen, bleibt aber innerhalb Safety-Limits. In Production passiert das nur bei `Regelleistung:ProductionActivationEnabled=true` und grünem Produkt-/Profil-/Health-Gate. | Control-Cycle-Test mit konkurrierendem Day-Ahead-/Intraday-Commitment plus Negativtest für deaktiviertes Production-Gate. |
+| Aktivierungssignal ungültig/stale | Kein normaler Fahrplan wird durch ein unvalides Signal verdrängt. M4 startet mit konservativem Default `max_age=2s` und `future_skew_tolerance=500ms`, beide Werte sind aber Profilkonfiguration und müssen mit OPC-UA-/Netzjitter kalibriert werden, bevor Regelleistung produktiv aktivierbar ist. Systematische Zeitbasisfehler führen nach Debounce in `TimebaseDegraded`; in diesem Zustand werden RL-Aktivierungen stumm geschaltet und observierbar als nicht dispatch-relevant markiert. | Negativtest für stale Timestamp, future skew, nicht-finite Leistung, fehlende Asset-Zuordnung, Debounce in `TimebaseDegraded` und Wiederherstellung nach stabiler Zeitbasis plus Profiltests für Default und produktionsspezifisches Tuning. |
 | OPC-UA Lesen | Node-Werte werden in interne Telemetrie gemappt. | Adaptertest gegen Simulator inklusive Datentyp- und Unit-Mapping. |
 | OPC-UA Schreiben | Leistungssollwerte werden auf konfigurierte NodeIds geschrieben. | Simulator-Integrationstest mit Command-Result. |
 | OPC-UA Subscription | Änderungen ausgewählter Nodes werden ereignisbasiert verarbeitet. | Integrationstest mit Subscription-Update ohne Polling-Only-Pfad. |
 | OPC-UA StatusCode schlecht | Wert wird als ungültig markiert und nicht als gesunde Telemetrie verwendet. | Adaptertest für Bad/Uncertain StatusCode. |
-| OPC-UA Security | Zertifikat, Security Mode und Security Policy sind konfigurierbar. | Konfigurations-/Handshake-Test gegen gesicherten Simulator oder Testserver. |
+| OPC-UA Security | Default ist ein sicherer Modus (`SignAndEncrypt`) plus Policy aus einer expliziten Allowlist. M4-Allowlist startet mit `Basic256Sha256`; weitere Policies brauchen Plan-/Test-Update. `SecurityMode=None` ist nur per explizitem Opt-in mit `AllowUnsecured=true` und `AllowUnsecuredReason` erlaubt, emittiert eine Warnung und ist bei `RuntimeProfile=Production` ein Startup-Fehler. | Konfigurations-/Handshake-Test gegen gesicherten Simulator oder Testserver plus Negativtest für ungesicherten Production-Start, fehlendes Profil und nicht-allowlistete Policy. |
 | MQTT Command-ACK | Commands tragen `CommandId`; ACKs werden mit dem richtigen Command korreliert. | MQTT-Integrationstest mit QoS-Konfiguration und ACK-Mismatch-Negativfall. |
 
 ---
@@ -131,18 +135,40 @@ Aktivierungssemantik behaupten.
 
 ---
 
+## Prioritätsvertrag
+
+M4 verwendet für den Regelkreis eine explizite
+`ControlPriorityClass`-Ordnung. Niedrigere Zahl gewinnt; ein niedrigerer
+Eintrag darf durch keinen höheren Eintrag überschrieben werden.
+
+| Rang | Klasse | Bedeutung / Tiebreak |
+| ---- | ------ | -------------------- |
+| 1 | `EmergencyStop` | Jeder aktive Stop gewinnt; mehrere Stop-Quellen werden als ein Stop-Zustand zusammengeführt. |
+| 2 | `SafetyLimit` | Geräte-/Wechselrichter-/Netzgrenzen, SOC-Grenzen und Ramp-Limits; deterministische Clamp-Reihenfolge bleibt Teil des Control-Kernel-Vertrags. |
+| 3 | `RegelleistungsActivation` | Nur valide, nicht-stale Aktivierungssignale. Totaler Tiebreak: höchste `sequence_number`; wenn keine Sequence vorhanden ist, neuester valider `signal_timestamp_utc`; danach lexikografisch kleinster Tupelwert `(source_id, activation_id/message_id)`. Exakte Wiederholungen mit gleicher `source_id` und `activation_id`/`message_id` sind innerhalb des dedupe-Fensters idempotent und dürfen re-applied werden; vollständiger Gleichstand mit widersprüchlichem Payload ist `ambiguous-duplicate`, hat keinen Gewinner und wird nicht dispatch-relevant. |
+| 4 | `BindingMarketCommitment` | Verbindliche Marktverpflichtung (`MarketCommitment` mit `BindingState=Binding`) gemäß bestehendem M2-Modell. |
+| 5 | `IntradaySchedule` | Nicht-bindender Intraday-Fahrplan. |
+| 6 | `DayAheadSchedule` | Nicht-bindender Day-Ahead-Fahrplan. |
+| 7 | `LocalOptimization` | Fallback ohne höher priorisierte Quelle. |
+
+Die Terminologie im Plan folgt dieser Tabelle: „Safety-Limits" meint
+immer Rang 2, „Market Commitments" meint das bestehende Domain-Modell,
+und „verbindliche Marktverpflichtung" ist Rang 4.
+
+---
+
 ## Arbeitspakete
 
 | Status | ID | Paket | DoD |
 | ------ | -- | ----- | --- |
-| ⬜ | RM-M4-01 | Intraday-Reoptimierung (Resthorizont) | Neuer Use-Case erzeugt eine Schedule-Version nur für den zukünftigen Resthorizont; Vergangenheitsfenster bleiben unverändert. Bei Optimiererfehlern, invaliden Inputs oder unzulässigen Constraints wird kein leerer/teilweiser Fahrplan geschrieben; die bisherige gültige Zukunftsversion bleibt aktiv und der Fehler ist persistier-/observierbar. Tests decken UTC, halboffene Fenster, Versionsnummern, vorhandene Marktcommitments und den Fallback-ohne-Replace-Pfad ab. |
+| ⬜ | RM-M4-01 | Intraday-Reoptimierung (Resthorizont) | Neuer Use-Case erzeugt eine Schedule-Version nur für den zukünftigen Resthorizont; Vergangenheitsfenster bleiben unverändert. Der Replace ist atomar: Commit-Lock pro `(asset_id, schedule_type)`, optimistic CAS auf erwarteter Schedule-Version, kein Teilwrite über Header/Windows. Bei Optimiererfehlern, invaliden Inputs, unzulässigen Constraints oder CAS-Konflikten wird kein leerer/teilweiser Fahrplan geschrieben; die bisherige gültige Zukunftsversion bleibt aktiv und der Fehler ist persistier-/observierbar. Tests decken UTC, halboffene Fenster, Versionsnummern, vorhandene Market Commitments, Fallback-ohne-Replace und parallele Writer-Konflikte ab. |
 | ⬜ | RM-M4-02 | Reservierungs-Modell für Regelleistung + Solver-Constraints | Domain-Modell für Lade-/Entlade-Reserve mit Zeitfenster und Asset-Bezug; Optimizer begrenzt verfügbare Leistung entsprechend. Tests zeigen, dass Day-Ahead- und Intraday-Optimierung Reserve-Bänder nicht verletzen. |
-| ⬜ | RM-M4-03 | Regelleistungs-Aktivierungssignal-Verarbeitung mit Priorisierung | Aktivierungssignal wird validiert, zeitlich begrenzt und im Regelkreis vor Marktcommitments/Fahrplänen berücksichtigt. Safety-Limits bleiben vorrangig; stale/ungültige Signale sind observierbar und verdrängen keinen validen Fahrplan. |
+| ⬜ | RM-M4-03 | Regelleistungs-Aktivierungssignal-Verarbeitung mit Priorisierung | Aktivierungssignal wird validiert, zeitlich begrenzt und im Regelkreis vor Market Commitments/Fahrplänen berücksichtigt. Default-Gültigkeit: `signal_timestamp_utc` in UTC, konservativ `max_age=2s`, `future_skew_tolerance=500ms`, `dedupe_window=10s`, Alter berechnet gegen `IClock.UtcNow`; diese Werte sind Optionswerte und brauchen profilbezogene Tests sowie dokumentierte Kalibrierung gegen gemessenen OPC-UA-/Netzjitter vor produktiver Aktivierung. Produktionsprofile verlangen `Regelleistung:ProductionActivationEnabled=true`, dokumentierte Produktannahme, synchronisierte Systemzeit, gesunden Dedupe-Store und grünes Security-Profil; fehlt eines davon, bleibt RL-Aktivierung nicht dispatch-relevant. Bei fehlender Monotonic-Clock bleibt UTC-Validierung erlaubt, aber negative Alterswerte außerhalb future-skew oder erkannte Clock-Rücksprünge invalidieren das Signal fail-closed. Zeitbasis-Stabilität hat Debounce: z. B. drei Zeitverletzungen in zehn Regelzyklen setzen `TimebaseDegraded`; fünf aufeinanderfolgende stabile Zyklen oder ein expliziter Health-Recover heben den Zustand auf. In `TimebaseDegraded` werden RL-Aktivierungen nicht dispatch-relevant, Status/Log/Metrik nennen `timebase-degraded`. Validierungsreihenfolge: **jede Rezeption**, auch ein Dedupe-Hit, muss zuerst Source-/Payload-Schema, UTC-Zeitfenster (`max_age`/`future_skew_tolerance`) und `TimebaseDegraded` bestehen; erst danach darf Idempotenz/Dedupe eine Wiederholung als akzeptiert markieren. Idempotenz: gleiche `source_id` + `message_id`/`activation_id` + Payload innerhalb `dedupe_window` wird als Replay akzeptiert, widersprüchliche Wiederholung mit gleicher ID wird verworfen. Der Dedupe-/Replay-Tracker ist persistent: letzter akzeptierter `activation_id`/`message_id`, `sequence_number`, Timestamp, Payload-Hash und Winner pro `source_id` werden versioniert gespeichert, beim Start geladen und nach Failover/Reconnect weiterverwendet. Retention ist begrenzt und sicher: pro `source_id` werden mindestens der letzte akzeptierte Checkpoint, alle Einträge innerhalb `max(max_age + future_skew_tolerance + dedupe_window, 60s)` und maximal eine konfigurierte Obergrenze (`max_entries_per_source`) gehalten; Kompaktierung löscht nie aktuell gültige oder noch replay-relevante Aktivierungen und ist getestet. Tracker-Load ist fail-closed: beschädigter, inkompatibler, übergroßer oder teilkorrupter Checkpoint deaktiviert RL-Aktivierung (`dedupe-store-invalid`) bis Recovery/Migration, mit Alarm, Health-Status und Testfall. Safety-Limits bleiben vorrangig; stale/ungültige Signale sind observierbar und verdrängen keinen validen Fahrplan. |
 | ⬜ | RM-M4-04 | OPC-UA-Adapter (Lesen, Schreiben, Subscriptions, StatusCode) | Adapter-Projekt `BatteryEms.Adapters.OpcUa` implementiert die bestehenden Driven-Ports `IBatteryTelemetrySource` und `IBatteryCommandSink`; Node-Werte werden in interne Telemetrie gemappt; Commands schreiben konfigurierte NodeIds; Subscriptions liefern Updates; schlechte StatusCodes markieren Daten ungültig. |
-| ⬜ | RM-M4-05 | OPC-UA-Security (Zertifikate, Security Mode/Policy) | Konfiguration validiert Endpoint, Security Mode, Security Policy und Zertifikatspfade; unsichere Defaults sind explizit und testbar. Gesicherter Handshake ist gegen Simulator/Testserver nachgewiesen. |
+| ⬜ | RM-M4-05 | OPC-UA-Security (Zertifikate, Security Mode/Policy) | Konfiguration validiert Endpoint, Security Mode, Security Policy, Zertifikatspfade und Runtime-Profil. Default ist sicher: `SignAndEncrypt` und `SecurityPolicy` aus expliziter Allowlist; M4-Allowlist startet mit `Basic256Sha256`, jede Erweiterung braucht Planänderung, Tests und Doku. `SecurityMode=None` braucht explizites `AllowUnsecured=true` plus nicht-leeren `AllowUnsecuredReason`, emittiert eine strukturierte Warnung und ist bei `RuntimeProfile=Production` oder fehlendem produktionsnahen Profil ein Startup-Fehler. Gesicherter Handshake, nicht-allowlistete Policy, ungesicherter Test-Opt-in und Production-Fail-Closed-Pfad sind gegen Simulator/Testserver nachgewiesen. |
 | ⬜ | RM-M4-06 | MQTT QoS und Command-ACK-Korrelation | QoS-Level ist pro Publisher/Subscriber konfigurierbar; Commands tragen `CommandId`; ACKs korrelieren deterministisch und Mismatch/Timeout erzeugen einen fehlerhaften `CommandDispatchResult`. |
-| ⬜ | RM-M4-07 | Versionierte OPC-UA-Mappings in Config | `config/schema/opcua-mapping.schema.json` validiert NodeIds, Richtung, Datentyp, Skalierung, Unit und Device-Point-Metadaten. Beispiel-Mapping liegt unter `config/examples/adapters/`; Loader-Tests decken gültige und ungültige Mappings ab. |
-| ⬜ | RM-M4-08 | Integrationstests OPC-UA gg. Simulator | Docker-/CI-fähiger Simulatorpfad testet Lesen, Schreiben, Subscription, StatusCode und Security-Basispfad. Quality-Doku wird mit konkretem Testtarget aktualisiert. |
+| ⬜ | RM-M4-07 | Versionierte OPC-UA-Mappings in Config | `config/schema/opcua-mapping.schema.json` validiert NodeIds, Richtung, Datentyp, Skalierung, Unit und Device-Point-Metadaten. Mapping-Dateien tragen eine Schema-Version; Loader akzeptiert nur unterstützte Versionen oder eine explizit getestete Migration/Backward-Compatibility-Route. Schema-/Mapping-Drift im produktiven Betrieb failt beim Start, bevor OPC-UA aktiv wird. Beispiel-Mapping liegt unter `config/examples/adapters/`; Loader-Tests decken gültige, ungültige, veraltete und inkompatible Mappings ab. |
+| ⬜ | RM-M4-08 | Integrationstests OPC-UA gg. Simulator | Docker-/CI-fähiger Simulatorpfad testet Lesen, Schreiben, Subscription, StatusCode, Security-Basispfad und Aktivierungsjitter-Profile. Race-/Negativtests decken konkurrierende gültige Aktivierungssignale aus mehreren Quellen, vollständige Tiebreak-Gleichstände, Duplikat-Replay, Restart-/Failover-Replay aus persistentem Dedupe-Tracker, widersprüchliche Wiederholung, `TimebaseDegraded`-Debounce und deterministische Persistenz des gewählten Gewinners ab. Quality-Doku wird mit konkretem Testtarget aktualisiert. |
 
 ---
 
@@ -166,24 +192,70 @@ Aktivierungssemantik behaupten.
 
 ## Akzeptanzkriterien
 
-- Bei aktiver Regelleistungsanforderung übersteuert der Regelkreis den
-  normalen Fahrplan, ohne Sicherheitsgrenzen zu verletzen.
-- Emergency Stop, Geräte-/Netzgrenzen, SOC-Grenzen und Ramp-Limits haben
-  weiterhin höhere Priorität als Regelleistungsaktivierung.
+- Bei aktiver valider Regelleistungsanforderung übersteuert der
+  Regelkreis den normalen Fahrplan, ohne Safety-Limits zu verletzen.
+- In Production ist RL-Dispatch hart gated: Ohne
+  `Regelleistung:ProductionActivationEnabled=true`, dokumentierte
+  Produktannahme, Profilfreigabe und grüne Health-Checks bleibt jede
+  Aktivierung nicht dispatch-relevant.
+- `ControlPriorityClass` ist im Regelkreis und in Tests nachgewiesen:
+  `EmergencyStop`, `SafetyLimit`, `RegelleistungsActivation`,
+  `BindingMarketCommitment`, `IntradaySchedule`, `DayAheadSchedule`,
+  `LocalOptimization`.
+- Emergency Stop und Safety-Limits haben weiterhin höhere Priorität als
+  Regelleistungsaktivierung.
 - Day-Ahead- und Intraday-Optimierung verletzen keine reservierten
   Regelleistungsbereiche.
 - Ein bestehender Fahrplan kann für einen Resthorizont neu bewertet und
-  versioniert ersetzt werden.
+  versioniert, atomar und per CAS ersetzt werden.
 - Scheitert die Resthorizont-Reoptimierung, wird kein leerer oder
   teilweiser Fahrplan aktiv; die bisherige gültige Zukunftsversion bleibt
   der Fallback.
+- Kollidierende Schedule-Writer erzeugen keinen Last-Writer-Wins-Effekt:
+  einer gewinnt den Commit-Lock/CAS, alle anderen brechen sichtbar ab und
+  müssen mit frischem Schedule-State neu planen.
 - OPC-UA integriert sich über `IBatteryTelemetrySource` und
   `IBatteryCommandSink`; die zentrale Regelpipeline braucht keinen
   protokollspezifischen Zweig.
 - OPC-UA-Mappings sind versioniert, schema-validiert und mit
   Device-Point-Metadaten kompatibel.
 - Schlechte OPC-UA-StatusCodes und stale Aktivierungssignale werden als
-  ungültig behandelt und sind in Tests sichtbar.
+  ungültig behandelt und sind in Tests sichtbar; stale/future-skew
+  folgen den RM-M4-03-Profilwerten.
+- Aktivierungs-Dedupe ist idempotent: exakte Wiederholungen werden
+  innerhalb des dedupe-Fensters akzeptiert, widersprüchliche Replays und
+  gleichrangige Mehrquellenkonflikte werden deterministisch verworfen oder
+  deterministisch auf einen persistierten Gewinner reduziert.
+- Dedupe greift nie vor Safety-/Zeitvalidierung: Auch ein bekannter
+  Replay-Key muss bei jeder Rezeption `max_age`, `future_skew_tolerance`
+  und `TimebaseDegraded` bestehen, bevor er erneut dispatch-relevant sein
+  darf.
+- Der Gewinner bei gleichrangigen Aktivierungssignalen ist vollständig
+  deterministisch: `sequence_number`, dann `signal_timestamp_utc`, dann
+  lexikografischer `(source_id, activation_id/message_id)`-Tiebreak; bei
+  vollständigem Gleichstand mit widersprüchlichem Payload gibt es keinen
+  Gewinner.
+- Dedupe-/Replay-Schutz überlebt Restart, Failover und OPC-UA-Reconnect:
+  der letzte akzeptierte Aktivierungs-Checkpoint pro `source_id` ist
+  persistent und versioniert.
+- Dedupe-Retention ist begrenzt und sicher: Kompaktierung hält mindestens
+  den letzten Checkpoint und alle noch gültigen/replay-relevanten
+  Einträge; Größenlimit- und Kompaktierungstests verhindern unbounded
+  growth.
+- Ist der persistente Dedupe-/Replay-Tracker beschädigt, inkompatibel
+  oder nicht eindeutig migrierbar, bleibt RL-Aktivierung fail-closed
+  deaktiviert; Health/Logs/Metriken melden `dedupe-store-invalid`.
+- Bei instabiler Zeitquelle geht RL-Aktivierung nach Debounce in
+  `TimebaseDegraded`; bis zur Wiederherstellung bleibt der Regelkreis im
+  sicheren Fahrplan-/Fallback-Pfad und markiert RL-Aktivierungen als nicht
+  dispatch-relevant.
+- OPC-UA startet in Production nicht mit `SecurityMode=None`; ungesicherte
+  Testprofile brauchen explizites Opt-in, nicht-leeren Grund und Warn-Log.
+  `RuntimeProfile=Production` ist technisch validiert; fehlendes oder
+  widersprüchliches Profil failt geschlossen.
+- OPC-UA akzeptiert nur allowlistete Security Policies; für M4 ist
+  `Basic256Sha256` die einzige initiale Policy. Unbekannte, schwächere
+  oder nicht dokumentiert freigegebene Policies failen geschlossen.
 - MQTT-Command-ACK-Korrelation ist über `CommandId` getestet, inklusive
   Timeout und falscher ACK-ID.
 - Quality-Doku und Roadmap werden beim Abschluss synchronisiert.
@@ -195,7 +267,8 @@ Aktivierungssemantik behaupten.
 - **Regelleistungsprodukt offen.** LH-OPEN-002 fragt weiterhin, welche
   Produkte konkret relevant sind. M4 darf deshalb mit einem generischen
   Aktivierungsmodell starten, muss Produktannahmen aber vor produktiver
-  Aktivierung festhalten.
+  Aktivierung festhalten. Das Production-Gate bleibt bis dahin hart
+  deaktiviert (`Regelleistung:ProductionActivationEnabled=false`).
 - **Echtzeitfähigkeit.** Wenn Aktivierungsfristen enger sind als der
   aktuelle .NET-Regelkreis belastbar erfüllt, ist ein ADR für Native-,
   Edge- oder Out-of-Process-Design nötig. Das ist nicht implizit Teil von
@@ -205,8 +278,24 @@ Aktivierungssemantik behaupten.
   Subscription-Stabilität, Testserver-/Simulatorfähigkeit,
   Lizenzkompatibilität und CI-Reproduzierbarkeit.
 - **Mapping-Drift.** Hersteller-NodeIds und Firmware-Versionen können
-  auseinanderlaufen. Deshalb muss RM-M4-07 versionierte Mapping-Dateien
-  und Schema-Tests vor produktiver Adapteraktivierung liefern.
-- **Prioritätskonflikte.** M2 hat Marktcommitments bereits priorisiert;
-  M4 erweitert diese Ordnung. Tests müssen zeigen, dass bestehende
-  Day-Ahead-/Intraday-Pfade nicht versehentlich höhere Priorität behalten.
+  auseinanderlaufen. Deshalb muss RM-M4-07 versionierte Mapping-Dateien,
+  Backward-Compatibility-/Migrationstests und Startup-Fail-Closed bei
+  inkompatiblen Mapping-Versionen vor produktiver Adapteraktivierung
+  liefern.
+- **Prioritätskonflikte.** M2 hat Market Commitments bereits priorisiert;
+  M4 erweitert diese Ordnung um `ControlPriorityClass`. Tests müssen
+  zeigen, dass bestehende Day-Ahead-/Intraday-Pfade nicht versehentlich
+  höhere Priorität behalten und dass Tiebreaks deterministisch sind.
+- **Profil- und Latenzdrift.** Die Default-Fenster für Aktivierungssignale
+  sind konservative Startwerte, nicht Produktgarantien. Produktive
+  Regelleistung braucht gemessene Jitter-/Latenzprofile und dokumentierte
+  Optionswerte, sonst bleibt Aktivierung in Production deaktiviert.
+- **Persistenter Replay-Schutz.** Dedupe nur im Speicher reicht nicht,
+  weil Restart, Failover und OPC-UA-Reconnect alte Signale erneut liefern
+  können. RM-M4-03 muss daher einen versionierten Checkpoint pro Quelle
+  persistieren oder die Aktivierung bleibt nicht produktionsfähig.
+- **Storage-Fehler im Commit-/Checkpoint-Pfad.** Fällt der Commit-Lock,
+  Schedule-CAS oder Dedupe-Checkpoint-Store aus, darf kein partieller
+  Schedule und keine RL-Aktivierung wirksam werden. Der Pfad failt
+  geschlossen, nutzt den bisherigen Fahrplan/Fallback und emittiert
+  Recovery-/Rollback-Diagnose.
