@@ -592,27 +592,41 @@ Der Native-Pfad ist niemals exklusiv: das System bleibt durch die
 ## 7. CI-Pipeline
 
 CI läuft auf GitHub Actions, Workflow `.github/workflows/build.yml`,
-Runner `ubuntu-24.04`. Ausgeführt auf Pull Requests gegen `main` und
-auf Pushes nach `main`.
+Runner `ubuntu-24.04`. Ausgeführt wird sie auf Pull Requests gegen
+`main` und auf Pushes nach `main`.
 
 Verbindliche Make-Targets pro Run, in dieser Reihenfolge:
 
 ```bash
 make lint
-make native-lint          # ab M3
+make native-lint
 make arch-check
 make test
 make test-safety
-make test-integration
-make test-native-interop  # ab M3
-make test-container
 make coverage-gate
+make simulator-lint
+make simulator-test
+make simulator-race
+make simulator-coverage-gate
+make schema-validate
+make schema-drift-check
+make native-build
+make native-sanitizer
+make native-coverage-gate
+make native-coverage-exclusions
+make test-native-interop
+make test-native-parity
+make test-integration
+make test-container
 make build                # erzeugt Runtime-Image
 ```
 
 Die Targets delegieren in dieselben Docker-Stages, die lokal genutzt
-werden. Test-, Coverage- und Lint-Reports als Workflow-Artefakte sind
-optional bis M2; ab M2 sind sie Pflicht-Artefakte.
+werden. CI speichert pro Target das Build-Log als Workflow-Artefakt.
+Coverage-Artefakte werden aus den Coverage-Images extrahiert:
+`.NET`-Coverage aus `bess-ems-coverage-gate`, Simulator-Coverage aus
+`bess-field-sim:coverage` und Native-Coverage aus
+`bess-ems-native-coverage-gate`.
 
 `docker build --no-cache-filter <stage>` wird in CI verwendet, um die
 Re-Evaluation von Test-/Coverage-Stages zu erzwingen, ohne `deps`-Layer
@@ -620,23 +634,29 @@ zu verwerfen.
 
 ---
 
-## 8. Release-Pipeline-Gates (Platzhalter)
+## 8. Release-Pipeline-Gates
 
-Keine Release-Pipeline definiert. Wird mit dem ersten Tag (`v0.1.0`)
-konkret. Erwartete Gates analog zum cmake-xray-Pattern:
+Release-Gates sind in
+[`docs/plan/adr/0002-release-pipeline-gates.md`](../plan/adr/0002-release-pipeline-gates.md)
+entschieden. Workflow `.github/workflows/release.yml` läuft auf Tags
+`v*.*.*` und ist vor dem ersten Tag `v0.1.0` verbindlich.
 
-- Tag-Validator (semver `vMAJOR.MINOR.PATCH[-PRERELEASE]`, kein
-  Build-Metadata-Suffix)
-- reproduzierbares Linux-Container-Image mit `SOURCE_DATE_EPOCH`
-- OCI-Image-Idempotenz über `docker buildx imagetools inspect`
-- Drei-Wege-Versionscheck: Tag ↔ Build-eingebrannte Version ↔
-  `/health`-Endpoint-Version
-- Native-ABI-Versionscheck: Tag-Major/Minor entspricht ABI-Version
-- Asset-Allowlist gegen Asset-Drift
-- SBOM (Syft) und Image-Signatur (Cosign) als Pflicht-Artefakte ab
-  Major-Release
+Verbindliche Gates:
 
-Die konkrete Ausgestaltung kommt mit einer Folge-ADR vor `v0.1.0`.
+- Tag-Validator: semver `vMAJOR.MINOR.PATCH[-PRERELEASE]`, kein
+  Build-Metadata-Suffix.
+- `make fullbuild`: alle CI-Gates plus Runtime-Image und Compose-Smoke.
+- Runtime-Image-Build mit `SOURCE_DATE_EPOCH` aus dem getaggten Commit.
+- OCI-Labels für Version, Revision und Source.
+- Versionscheck: Tag-Version ↔ OCI-Label
+  `org.opencontainers.image.version`; Revision ↔ `GITHUB_SHA`.
+- Native-Library-Check: `/app/native/libbattery_control_core.so`
+  existiert und `ldd` enthält kein `not found`.
+- SBOM als Pflicht-Artefakt ab Major-Release (`v1.0.0` und höher).
+
+Der Workflow ist Gate-only: Er veröffentlicht kein Image und signiert
+noch nicht. Registry-Push und Cosign-Signatur werden erst aktiviert,
+wenn Registry, Namensschema und Signatur-/OIDC-Policy entschieden sind.
 
 ---
 

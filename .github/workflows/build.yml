@@ -1,0 +1,104 @@
+name: build
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOCKER_BUILDKIT: "1"
+  COMPOSE_DOCKER_CLI_BUILD: "1"
+
+jobs:
+  build:
+    name: CI gates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4.0.0
+
+      - name: Run mandatory gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/ci
+
+          run_gate() {
+            local target="$1"
+            local stage="${2:-}"
+            local log="artifacts/ci/${target}.log"
+
+            echo "::group::make ${target}"
+            if [ -n "${stage}" ]; then
+              make "${target}" DOCKER_BUILD_ARGS="--pull --no-cache-filter ${stage}" 2>&1 | tee "${log}"
+            else
+              make "${target}" 2>&1 | tee "${log}"
+            fi
+            echo "::endgroup::"
+          }
+
+          copy_from_image() {
+            local image="$1"
+            local source_path="$2"
+            local destination="$3"
+            local container_id
+
+            if ! docker image inspect "${image}" >/dev/null 2>&1; then
+              echo "image ${image} not found; skipping artifact copy"
+              return 0
+            fi
+
+            mkdir -p "${destination}"
+            container_id="$(docker create "${image}")"
+            docker cp "${container_id}:${source_path}" "${destination}" || true
+            docker rm "${container_id}" >/dev/null
+          }
+
+          run_gate lint lint
+          run_gate native-lint native-lint
+          run_gate arch-check arch-check
+          run_gate test test
+          run_gate test-safety test-safety
+          run_gate coverage-gate coverage-gate
+          copy_from_image "bess-ems-coverage-gate:latest" "/src/coverage" "artifacts/ci/dotnet-coverage"
+          run_gate simulator-lint
+          run_gate simulator-test
+          run_gate simulator-race
+          run_gate simulator-coverage-gate
+          copy_from_image "bess-field-sim:coverage" "/out" "artifacts/ci/simulator-coverage"
+          run_gate schema-validate
+          run_gate schema-drift-check
+          run_gate native-build native-build
+          run_gate native-sanitizer native-sanitizer
+          run_gate native-coverage-gate native-coverage-gate
+          copy_from_image "bess-ems-native-coverage-gate:latest" "/build/native-cov/coverage" "artifacts/ci/native-coverage"
+          run_gate native-coverage-exclusions
+          run_gate test-native-interop test-native-interop
+          run_gate test-native-parity test-native-parity
+          run_gate test-integration
+          run_gate test-container runtime
+          run_gate build runtime
+
+      - name: Upload CI logs
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: ci-logs
+          path: artifacts/ci
+          if-no-files-found: warn
+          retention-days: 14
