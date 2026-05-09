@@ -265,20 +265,30 @@ des OP-OPEN-05-Slices).
 
 ## Item 6: RM-M3-FUP-02 — Optimistic Schedule Replace (OP-OPEN-05)
 
-**Trigger:** Multi-Replica-Optimize oder ein schema-verändernder
-Schedule-Track. Heute ist der `IScheduleRepository` ohne Versions-
-Concurrency-Control, was bei mehreren Optimize-Replicas zu
-Last-Write-Wins führen würde.
+**Trigger:** Multi-Replica-Optimize oder RM-M4-01
+(Intraday-Reoptimierung — Plan-RM-M4 verlangt explizit „atomarer
+Commit-Lock pro `(asset_id, schedule_type)` plus optimistic
+compare-and-swap auf der erwarteten Schedule-Version"). Heute ist
+`IScheduleRepository.Replace` unconditional; eine
+per-`(asset, type)`-Semaphore in
+`DefaultScheduleOptimizationUseCase` serialisiert Single-Host-
+Konflikte, hat aber bei mehreren Replicas keinen koordinierten
+Effekt → Last-Write-Wins.
 
 **DoD (aus plan-RM-M3.md):** `IScheduleRepository.Replace(schedule,
 expectedBaseVersion)` plus Dapper-`WHERE version = @expected`;
 Versionskonflikt wird als `Failed` Run mit Reason
 `concurrent-version-conflict` auditierbar.
 
-**Aktivierungs-Pfad:** eigener `plan-RM-M3-FUP-02.md`. Triggert
-zusammen mit FUP-01 (Schema-Änderung) — FUP-02 produziert eine
-Schema-Erweiterung (`schedules.version`-Constraint) die dem
-Migrationspfad einen ersten echten Konsumenten gibt.
+**Aktivierungs-Pfad:** Slice-Plan
+[`plan-RM-M3-FUP-02.md`](plan-RM-M3-FUP-02.md) liegt bereits
+in `open/` (Trigger-Watch zündet, Plan ist vorgezogen). FUP-02
+trägt **keine** Schema-Änderung — `schedules.version` existiert
+seit dem M2-`0001_initial.sql` als `INTEGER NOT NULL`, reine CAS
+via `WHERE version = @expected` braucht weder neue Spalte noch
+neues Constraint. FUP-02 bündelt deshalb **nicht zwingend** mit
+FUP-01; FUP-01 zündet erst durch echten Schema-Bedarf aus einem
+anderen Slice.
 
 ---
 
@@ -343,8 +353,8 @@ Beim Zünden eines Triggers:
      neue ADR + zugehöriger Plan für die Architektur-Pivots.
    - Block B: `plan-RM-M3-FUP-NN.md` pro FUP-Item (oder
      Carve-out-Sektion innerhalb des auslösenden Plans, falls der
-     Trigger ein anderer Plan ist — z. B. ein OP-OPEN-05-Slice
-     der FUP-01 + FUP-02 in einem Zug zieht).
+     Trigger ein anderer Plan ist — z. B. ein RM-M4-01-Slice
+     der FUP-02 als Vorbedingungs-Slice einplant).
 3. Item-Eintrag hier mit Verweis auf den neuen Plan markieren oder
    nach `done/` verschieben sobald der Slice abgeschlossen ist.
 4. Roadmap-„Aktueller Stand"-Block ergänzen.
