@@ -3,7 +3,7 @@
 **Dokumenttyp:** Vorabklärung / Trigger-Watch
 **Status:** Offen — Folgearbeiten zu aktiven M4-Slices, ohne Plan-Heimat im Master-Plan
 **Bezug:**
-[`../in-progress/plan-RM-M4.md`](../in-progress/plan-RM-M4.md) (Master-Slice-Plan, in Arbeit — RM-M4-02 ✅, RM-M4-01 in Vorbereitung),
+[`../in-progress/plan-RM-M4.md`](../in-progress/plan-RM-M4.md) (Master-Slice-Plan, in Arbeit — RM-M4-01 ✅, RM-M4-02 ✅, RM-M4-06 in Vorbereitung),
 [`../in-progress/roadmap.md`](../in-progress/roadmap.md)
 
 ---
@@ -25,9 +25,13 @@ eigenen Slice-Plan brauchen wenn sie zünden.
 Konkrete Slice-Pläne entstehen erst beim Trigger:
 
 - `plan-RM-M4-01-FUP-NN.md` für Folgearbeiten zum Intraday-Slice
+  (F-01, F-02)
+- `plan-RM-M4-06-FUP-NN.md` für Folgearbeiten zum MQTT-Slice
+  (F-03, F-04, F-05)
 - Oder Carve-out-Sektion innerhalb des auslösenden Plans, falls
   der Trigger ein anderer Slice ist (z. B. Operator-API-Slice der
-  F-01 + F-02 zusammenzieht).
+  F-01 + F-02 zusammenzieht; oder ein Production-Hardening-Slice
+  der F-04 als Pflicht-Bestandteil aufnimmt).
 
 ---
 
@@ -123,6 +127,143 @@ einem Step-Boundary liegt.
 auslösenden Plan (z. B. wenn ein Operator-Slice F-01 zieht und
 beide Items zusammen abdeckt). Sonst eigener `plan-RM-M4-01-FUP-
 alignment-tolerance.md`.
+
+---
+
+## Item F-03: Persistente ACK-Tracking über Reconnect
+
+**Quelle:** RM-M4-06 Design-Entscheidung D-02 — `MqttCommandSink`
+hält das Pending-Command-Tracking (`ConcurrentDictionary<commandId,
+TaskCompletionSource>`) ausschließlich in-process. Reconnect oder
+Process-Restart vor ACK-Eintreffen verliert die Pending-Liste; die
+betroffenen Commands laufen in `ack-timeout`.
+
+**Trigger** (eines reicht):
+
+- Production-Deployment zeigt häufige Broker-Disconnects (z. B.
+  flatternde Netzwerk-Strecke zum Inverter-Broker, Pod-Recreation
+  während laufender Commands), und die resultierenden
+  `ack-timeout`-Failed-Runs erreichen eine operativ relevante Rate.
+- Compliance-/SLA-Anforderung: „kein produktiv-akzeptierter Command
+  darf zwischen Publish und ACK verloren gehen" — der heutige
+  in-process Speicher ist dem nicht gewachsen.
+- Multi-Replica-Deployment: Replica A publisht Command, Replica B
+  empfängt das ACK (Subscriber-Sharding) — heute überhaupt nicht
+  unterstützt, würde persistente Cross-Replica-Korrelation
+  brauchen.
+
+**Scope-Skizze** (wenn der Trigger zündet):
+
+- Neue `IPendingCommandStore`-Application-Schicht-Schnittstelle
+  (Append on Publish, Resolve on ACK, Expire-on-Timeout).
+- Persistente Variante (Dapper/Postgres) als M4-Folge — würde
+  RM-M3-FUP-01 als ersten echten Schema-Migrationskonsumenten
+  nutzen, falls FUP-01 bis dahin nicht anderweitig zündet.
+- Reconcile-on-Reconnect: beim Reconnect die persistierten
+  Pending-Commands re-laden, ACK-Subscription neu aufbauen, ACKs
+  die zwischen Disconnect und Resubscribe ausgesendet wurden gehen
+  trotzdem verloren (Broker behält je nach Session-Settings nichts
+  vor).
+- Time-bounded-Replay: Pending-Commands älter als Schwelle X
+  werden als `ack-timeout-after-restart` gemarkiert und entfernt
+  statt unendlich gehalten.
+- Tests: parallel zwei Pending, Reconnect zwischen Publish und ACK,
+  Cross-Replica-Korrelation falls in Scope.
+
+**Aufwandsschätzung:** grob 1-2 Wochen. ~400-600 LOC inkl. Tests
+und Migration-Drafts wenn Persistenz dabei ist; ~150-250 LOC für
+eine reine in-memory-mit-Reconcile-on-Reconnect-Variante.
+
+**Aktivierungs-Pfad:** eigener `plan-RM-M4-06-FUP-persistent-ack.md`.
+
+---
+
+## Item F-04: TLS und Broker-Auth-Härtung
+
+**Quelle:** RM-M4-06 Design-Entscheidung D-01 — `MqttNetClient`
+spricht plaintext-TCP zum Broker. **Pflicht-Slice bevor der Adapter
+in Production gegen einen echten Broker zeigt.** Dieser Slice ist
+nicht „nice-to-have" — die heutige Konfiguration darf produktiv
+nicht laufen.
+
+**Trigger** (eines reicht):
+
+- Erstes Production-Deployment gegen einen realen Broker
+  (Inverter-Hersteller-Broker, TSO-Broker, internes
+  Production-Mosquitto-Cluster).
+- Compliance-/Security-Audit verlangt verschlüsselte
+  Broker-Verbindung und authentisierten Client.
+- Penetration-Test deckt das Plaintext-Risiko explizit auf.
+
+**Scope-Skizze** (wenn der Trigger zündet):
+
+- `MqttClientOptionsBuilder.WithTlsOptions(...)`: Cert-Validation
+  gegen einen konfigurierten CA-Bundle (nicht system-default um
+  hostile-default-Trust zu vermeiden), Server-Cert-Hostname-Check.
+- `MqttAdapterOptions.Tls` neuer Property-Block: `Enabled` (Default
+  `true` in Production, `false` nur über expliziten
+  `AllowPlaintextReason` mit Runtime-Profile-Gating analog zu
+  RM-M4-05 OPC-UA-Security).
+- Username/Password aus `IConfiguration`: fail-closed bei fehlenden
+  Credentials in Production-Profile, Klartext-Konfig nur in
+  Development.
+- Optional: Client-Cert-Authentication als Alternative zu
+  Username/Password (industrie-üblich für IoT-Broker).
+- Doku in `docs/user/quality.md` oder neue
+  `docs/user/security.md`: Broker-CA-Bundle-Verwaltung,
+  Credential-Rollover-Workflow.
+- Update von `MqttNetClient.cs:12-14` SECURITY-Kommentar.
+- Tests: TLS-Handshake gegen Test-Broker mit selbst-signiertem
+  Cert, Negativtest für Cert-Mismatch, Negativtest für
+  Production-Profile mit Plaintext-Config (Startup-Failure),
+  Username/Password fail-closed bei leerer Config.
+
+**Aufwandsschätzung:** grob 1 Woche. ~300-500 LOC inkl. Tests.
+Möglicherweise eigene Welle „Production-Hardening / Security",
+die TLS/Auth-Härtung für **alle** Adapter (Modbus, MQTT, OPC-UA
+mit RM-M4-05) bündelt.
+
+**Aktivierungs-Pfad:** eigener `plan-RM-M4-06-FUP-tls-auth.md`,
+oder als Pflicht-Bestandteil eines übergreifenden
+Production-Hardening-Slice.
+
+---
+
+## Item F-05: MQTTv5-Properties-Adoption
+
+**Quelle:** RM-M4-06 Design-Entscheidung D-04 — der Adapter
+nutzt heute MQTTv3.1.1-Shape. v5-spezifische Properties (User
+Properties, Reason-Codes, Subscription-Identifier,
+Message-Expiry-Interval) sind nicht im Slice.
+
+**Trigger** (eines reicht):
+
+- Broker upgraded auf MQTTv5 und ein konkreter v5-Property-Bedarf
+  meldet sich (z. B. User Properties für Multi-Tenant-
+  Routing-Metadaten oder strukturierte Reason-Codes für
+  Ablehnungs-Diagnostik statt heute frei-text `ack.Reason`).
+- TSO-/Hersteller-Spec verlangt v5-spezifische Properties.
+- Operator-Reibung: heutige Plaintext-`Reason`-Strings sind
+  schlecht maschinen-konsumierbar; v5-Reason-Codes als enum-
+  basierter Pfad gefordert.
+
+**Scope-Skizze** (wenn der Trigger zündet):
+
+- `IMqttClient`-Port-Erweiterung: `MqttMessage` bekommt einen
+  Properties-Container (User Properties als `IReadOnlyDictionary<
+  string, string>`, Reason-Code als enum).
+- `MqttCommandSink`/`MqttTelemetrySource`-Mapping-Schicht für
+  Properties.
+- MQTTnet 5.x-Mapping (technisch unterstützt, nicht aktiviert).
+- `MqttAdapterOptions.ProtocolVersion` (Default `V311`, Opt-in
+  `V500`).
+- Tests: User-Property-Roundtrip, Reason-Code-Mapping,
+  Backward-Compatibility-Pfad für v3.1.1-Broker.
+
+**Aufwandsschätzung:** grob 1-2 Wochen. ~250-400 LOC inkl.
+Tests.
+
+**Aktivierungs-Pfad:** eigener `plan-RM-M4-06-FUP-mqttv5.md`.
 
 ---
 
