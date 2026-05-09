@@ -28,6 +28,8 @@ Konkrete Slice-Pläne entstehen erst beim Trigger:
   (F-01, F-02)
 - `plan-RM-M4-06-FUP-NN.md` für Folgearbeiten zum MQTT-Slice
   (F-03, F-04, F-05, F-06)
+- `plan-RM-M4-07-FUP-NN.md` für Folgearbeiten zum
+  OPC-UA-Mapping-Schema-Slice (F-07)
 - Oder Carve-out-Sektion innerhalb des auslösenden Plans, falls
   der Trigger ein anderer Slice ist (z. B. Operator-API-Slice der
   F-01 + F-02 zusammenzieht; oder ein Production-Hardening-Slice
@@ -267,6 +269,57 @@ Politik; wer ExactlyOnce will, kann es ohne Hindernis setzen.
 **Aktivierungs-Pfad:** möglicherweise Carve-out im RM-M4-05-OPC-UA-
 Security-Slice (gleiches Pattern); sonst eigener kleiner
 `plan-RM-M4-06-FUP-exactly-once-gate.md`.
+
+---
+
+## Item F-07: OPC-UA-Mapping-Migration v1→v2 (Template-Slice)
+
+**Quelle:** RM-M4-07 Design-Entscheidung D-02 — `opcua-mapping.
+schema.json` ist heute auf `schema_version: ["v1"]` festgenagelt.
+Kein Migration-Code im Loader, keine Backward-Compatibility-Route.
+Die DoD-Klausel „Loader akzeptiert nur unterstützte Versionen oder
+eine explizit getestete Migration/Backward-Compatibility-Route"
+ist über die strikte Versions-Akzeptanz abgedeckt; die Migration
+selbst entsteht erst beim ersten v2-Format-Bedarf.
+
+**Trigger** (eines reicht):
+
+- TSO- oder Vendor-Spec-Update verlangt eine zusätzliche
+  Feldgruppe in der Mapping-Datei (z. B. neue Sicherheits-
+  Metadaten, Group-Subscription-Hints, Encoding-Hints für
+  binäre NodeIds).
+- Operations-Reibung: bestehende v1-Mappings werden so umfangreich
+  dass eine strukturelle Reorganisation (z. B. Node-Group-Hierarchie
+  statt flacher Liste) operativ wertvoll wird.
+- OPC-UA-Adapter (RM-M4-04) findet beim Discovery-Pfad ein Feld,
+  das zwingend ins Mapping muss aber im v1-Format keinen Platz hat.
+
+**Scope-Skizze** (wenn der Trigger zündet):
+
+- `schema_version: ["v1", "v2"]` Akzeptanz im Loader.
+- Konkrete v1→v2-Migrations-Funktion (read v1, write v2-Shape) plus
+  Round-Trip-Test (v1-Datei lädt → v2-internes-Modell → ist
+  semantisch identisch zu nativ-v2-Datei).
+- Backward-Compatibility-Pfad: bleibt v1-Mapping akzeptiert, ODER
+  Deprecation-Warning mit konkretem Trigger-Datum?
+- Tests: v1 lädt, v2 lädt, v0 (deprecated) wird abgelehnt, v3
+  (future-incompatible) wird abgelehnt, v1→v2-Migration ist
+  bit-konsistent.
+- Docs: `docs/user/quality.md` oder neue Migration-Anleitung mit
+  Operator-Workflow für Mapping-Dateien-Update.
+
+**Wichtig:** F-07 setzt **nicht nur die zweite Version** um, sondern
+das **Pattern für alle nachfolgenden Migrations**. Das Migrations-
+Test-Harness und die Versions-Akzeptanz-Reihe sind das eigentliche
+Asset; der konkrete v2-Inhalt ist sekundär.
+
+**Aufwandsschätzung:** ~300-400 LOC inkl. Migration-Tests und
+Beispiel-Datei-Update. Erstmaliger Slice trägt mehr Aufwand
+(Pattern-Etablierung); Folge-Migrationen v2→v3 etc. sind
+inkrementell ~100-150 LOC.
+
+**Aktivierungs-Pfad:** eigener `plan-RM-M4-07-FUP-mapping-
+migration.md`.
 
 ---
 
