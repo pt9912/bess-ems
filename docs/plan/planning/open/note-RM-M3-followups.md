@@ -32,9 +32,19 @@ zu verschwinden — sind sie hier zentral in zwei Blöcken geführt:
 
 Kein Item zündet aktuell. Diese Notiz ist **Trigger-Watch-
 Material**, kein Slice-Plan: der konkrete Plan entsteht erst,
-wenn ein Trigger zündet, und zwar im Format `plan-RM-M3-D3.md`
-(für M3-Folge-Slices), `plan-RM-M3-FUP-NN.md` (für die M2-
-Folgewellen) oder einer eigenen ADR (für die Architektur-Pivots).
+wenn ein Trigger zündet, und zwar in einem von vier Formaten —
+abhängig von der Item-Klasse:
+
+- `plan-RM-M3-D3.md` für PID-Routing (Item 1, M3-Folge-Slice
+  analog zu plan-RM-M3-D2.md).
+- Eigener Operations-/Observability-Slice **ohne** RM-M3-Prefix
+  für Items 2 + 3 (die FUP-Reservierung 01..04 gehört Block B,
+  diese Items sind eine andere Trigger-Klasse).
+- Eigene ADR plus zugehöriger Slice-Plan für Item 4 (Architektur-
+  Pivots, ADR 0003/0004 als normative Trigger-Quellen).
+- `plan-RM-M3-FUP-NN.md` für Items 5–8 (M2-Folgewellen mit
+  reservierten IDs RM-M3-FUP-01..04), oder als Carve-out-Sektion
+  innerhalb des auslösenden Plans.
 
 ---
 
@@ -195,15 +205,20 @@ Architektur-Event aus zwei Blickwinkeln. Wenn dieser Trigger zündet,
 wird er durch eine **gemeinsame Folge-ADR** plus einen **gemeinsamen
 Slice-Plan** adressiert (Aufwand grob 5–10 Wochen, ADR 0004 §3).
 
-**Aktivierungs-Pfad:**
+**Aktivierungs-Pfad:** ADR-Nummern werden sequenziell beim
+Schreiben vergeben — die nächste freie Nummer ist heute **0005**.
+Die genaue Reservierung ergibt sich daraus, in welcher Reihenfolge
+die ADRs landen:
 
-- Sprach-Pivot allein: neue ADR `0005-native-kernel-rust-pivot.md`,
-  bestehende ADR 0003 wird zu „Superseded by 0005".
-- Out-of-Process-Pivot allein: neue ADR `0006-native-kernel-out-of-process.md`,
-  bestehende ADR 0004 wird zu „Superseded by 0006".
-- Bündel-Pivot: eine gemeinsame ADR (z. B. `0005-native-kernel-pivot.md`)
-  die beide Achsen adressiert; beide bestehenden ADRs werden zu
-  „Superseded".
+- Sprach-Pivot allein zuerst: neue ADR `00NN-native-kernel-rust-pivot.md`
+  (mit `NN` = nächster freier Slot zum Schreibzeitpunkt); bestehende
+  ADR 0003 wird zu „Superseded by 00NN".
+- Out-of-Process-Pivot allein zuerst: neue ADR
+  `00NN-native-kernel-out-of-process.md`; bestehende ADR 0004 wird
+  zu „Superseded by 00NN".
+- Bündel-Pivot (beide Achsen in einem Schritt): eine gemeinsame ADR
+  (z. B. `00NN-native-kernel-pivot.md`); beide bestehenden ADRs
+  werden zu „Superseded by 00NN".
 
 **Aktueller Status:** kein Trigger zündet. Diese Notiz hält die
 Trigger-Watch-Pflicht fest — beim nächsten architektonischen Review
