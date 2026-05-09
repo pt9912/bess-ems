@@ -512,10 +512,36 @@ Das System soll Marktprodukte fachlich differenziert abbilden, sobald diese im j
 - aFRR negative Reservekapazität
 - aFRR positive Aktivierungsenergie
 - aFRR negative Aktivierungsenergie
+- mFRR positive Reservekapazität
+- mFRR negative Reservekapazität
+- mFRR positive Aktivierungsenergie
+- mFRR negative Aktivierungsenergie
 
 **Abnahmekriterium:** Marktverpflichtungen, Preise und Optimierungsinputs unterscheiden Marktprodukt, Richtung, Einheit und Zeitschritt eindeutig.
 
 ---
+
+### Entscheidung zu LH-OPEN-002 — Regelleistungsprodukte
+
+Für die Produktplanung werden konkret die im deutschen Regelreservemarkt relevanten Produktfamilien FCR, aFRR und mFRR berücksichtigt.
+
+**Planungsannahme Stand 2026-05-09:**
+
+| Produktprofil | Marktbezug | Richtung | Zeitraster | Leistungsinterpretation | M4-Verwendung |
+| ------------- | ---------- | -------- | ---------- | ----------------------- | ------------- |
+| FCR Reservekapazität | Regelleistung | symmetrisch, positive und negative Leistung müssen gemeinsam vorgehalten werden | 4-h-Produkt; interne Reservierungsauflösung mindestens 15 min | bidirektional reserviertes Leistungsband um den Baseline-Fahrplan; keine getrennte Aktivierungsenergie im EMS-Marktmodell | erstes reales Reservierungsprofil |
+| aFRR positive Reservekapazität | Regelleistung | positiv, Einspeisung erhöhen oder Bezug senken | 4-h-Produkt; interne Reservierungsauflösung mindestens 15 min | entladeseitige Reserve, die Day-Ahead und Intraday nicht verplanen dürfen | erstes reales Reserveprofil neben FCR |
+| aFRR negative Reservekapazität | Regelleistung | negativ, Einspeisung senken oder Bezug erhöhen | 4-h-Produkt; interne Reservierungsauflösung mindestens 15 min | ladeseitige Reserve, die Day-Ahead und Intraday nicht verplanen dürfen | erstes reales Reserveprofil neben FCR |
+| aFRR positive Aktivierungsenergie | Regelarbeit | positiv | 15-min-Abrechnungsraster; Aktivierung im Regelkreis als zeitgestempelter Sollwert | aktivierter Leistungs-Sollwert vor Marktverpflichtungen und Fahrplänen, nach Safety-Limits | primärer M4-Aktivierungspfad |
+| aFRR negative Aktivierungsenergie | Regelarbeit | negativ | 15-min-Abrechnungsraster; Aktivierung im Regelkreis als zeitgestempelter Sollwert | aktivierter Leistungs-Sollwert vor Marktverpflichtungen und Fahrplänen, nach Safety-Limits | primärer M4-Aktivierungspfad |
+| mFRR positive Reservekapazität | Regelleistung | positiv | 4-h-Produkt; interne Reservierungsauflösung mindestens 15 min | entladeseitige Reserve, die Day-Ahead und Intraday nicht verplanen dürfen | Marktmodell und Reservierungsdaten vorbereiten |
+| mFRR negative Reservekapazität | Regelleistung | negativ | 4-h-Produkt; interne Reservierungsauflösung mindestens 15 min | ladeseitige Reserve, die Day-Ahead und Intraday nicht verplanen dürfen | Marktmodell und Reservierungsdaten vorbereiten |
+| mFRR positive Aktivierungsenergie | Regelarbeit | positiv | 15-min-Abrechnungsraster | fachlich relevantes Arbeitsprodukt; produktive MOLS-/MARI-Aktivierung bleibt Folgeausbau | nicht als produktiver M4-Aktivierungspfad |
+| mFRR negative Aktivierungsenergie | Regelarbeit | negativ | 15-min-Abrechnungsraster | fachlich relevantes Arbeitsprodukt; produktive MOLS-/MARI-Aktivierung bleibt Folgeausbau | nicht als produktiver M4-Aktivierungspfad |
+
+**Priorisierung:** M4 modelliert Reserve-Constraints produktneutral, muss aber FCR und aFRR als erste reale Produktprofile nachweisen. mFRR wird im Marktproduktmodell und in den Reservierungsdaten vorbereitet, aber nicht als produktiver Aktivierungspfad vorausgesetzt.
+
+**Abnahmekriterium:** Die Produktfamilie, Richtung, Einheit und der Zeitschritt sind für FCR, aFRR und mFRR eindeutig modellierbar. Produktive Aktivierung bleibt deaktiviert, bis das konkrete Produktprofil inklusive Präqualifikations-, Schnittstellen-, Latenz- und Jitter-Annahmen freigegeben ist.
 
 ## 9. Optimierungsanforderungen
 
@@ -1988,7 +2014,7 @@ Ein zu früher Fokus auf MILP/MPC kann die robuste technische Ausführung verzö
 | Kennung     | Frage                                                                           | Status |
 | ----------- | ------------------------------------------------------------------------------- | ------ |
 | LH-OPEN-001 | Welche konkreten Batteriesysteme / Hersteller sollen zuerst unterstützt werden? | Offen  |
-| LH-OPEN-002 | Welche Regelleistungsprodukte sind konkret relevant?                            | Offen  |
+| LH-OPEN-002 | Welche Regelleistungsprodukte sind konkret relevant? Siehe Entscheidung in §8.  | Geklärt |
 | LH-OPEN-003 | Welche Marktpreisquellen sollen angebunden werden?                              | Offen  |
 | LH-OPEN-004 | Welche produktive Zykluszeit gilt je Anlagenklasse und Betriebsmodus?           | Offen  |
 | LH-OPEN-005 | Soll ein Operator UI Bestandteil des Projekts sein?                             | Offen  |
