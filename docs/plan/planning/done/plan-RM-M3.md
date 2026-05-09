@@ -389,12 +389,15 @@ absolut; Status, Mode und Reason-Codes muessen exakt matchen.
 
 ## M2-Folgearbeit Mit M3-Trigger
 
-| Status | ID              | Paket                                      | Aktivierungsbedingung | DoD |
-| ------ | --------------- | ------------------------------------------ | --------------------- | --- |
-| ⬜     | RM-M3-FUP-01    | Erste echte Folgemigration ueber vorhandenen Migrationspfad aktivieren | OP-OPEN-05/06 oder erste echte Schema-Aenderung | Der abgeschlossene Migrationspfad aus [`plan-RM-M2-migration.md`](plan-RM-M2-migration.md) wird konsumiert: `schema/schema.yaml` wird angepasst, eine echte `Migrations/RunOnce/0002_*.sql` wird erzeugt/committed, Drafts bleiben nicht eingebettet, `schema-validate`/`schema-drift-check` bleiben gruen und der Runtime-Migrator appliziert die Aenderung idempotent. |
-| ⬜     | RM-M3-FUP-02    | Optimistic Schedule Replace (OP-OPEN-05)   | Multi-Replica-Optimize oder schema-veraendernder Schedule-Track | `IScheduleRepository.Replace(schedule, expectedBaseVersion)` plus Dapper-`WHERE version = @expected`; Versionskonflikt wird als `Failed` Run mit Reason `concurrent-version-conflict` auditierbar. |
-| ⬜     | RM-M3-FUP-03    | Optimization-Lock-Eviction (OP-OPEN-06)    | Ephemere Asset-IDs, Multi-Tenant-Rotation oder wachsende Test-ID-Sets | `_locks` in `DefaultScheduleOptimizationUseCase` bekommt LRU/TTL-Eviction mit konfigurierbarer Schwelle und Metrik `bess_optimization_lock_table_size`. |
-| ⬜     | RM-M3-FUP-04    | Replay-Carve-outs nach RM-M2-10            | Externe Fixtures, Operator-Replay, Multi-Asset-Replay oder Production-Replay werden gebraucht | Der in RM-M2-10 gelieferte Telemetrie-Replay-Harness bleibt bestehen. M3+ ergaenzt nur konkrete Folge-Slices wie JSON-File-Loader unter `tests/fixtures/replay/`, Operator-CLI/Make-Target, Multi-Asset-Replay-Koordination oder Compare-against-Production-Replay; Solver-Replay aus M2 bleibt unveraendert. |
+> **Verschoben in die Trigger-Watch-Note** —
+> [`../open/note-RM-M3-followups.md`](../open/note-RM-M3-followups.md)
+> Block B (Items 5–8). Die ursprüngliche Tabelle mit RM-M3-FUP-01..04
+> (erste echte Folgemigration, Optimistic Schedule Replace OP-OPEN-05,
+> Optimization-Lock-Eviction OP-OPEN-06, Replay-Carve-outs nach
+> RM-M2-10) ist dort mit Trigger-Bedingungen, DoD-Sätzen aus diesem
+> Plan und Aktivierungs-Pfad zentral geführt. Single source of truth
+> für die offene Trigger-Watch ist die Note; dieser Eintrag hier
+> verbleibt nur als historischer Anker für die Quelle.
 
 ---
 
