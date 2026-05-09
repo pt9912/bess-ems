@@ -263,32 +263,31 @@ des OP-OPEN-05-Slices).
 
 ---
 
-## Item 6: RM-M3-FUP-02 — Optimistic Schedule Replace (OP-OPEN-05)
+## Item 6: RM-M3-FUP-02 ✅ — Optimistic Schedule Replace (OP-OPEN-05)
 
-**Trigger:** Multi-Replica-Optimize oder RM-M4-01
-(Intraday-Reoptimierung — Plan-RM-M4 verlangt explizit „atomarer
-Commit-Lock pro `(asset_id, schedule_type)` plus optimistic
-compare-and-swap auf der erwarteten Schedule-Version"). Heute ist
-`IScheduleRepository.Replace` unconditional; eine
-per-`(asset, type)`-Semaphore in
-`DefaultScheduleOptimizationUseCase` serialisiert Single-Host-
-Konflikte, hat aber bei mehreren Replicas keinen koordinierten
-Effekt → Last-Write-Wins.
+**Status:** Abgeschlossen. Slice-Plan im `done/`-Ordner:
+[`../done/plan-RM-M3-FUP-02.md`](../done/plan-RM-M3-FUP-02.md).
 
-**DoD (aus plan-RM-M3.md):** `IScheduleRepository.Replace(schedule,
-expectedBaseVersion)` plus Dapper-`WHERE version = @expected`;
-Versionskonflikt wird als `Failed` Run mit Reason
-`concurrent-version-conflict` auditierbar.
+**Auslieferung:** `IScheduleRepository.Replace(schedule,
+expectedBaseVersion)` mit branched-CAS-SQL in
+`DapperScheduleRepository` (Insert-Pfad `ON CONFLICT DO NOTHING`,
+Update-Pfad `UPDATE … WHERE version = @expected`); Konflikt
+wirft `ScheduleConcurrencyConflictException`, wird vom
+`DefaultScheduleOptimizationUseCase` gefangen und als
+`OptimizationSolverStatus.Failed`-Run mit
+`TerminationCode = "concurrent-version-conflict"` und
+`TerminationDetail = "expected=…,actual=…"` persistiert. Tests:
+InMemory-CAS-Pin, Persistence-Integration für Insert- und
+Update-Pfad-Konflikte (mit Transaktions-Rollback-Verifikation),
+Use-Case-Failed-Run-Pin und Wiring-Pin
+(Use-Case ruft Replace mit dem **gelesenen** `existing.Version`,
+nicht mit `result.ProducedSchedule.Version`). Architektur-Tabu-Test
+verifiziert den Exception-Sichtbarkeitsbereich.
 
-**Aktivierungs-Pfad:** Slice-Plan
-[`plan-RM-M3-FUP-02.md`](plan-RM-M3-FUP-02.md) liegt bereits
-in `open/` (Trigger-Watch zündet, Plan ist vorgezogen). FUP-02
-trägt **keine** Schema-Änderung — `schedules.version` existiert
+**Schema-Stand:** keine Änderung — `schedules.version` existiert
 seit dem M2-`0001_initial.sql` als `INTEGER NOT NULL`, reine CAS
-via `WHERE version = @expected` braucht weder neue Spalte noch
-neues Constraint. FUP-02 bündelt deshalb **nicht zwingend** mit
-FUP-01; FUP-01 zündet erst durch echten Schema-Bedarf aus einem
-anderen Slice.
+braucht weder neue Spalte noch neues Constraint. FUP-02 bündelte
+**nicht** mit FUP-01.
 
 ---
 

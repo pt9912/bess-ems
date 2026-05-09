@@ -4,6 +4,7 @@ using BatteryEms.Application.Markets;
 using BatteryEms.Application.Observability;
 using BatteryEms.Application.Optimization;
 using BatteryEms.Application.Persistence;
+using BatteryEms.Application.Time;
 using BatteryEms.Domain;
 using Microsoft.Extensions.Logging;
 
@@ -60,6 +61,7 @@ public sealed partial class DefaultScheduleOptimizationUseCase
     private readonly IScheduleRepository _scheduleRepository;
     private readonly IOptimizationRunRepository _runRepository;
     private readonly IOptimizationRunMetrics _metrics;
+    private readonly IClock _clock;
     private readonly ILogger<DefaultScheduleOptimizationUseCase> _logger;
 
     // Per-(asset, type) serialisation guards the read-optimise-write
@@ -76,18 +78,21 @@ public sealed partial class DefaultScheduleOptimizationUseCase
         IScheduleRepository scheduleRepository,
         IOptimizationRunRepository runRepository,
         IOptimizationRunMetrics metrics,
+        IClock clock,
         ILogger<DefaultScheduleOptimizationUseCase> logger)
     {
         ArgumentNullException.ThrowIfNull(optimizer);
         ArgumentNullException.ThrowIfNull(scheduleRepository);
         ArgumentNullException.ThrowIfNull(runRepository);
         ArgumentNullException.ThrowIfNull(metrics);
+        ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(logger);
 
         _optimizer = optimizer;
         _scheduleRepository = scheduleRepository;
         _runRepository = runRepository;
         _metrics = metrics;
+        _clock = clock;
         _logger = logger;
     }
 
@@ -187,28 +192,82 @@ public sealed partial class DefaultScheduleOptimizationUseCase
         // throws — leaves an active schedule without an audit run; an M3
         // follow-up wraps both writes in one transaction once the
         // persistence ports expose a shared connection scope (OPEN-05).
+        //
+        // RM-M3-FUP-02: a CAS conflict on the Replace path means another
+        // writer (typically a sibling replica) committed a newer version
+        // between our FindActive and Replace. We replace `result.Run`
+        // with a synthetic Failed run that records the conflict
+        // (TerminationCode = "concurrent-version-conflict",
+        //  TerminationDetail = "expected=…,actual=…") and append THAT
+        // instead — the optimal solution we computed never reached the
+        // schedule store, so persisting a Run that claims it did would
+        // lie. The use case must pass the local `baseVersion` (read
+        // before optimise) into Replace, NOT result.ProducedSchedule.Version
+        // — the latter would be a no-op CAS because the optimiser sets
+        // ProducedSchedule.Version = baseVersion + 1.
         int? producedVersion = null;
+        var runToPersist = result.Run;
         if (result.ProducedSchedule is not null)
         {
-            _scheduleRepository.Replace(result.ProducedSchedule);
-            producedVersion = result.ProducedSchedule.Version;
+            try
+            {
+                _scheduleRepository.Replace(result.ProducedSchedule, baseVersion);
+                producedVersion = result.ProducedSchedule.Version;
+            }
+            catch (ScheduleConcurrencyConflictException conflict)
+            {
+                runToPersist = BuildConcurrencyConflictRun(request, result.Run, conflict);
+                producedVersion = null;
+            }
         }
 
-        await _runRepository.AppendAsync(result.Run, cancellationToken).ConfigureAwait(false);
+        await _runRepository.AppendAsync(runToPersist, cancellationToken).ConfigureAwait(false);
 
         // Metrics fire after the run is durably persisted so a /metrics
         // scrape and the persisted run history can never disagree on
         // counts (LH-OPT-009 audit-stance: a run that wasn't appended
         // didn't happen, so it shouldn't be counted either).
-        _metrics.Record(result.Run);
+        _metrics.Record(runToPersist);
 
-        Log.RunCompleted(_logger, result.Run.RunId, request.AssetId, result.Run.Status, producedVersion ?? -1);
+        Log.RunCompleted(_logger, runToPersist.RunId, request.AssetId, runToPersist.Status, producedVersion ?? -1);
 
         return new ScheduleOptimizationOutcome(
-            RunId: result.Run.RunId,
-            Status: result.Run.Status,
+            RunId: runToPersist.RunId,
+            Status: runToPersist.Status,
             ProducedScheduleVersion: producedVersion,
-            TerminationReason: result.Run.TerminationReason);
+            TerminationReason: runToPersist.TerminationReason);
+    }
+
+    // Builds a Failed OptimizationRun that audits a CAS conflict on the
+    // schedule replace path. We reuse the optimiser-side metadata
+    // (solver name, horizon window, time step, runtime) so dashboards
+    // can still tell where the work came from; only Status, termination
+    // pair, ProducedSchedule and CreatedAt change. The objective fields
+    // are zeroed because the produced schedule never persisted.
+    private OptimizationRun BuildConcurrencyConflictRun(
+        ScheduleOptimizationRequest request,
+        OptimizationRun originalRun,
+        ScheduleConcurrencyConflictException conflict)
+    {
+        var detail = $"expected={conflict.ExpectedBaseVersion},actual={conflict.ActualVersion}";
+        return new OptimizationRun(
+            runId: Guid.NewGuid(),
+            assetId: request.AssetId,
+            solverName: originalRun.SolverName,
+            status: OptimizationSolverStatus.Failed,
+            horizonStart: originalRun.HorizonStart,
+            horizonEnd: originalRun.HorizonEnd,
+            timeStep: originalRun.TimeStep,
+            objectiveValue: 0,
+            objectiveBreakdown: OptimizationObjectiveBreakdown.Empty,
+            constraintViolations: Array.Empty<string>(),
+            warnings: Array.Empty<string>(),
+            solverRuntime: originalRun.SolverRuntime,
+            terminationCode: "concurrent-version-conflict",
+            terminationDetail: detail,
+            createdAt: _clock.UtcNow,
+            inputs: originalRun.Inputs,
+            producedSchedule: null);
     }
 
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]

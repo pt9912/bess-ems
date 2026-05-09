@@ -78,8 +78,10 @@ unter `in-progress/`.
 > als Trigger), NativeControl-Health-Endpoint
 > (Operator-Anforderung), Out-of-Process/Sprach-Pivot (ADR
 > 0003/0004 Trigger). Plus die orthogonalen
-> RM-M3-FUP-01..04-Carve-outs (Migrationen, OP-OPEN-05/06,
+> RM-M3-FUP-01/03/04-Carve-outs (Migrationen, OP-OPEN-06,
 > Replay-Folge-Slices), ebenfalls trigger-getrieben offen.
+> RM-M3-FUP-02 ✅ (OP-OPEN-05 — optimistic Schedule-Replace-CAS)
+> ist abgeschlossen.
 >
 > **M2-Welle 1 (Optimization-Slice, abgeschlossen):**
 > [`../done/plan-RM-M2-optimization.md`](../done/plan-RM-M2-optimization.md)
@@ -92,7 +94,8 @@ unter `in-progress/`.
 > Violations, `POST /markets/day-ahead/optimize` operator-policy-
 > guarded, sowie Replay-/Reproduzierbarkeitstests (LH-OPT-009).
 > Drei Review-Pässe, alle Findings adressiert oder mit präzise
-> dokumentiertem M3-Trigger eingefroren (OP-OPEN-05/06).
+> dokumentiertem M3-Trigger eingefroren (OP-OPEN-05 ✅ via
+> RM-M3-FUP-02; OP-OPEN-06 trigger-getrieben offen).
 >
 > **M2-Welle 2 (Restliche M2-Items, abgeschlossen):**
 > RM-M2-01 (Marktcommitment-Priorisierung mit `MarketCommitmentPriority`

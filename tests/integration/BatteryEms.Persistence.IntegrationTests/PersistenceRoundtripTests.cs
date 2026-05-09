@@ -130,7 +130,7 @@ public sealed class PersistenceRoundtripTests : IAsyncLifetime
             new(Now, Now + TimeSpan.FromHours(1), 30),
             new(Now + TimeSpan.FromHours(1), Now + TimeSpan.FromHours(2), -20),
         });
-        await repo.ReplaceAsync(v1, CancellationToken.None);
+        await repo.ReplaceAsync(v1, expectedBaseVersion: 0, CancellationToken.None);
 
         // Replace with a v2 that has fewer windows; the previous extra
         // window must be gone, not merged.
@@ -138,10 +138,75 @@ public sealed class PersistenceRoundtripTests : IAsyncLifetime
         {
             new(Now, Now + TimeSpan.FromHours(1), 15),
         });
-        await repo.ReplaceAsync(v2, CancellationToken.None);
+        await repo.ReplaceAsync(v2, expectedBaseVersion: 1, CancellationToken.None);
 
         var loaded = await repo.FindActiveAsync("single-bess-1", ScheduleType.DayAhead, CancellationToken.None);
         Assert.NotNull(loaded);
+        Assert.Equal(2, loaded!.Version);
+        Assert.Single(loaded.Windows);
+        Assert.Equal(15, loaded.Windows[0].TargetPowerKw);
+    }
+
+    [Fact]
+    public async Task Schedule_replace_with_zero_base_on_existing_row_throws_conflict()
+    {
+        // RM-M3-FUP-02 insert-path CAS: a caller that passes
+        // expectedBaseVersion=0 on a (asset, type) that already holds
+        // v1 must fail rather than silently replace.
+        var repo = new DapperScheduleRepository(_dataSource!);
+
+        var v1 = new Schedule("single-bess-1", ScheduleType.DayAhead, "DE-LU", 1, new List<ScheduleWindow>
+        {
+            new(Now, Now + TimeSpan.FromHours(1), 30),
+        });
+        await repo.ReplaceAsync(v1, expectedBaseVersion: 0, CancellationToken.None);
+
+        var ex = await Assert.ThrowsAsync<ScheduleConcurrencyConflictException>(
+            () => repo.ReplaceAsync(v1, expectedBaseVersion: 0, CancellationToken.None));
+        Assert.Equal(0, ex.ExpectedBaseVersion);
+        Assert.Equal(1, ex.ActualVersion);
+
+        // The first v1 row is still the active one; CAS rollback worked.
+        var loaded = await repo.FindActiveAsync("single-bess-1", ScheduleType.DayAhead, CancellationToken.None);
+        Assert.Equal(1, loaded!.Version);
+    }
+
+    [Fact]
+    public async Task Schedule_replace_with_stale_base_version_throws_conflict_and_rolls_back()
+    {
+        // RM-M3-FUP-02 update-path CAS: a caller that passes
+        // expectedBaseVersion=1 after the row already advanced to v2
+        // must fail. The schedule_windows DELETE/INSERT inside the
+        // same transaction must also be rolled back.
+        var repo = new DapperScheduleRepository(_dataSource!);
+
+        var v1 = new Schedule("single-bess-1", ScheduleType.DayAhead, "DE-LU", 1, new List<ScheduleWindow>
+        {
+            new(Now, Now + TimeSpan.FromHours(1), 30),
+            new(Now + TimeSpan.FromHours(1), Now + TimeSpan.FromHours(2), -20),
+        });
+        await repo.ReplaceAsync(v1, expectedBaseVersion: 0, CancellationToken.None);
+
+        var v2 = new Schedule("single-bess-1", ScheduleType.DayAhead, "DE-LU", 2, new List<ScheduleWindow>
+        {
+            new(Now, Now + TimeSpan.FromHours(1), 15),
+        });
+        await repo.ReplaceAsync(v2, expectedBaseVersion: 1, CancellationToken.None);
+
+        // A second writer that still thinks the base is v1 attempts v2;
+        // the CAS rejects it because the actual row is now v2.
+        var v2bStale = new Schedule("single-bess-1", ScheduleType.DayAhead, "DE-LU", 2, new List<ScheduleWindow>
+        {
+            new(Now + TimeSpan.FromHours(2), Now + TimeSpan.FromHours(3), 99),
+        });
+        var ex = await Assert.ThrowsAsync<ScheduleConcurrencyConflictException>(
+            () => repo.ReplaceAsync(v2bStale, expectedBaseVersion: 1, CancellationToken.None));
+        Assert.Equal(1, ex.ExpectedBaseVersion);
+        Assert.Equal(2, ex.ActualVersion);
+
+        // The 99-window from v2bStale must NOT be persisted (transaction
+        // rollback). Only the v2 windows from the winning replace remain.
+        var loaded = await repo.FindActiveAsync("single-bess-1", ScheduleType.DayAhead, CancellationToken.None);
         Assert.Equal(2, loaded!.Version);
         Assert.Single(loaded.Windows);
         Assert.Equal(15, loaded.Windows[0].TargetPowerKw);

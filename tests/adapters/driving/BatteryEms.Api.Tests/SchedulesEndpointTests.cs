@@ -36,7 +36,7 @@ public sealed class SchedulesEndpointTests : IClassFixture<BatteryEmsApiFactory>
             new(start, start + TimeSpan.FromHours(1), 25),
             new(start + TimeSpan.FromHours(1), start + TimeSpan.FromHours(2), -10),
         });
-        repo.Replace(schedule);
+        repo.Replace(schedule, expectedBaseVersion: 0);
 
         using var client = _factory.CreateClient();
         var response = await client.GetAsync("/markets/schedules/current?assetId=asset-sched");

@@ -13,19 +13,30 @@ public sealed class DapperScheduleRepository : IScheduleRepository
     // never sees a torn schedule mid-rewrite. RM-M1-14 will own the
     // historical retention story.
     //
-    // Concurrency: the upsert has *no* `WHERE version = @expected`
-    // guard. Two writers racing on the same (asset, type) will both
-    // win their write; the second silently overwrites. M2 callers
-    // serialise via DefaultScheduleOptimizationUseCase's per-key
-    // SemaphoreSlim within one process. Multi-replica deployments
-    // need RM-M2-OP-OPEN-05 — see IScheduleRepository.Replace doc.
+    // Concurrency (RM-M3-FUP-02): the header write is split into two
+    // explicit branches gated on expectedBaseVersion. Insert path
+    // (`expectedBaseVersion == 0`) uses ON CONFLICT DO NOTHING so a
+    // pre-existing row surfaces as RowsAffected=0 and a Conflict
+    // exception (with the actual version probed back) — never as a
+    // silent overwrite. Update path (`> 0`) uses a plain UPDATE with
+    // `WHERE version = @expected`; RowsAffected != 1 means the row is
+    // gone or the version moved → Conflict exception.
     private const string DeleteWindowsSql = "DELETE FROM schedule_windows WHERE asset_id = @AssetId AND type = @Type;";
-    private const string UpsertHeaderSql = """
+    private const string InsertHeaderSql = """
         INSERT INTO schedules (asset_id, type, market_bid_area, version)
         VALUES (@AssetId, @Type, @MarketBidArea, @Version)
-        ON CONFLICT (asset_id, type) DO UPDATE SET
-            market_bid_area = EXCLUDED.market_bid_area,
-            version = EXCLUDED.version;
+        ON CONFLICT (asset_id, type) DO NOTHING;
+        """;
+    private const string UpdateHeaderWithCasSql = """
+        UPDATE schedules
+        SET market_bid_area = @MarketBidArea, version = @Version
+        WHERE asset_id = @AssetId
+          AND type = @Type
+          AND version = @ExpectedBaseVersion;
+        """;
+    private const string SelectHeaderVersionSql = """
+        SELECT version FROM schedules
+        WHERE asset_id = @AssetId AND type = @Type;
         """;
     private const string InsertWindowSql = """
         INSERT INTO schedule_windows (asset_id, type, window_start, window_end, target_power_kw)
@@ -75,10 +86,10 @@ public sealed class DapperScheduleRepository : IScheduleRepository
         return FindActiveAsync(assetId, type).GetAwaiter().GetResult();
     }
 
-    public void Replace(Schedule schedule)
+    public void Replace(Schedule schedule, int expectedBaseVersion)
     {
         ArgumentNullException.ThrowIfNull(schedule);
-        ReplaceAsync(schedule).GetAwaiter().GetResult();
+        ReplaceAsync(schedule, expectedBaseVersion).GetAwaiter().GetResult();
     }
 
     public async Task<IReadOnlyList<Schedule>> FindAllAsync(string assetId, CancellationToken cancellationToken = default)
@@ -119,9 +130,15 @@ public sealed class DapperScheduleRepository : IScheduleRepository
         }
     }
 
-    public async Task ReplaceAsync(Schedule schedule, CancellationToken cancellationToken = default)
+    public async Task ReplaceAsync(Schedule schedule, int expectedBaseVersion, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(schedule);
+        if (expectedBaseVersion < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(expectedBaseVersion),
+                "expectedBaseVersion must be >= 0 (0 = no prior version).");
+        }
 
         var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using (connection.ConfigureAwait(false))
@@ -130,17 +147,60 @@ public sealed class DapperScheduleRepository : IScheduleRepository
             await using (transaction.ConfigureAwait(false))
             {
                 var typeWire = ScheduleTypeWire.ToWire(schedule.Type);
-                await connection.ExecuteAsync(new CommandDefinition(
-                    UpsertHeaderSql,
-                    new
-                    {
-                        AssetId = schedule.AssetId,
-                        Type = typeWire,
-                        MarketBidArea = schedule.MarketBidArea,
-                        Version = schedule.Version,
-                    },
-                    transaction: transaction,
-                    cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+                // Header CAS, branch on insert-vs-update. Probe the actual
+                // version on conflict so the exception carries useful
+                // diagnostic detail.
+                int rows;
+                if (expectedBaseVersion == 0)
+                {
+                    rows = await connection.ExecuteAsync(new CommandDefinition(
+                        InsertHeaderSql,
+                        new
+                        {
+                            AssetId = schedule.AssetId,
+                            Type = typeWire,
+                            MarketBidArea = schedule.MarketBidArea,
+                            Version = schedule.Version,
+                        },
+                        transaction: transaction,
+                        cancellationToken: cancellationToken)).ConfigureAwait(false);
+                }
+                else
+                {
+                    rows = await connection.ExecuteAsync(new CommandDefinition(
+                        UpdateHeaderWithCasSql,
+                        new
+                        {
+                            AssetId = schedule.AssetId,
+                            Type = typeWire,
+                            MarketBidArea = schedule.MarketBidArea,
+                            Version = schedule.Version,
+                            ExpectedBaseVersion = expectedBaseVersion,
+                        },
+                        transaction: transaction,
+                        cancellationToken: cancellationToken)).ConfigureAwait(false);
+                }
+
+                if (rows != 1)
+                {
+                    var actual = await connection.QuerySingleOrDefaultAsync<int?>(new CommandDefinition(
+                        SelectHeaderVersionSql,
+                        new { AssetId = schedule.AssetId, Type = typeWire },
+                        transaction: transaction,
+                        cancellationToken: cancellationToken)).ConfigureAwait(false);
+                    // Rollback before throwing so the windows DELETE/INSERT
+                    // we are about to skip is also undone (defence in depth
+                    // — `await using` would dispose-rollback as well, but
+                    // an explicit Rollback documents the intent).
+                    await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+                    throw new ScheduleConcurrencyConflictException(
+                        schedule.AssetId,
+                        schedule.Type,
+                        expectedBaseVersion,
+                        actualVersion: actual ?? 0);
+                }
+
                 await connection.ExecuteAsync(new CommandDefinition(
                     DeleteWindowsSql,
                     new { AssetId = schedule.AssetId, Type = typeWire },

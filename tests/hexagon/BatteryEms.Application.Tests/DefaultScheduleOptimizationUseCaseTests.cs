@@ -3,6 +3,7 @@ using BatteryEms.Application.Markets;
 using BatteryEms.Application.Observability;
 using BatteryEms.Application.Optimization;
 using BatteryEms.Application.Persistence;
+using BatteryEms.Application.Time;
 using BatteryEms.Domain;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -44,7 +45,7 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
         var schedules = new InMemoryScheduleRepository();
         // Seed v3 with a non-default bid area; the use case must derive
         // the next request's identity from this row, not the M2 default.
-        schedules.Replace(BuildSchedule(version: 3, marketBidArea: "AT"));
+        schedules.Replace(BuildSchedule(version: 3, marketBidArea: "AT"), expectedBaseVersion: 0);
 
         var optimizer = new SpyOptimizer(req => BuildResult(
             req, OptimizationSolverStatus.Optimal, includeSchedule: true));
@@ -206,6 +207,101 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
     }
 
     [Fact]
+    public async Task Cas_conflict_on_replace_persists_failed_run_with_concurrent_version_conflict_code()
+    {
+        // Sibling-replica race: we read v3, optimise to v4, but a sibling
+        // already advanced the store to v4. Our Replace must fail with
+        // ScheduleConcurrencyConflictException and the use case must
+        // turn that into a Failed run.
+        var schedules = new ConflictingScheduleRepository(
+            seedActualVersion: 3,
+            actualVersionAtReplace: 4);
+        var optimizer = new SpyOptimizer(req =>
+            BuildResult(req, OptimizationSolverStatus.Optimal, includeSchedule: true));
+        var runs = new InMemoryOptimizationRunRepository();
+        var useCase = Build(optimizer, schedules, runs);
+
+        var outcome = await useCase.ExecuteAsync(BuildCommand(), CancellationToken.None);
+
+        Assert.Equal(OptimizationSolverStatus.Failed, outcome.Status);
+        Assert.Null(outcome.ProducedScheduleVersion);
+        Assert.Equal("concurrent-version-conflict:expected=3,actual=4", outcome.TerminationReason);
+
+        var stored = await runs.FindByIdAsync(outcome.RunId, CancellationToken.None);
+        Assert.NotNull(stored);
+        Assert.Equal(OptimizationSolverStatus.Failed, stored!.Status);
+        Assert.Equal("concurrent-version-conflict", stored.TerminationCode);
+        Assert.Equal("expected=3,actual=4", stored.TerminationDetail);
+        Assert.Null(stored.ProducedSchedule);
+    }
+
+    [Fact]
+    public async Task Use_case_replaces_with_existing_version_not_produced_version()
+    {
+        // Wiring pin: the use case must call Replace with the version
+        // it READ (existing.Version), not the version the optimiser
+        // PRODUCED (existing.Version + 1). The latter would be a no-op
+        // CAS that defeats RM-M3-FUP-02 entirely.
+        var schedules = new RecordingScheduleRepository(seedVersion: 5);
+        var optimizer = new SpyOptimizer(req =>
+            BuildResult(req, OptimizationSolverStatus.Optimal, includeSchedule: true));
+        var runs = new InMemoryOptimizationRunRepository();
+        var useCase = Build(optimizer, schedules, runs);
+
+        await useCase.ExecuteAsync(BuildCommand(), CancellationToken.None);
+
+        var call = Assert.Single(schedules.ReplaceCalls);
+        Assert.Equal(5, call.ExpectedBaseVersion);
+        Assert.Equal(6, call.SchedulePassedIn.Version);
+    }
+
+    private sealed class ConflictingScheduleRepository : IScheduleRepository
+    {
+        private readonly Schedule? _seed;
+        private readonly int _actualVersionAtReplace;
+
+        public ConflictingScheduleRepository(int seedActualVersion, int actualVersionAtReplace)
+        {
+            _actualVersionAtReplace = actualVersionAtReplace;
+            _seed = seedActualVersion > 0
+                ? BuildSchedule(version: seedActualVersion, marketBidArea: "DE-LU")
+                : null;
+        }
+
+        public IEnumerable<Schedule> FindAll(string assetId) =>
+            _seed is not null ? new[] { _seed } : Array.Empty<Schedule>();
+
+        public Schedule? FindActive(string assetId, ScheduleType type) => _seed;
+
+        public void Replace(Schedule schedule, int expectedBaseVersion) =>
+            throw new ScheduleConcurrencyConflictException(
+                schedule.AssetId, schedule.Type, expectedBaseVersion, _actualVersionAtReplace);
+    }
+
+    private sealed class RecordingScheduleRepository : IScheduleRepository
+    {
+        private readonly Schedule? _seed;
+        public List<(int ExpectedBaseVersion, Schedule SchedulePassedIn)> ReplaceCalls { get; } = new();
+
+        public RecordingScheduleRepository(int seedVersion)
+        {
+            _seed = seedVersion > 0
+                ? BuildSchedule(version: seedVersion, marketBidArea: "DE-LU")
+                : null;
+        }
+
+        public IEnumerable<Schedule> FindAll(string assetId) =>
+            _seed is not null ? new[] { _seed } : Array.Empty<Schedule>();
+
+        public Schedule? FindActive(string assetId, ScheduleType type) => _seed;
+
+        public void Replace(Schedule schedule, int expectedBaseVersion)
+        {
+            ReplaceCalls.Add((expectedBaseVersion, schedule));
+        }
+    }
+
+    [Fact]
     public async Task Outcome_carries_run_id_and_termination_reason_from_persisted_run()
     {
         var optimizer = new SpyOptimizer(req =>
@@ -223,12 +319,14 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
         IScheduleOptimizer optimizer,
         IScheduleRepository schedules,
         IOptimizationRunRepository runs,
-        IOptimizationRunMetrics? metrics = null)
+        IOptimizationRunMetrics? metrics = null,
+        IClock? clock = null)
         => new(
             optimizer,
             schedules,
             runs,
             metrics ?? NoOpOptimizationRunMetrics.Instance,
+            clock ?? new FakeClock(),
             NullLogger<DefaultScheduleOptimizationUseCase>.Instance);
 
     private static ScheduleOptimizationCommand BuildCommand() =>

@@ -14,18 +14,19 @@ public interface IScheduleRepository
     // The latest schedule replaced for (assetId, type), or null if none.
     Schedule? FindActive(string assetId, ScheduleType type);
 
-    // Replaces the schedule for (assetId, type). M1 keeps only the most
-    // recent version per (asset, type); historical retention is RM-M1-14.
+    // Replaces the schedule for (assetId, type) with optimistic
+    // concurrency control (RM-M3-FUP-02). M1 keeps only the most
+    // recent version per (asset, type); historical retention is
+    // RM-M1-14.
     //
-    // Concurrency contract (M2): Replace is *unconditional* — it has no
-    // expected-version check, so two callers reading the same Version=v3
-    // and writing v4 will both succeed and the second write silently
-    // overwrites the first. M2 relies on caller-side serialisation
-    // (DefaultScheduleOptimizationUseCase per-(asset, type) SemaphoreSlim,
-    // single host process). A multi-replica deployment requires
-    // RM-M2-OP-OPEN-05 to land first: this signature gains an
-    // `expectedBaseVersion` parameter and the Dapper implementation
-    // adds `WHERE version = @expected` so a stale write fails fast
-    // instead of clobbering the live schedule.
-    void Replace(Schedule schedule);
+    // Concurrency contract: `expectedBaseVersion` is the version the
+    // caller saw when it last read the schedule. `0` means "no prior
+    // version exists" (insert path); `> 0` means "expect exactly this
+    // version as the base" (CAS update path). A mismatch — including
+    // an existing row when 0 was passed, or a stale version when N>0
+    // was passed — throws ScheduleConcurrencyConflictException
+    // instead of silently overwriting. Callers must pass `>= 0`;
+    // negative values are an ArgumentOutOfRangeException at the
+    // boundary.
+    void Replace(Schedule schedule, int expectedBaseVersion);
 }

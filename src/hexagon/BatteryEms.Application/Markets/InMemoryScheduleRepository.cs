@@ -35,9 +35,40 @@ public sealed class InMemoryScheduleRepository : IScheduleRepository
         return _byKey.TryGetValue((assetId, type), out var schedule) ? schedule : null;
     }
 
-    public void Replace(Schedule schedule)
+    public void Replace(Schedule schedule, int expectedBaseVersion)
     {
         ArgumentNullException.ThrowIfNull(schedule);
-        _byKey[(schedule.AssetId, schedule.Type)] = schedule;
+        if (expectedBaseVersion < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(expectedBaseVersion),
+                "expectedBaseVersion must be >= 0 (0 = no prior version).");
+        }
+
+        var key = (schedule.AssetId, schedule.Type);
+        // AddOrUpdate is the only ConcurrentDictionary primitive that
+        // serialises read+write under a per-key lock — exactly what
+        // CAS needs. The updateValueFactory throws on mismatch; the
+        // dictionary returns the new value on success.
+        _byKey.AddOrUpdate(
+            key,
+            addValueFactory: _ =>
+            {
+                if (expectedBaseVersion != 0)
+                {
+                    throw new ScheduleConcurrencyConflictException(
+                        schedule.AssetId, schedule.Type, expectedBaseVersion, actualVersion: 0);
+                }
+                return schedule;
+            },
+            updateValueFactory: (_, existing) =>
+            {
+                if (existing.Version != expectedBaseVersion)
+                {
+                    throw new ScheduleConcurrencyConflictException(
+                        schedule.AssetId, schedule.Type, expectedBaseVersion, existing.Version);
+                }
+                return schedule;
+            });
     }
 }

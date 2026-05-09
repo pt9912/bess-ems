@@ -5,6 +5,7 @@ using BatteryEms.Application.Markets;
 using BatteryEms.Application.Observability;
 using BatteryEms.Application.Optimization;
 using BatteryEms.Application.Persistence;
+using BatteryEms.Application.Time;
 using BatteryEms.Domain;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -39,6 +40,7 @@ public sealed class ScheduleOptimizationTracingTests
             new InMemoryScheduleRepository(),
             new InMemoryOptimizationRunRepository(),
             NoOpOptimizationRunMetrics.Instance,
+            new FakeClock(),
             NullLogger<DefaultScheduleOptimizationUseCase>.Instance);
 
         var outcome = await useCase.ExecuteAsync(BuildCommand(assetId), CancellationToken.None);
@@ -66,6 +68,7 @@ public sealed class ScheduleOptimizationTracingTests
             new InMemoryScheduleRepository(),
             new InMemoryOptimizationRunRepository(),
             NoOpOptimizationRunMetrics.Instance,
+            new FakeClock(),
             NullLogger<DefaultScheduleOptimizationUseCase>.Instance);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>

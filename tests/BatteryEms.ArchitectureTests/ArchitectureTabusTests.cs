@@ -88,4 +88,43 @@ public sealed class ArchitectureTabusTests
 
         Assert.True(result.IsSuccessful, ArchitectureTestHelpers.FormatFailures(result));
     }
+
+    // RM-M3-FUP-02: ScheduleConcurrencyConflictException is a domain
+    // exception that lives in BatteryEms.Application.Markets, is thrown
+    // by BatteryEms.Adapters.Persistence and caught by
+    // BatteryEms.Application.Api (the use-case layer). It must not
+    // leak into any other module — driving adapters mapping HTTP
+    // responses, the dispatch path, the worker, or other driven
+    // adapters all stay unaware of the typed exception. If a future
+    // need to reference it from outside those three modules arises,
+    // promote a domain-result type instead of widening this exception.
+    [Fact]
+    public void Schedule_concurrency_conflict_exception_is_only_referenced_from_persistence_and_api()
+    {
+        const string exceptionType =
+            "BatteryEms.Application.Markets.ScheduleConcurrencyConflictException";
+
+        var modulesThatMustNotReference = new[]
+        {
+            ProjectAssemblies.Domain,
+            ProjectAssemblies.Worker,
+            ProjectAssemblies.Modbus,
+            ProjectAssemblies.Mqtt,
+            ProjectAssemblies.Telemetry,
+            ProjectAssemblies.Optimization,
+            ProjectAssemblies.Infrastructure,
+            ProjectAssemblies.Host,
+        };
+
+        foreach (var assembly in modulesThatMustNotReference)
+        {
+            var result = Types.InAssembly(assembly)
+                .Should()
+                .NotHaveDependencyOn(exceptionType)
+                .GetResult();
+
+            Assert.True(result.IsSuccessful,
+                $"{assembly.GetName().Name}: {ArchitectureTestHelpers.FormatFailures(result)}");
+        }
+    }
 }
