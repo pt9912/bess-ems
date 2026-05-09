@@ -27,6 +27,7 @@ public static class ApplicationServiceRegistration
         services.AddSingleton<ICommandRepository, InMemoryCommandRepository>();
         services.AddSingleton<IScheduleRepository>(_ => new InMemoryScheduleRepository());
         services.AddSingleton<IScheduleTracker, DefaultScheduleTracker>();
+        services.AddSingleton<IReserveRepository>(_ => new InMemoryReserveRepository());
         services.AddSingleton<IOperatorStopRegistry, InMemoryOperatorStopRegistry>();
         services.AddSingleton<IOperatorAuditLog, InMemoryOperatorAuditLog>();
 

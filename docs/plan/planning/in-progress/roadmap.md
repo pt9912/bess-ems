@@ -39,7 +39,7 @@ unter `in-progress/`.
 
 ## Aktueller Stand
 
-> **Stand:** 2026-05-07
+> **Stand:** 2026-05-09
 > **Abgeschlossen:** M1 (alle 24 Liefergegenstände grün) und M2 (alle
 > 10 Liefergegenstände RM-M2-01..10 grün). `make fullbuild`
 > reproduzierbar grün, Compose-Stack (bess-ems + Postgres + Mosquitto
@@ -82,6 +82,19 @@ unter `in-progress/`.
 > Replay-Folge-Slices), ebenfalls trigger-getrieben offen.
 > RM-M3-FUP-02 ✅ (OP-OPEN-05 — optimistic Schedule-Replace-CAS)
 > ist abgeschlossen.
+>
+> **M4 gestartet:** [`plan-RM-M4.md`](plan-RM-M4.md) ist nach
+> `in-progress/` migriert. **RM-M4-02 ✅** (Reservierungs-Modell +
+> Solver-Constraints) ist abgeschlossen: Domain-Trio
+> `ReserveProduct`/`ReserveDirection`/`ReserveBand`, Driven Port
+> `IReserveRepository` + `InMemoryReserveRepository`,
+> Use-Case-Verdrahtung über `ScheduleOptimizationRequest.Reserves`,
+> OR-Tools deduziert Charge-/Discharge-Caps (Symmetric beidseitig,
+> Up/Down einseitig) und terminiert Über-Commit mit
+> `reserve-exceeds-capacity`; 9 Domain- + 10 OR-Tools-Pins inkl.
+> FCR-symmetrischem und AFRR-Up/Down-Profiltest. Andere M4-Pakete
+> (RM-M4-01 Intraday, RM-M4-03 Aktivierungssignal, RM-M4-04..08
+> OPC-UA/MQTT) bleiben abhängigkeits-/trigger-getrieben offen.
 >
 > **M2-Welle 1 (Optimization-Slice, abgeschlossen):**
 > [`../done/plan-RM-M2-optimization.md`](../done/plan-RM-M2-optimization.md)
@@ -135,7 +148,7 @@ unter `in-progress/`.
 | ✅     | M1          | MVP — sichere Regelpipeline        | 1     | [Abgeschlossen](../done/plan-RM-M1.md) |
 | ✅     | M2          | Marktausbau und Optimierung        | 1 → 2 | Abgeschlossen ([Optimization-Slice](../done/plan-RM-M2-optimization.md), RM-M2-01..10, [Migrations-Tooling](../done/plan-RM-M2-migration.md), [HIL](../done/HIL-simulator.md)) |
 | ✅     | M3          | Native Control Core (Library)      | 2     | [`../done/plan-RM-M3.md`](../done/plan-RM-M3.md) — alle RM-M3-01..13 ✅ inkl. C-Pivot, doctest, vier Native-Quality-Gates, replay-basierter Parity, Doku-Sync und PID-Slice mit ABI-Minor-Bump 0.1→0.2; M3-D2 produktive Routing-Aktivierung ✅ ([`../done/plan-RM-M3-D2.md`](../done/plan-RM-M3-D2.md)); offene Follow-up-Slices (acht Items in zwei Blöcken) in [`../open/note-RM-M3-followups.md`](../open/note-RM-M3-followups.md) — Block A M3-Closure-Out-of-Scope, Block B M2-Folgewellen mit M3-Trigger; alle trigger-getrieben, kein aktiver Trigger heute |
-| ⬜     | M4          | Regelleistung und OPC-UA           | 2     | folgt mit Aktivierung |
+| 🟡     | M4          | Regelleistung und OPC-UA           | 2     | [`plan-RM-M4.md`](plan-RM-M4.md) — RM-M4-02 (Reservierungs-Modell + Solver-Constraints) als erste aktive Slice, andere Pakete trigger-/abhängigkeitsgetrieben offen |
 | ⬜     | M5          | MPC, Solver-Sidecar, Replay        | 3     | folgt mit Aktivierung |
 | ⬜     | M6          | Skalierung, UI, Edge / Multi-Asset | 4     | folgt mit Aktivierung |
 
@@ -309,7 +322,7 @@ bleibt Fallback und Referenz.
 | Status | ID         | Inhalt                                                              | LH-Bezug                |
 | ------ | ---------- | ------------------------------------------------------------------- | ----------------------- |
 | ⬜     | RM-M4-01   | Intraday-Reoptimierung (Resthorizont)                               | LH-MKT-002              |
-| ⬜     | RM-M4-02   | Reservierungs-Modell für Regelleistung + Solver-Constraints         | LH-MKT-004              |
+| ✅     | RM-M4-02   | Reservierungs-Modell für Regelleistung + Solver-Constraints — Domain `ReserveProduct`/`ReserveDirection`/`ReserveBand` (FCR↔Symmetric, AFRR/MFRR↔Up oder Down, halboffenes Fenster, PowerKw als Magnitude). Driven Port `IReserveRepository` + `InMemoryReserveRepository`; `ScheduleOptimizationRequest.Reserves` (Default leer ⇒ M2-Pfad bit-identisch); `DefaultScheduleOptimizationUseCase` ruft `FindActive` und reicht durch. OR-Tools deduziert per Step die Caps (Symmetric beidseitig, Up nur Discharge, Down nur Charge); Über-Commit terminiert mit `reserve-exceeds-capacity` statt LP-infeasible. 9 Domain- + 10 OR-Tools-Tests inkl. FCR-symmetrischer Profiltest, AFRR-positiv- und AFRR-negativ-Profiltest, MFRR-Modellierbarkeit. **Bewusst draußen:** LP-Strafkosten für Reserveverletzung (RM-M2-04-OPT-RESERVE-Folge), persistente Dapper-`IReserveRepository`, API für Reserve-Pflege, Penalty/Pricing — alles eigene Slices wenn realer Konsument das fordert. | LH-MKT-004              |
 | ⬜     | RM-M4-03   | Regelleistungs-Aktivierungssignal-Verarbeitung mit Priorisierung    | LH-MKT-005, LH-MKT-006  |
 | ⬜     | RM-M4-04   | OPC-UA-Adapter (Lesen, Schreiben, Subscriptions, StatusCode)        | LH-OPCUA-001..004       |
 | ⬜     | RM-M4-05   | OPC-UA-Security (Zertifikate, Security Mode/Policy)                 | LH-OPCUA-005            |

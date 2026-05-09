@@ -38,6 +38,7 @@ public sealed class ScheduleOptimizationTracingTests
         var useCase = new DefaultScheduleOptimizationUseCase(
             optimizer,
             new InMemoryScheduleRepository(),
+            new InMemoryReserveRepository(),
             new InMemoryOptimizationRunRepository(),
             NoOpOptimizationRunMetrics.Instance,
             new FakeClock(),
@@ -66,6 +67,7 @@ public sealed class ScheduleOptimizationTracingTests
         var useCase = new DefaultScheduleOptimizationUseCase(
             optimizer,
             new InMemoryScheduleRepository(),
+            new InMemoryReserveRepository(),
             new InMemoryOptimizationRunRepository(),
             NoOpOptimizationRunMetrics.Instance,
             new FakeClock(),

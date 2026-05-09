@@ -114,6 +114,28 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
         }
         var initialSocKwh = initialSocPercent / 100.0 * capacityKwh;
 
+        // RM-M4-02 LH-MKT-004: deduct held reserve bands from the
+        // per-step charge/discharge caps. Symmetric (FCR) reserves
+        // withhold magnitude in BOTH directions; Up reserves withhold
+        // only on the discharge side; Down reserves withhold only on
+        // the charge side. If reserves over-commit a step beyond the
+        // asset's nameplate the run terminates with a specific code
+        // before any LP variables are built (operator-actionable
+        // signal vs. an opaque LP-infeasible).
+        var (effChargeMax, effDischargeMax) = ComputeReserveCaps(request, n);
+        for (var t = 0; t < n; t++)
+        {
+            if (effChargeMax[t] < 0 || effDischargeMax[t] < 0)
+            {
+                return BuildFailedResult(request,
+                    terminationCode: "reserve-exceeds-capacity",
+                    terminationDetail: System.FormattableString.Invariant(
+                        $"step {t}: charge_cap={effChargeMax[t]:F3}kW, discharge_cap={effDischargeMax[t]:F3}kW"),
+                    warning: $"Held reserve at step {t} exceeds asset capacity " +
+                        $"(charge_cap={effChargeMax[t]:F3} kW, discharge_cap={effDischargeMax[t]:F3} kW).");
+            }
+        }
+
         // GLOP ships with the Google.OrTools NuGet, so CreateSolver is
         // guaranteed to succeed; if the native bindings ever go missing
         // the call throws DllNotFoundException, which the use case treats
@@ -132,8 +154,8 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
             var soc = new Variable[n + 1];
             for (var t = 0; t < n; t++)
             {
-                charge[t] = solver.MakeNumVar(0, asset.MaxChargePowerKw, $"p_charge_{t}");
-                discharge[t] = solver.MakeNumVar(0, asset.MaxDischargePowerKw, $"p_discharge_{t}");
+                charge[t] = solver.MakeNumVar(0, effChargeMax[t], $"p_charge_{t}");
+                discharge[t] = solver.MakeNumVar(0, effDischargeMax[t], $"p_discharge_{t}");
             }
             for (var t = 0; t <= n; t++)
             {
@@ -315,6 +337,65 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
     // component adds to the running totals, then SetCoefficient is called
     // exactly once per (variable, step) — OR-Tools' SetCoefficient
     // overwrites, so accumulating in arrays first keeps the contributions
+    // RM-M4-02: per-step max-charge/max-discharge caps after deducting
+    // held reserves (LH-MKT-004). A reserve covers step t if its
+    // half-open window contains the step's start instant; multiple
+    // reserves of the same Direction sum (e.g. FCR 5 kW + AFRR-Up
+    // 3 kW at the same step). Symmetric reserves withhold capacity on
+    // both sides; Up only on discharge; Down only on charge. The
+    // returned arrays may carry negative values when reserves over-
+    // commit a step — the caller surfaces that as
+    // `reserve-exceeds-capacity` rather than letting it become an
+    // LP-infeasible cap.
+    private static (double[] EffChargeMax, double[] EffDischargeMax) ComputeReserveCaps(
+        ScheduleOptimizationRequest request,
+        int n)
+    {
+        var asset = request.Asset;
+        var effChargeMax = new double[n];
+        var effDischargeMax = new double[n];
+        for (var t = 0; t < n; t++)
+        {
+            effChargeMax[t] = asset.MaxChargePowerKw;
+            effDischargeMax[t] = asset.MaxDischargePowerKw;
+        }
+
+        if (request.Reserves.Count == 0)
+        {
+            return (effChargeMax, effDischargeMax);
+        }
+
+        for (var t = 0; t < n; t++)
+        {
+            var stepStart = request.HorizonStart + TimeSpan.FromTicks(t * request.TimeStep.Ticks);
+            foreach (var band in request.Reserves)
+            {
+                if (!string.Equals(band.AssetId, asset.AssetId, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                if (!band.Covers(stepStart))
+                {
+                    continue;
+                }
+                switch (band.Direction)
+                {
+                    case ReserveDirection.Symmetric:
+                        effChargeMax[t] -= band.PowerKw;
+                        effDischargeMax[t] -= band.PowerKw;
+                        break;
+                    case ReserveDirection.Up:
+                        effDischargeMax[t] -= band.PowerKw;
+                        break;
+                    case ReserveDirection.Down:
+                        effChargeMax[t] -= band.PowerKw;
+                        break;
+                }
+            }
+        }
+        return (effChargeMax, effDischargeMax);
+    }
+
     // explicit and avoids read-modify-write against the solver state.
     private (double[] chargeCoef, double[] dischargeCoef) ComputeChargeDischargeCoefficients(
         ScheduleOptimizationRequest request,

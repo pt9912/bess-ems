@@ -332,10 +332,12 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
         IScheduleRepository schedules,
         IOptimizationRunRepository runs,
         IOptimizationRunMetrics? metrics = null,
-        IClock? clock = null)
+        IClock? clock = null,
+        IReserveRepository? reserves = null)
         => new(
             optimizer,
             schedules,
+            reserves ?? new InMemoryReserveRepository(),
             runs,
             metrics ?? NoOpOptimizationRunMetrics.Instance,
             clock ?? new FakeClock(),

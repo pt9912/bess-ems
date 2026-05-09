@@ -4,7 +4,7 @@
 **Status:** Abgeschlossen — RM-M3-FUP-02 ✅ alle Arbeitspakete (FUP-02-01..07) umgesetzt; CAS via `expectedBaseVersion` auf `IScheduleRepository.Replace` ist im Hexagon und in der Dapper-Variante aktiv, Use-Case fängt Konflikte als `Failed`-Run mit `TerminationCode = "concurrent-version-conflict"`, Tests pinnen Insert-Pfad-Konflikt, Update-Pfad-Konflikt mit Rollback, Use-Case-Materialisierung und das Wiring (Replace mit gelesenem `existing.Version`).
 **Bezug:**
 [`../open/note-RM-M3-followups.md`](../open/note-RM-M3-followups.md) Block B Item 6 (Trigger-Watch-Eintrag mit Status-Marker),
-[`../open/plan-RM-M4.md`](../open/plan-RM-M4.md) (RM-M4-01 ist der erste konkrete Konsument; verlangt Commit-Lock + CAS auf der erwarteten Schedule-Version — siehe `plan-RM-M4.md` §Aktivierungsbedingungen Z. 94 und §Arbeitspakete RM-M4-01 Z. 164),
+[`../in-progress/plan-RM-M4.md`](../in-progress/plan-RM-M4.md) (RM-M4-01 ist der erste konkrete Konsument; verlangt Commit-Lock + CAS auf der erwarteten Schedule-Version — siehe `plan-RM-M4.md` §Aktivierungsbedingungen Z. 94 und §Arbeitspakete RM-M4-01 Z. 164),
 [`plan-RM-M2-optimization.md`](plan-RM-M2-optimization.md) (RM-M2-OP-OPEN-05 als ursprüngliche Quelle, jetzt ✅),
 [`plan-RM-M3.md`](plan-RM-M3.md) (M3-Master-Plan, historischer Anker; die ursprüngliche „M2-Folgearbeit Mit M3-Trigger"-Tabelle ist heute ein Stub-Absatz mit Verweis auf die Open-Note Block B),
 [`../../../../spec/lastenheft.md`](../../../../spec/lastenheft.md) (LH-PERSIST-003 versionierte Fahrpläne, LH-OPT-009 Reproduzierbarkeit, LH-NF-005 Verfügbarkeit)

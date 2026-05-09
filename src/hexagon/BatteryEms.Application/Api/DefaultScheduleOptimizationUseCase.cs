@@ -59,6 +59,7 @@ public sealed partial class DefaultScheduleOptimizationUseCase
 
     private readonly IScheduleOptimizer _optimizer;
     private readonly IScheduleRepository _scheduleRepository;
+    private readonly IReserveRepository _reserveRepository;
     private readonly IOptimizationRunRepository _runRepository;
     private readonly IOptimizationRunMetrics _metrics;
     private readonly IClock _clock;
@@ -76,6 +77,7 @@ public sealed partial class DefaultScheduleOptimizationUseCase
     public DefaultScheduleOptimizationUseCase(
         IScheduleOptimizer optimizer,
         IScheduleRepository scheduleRepository,
+        IReserveRepository reserveRepository,
         IOptimizationRunRepository runRepository,
         IOptimizationRunMetrics metrics,
         IClock clock,
@@ -83,6 +85,7 @@ public sealed partial class DefaultScheduleOptimizationUseCase
     {
         ArgumentNullException.ThrowIfNull(optimizer);
         ArgumentNullException.ThrowIfNull(scheduleRepository);
+        ArgumentNullException.ThrowIfNull(reserveRepository);
         ArgumentNullException.ThrowIfNull(runRepository);
         ArgumentNullException.ThrowIfNull(metrics);
         ArgumentNullException.ThrowIfNull(clock);
@@ -90,6 +93,7 @@ public sealed partial class DefaultScheduleOptimizationUseCase
 
         _optimizer = optimizer;
         _scheduleRepository = scheduleRepository;
+        _reserveRepository = reserveRepository;
         _runRepository = runRepository;
         _metrics = metrics;
         _clock = clock;
@@ -175,8 +179,10 @@ public sealed partial class DefaultScheduleOptimizationUseCase
         var existing = _scheduleRepository.FindActive(command.AssetId, command.ScheduleType);
         var marketBidArea = existing?.MarketBidArea ?? DefaultMarketBidArea;
         var baseVersion = existing?.Version ?? 0;
+        var reserves = _reserveRepository.FindActive(
+            command.AssetId, command.HorizonStart, command.HorizonEnd);
 
-        var request = new ScheduleOptimizationRequest(command, marketBidArea, baseVersion);
+        var request = new ScheduleOptimizationRequest(command, marketBidArea, baseVersion, reserves);
 
         var result = await _optimizer.OptimizeAsync(request, cancellationToken).ConfigureAwait(false);
 

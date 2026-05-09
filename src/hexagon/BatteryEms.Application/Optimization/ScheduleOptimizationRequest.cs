@@ -35,10 +35,16 @@ public sealed class ScheduleOptimizationRequest
     public string MarketBidArea { get; }
     public int BaseScheduleVersion { get; }
 
+    // RM-M4-02 LH-MKT-004: held reserve bands the optimiser must honour
+    // by deducting capacity per overlapping horizon step. Empty when no
+    // reserves are held; that path is bit-identical to the M2 optimiser.
+    public IReadOnlyList<ReserveBand> Reserves { get; }
+
     public ScheduleOptimizationRequest(
         ScheduleOptimizationCommand command,
         string marketBidArea,
-        int baseScheduleVersion)
+        int baseScheduleVersion,
+        IReadOnlyList<ReserveBand>? reserves = null)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentException.ThrowIfNullOrWhiteSpace(marketBidArea);
@@ -52,6 +58,7 @@ public sealed class ScheduleOptimizationRequest
         Command = command;
         MarketBidArea = marketBidArea;
         BaseScheduleVersion = baseScheduleVersion;
+        Reserves = reserves ?? Array.Empty<ReserveBand>();
     }
 
     // Forwarders for the existing optimiser access surface — adding a
