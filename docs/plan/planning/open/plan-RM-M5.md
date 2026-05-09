@@ -48,9 +48,9 @@ Multi-Asset-Bedienung.
 
 **In Scope:**
 
-- gRPC-Vertrag fuer `optimization-core` mit Health, Version,
-  Optimierungsrequest, Cancellation/Deadline und strukturierten
-  Fehler-/Solverstatus-Rueckgaben.
+- Transportneutraler Sidecar-Vertrag fuer `optimization-core` mit Health,
+  Version, Optimierungsrequest, Cancellation/Deadline,
+  Request-Idempotenz und strukturierten Fehler-/Solverstatus-Rueckgaben.
 - Driven Adapter im .NET-Host, der das Sidecar hinter bestehenden
   Optimierungsports integriert und Solver-Auswahl per Konfiguration
   erlaubt.
@@ -95,19 +95,20 @@ dass der erste Sidecar-/Replay-Slice fachlich unabhaengig von offenen
 M4-Teilen ist. Vor dem ersten produktionsnahen Sidecar-PR muessen die
 M2/M3-Basisgates auf `main` gruen sein und ADR 0004 fuer den konkreten
 M5-Sidecar-Schnitt entweder bestaetigt oder ergaenzt werden. Das
-Architektur-Open-Item `AR-OPEN-002` ist fuer M5 blockierend: gRPC darf
-erst implementiert werden, wenn ADR 0004 oder `spec/architecture.md` die
-finale Transportentscheidung fuer externe Optimierungs-Sidecars festhaelt.
+Architektur-Open-Item `AR-OPEN-002` ist fuer M5 blockierend: Ein
+konkreter Transport darf erst implementiert werden, wenn ADR 0004 oder
+`spec/architecture.md` die finale Transportentscheidung fuer externe
+Optimierungs-Sidecars festhaelt.
 
 | Check | Erwartung |
 | ----- | --------- |
 | M2-Optimierung | `IScheduleOptimizer`, `OptimizationRun`, Solverstatus und Persistenz sind stabil; Sidecar-Integration ersetzt keinen Domain-Vertrag. |
 | M3-Native | In-Process Native bleibt fuer kleine Control-Kerne verfuegbar; M5 fuehrt Sidecar nur fuer MPC/Solver-grosse Kerne ein. |
 | M4-Schnitt | Falls Regelleistungs-Reserve-Constraints Teil des MPC-/MILP-Modells werden, muss das M4-Reservemodell abgeschlossen oder als explizite Planannahme dokumentiert sein. |
-| ADR-Status | ADR 0004 wird fuer gRPC-Sidecar, Supervisor-/Health-Verhalten, Fallback-Policy und Container-Topologie revalidiert. |
+| ADR-Status | ADR 0004 wird fuer Sidecar-Transport, Supervisor-/Health-Verhalten, Fallback-Policy und Container-Topologie revalidiert. |
 | Transportentscheidung | `AR-OPEN-002` ist geschlossen; ADR 0004 oder Architektur §13 nennt den finalen Transport (`gRPC` oder Alternative), Security-/Mocking-/CI-Konsequenzen und den Link zur Entscheidung. |
 | Replay-Baseline | Bestehende M2/M3-Replay-Datensaetze sind referenzierbar; neue Datensaetze bekommen Manifest, Version und Vergleichsregeln. |
-| Toolchain | Protobuf/gRPC-Codegen, Sidecar-Build und Container-Build sind reproduzierbar in Docker/CI. |
+| Toolchain | Transport-Codegen falls noetig, Sidecar-Build und Container-Build sind reproduzierbar in Docker/CI. |
 | Fallback | Fuer jeden Sidecar-Aufruf ist vor Aktivierung dokumentiert, welcher lokale Fallback benutzt wird und welche Semantik dadurch verloren geht. |
 
 ---
@@ -123,6 +124,24 @@ finale Transportentscheidung fuer externe Optimierungs-Sidecars festhaelt.
 | Kalman-/State-Space-Schaetzung | Schaetzer liefert finite, plausible Zustandswerte und markiert unbrauchbare Eingaben als ungueltig. | Numerischer Kerneltest mit Rausch-/Missing-Measurement-Faellen. |
 | Replay-Datensatzvergleich | Derselbe Datensatz kann gegen mehrere Engines laufen und erzeugt reproduzierbare Commands/Sollwerte oder eine erklaerte Drift. | Replay-CLI-/Testtarget mit Manifest, Golden-Datei und Diff-Report. |
 | Erweiterte Metriken | Solverstatus, Sidecar-Health, Laufzeit, Deadline/Timeout, Fallback und Command-Latenz sind im Prometheus-Pfad sichtbar. | Metrics-Test mit erfolgreichem Lauf, Timeout und Fallback. |
+
+---
+
+## Request-Idempotenz Und Retry
+
+Jeder Sidecar-Aufruf traegt eine eindeutige `request_id` und eine
+fachliche Idempotency-Key-Kombination aus `asset_id`, Schedule-Type,
+Horizon, Input-Versionen, Constraint-/Limit-Version und Engine-Version.
+`run_id` darf daraus abgeleitet oder separat vergeben werden, muss aber
+eindeutig mit `request_id` korrelierbar bleiben.
+
+| Thema | Regel |
+| ----- | ----- |
+| Deduplizierung | Wiederholte Requests mit gleicher `request_id` duerfen hoechstens einen `OptimizationRun` und hoechstens eine Schedule-Version erzeugen. |
+| Retry-Grenze | Automatische Retries sind nur fuer Transportfehler erlaubt, bei denen keine Sidecar-Annahme nachweisbar ist. Sie verwenden dieselbe `request_id`; neue `request_id` bedeutet neuer Lauf und braucht neuen Run-Kontext. |
+| Timeout danach Antwort | Wenn ein spaeter Sidecar-Response fuer eine bereits als Timeout behandelte `request_id` ankommt, darf er keinen neuen Plan aktivieren. Er darf nur als late/duplicate observiert werden. |
+| Replay | Replay-Datensaetze speichern `request_id` oder eine deterministische Ableitungsregel, damit Retry-/Duplicate-Faelle reproduzierbar sind. |
+| Observability | Logs, `OptimizationRun`, Metriken und Container-Orchestrierungstests enthalten `request_id`, `run_id` und `fallback_reason`. |
 
 ---
 
@@ -170,23 +189,26 @@ nicht ein stiller Optimierungs-Fallback.
 
 ## Sidecar-Status-Taxonomie
 
-RM-M5-01 muss den gRPC-/Sidecar-Status vor produktivem Code als
-versionierten Contract festlegen. Die .NET-Seite darf nur diese Tabelle in
-`OptimizationRun.Status`, `TerminationReason` und Metrik-Tags mappen.
+RM-M5-01 muss den transportneutralen Sidecar-Status vor produktivem Code
+als versionierten Contract festlegen. Der gewaehlte Transport mappt seine
+konkreten Statuscodes, zum Beispiel gRPC-Codes oder HTTP-Status, zuerst
+auf diese normierten Transport-Outcomes. Die .NET-Seite darf nur diese
+Tabelle in `OptimizationRun.Status`, `TerminationReason` und Metrik-Tags
+mappen.
 
-| Sidecar-/Transportstatus | Solverstatus aus Sidecar | M2 `OptimizationSolverStatus` | Metric Tags / Reason | Fallback |
-| ------------------------ | ------------------------ | ----------------------------- | -------------------- | -------- |
-| `OK` | `optimal` | `Optimal` | `status=optimal`, `fallback=none` | Ergebnis uebernehmen. |
-| `OK` | `feasible` | `Feasible` | `status=feasible`, `fallback=none` | Ergebnis uebernehmen, Qualitaetsinfo persistieren. |
-| `OK` | `infeasible` | `Infeasible` | `status=infeasible`, `fallback=last_valid_or_safe_stop` | Keine neue Version; Fallback-Matrix. |
-| `OK` | `unbounded` | `Unbounded` | `status=unbounded`, `fallback=last_valid_or_safe_stop` | Keine neue Version; Fallback-Matrix. |
-| `OK` | `time_limit` | `TimeLimit` | `status=time_limit`, `fallback=last_valid_or_safe_stop` | Nur uebernehmen, wenn Sidecar zugleich nutzbare `feasible`-Loesung markiert; sonst Fallback-Matrix. |
-| `OK` | `iteration_limit` | `IterationLimit` | `status=iteration_limit`, `fallback=last_valid_or_safe_stop` | Nur uebernehmen, wenn Sidecar zugleich nutzbare `feasible`-Loesung markiert; sonst Fallback-Matrix. |
-| `DEADLINE_EXCEEDED` | kein Ergebnis | `TimeLimit` | `status=time_limit`, `transport=deadline_exceeded`, `fallback=local_optimizer_or_safe_stop` | Fallback-Matrix Timeout/Deadline. |
-| `UNAVAILABLE` | kein Ergebnis | `Failed` | `status=failed`, `transport=unavailable`, `fallback=local_optimizer_or_safe_stop` | Fallback-Matrix Unavailable. |
-| `CANCELLED` durch Caller | kein Ergebnis | `Failed` | `status=failed`, `transport=cancelled`, `fallback=cancelled` | Kein Retry; Run bleibt fehlgeschlagen oder wird gar nicht erzeugt, je nach Use-Case-Abbruchpunkt. |
-| `INVALID_ARGUMENT` / Schemafehler | kein Ergebnis | `Failed` | `status=failed`, `transport=invalid_argument`, `fallback=safe_stop_if_no_valid_plan` | Ergebnis verwerfen; kein lokaler Optimierer mit denselben ungueltigen Eingaben. |
-| `INTERNAL` / Crash / Decode-Fehler / unbekannter Status | kein Ergebnis | `Failed` | `status=failed`, `transport=internal`, `fallback=last_valid_or_safe_stop` | Fallback-Matrix Crash/Transportabbruch. |
+| Normierter Transportstatus | Solverstatus aus Sidecar | M2 `OptimizationSolverStatus` | Metric Tags / Reason | Fallback |
+| -------------------------- | ------------------------ | ----------------------------- | -------------------- | -------- |
+| `success` | `optimal` | `Optimal` | `status=optimal`, `transport=success`, `fallback=none` | Ergebnis uebernehmen. |
+| `success` | `feasible` | `Feasible` | `status=feasible`, `transport=success`, `fallback=none` | Ergebnis uebernehmen, Qualitaetsinfo persistieren. |
+| `success` | `infeasible` | `Infeasible` | `status=infeasible`, `transport=success`, `fallback=last_valid_or_safe_stop` | Keine neue Version; Fallback-Matrix. |
+| `success` | `unbounded` | `Unbounded` | `status=unbounded`, `transport=success`, `fallback=last_valid_or_safe_stop` | Keine neue Version; Fallback-Matrix. |
+| `success` | `time_limit` | `TimeLimit` | `status=time_limit`, `transport=success`, `fallback=last_valid_or_safe_stop` | Nur uebernehmen, wenn Sidecar zugleich nutzbare `feasible`-Loesung markiert; sonst Fallback-Matrix. |
+| `success` | `iteration_limit` | `IterationLimit` | `status=iteration_limit`, `transport=success`, `fallback=last_valid_or_safe_stop` | Nur uebernehmen, wenn Sidecar zugleich nutzbare `feasible`-Loesung markiert; sonst Fallback-Matrix. |
+| `deadline_exceeded` | kein Ergebnis | `TimeLimit` | `status=time_limit`, `transport=deadline_exceeded`, `fallback=local_optimizer_or_safe_stop` | Fallback-Matrix Timeout/Deadline. |
+| `unavailable` | kein Ergebnis | `Failed` | `status=failed`, `transport=unavailable`, `fallback=local_optimizer_or_safe_stop` | Fallback-Matrix Unavailable. |
+| `cancelled` durch Caller | kein Ergebnis | `Failed` | `status=failed`, `transport=cancelled`, `fallback=last_valid_or_safe_stop` | Kein Retry; danach derselbe frische-Plan-oder-Safe-Stop-Fallback wie bei Transportabbruch. |
+| `invalid_request` / Schemafehler | kein Ergebnis | `Failed` | `status=failed`, `transport=invalid_request`, `fallback=safe_stop_if_no_valid_plan` | Ergebnis verwerfen; kein lokaler Optimierer mit denselben ungueltigen Eingaben. |
+| `internal_error` / Crash / Decode-Fehler / unbekannter Status | kein Ergebnis | `Failed` | `status=failed`, `transport=internal_error`, `fallback=last_valid_or_safe_stop` | Fallback-Matrix Crash/Transportabbruch. |
 
 Die Metrik-Statuslabels bleiben snake_case-kompatibel zu M2
 (`optimal`, `feasible`, `infeasible`, `unbounded`, `time_limit`,
@@ -203,7 +225,8 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
 
 | Thema | Vorgabe |
 | ----- | ------- |
-| Formatversion | Neue Datensaetze starten mit Manifest `replay-manifest.v1`; jedes Fixture nennt Schema-Version, Engine-Ziele, Toleranzen, Zeitbasis und Golden-Artefakte. |
+| Formatversion | Neue Datensaetze starten mit Manifest `replay-manifest.v1`; jedes Fixture nennt Schema-Version, Engine-Ziele, Toleranzen, Zeitbasis, deterministische `request_id`-Ableitung und Golden-Artefakte. |
+| Determinismus | Jedes Manifest dokumentiert `seed`, `solver_deterministic_mode`, Solver-/Runtime-/Numerik-Versionen, Time-Step, Rundungsmodus und aktivierte Solver-Optionen. Zufalls- oder Rauschmodelle duerfen nur ueber Manifest-Seed laufen. |
 | Bestehende M2-Fixtures | Der M2-Telemetrie-Replay-Shape bleibt ueber einen Kompatibilitaets-Loader lauffaehig. Migration darf in kleinen Folge-PRs erfolgen; der Kompatibilitaets-Loader darf erst entfernt werden, wenn ein migriertes Manifest dieselben fachlichen Faelle abdeckt und mindestens ein CI-Lauf beide Pfade verglichen hat. |
 | Bestehende M3-Fixtures | Native-Parity-Cases bleiben als Referenzdatensatz erhalten; M5 darf sie referenzieren oder maschinell nach Manifest v1 spiegeln, aber nicht ohne Ersatz loeschen. |
 | Migration | Falls ein Fixture-Format gebrochen wird, muss RM-M5-04 ein Migrationstool oder eine dokumentierte Fixture-Konvertierung mit Golden-Diff-Nachweis liefern. Die bestehende M2/M3-Fallliste ist dabei zu 100 % zu inventarisieren; jedes entfernte Fixture braucht ein gemapptes Manifest-v1-Aequivalent oder eine begruendete Planentscheidung. |
@@ -216,7 +239,7 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
 
 | Bereich | Artefakt | LH-Bezug |
 | ------- | -------- | -------- |
-| Contract | `optimization-core` Protobuf/gRPC-Vertrag fuer Optimize, MPC, Health, Version und Cancellation | LH-OPT-006 |
+| Contract | `optimization-core` Sidecar-Vertrag fuer Optimize, MPC, Health, Version, Cancellation und Request-Idempotenz | LH-OPT-006 |
 | Adapter | .NET Driven Adapter fuer Sidecar-Aufrufe hinter bestehenden Optimierungsports | LH-OPT-002/006 |
 | Native/Sidecar | `optimization_core` Service mit Solver-/MPC-Backend-Wahl | LH-OPT-002/003/006 |
 | Native/Kernel | `state_space_core` oder Sidecar-interner MPC-Kernel mit State-Space/Kalman/Horizon | LH-CTRL-005/006 |
@@ -232,10 +255,10 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
 
 | Status | ID | Paket | DoD |
 | ------ | -- | ----- | --- |
-| ⬜ | RM-M5-01 | gRPC-Sidecar `optimization-core` (LP/MILP/MPC) | Transportentscheidung fuer `AR-OPEN-002` ist abgeschlossen; Protobuf-Vertrag ist versioniert; .NET-Adapter ruft Sidecar mit Deadline/Cancellation auf; Health/Version sind testbar; Sidecar-Status-Taxonomie mappt gRPC-Status + Solverstatus exakt auf M2-`OptimizationRun`, `TerminationReason` und Metric-Tags; alle Fehlerklassen aus der Fallback-Matrix und alle Plan-Gueltigkeits-Invalidierungen sind getestet. |
-| ⬜ | RM-M5-02 | MPC-Kernel (State-Space, Kalman, Vorhersagehorizont) | Kernel berechnet finite Trajektorien aus State-Space-Modell und Horizon; Kalman-/Schaetzerpfad behandelt Rauschen, Missing Measurements und unplausible Werte; Tests beweisen SOC-, Leistungs-, Ramp- und Constraint-Einhaltung. |
+| ⬜ | RM-M5-01 | Sidecar `optimization-core` (LP/MILP/MPC) | Transportentscheidung fuer `AR-OPEN-002` ist abgeschlossen; Sidecar-Vertrag ist versioniert; .NET-Adapter ruft Sidecar mit Deadline/Cancellation und `request_id` auf; Health/Version sind testbar; Sidecar-Status-Taxonomie mappt normierten Transportstatus + Solverstatus exakt auf M2-`OptimizationRun`, `TerminationReason` und Metric-Tags; Retry-/Duplicate-Faelle sind idempotent; alle Fehlerklassen aus der Fallback-Matrix und alle Plan-Gueltigkeits-Invalidierungen sind getestet. |
+| ⬜ | RM-M5-02 | MPC-Kernel (State-Space, Kalman, Vorhersagehorizont) | Kernel berechnet finite Trajektorien aus State-Space-Modell und Horizon; Kalman-/Schaetzerpfad behandelt Rauschen, Missing Measurements und unplausible Werte; Tests beweisen SOC-, Leistungs-, Ramp- und Constraint-Einhaltung; Fixture-Laeufe sind ueber Seed, Solver-Optionen und Runtime-/Numerik-Version reproduzierbar. |
 | ⬜ | RM-M5-03 | Hochfrequente Telemetrie-Filterung im Native Core (optional) | Aktivierung nur bei konkretem Bedarf aus RM-M5-02; Filtervertrag dokumentiert Samplingrate, Einheiten und Fehlerverhalten; .NET-Prechecks bleiben erhalten; Replay-/Numeriktests decken Drift und ungueltige Eingaben ab; invalider Filter-/MPC-State folgt der Fallback-Matrix. |
-| ⬜ | RM-M5-04 | Replay-Plattform mit Datensatz-Verwaltung und Sollwertvergleich | Versioniertes Manifest fuer Datensaetze; Loader fuer externe JSON-Fixtures; bestehende M2/M3-Fixtures bleiben ueber Kompatibilitaets-Loader lauffaehig, bis 100 % der Pflichtfallliste in kleinen Folge-PRs mit Golden-Diff-Nachweis migriert sind; Runner vergleicht Commands/Sollwerte gegen Golden-Dateien und mehrere Engines; Diff-Report trennt erlaubte numerische Toleranz von fachlicher Drift. |
+| ⬜ | RM-M5-04 | Replay-Plattform mit Datensatz-Verwaltung und Sollwertvergleich | Versioniertes Manifest fuer Datensaetze; Loader fuer externe JSON-Fixtures; bestehende M2/M3-Fixtures bleiben ueber Kompatibilitaets-Loader lauffaehig, bis 100 % der Pflichtfallliste in kleinen Folge-PRs mit Golden-Diff-Nachweis migriert sind; Manifest enthaelt Seed, Determinismusmodus, Runtime-/Numerik-Versionen, Solver-Optionen, `request_id`-Regel und Toleranzen; Runner vergleicht Commands/Sollwerte gegen Golden-Dateien und mehrere Engines; Diff-Report trennt erlaubte numerische Toleranz von fachlicher Drift. |
 | ⬜ | RM-M5-05 | Erweiterte Metriken / Solverstatus / Command-Latenz | Prometheus-Metriken decken Solverstatus, Laufzeit, Deadline/Timeout, Fallback-Reason, `safe_stop`, `no_valid_plan`, Sidecar-Health und Command-Latenz ab; Tests scrapen erfolgreiche und fehlerhafte Pfade. |
 | ⬜ | RM-M5-06 | Container-Orchestrierungstests (Worker + Sidecar) | Compose-/CI-Gate startet Worker und Sidecar, prueft Health, erfolgreichen Optimierungslauf, Sidecar-Crash, Restart und Fallback; Container-Logs enthalten korrelierbare RunId/RequestId. |
 
@@ -248,7 +271,7 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
    CI-Konsequenzen enthalten, bevor ein produktionsnaher Sidecar-Pfad
    gemerged wird.
 2. RM-M5-01 zuerst als schmalen Contract-Slice bauen: Health, Version,
-   Test-Sidecar, Deadline, Fallback und Status-Mapping.
+   Test-Sidecar, Deadline, Idempotenz, Fallback und Status-Mapping.
 3. RM-M5-05 parallel zum ersten Sidecar-Slice aktivieren, damit
    Sidecar-Fehler, Deadlines und Fallbacks nicht nachtraeglich
    observierbar gemacht werden muessen.
@@ -279,15 +302,21 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
   Maximalalter, Version, Asset-/Constraint-Kontext und Telemetrie-Drift
   die Plan-Gueltigkeitsregeln erfuellen.
 - Optimierer bleiben ueber bestehende Ports austauschbar; Application und
-  Domain referenzieren keinen konkreten Solver und keinen gRPC-Client.
+  Domain referenzieren keinen konkreten Solver und keinen transport- oder
+  solver-spezifischen Client.
 - Solverstatus, RunId, Horizon, Objective-/Qualitaetsinformationen und
-  Fehlergrund bleiben mit dem M2-Optimierungsmodell kompatibel; gRPC- und
-  Sidecar-Status werden ausschliesslich ueber die Sidecar-Status-Taxonomie
-  gemappt.
+  Fehlergrund bleiben mit dem M2-Optimierungsmodell kompatibel;
+  Transport- und Sidecar-Status werden ausschliesslich ueber die
+  Sidecar-Status-Taxonomie gemappt.
+- Wiederholte Sidecar-Calls sind ueber `request_id` idempotent; Duplicate-
+  oder Late-Responses duerfen keinen zweiten Run und keine zweite
+  Schedule-Version erzeugen.
 - Replay-Datensaetze sind versioniert, reproduzierbar und koennen
   Sollwerte/Commands zwischen Managed-, Native- und Sidecar-Pfaden
   vergleichen; bestehende M2/M3-Pflichtfaelle bleiben bis zu einer
-  vollstaendigen, toleranzgeprueften Migration lauffaehig.
+  vollstaendigen, toleranzgeprueften Migration lauffaehig. MPC-/Replay-
+  Fixtures dokumentieren Seed, Determinismusmodus, Runtime-/Numerik-
+  Versionen und Solver-Optionen.
 - Container-Gates pruefen Worker + Sidecar inklusive Health,
   Orchestrierung, Crash/Restart und Fallback.
 - Metriken fuer Solverstatus, Laufzeit, Deadline/Timeout,
@@ -300,12 +329,12 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
 
 ## Risiken und Entscheidungen
 
-- **gRPC-Vertrag vs. Architektur-Drift.** Architektur §13 und ADR 0004
-  sehen gRPC fuer Phase-3-Sidecars vor, aber das Architektur-Open-Item
-  `AR-OPEN-002` in `spec/architecture.md` fuehrt gRPC vs. REST-only fuer
-  externe Optimierungs-Sidecars noch als offen. M5 muss diese
-  Architekturfrage vor produktivem Code per ADR-Update oder
-  Architektur-Sync schliessen.
+- **Transportvertrag vs. Architektur-Drift.** Architektur §13 und ADR
+  0004 nennen gRPC als Phase-3-Kandidat, aber `AR-OPEN-002` in
+  `spec/architecture.md` fuehrt gRPC vs. REST-only fuer externe
+  Optimierungs-Sidecars noch als offen. Bis zur Entscheidung bleibt der
+  Plan transportneutral; M5 muss die Architekturfrage vor produktivem Code
+  per ADR-Update oder Architektur-Sync schliessen.
 - **Fallback-Semantik.** Ein Sidecar-Fallback kann Optimierungsqualitaet
   verlieren. Die Fallback-Matrix ist der verbindliche Default; jede
   Abweichung braucht Plan-/ADR-Update, weil NoOp, bestehender LP-Adapter,
@@ -315,6 +344,10 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
   Rundungsabweichungen erzeugen. Replay-Toleranzen muessen eng,
   einheitenbezogen und fachlich begruendet sein; Safety-Invarianten haben
   keine Toleranzverletzung.
+- **Nichtdeterministische Solver-/MPC-Laeufe.** Rauschen, Random Seeds,
+  Solver-Heuristiken oder unterschiedliche numerische Runtime-Versionen
+  koennen Golden-Diffs instabil machen. RM-M5-02/RM-M5-04 muessen
+  Determinismus explizit konfigurieren und im Manifest dokumentieren.
 - **Stateful MPC.** Ein MPC-Kern mit internem Zustand ist ein anderer
   Vertrag als die M3-Value-Step-Funktionen. Reset, Snapshot-Isolation,
   Asset-Bezug und Replay-Reproduzierbarkeit muessen getestet werden.
