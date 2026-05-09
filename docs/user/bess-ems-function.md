@@ -116,9 +116,100 @@ flowchart LR
   PCS --> Grid
 ```
 
+## 3. Architekturvergleich und Referenz
+
+### 3.1 Beispiel für EMS-Software: [OpenEMS](https://github.com/OpenEMS/openems)
+
+- **OpenEMS** (Open Source): Modularer Stack mit **Edge**, **Backend** und
+  **UI**, der auf Gerätemodelle, Zeitreihenbetrieb und Steuerlogik setzt.
+- Typisch passend für das hier beschriebene EMS-Konzept, weil das Projekt
+  ausdrücklich ein Energy Management System für Speicher, Last- und
+  Erzeugungsintegration beschreibt.
+- Die Architektur ist stark auf
+  integrationsnahe Anbindung ausgelegt (z. B. Gateway-/Bridge-Module
+  wie Modbus, MQTT, REST), und mehrere Batterie-/Inverter-Treiber sind
+  als fertige Komponenten im Repository angelegt.
+- Lizenz- und Betriebsmodell: Open Source (u. a. **AGPL-3.0 / EPL-2.0**),
+  dadurch hoher Integrations- und Erweiterungsgrad, aber mit
+  entsprechenden Produkt-/Compliance-Anforderungen an eigene Deployments.
+- Für ISV/Hersteller und proprietäre Produktisierung ist der **MIT-Ansatz von bess-ems** in der Regel die passendere Wahl, da er weniger Lizenzrestriktionen für eigene Betriebslogik und IP-Vermarktung mit sich bringt.
+
+### 3.2 OpenEMS vs. bess-ems (M1-Stand)
+
+  | Bereich                       | OpenEMS (openems)                                                                                                                           | bess-ems                                                                                                                                                      |
+  | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | Ausrichtung                   | „IoT-Stack“ für Site-level EMS mit Edge + Backend + UI; starke Geräte-/Asset-Abstraktion und Controller-Ökosystem.                          | Speziell auf BESS fokussiert, mit expliziter Architektur für Marktlogik, Regelung, Optimierung und Sicherheitsfallbacks.                                      |
+  | Kerntechnologie               | Java + OSGi/Bündel, modulare Bundle-Architektur.                                                                                            | C#/.NET 10, optionale C/C++-Native-Kerne (P/Invoke), Docker-first.                                                                                            |
+  | Architekturprinzip            | Input-Process-Output-Zyklus, Prozessbild-Konsistenz (Process Image), Scheduler + Controller.                                                | Getrennter Regelkreispfad mit Optimierung -> State-Machine/Limiter -> Command, hexagonal/dreischichtig dokumentiert, klarer Safety-First-Flow.                |
+  | Marktfunktionalität           | Schwerpunkt auf flexiblem EMS-/Gerätemanagement; Dokumentation hebt breite Device-/Protokollunterstützung und PLC-ähnliche Regelung hervor. | Spezifisch auf Day-Ahead/Intraday/Regelleistung ausgelegt mit Marktpriorisierung sowie Constraint-Hierarchie laut Lastenheft.                                 |
+  | Sicherheit & Fallback         | Fokussiert auf deterministische Komponentenlogik, mit möglicher OSGi-bedingter Asynchronität/Latenz.                                        | Explizit priorisierte Sicherheitskette (Emergency Stop, Datengüte, Datenalter, sichere Defaults), inkl. definiertem Fallback bei ungültigem Snapshot.         |
+  | Geräte-/Kommunikationsschicht | Sehr starke „Device as Component“-Abstraktion; breite Anbindung über Bridges/Controller-Konzept (u. a. Modbus/TCP in Beispielen).           | Konkrete Adapterwege für Modbus TCP, MQTT (MVP), OPC-UA als nächster Ausbauschritt; einheitliche Adapter-Ports und interne Modelle.                           |
+  | Beobachtbarkeit               | UI + Backend für Echtzeitansicht, Historie und Aggregation vorhanden.                                                                       | API-first mit Health/Status/Command/Fahrplan, persistenter Historie und Audit-Events; Monitoring (Métriken/OTel) als geplante/teilweise umgesetzte Ergänzung. |
+  | Reifegrad                     | Sehr reifer Bestand (viele Releases, breite Community/Instanzen).                                                                           | Aktuell M1, Kernlogik/Tests vorhanden, aber nicht „full production“ (laut eigenem Repo).                                                                      |
+  | Lizenz                        | OpenEMS-Edge: EPL-2.0, OpenEMS-UI: AGPL-3.0.                                                                                                | MIT.                                                                                                                                                          |
+
+Die OpenEMS-Lizenzangaben gelten je Modul; bei produktiven Installationen sollte die genaue Lizenz je eingesetzter Komponente verifiziert werden.
+
+#### Fazit
+
+- bess-ems gewinnt, wenn ihr schnell einen marktgetriebenen, BESS-zentrierten Kontrollpfad mit expliziter Safety-Priorisierung und klarer Trennung von Markt- vs. Echtzeitlogik braucht.
+- OpenEMS gewinnt, wenn ihr lieber ein etabliertes, vollständiges Ökosystem mit Edge/Backend/UI und breitem Geräte-Controller-Portfolio sofort nutzen wollt, inkl. Community-Wartung.
+- Kurzregel: Wenn maximale Freiheit für Produktisierung, proprietäre Erweiterungen und IP-Schließung entscheidend sind, passt **bess-ems (MIT)** besonders gut.
+
+### 3.3 1:1-Mapping (OpenEMS ↔ bess-ems)
+
+```mermaid
+flowchart LR
+  subgraph Laufzeit
+    A["OpenEMS Edge"] --> B["bess-ems Worker + Worker-Loop"]
+  end
+
+  subgraph Bedienung
+    C["OpenEMS UI"] --> D["bess-ems Operator-API"]
+    D --> E["UI-Integration (geplant)"]
+  end
+
+  subgraph Management
+    F["OpenEMS Backend"] --> G["kein dediziertes bess-ems Backend (M1)"]
+  end
+```
+
+```mermaid
+flowchart LR
+  subgraph Steuerlogik
+    A["OpenEMS Component / Nature / Channel"] --> B["Domain-Modelle + Capabilities"]
+    C["OpenEMS Process Image"] --> D["Snapshot-Store + Datenqualitätsmodell"]
+    E["OpenEMS Scheduler + Controller"] --> F["State-Machine + Prioritätenkette"]
+  end
+```
+
+```mermaid
+flowchart LR
+  subgraph Anbindung und Plattform
+    A["OpenEMS Bridges"] --> B["Treiber-Adapter: Modbus, MQTT, OPC-UA (geplant)"]
+    C["OpenEMS Config Admin / JSON-RPC"] --> D["Ports + JSON-Schemas"]
+    E["OpenEMS Bundle-Lifecycle"] --> F[".NET-Module + DI-Composition"]
+    G["OpenEMS Device-Ökosystem"] --> H["BESS-zentrierte Logik + späterer Native-Kern"]
+  end
+```
+
+| OpenEMS-Baustein         | bess-ems-Mapping                                   | Aktueller Stand                                           |
+| ------------------------ | -------------------------------------------------- | --------------------------------------------------------- |
+| Edge                     | Worker + Worker-Loop / Realtime-Orchestrierung     | Entspricht dem regelungsnahen Kern am Standort            |
+| UI                       | Operator-API (MVP), UI-Integration geplant         | OpenEMS hat bereits ein produktives Echtzeit-Frontend     |
+| Backend                  | Kein dediziertes Backend-Modul (M1)                | Aggregation/Multi-Standort liegt noch aus                 |
+| Component/Nature/Channel | Domain-Modelle + Capabilities                      | Gute Entsprechung inkl. Vorzeichenkonvention              |
+| Process Image            | Snapshot-Store + Datenqualitätsmodell              | Explizit auf Datengüte und sichere Defaults ausgelegt     |
+| Scheduler + Controller   | State-Machine + Prioritätenkette + Limiter-Routing | Unterschiedlicher Schichtaufbau, klarer Safety-First-Flow |
+| Bridges                  | Treiber-Adapter (Modbus, MQTT; OPC-UA geplant)     | Adapter-/Port-Trennung bereits klar strukturiert          |
+| Konfiguration            | Konfigurationsgetriebene Ports + JSON-Schemas      | Aktuell stärker Datei/Code-zentriert als UI-zentriert     |
+| Lifecycle                | .NET + DI-Composition (Hexagonaler Ansatz)         | Modularität gegeben, aber andere Plattform                |
+| Device-/ESS-Ökosystem    | BESS-zentrierte Logik + späterer Native-Kern       | Fokussiert auf BESS und Marktpfade                        |
+
+
 ---
 
-## 3. Entscheidungen
+## 4. Entscheidungen
 
 Das EMS entscheidet nicht nur, **ob** geladen oder entladen wird, sondern
 auch **wie stark**, **wie lange** und **unter welchen Grenzen**.
@@ -157,7 +248,7 @@ Zielwert = wirtschaftliches / netzdienliches Ziel
 
 ---
 
-## 4. Ausgaben
+## 5. Ausgaben
 
 Das Ergebnis des EMS ist ein begrenzter Dispatch an die nachgelagerten
 technischen Systeme. Das BMS liefert dafür Schutzgrenzen, Freigaben und
@@ -186,7 +277,7 @@ dieselbe Konvention verwenden.
 
 ---
 
-## 5. Typische Betriebsarten
+## 6. Typische Betriebsarten
 
 | Betriebsart                | Ziel                                                        |
 | -------------------------- | ----------------------------------------------------------- |
@@ -200,7 +291,7 @@ dieselbe Konvention verwenden.
 
 ---
 
-## 6. Sicherheitsprinzip
+## 7. Sicherheitsprinzip
 
 Das EMS optimiert den Betrieb, ersetzt aber keine Schutzfunktionen. BMS,
 PCS und Schutztechnik behalten ihre eigenen harten Grenzen. Das EMS muss
@@ -219,7 +310,7 @@ Praktisch bedeutet das:
 - Nachvollziehbare Command- und Audit-Historie.
 - Definiertes Verhalten bei Kommunikations- oder Datenqualitätsfehlern.
 
-## 6.1 Notfall- und Wiederanlaufablauf (vereinfacht)
+## 7.1 Notfall- und Wiederanlaufablauf (vereinfacht)
 
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'background':'#f8fafc','primaryColor':'#dbeafe','primaryTextColor':'#0f172a','primaryBorderColor':'#1e40af','lineColor':'#8f872a','secondaryColor':'#fef3c7','tertiaryColor':'#dcfce7','noteBkgColor':'#fef3c7','noteTextColor':'#0f172a','noteBorderColor':'#a16207','actorBkg':'#dbeafe','actorBorder':'#1e40af','actorTextColor':'#0f172a','actorLineColor':'#475569','signalColor':'#0f172a','signalTextColor':'#0f172a','sequenceNumberColor':'#ffffff','labelTextColor':'#0f172a','loopTextColor':'#0f172a','edgeLabelBackground':'#f8fafc'}}}%%
@@ -235,19 +326,19 @@ flowchart TD
   H --> I[Wiederanlauf mit Rampenlimit]
   I --> B
   G -- nein --> E
-  D -->|Timeout| B
+  D -->|Timeout| F
 ```
 
-## 6.2 Typische Auslöser für den sicheren Zustand
+## 7.2 Typische Auslöser für den sicheren Zustand
 
-| Ereignis (Beispiel)                               | Typische Auswirkung                        | Reaktion im Safe-Mode                              |
-| ------------------------------------------------- | ------------------------------------------ | -------------------------------------------------- |
-| Kritischer BMS-Alarm                              | Batterie- oder Zellschutz greift           | `P=0`, `Q=0`, keine aktiven Dispatch-Befehle       |
-| PCS-Fehler, Freigabe weg                          | Leistungsabgabe kann nicht sicher erfolgen | Leistung auf 0, Anlagenzustand sichern             |
-| Kommunikationsverlust EMS↔BMS/PCS                 | Zustand/limits nicht verlässlich           | Fallback-Befehle halten, Monitoring alarmieren     |
-| Unplausible Messung (z. B. Sprünge, Timeout)      | Optimierung wird unzuverlässig             | Fallback beibehalten, Operator informieren         |
-| Datenqualität unter Grenzwert                     | Risiko falscher Dispatch-Berechnung        | Kein automatischer Re-Enable bis Freigabe          |
-| Scharfes Netzereignis (Frequenz-/Spannungsabwurf) | Netzvorgaben / Schutzlogik erzwingen       | Lokale Grenzwerte respektieren, ggf. 0er Sollwerte |
+| Ereignis (Beispiel)                               | Typische Auswirkung                        | Reaktion im Safe-Mode                                                |
+| ------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------- |
+| Kritischer BMS-Alarm                              | Batterie- oder Zellschutz greift           | `P=0`, `Q=0`, keine aktiven Dispatch-Befehle                         |
+| PCS-Fehler, Freigabe weg                          | Leistungsabgabe kann nicht sicher erfolgen | Leistung auf 0, Anlagenzustand sichern                               |
+| Kommunikationsverlust EMS↔BMS/PCS                 | Zustand/limits nicht verlässlich           | `P=0`, `Q=0` halten, Monitoring alarmieren und Operator informieren. |
+| Unplausible Messung (z. B. Sprünge, Timeout)      | Optimierung wird unzuverlässig             | Fallback beibehalten, Operator informieren                           |
+| Datenqualität unter Grenzwert                     | Risiko falscher Dispatch-Berechnung        | Kein automatischer Re-Enable bis Freigabe                            |
+| Scharfes Netzereignis (Frequenz-/Spannungsabwurf) | Netzvorgaben / Schutzlogik erzwingen       | Lokale Grenzwerte respektieren, ggf. 0er Sollwerte                   |
 
 Ein Rückkehrkriterium ist immer: **kritische Bedingungen beseitigt**,  
 **manuelle Freigabe liegt vor** und **Grenzprüfungen (SOC/SOH, Temperatur,
@@ -255,7 +346,7 @@ BMS/PCS-Limits) sind bestanden**.
 
 ---
 
-## 7. Kurzform
+## 8. Kurzform
 
 ```text
 Messen -> Bewerten -> Optimieren -> Dispatchen -> Ausgeben -> Nachregeln
