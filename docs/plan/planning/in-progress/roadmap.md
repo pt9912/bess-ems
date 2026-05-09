@@ -91,7 +91,7 @@ unter `in-progress/`.
 > Use-Case-Verdrahtung über `ScheduleOptimizationRequest.Reserves`,
 > OR-Tools deduziert Charge-/Discharge-Caps (Symmetric beidseitig,
 > Up/Down einseitig) und terminiert Über-Commit mit
-> `reserve-exceeds-capacity`; 9 Domain- + 10 OR-Tools-Pins inkl.
+> `reserve-exceeds-capacity`; 9 Domain- + 11 OR-Tools-Pins inkl.
 > FCR-symmetrischem und AFRR-Up/Down-Profiltest. Andere M4-Pakete
 > (RM-M4-01 Intraday, RM-M4-03 Aktivierungssignal, RM-M4-04..08
 > OPC-UA/MQTT) bleiben abhängigkeits-/trigger-getrieben offen.
@@ -322,7 +322,7 @@ bleibt Fallback und Referenz.
 | Status | ID         | Inhalt                                                              | LH-Bezug                |
 | ------ | ---------- | ------------------------------------------------------------------- | ----------------------- |
 | ⬜     | RM-M4-01   | Intraday-Reoptimierung (Resthorizont)                               | LH-MKT-002              |
-| ✅     | RM-M4-02   | Reservierungs-Modell für Regelleistung + Solver-Constraints — Domain `ReserveProduct`/`ReserveDirection`/`ReserveBand` (FCR↔Symmetric, AFRR/MFRR↔Up oder Down, halboffenes Fenster, PowerKw als Magnitude). Driven Port `IReserveRepository` + `InMemoryReserveRepository`; `ScheduleOptimizationRequest.Reserves` (Default leer ⇒ M2-Pfad bit-identisch); `DefaultScheduleOptimizationUseCase` ruft `FindActive` und reicht durch. OR-Tools deduziert per Step die Caps (Symmetric beidseitig, Up nur Discharge, Down nur Charge); Über-Commit terminiert mit `reserve-exceeds-capacity` statt LP-infeasible. 9 Domain- + 10 OR-Tools-Tests inkl. FCR-symmetrischer Profiltest, AFRR-positiv- und AFRR-negativ-Profiltest, MFRR-Modellierbarkeit. **Bewusst draußen:** LP-Strafkosten für Reserveverletzung (RM-M2-04-OPT-RESERVE-Folge), persistente Dapper-`IReserveRepository`, API für Reserve-Pflege, Penalty/Pricing — alles eigene Slices wenn realer Konsument das fordert. | LH-MKT-004              |
+| ✅     | RM-M4-02   | Reservierungs-Modell für Regelleistung + Solver-Constraints — Domain `ReserveProduct`/`ReserveDirection`/`ReserveBand` (FCR↔Symmetric, AFRR/MFRR↔Up oder Down, halboffenes Fenster, PowerKw als Magnitude). Driven Port `IReserveRepository` + `InMemoryReserveRepository`; `ScheduleOptimizationRequest.Reserves` (Default leer ⇒ M2-Pfad bit-identisch); `DefaultScheduleOptimizationUseCase` ruft `FindActive` und reicht durch. OR-Tools deduziert per Step die Caps (Symmetric beidseitig, Up nur Discharge, Down nur Charge); Über-Commit terminiert mit `reserve-exceeds-capacity` statt LP-infeasible. 9 Domain- + 11 OR-Tools-Tests inkl. FCR-symmetrischer Profiltest, AFRR-positiv- und AFRR-negativ-Profiltest, MFRR-Modellierbarkeit, ScheduleType-Theory (DayAhead+Intraday). **Bewusst draußen:** LP-Strafkosten für Reserveverletzung (RM-M2-04-OPT-RESERVE-Folge), persistente Dapper-`IReserveRepository`, API für Reserve-Pflege, Penalty/Pricing — alles eigene Slices wenn realer Konsument das fordert. | LH-MKT-004              |
 | ⬜     | RM-M4-03   | Regelleistungs-Aktivierungssignal-Verarbeitung mit Priorisierung    | LH-MKT-005, LH-MKT-006  |
 | ⬜     | RM-M4-04   | OPC-UA-Adapter (Lesen, Schreiben, Subscriptions, StatusCode)        | LH-OPCUA-001..004       |
 | ⬜     | RM-M4-05   | OPC-UA-Security (Zertifikate, Security Mode/Policy)                 | LH-OPCUA-005            |

@@ -145,8 +145,14 @@ public sealed partial class OrToolsScheduleOptimizer : IScheduleOptimizer
             // Clamp tiny negative noise to exact 0 before the LP variable
             // upper bound is set — GLOP would otherwise reject a NumVar
             // with ub < lb (lb is 0).
-            if (effChargeMax[t] < 0) { effChargeMax[t] = 0; }
-            if (effDischargeMax[t] < 0) { effDischargeMax[t] = 0; }
+            if (effChargeMax[t] < 0)
+            {
+                effChargeMax[t] = 0;
+            }
+            if (effDischargeMax[t] < 0)
+            {
+                effDischargeMax[t] = 0;
+            }
         }
 
         // GLOP ships with the Google.OrTools NuGet, so CreateSolver is

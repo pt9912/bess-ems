@@ -325,7 +325,12 @@ public sealed class OrToolsScheduleOptimizerReserveTests
         var result = await optimizer.OptimizeAsync(request, CancellationToken.None);
 
         Assert.Equal(OptimizationSolverStatus.Optimal, result.Run.Status);
-        var w = result.ProducedSchedule!.Windows;
+        // Pin: a future regression that hardcoded ScheduleType in the
+        // produced schedule (e.g. always DayAhead) would still pass the
+        // cap assertions because the LP body is type-agnostic — this
+        // assertion is the only thing that actually pins the threading.
+        Assert.Equal(scheduleType, result.ProducedSchedule!.Type);
+        var w = result.ProducedSchedule.Windows;
         Assert.True(w[0].TargetPowerKw >= -40 - Tolerance,
             $"{scheduleType}: FCR=10 should clamp charge cap to 40 kW, got {w[0].TargetPowerKw}");
         Assert.True(w[1].TargetPowerKw <= 40 + Tolerance,
