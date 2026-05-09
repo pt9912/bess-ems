@@ -26,6 +26,7 @@ internal static class ProjectAssemblies
     public const string PersistenceNamespace = "BatteryEms.Adapters.Persistence";
     public const string TelemetryNamespace = "BatteryEms.Adapters.Telemetry";
     public const string OptimizationNamespace = "BatteryEms.Adapters.Optimization";
+    public const string NativeInteropNamespace = "BatteryEms.Adapters.NativeInterop";
     public const string InfrastructureNamespace = "BatteryEms.Infrastructure";
     public const string HostNamespace = "BatteryEms.Host";
 }

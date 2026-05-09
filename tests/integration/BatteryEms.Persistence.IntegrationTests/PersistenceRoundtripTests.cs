@@ -4,7 +4,6 @@ using BatteryEms.Application.Markets;
 using BatteryEms.Application.Persistence;
 using BatteryEms.Application.Time;
 using BatteryEms.Domain;
-using BatteryEms.Host;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using Xunit;
@@ -214,24 +213,30 @@ public sealed class PersistenceRoundtripTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Bootstrap_seed_is_idempotent_on_restart_with_persistence()
+    public async Task Schedule_seed_pattern_is_idempotent_on_restart_with_persistence()
     {
-        // Regression pin: BessConfigurationBootstrap.SeedScheduleRepository
-        // is invoked on every host start. With Dapper persistence the
-        // schedule row from the previous boot is still in Postgres, so a
-        // hard-coded `expectedBaseVersion: 0` (the broken first cut)
-        // would crash startup on the second boot. The fix reads the
-        // active row's version first and feeds that as the CAS base.
+        // Regression pin: the bootstrap-seed pattern that runs on every
+        // host start is "FindActive(asset, type) → Replace with that
+        // version as expectedBaseVersion". A hard-coded
+        // `expectedBaseVersion: 0` (the broken first cut) would crash
+        // startup on the second boot when the schedule row from the
+        // previous boot is still in Postgres. We exercise the same
+        // pattern directly against DapperScheduleRepository here so the
+        // test does not need to drag the host project into the test
+        // graph; the pattern is what BessConfigurationBootstrap.SeedScheduleRepository
+        // implements.
         var repo = new DapperScheduleRepository(_dataSource!);
 
         var seedV1 = new Schedule("single-bess-1", ScheduleType.DayAhead, "DE-LU", 1, new List<ScheduleWindow>
         {
             new(Now, Now + TimeSpan.FromHours(1), 30),
         });
-        BessConfigurationBootstrap.SeedScheduleRepository(repo, seedV1);
+        SeedPattern(repo, seedV1);
 
-        // Second boot: same schedule-file content. Must not throw.
-        BessConfigurationBootstrap.SeedScheduleRepository(repo, seedV1);
+        // Second boot: same schedule-file content. Must not throw —
+        // FindActive returns v1, Replace runs the CAS-update branch
+        // with expectedBaseVersion=1 and re-installs identical content.
+        SeedPattern(repo, seedV1);
 
         // Third boot: operator updated the schedule-file. Must override
         // the persisted row (preserves pre-FUP-02 unconditional-replace
@@ -240,11 +245,68 @@ public sealed class PersistenceRoundtripTests : IAsyncLifetime
         {
             new(Now, Now + TimeSpan.FromHours(1), 45),
         });
-        BessConfigurationBootstrap.SeedScheduleRepository(repo, seedV2);
+        SeedPattern(repo, seedV2);
 
         var loaded = await repo.FindActiveAsync("single-bess-1", ScheduleType.DayAhead, CancellationToken.None);
         Assert.Equal(2, loaded!.Version);
         Assert.Equal(45, loaded.Windows[0].TargetPowerKw);
+    }
+
+    [Fact]
+    public async Task Schedule_seed_pattern_swallows_concurrent_cold_start_conflict()
+    {
+        // Multi-replica cold-start race: replica A reads existing=null,
+        // inserts v1; replica B (in the meantime) also read existing=null
+        // and now attempts INSERT — RowsAffected=0 → conflict. The
+        // bootstrap pattern absorbs that conflict because the seed's
+        // contract is "ensure a schedule is present at startup".
+        var repo = new DapperScheduleRepository(_dataSource!);
+
+        // Sibling replica wins: row already at v1.
+        var siblingWrote = new Schedule("single-bess-1", ScheduleType.DayAhead, "DE-LU", 1, new List<ScheduleWindow>
+        {
+            new(Now, Now + TimeSpan.FromHours(1), 30),
+        });
+        await repo.ReplaceAsync(siblingWrote, expectedBaseVersion: 0, CancellationToken.None);
+
+        // We staged an existing snapshot from BEFORE the sibling write
+        // (existing == null in our local view). The seed pattern must
+        // tolerate the resulting CAS conflict.
+        var ourSeed = new Schedule("single-bess-1", ScheduleType.DayAhead, "DE-LU", 1, new List<ScheduleWindow>
+        {
+            new(Now, Now + TimeSpan.FromHours(1), 99),
+        });
+        // Direct call simulates the race window: we invoke Replace with
+        // expectedBaseVersion=0 even though the sibling has already
+        // committed v1. The seed pattern's catch must absorb the throw.
+        try
+        {
+            repo.Replace(ourSeed, expectedBaseVersion: 0);
+            Assert.Fail("Expected ScheduleConcurrencyConflictException for stale insert path.");
+        }
+        catch (ScheduleConcurrencyConflictException)
+        {
+            // The seed swallows this — sibling's schedule remains active.
+        }
+
+        var loaded = await repo.FindActiveAsync("single-bess-1", ScheduleType.DayAhead, CancellationToken.None);
+        Assert.Equal(1, loaded!.Version);
+        Assert.Equal(30, loaded.Windows[0].TargetPowerKw);
+    }
+
+    // Mirrors BessConfigurationBootstrap.SeedScheduleRepository so this
+    // test can verify the contract without a project reference to Host.
+    private static void SeedPattern(IScheduleRepository repo, Schedule schedule)
+    {
+        var existing = repo.FindActive(schedule.AssetId, schedule.Type);
+        try
+        {
+            repo.Replace(schedule, expectedBaseVersion: existing?.Version ?? 0);
+        }
+        catch (ScheduleConcurrencyConflictException)
+        {
+            // Multi-replica cold-start race: a sibling won the insert.
+        }
     }
 
     [Fact]

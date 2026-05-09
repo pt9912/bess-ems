@@ -19,6 +19,7 @@ public sealed class DependencyRuleTests
                 ProjectAssemblies.PersistenceNamespace,
                 ProjectAssemblies.TelemetryNamespace,
                 ProjectAssemblies.OptimizationNamespace,
+                ProjectAssemblies.NativeInteropNamespace,
                 ProjectAssemblies.InfrastructureNamespace,
                 ProjectAssemblies.HostNamespace)
             .GetResult();
@@ -39,6 +40,7 @@ public sealed class DependencyRuleTests
                 ProjectAssemblies.PersistenceNamespace,
                 ProjectAssemblies.TelemetryNamespace,
                 ProjectAssemblies.OptimizationNamespace,
+                ProjectAssemblies.NativeInteropNamespace,
                 ProjectAssemblies.InfrastructureNamespace,
                 ProjectAssemblies.HostNamespace)
             .GetResult();
@@ -61,6 +63,7 @@ public sealed class DependencyRuleTests
                 ProjectAssemblies.PersistenceNamespace,
                 ProjectAssemblies.TelemetryNamespace,
                 ProjectAssemblies.OptimizationNamespace,
+                ProjectAssemblies.NativeInteropNamespace,
                 ProjectAssemblies.InfrastructureNamespace,
                 ProjectAssemblies.HostNamespace,
             }),
@@ -72,6 +75,7 @@ public sealed class DependencyRuleTests
                 ProjectAssemblies.PersistenceNamespace,
                 ProjectAssemblies.TelemetryNamespace,
                 ProjectAssemblies.OptimizationNamespace,
+                ProjectAssemblies.NativeInteropNamespace,
                 ProjectAssemblies.InfrastructureNamespace,
                 ProjectAssemblies.HostNamespace,
             }),
@@ -92,6 +96,7 @@ public sealed class DependencyRuleTests
     [InlineData(nameof(ProjectAssemblies.Persistence))]
     [InlineData(nameof(ProjectAssemblies.Telemetry))]
     [InlineData(nameof(ProjectAssemblies.Optimization))]
+    [InlineData(nameof(ProjectAssemblies.NativeInterop))]
     public void Driven_adapter_does_not_depend_on_driving_other_driven_or_infrastructure(string adapterName)
     {
         var allDriven = new (string Name, string Namespace)[]
@@ -101,6 +106,7 @@ public sealed class DependencyRuleTests
             (nameof(ProjectAssemblies.Persistence), ProjectAssemblies.PersistenceNamespace),
             (nameof(ProjectAssemblies.Telemetry), ProjectAssemblies.TelemetryNamespace),
             (nameof(ProjectAssemblies.Optimization), ProjectAssemblies.OptimizationNamespace),
+            (nameof(ProjectAssemblies.NativeInterop), ProjectAssemblies.NativeInteropNamespace),
         };
 
         var subject = adapterName switch
@@ -110,6 +116,7 @@ public sealed class DependencyRuleTests
             nameof(ProjectAssemblies.Persistence) => ProjectAssemblies.Persistence,
             nameof(ProjectAssemblies.Telemetry) => ProjectAssemblies.Telemetry,
             nameof(ProjectAssemblies.Optimization) => ProjectAssemblies.Optimization,
+            nameof(ProjectAssemblies.NativeInterop) => ProjectAssemblies.NativeInterop,
             _ => throw new System.ArgumentOutOfRangeException(nameof(adapterName), adapterName, "Unknown driven adapter."),
         };
 

@@ -238,24 +238,18 @@ public sealed partial class DefaultScheduleOptimizationUseCase
             TerminationReason: runToPersist.TerminationReason);
     }
 
-    // Builds a Failed OptimizationRun that audits a CAS conflict on the
-    // schedule replace path. The conflict was produced by the
-    // persistence-side CAS guard, NOT by the solver — the solver's
-    // output was correct, only the write was rejected. SolverName is
-    // therefore "schedule-cas-guard" so dashboards that group runs by
-    // SolverName don't mis-attribute the failure to the actual solver
-    // (e.g. or-tools-glop). We do reuse the optimiser-side horizon
-    // window and time step so the audit row still aligns with the
-    // schedule it tried to replace; SolverRuntime is reused to keep
-    // latency telemetry honest about how long the work took before the
-    // conflict surfaced. Inputs is reused: it names the (asset, type,
-    // version) tuple this run *tried to consume*. An audit reader
-    // querying "runs that consumed v3" will therefore see both the
-    // Failed conflict run and the successful run from the sibling
-    // replica — that is the intended attribution, not double-counting.
-    // CreatedAt comes from _clock.UtcNow (later than originalRun's
-    // createdAt) because the Failed audit event genuinely happens at
-    // conflict-detection time, not at solver completion.
+    // Builds a Failed OptimizationRun that audits a CAS conflict on
+    // the schedule replace path. The horizon window, time step and
+    // solver runtime are reused so the audit row still aligns with
+    // the schedule the run tried to replace. Inputs is reused: it
+    // names the (asset, type, version) tuple this run *tried to
+    // consume*. An audit reader querying "runs that consumed v3"
+    // will therefore see both the Failed conflict run and the
+    // successful run from the sibling replica — that is the intended
+    // attribution, not double-counting. CreatedAt comes from
+    // _clock.UtcNow (later than originalRun's createdAt) because the
+    // Failed audit event genuinely happens at conflict-detection
+    // time, not at solver completion.
     private OptimizationRun BuildConcurrencyConflictRun(
         ScheduleOptimizationRequest request,
         OptimizationRun originalRun,

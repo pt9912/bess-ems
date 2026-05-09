@@ -76,12 +76,29 @@ internal static class BessConfigurationBootstrap
         // Postgres, so a hard-coded `expectedBaseVersion: 0` would
         // fail CAS on every restart. Read the active row's version
         // first; on first boot it is null (insert path), on restart
-        // it carries the persisted version (CAS-update path). This
-        // preserves the pre-RM-M3-FUP-02 unconditional-replace
-        // semantic the schedule-file override depends on, without
-        // re-introducing last-write-wins between concurrent writers.
+        // it carries the persisted version (CAS-update path).
+        //
+        // Multi-replica cold-start race: two hosts booting in parallel
+        // can both see `existing == null`, both attempt the insert
+        // path, and the loser's `INSERT ... ON CONFLICT DO NOTHING`
+        // surfaces a ScheduleConcurrencyConflictException. The seed's
+        // contract is "ensure a schedule is present at startup"; that
+        // is satisfied by the sibling's write, so swallowing the
+        // conflict keeps the loser's host alive instead of crashing
+        // it. The migrator above relies on pg_advisory_lock for the
+        // same class of race; the seed does not because the typed
+        // exception lets us tell "lost the race" apart from any other
+        // failure, so a Postgres-specific lock is unnecessary here.
         var existing = repository.FindActive(schedule.AssetId, schedule.Type);
-        repository.Replace(schedule, expectedBaseVersion: existing?.Version ?? 0);
+        try
+        {
+            repository.Replace(schedule, expectedBaseVersion: existing?.Version ?? 0);
+        }
+        catch (ScheduleConcurrencyConflictException)
+        {
+            // Sibling replica seeded first. Idempotent semantics — leave
+            // their schedule in place and continue startup.
+        }
     }
 }
 

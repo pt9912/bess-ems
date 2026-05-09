@@ -99,7 +99,7 @@ public sealed class ArchitectureTabusTests
     // need to reference it from outside those three modules arises,
     // promote a domain-result type instead of widening this exception.
     [Fact]
-    public void Schedule_concurrency_conflict_exception_is_only_referenced_from_persistence_and_api()
+    public void Schedule_concurrency_conflict_exception_only_referenced_from_application_and_persistence()
     {
         const string exceptionType =
             "BatteryEms.Application.Markets.ScheduleConcurrencyConflictException";
