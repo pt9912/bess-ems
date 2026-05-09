@@ -71,10 +71,17 @@ internal static class BessConfigurationBootstrap
     {
         ArgumentNullException.ThrowIfNull(repository);
         ArgumentNullException.ThrowIfNull(schedule);
-        // Bootstrap-Seed runs once before any optimisation; the
-        // schedule is brand-new (no prior version), so 0 selects the
-        // insert path (RM-M3-FUP-02 sentinel convention).
-        repository.Replace(schedule, expectedBaseVersion: 0);
+        // Bootstrap-Seed runs on every host start. With persistence
+        // wired, the schedule row from the previous boot is still in
+        // Postgres, so a hard-coded `expectedBaseVersion: 0` would
+        // fail CAS on every restart. Read the active row's version
+        // first; on first boot it is null (insert path), on restart
+        // it carries the persisted version (CAS-update path). This
+        // preserves the pre-RM-M3-FUP-02 unconditional-replace
+        // semantic the schedule-file override depends on, without
+        // re-introducing last-write-wins between concurrent writers.
+        var existing = repository.FindActive(schedule.AssetId, schedule.Type);
+        repository.Replace(schedule, expectedBaseVersion: existing?.Version ?? 0);
     }
 }
 

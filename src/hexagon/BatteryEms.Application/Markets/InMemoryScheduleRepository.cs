@@ -46,10 +46,11 @@ public sealed class InMemoryScheduleRepository : IScheduleRepository
         }
 
         var key = (schedule.AssetId, schedule.Type);
-        // AddOrUpdate is the only ConcurrentDictionary primitive that
-        // serialises read+write under a per-key lock — exactly what
-        // CAS needs. The updateValueFactory throws on mismatch; the
-        // dictionary returns the new value on success.
+        // AddOrUpdate is CompareExchange-based; under contention the
+        // value-factory may re-execute, which is what makes CAS
+        // correct here: each retry sees the latest committed value
+        // and re-checks expectedBaseVersion against it. A throw from
+        // the factory propagates and leaves the dictionary unchanged.
         _byKey.AddOrUpdate(
             key,
             addValueFactory: _ =>

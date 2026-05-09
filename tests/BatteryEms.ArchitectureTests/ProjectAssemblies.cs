@@ -13,6 +13,7 @@ internal static class ProjectAssemblies
     public static readonly Assembly Persistence = typeof(BatteryEms.Adapters.Persistence.AssemblyMarker).Assembly;
     public static readonly Assembly Telemetry = typeof(BatteryEms.Adapters.Telemetry.AssemblyMarker).Assembly;
     public static readonly Assembly Optimization = typeof(BatteryEms.Adapters.Optimization.AssemblyMarker).Assembly;
+    public static readonly Assembly NativeInterop = typeof(BatteryEms.Adapters.NativeInterop.AssemblyMarker).Assembly;
     public static readonly Assembly Infrastructure = typeof(BatteryEms.Infrastructure.AssemblyMarker).Assembly;
     public static readonly Assembly Host = typeof(BatteryEms.Host.AssemblyMarker).Assembly;
 

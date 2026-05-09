@@ -4,6 +4,7 @@ using BatteryEms.Application.Markets;
 using BatteryEms.Application.Persistence;
 using BatteryEms.Application.Time;
 using BatteryEms.Domain;
+using BatteryEms.Host;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using Xunit;
@@ -210,6 +211,56 @@ public sealed class PersistenceRoundtripTests : IAsyncLifetime
         Assert.Equal(2, loaded!.Version);
         Assert.Single(loaded.Windows);
         Assert.Equal(15, loaded.Windows[0].TargetPowerKw);
+    }
+
+    [Fact]
+    public async Task Bootstrap_seed_is_idempotent_on_restart_with_persistence()
+    {
+        // Regression pin: BessConfigurationBootstrap.SeedScheduleRepository
+        // is invoked on every host start. With Dapper persistence the
+        // schedule row from the previous boot is still in Postgres, so a
+        // hard-coded `expectedBaseVersion: 0` (the broken first cut)
+        // would crash startup on the second boot. The fix reads the
+        // active row's version first and feeds that as the CAS base.
+        var repo = new DapperScheduleRepository(_dataSource!);
+
+        var seedV1 = new Schedule("single-bess-1", ScheduleType.DayAhead, "DE-LU", 1, new List<ScheduleWindow>
+        {
+            new(Now, Now + TimeSpan.FromHours(1), 30),
+        });
+        BessConfigurationBootstrap.SeedScheduleRepository(repo, seedV1);
+
+        // Second boot: same schedule-file content. Must not throw.
+        BessConfigurationBootstrap.SeedScheduleRepository(repo, seedV1);
+
+        // Third boot: operator updated the schedule-file. Must override
+        // the persisted row (preserves pre-FUP-02 unconditional-replace
+        // semantic for the seed path).
+        var seedV2 = new Schedule("single-bess-1", ScheduleType.DayAhead, "DE-LU", 2, new List<ScheduleWindow>
+        {
+            new(Now, Now + TimeSpan.FromHours(1), 45),
+        });
+        BessConfigurationBootstrap.SeedScheduleRepository(repo, seedV2);
+
+        var loaded = await repo.FindActiveAsync("single-bess-1", ScheduleType.DayAhead, CancellationToken.None);
+        Assert.Equal(2, loaded!.Version);
+        Assert.Equal(45, loaded.Windows[0].TargetPowerKw);
+    }
+
+    [Fact]
+    public async Task Schedule_replace_with_negative_expected_base_version_throws()
+    {
+        // Symmetry to InMemory: contract boundary check at the Dapper
+        // adapter must reject negative expectedBaseVersion before any
+        // SQL fires.
+        var repo = new DapperScheduleRepository(_dataSource!);
+        var schedule = new Schedule("single-bess-1", ScheduleType.DayAhead, "DE-LU", 1, new List<ScheduleWindow>
+        {
+            new(Now, Now + TimeSpan.FromHours(1), 30),
+        });
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            repo.ReplaceAsync(schedule, expectedBaseVersion: -1, CancellationToken.None));
     }
 
     [Fact]

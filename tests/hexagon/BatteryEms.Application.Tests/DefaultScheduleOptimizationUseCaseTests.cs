@@ -219,7 +219,10 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
         var optimizer = new SpyOptimizer(req =>
             BuildResult(req, OptimizationSolverStatus.Optimal, includeSchedule: true));
         var runs = new InMemoryOptimizationRunRepository();
-        var useCase = Build(optimizer, schedules, runs);
+        // Clock is well after HorizonStart so the createdAt assertion
+        // can distinguish "clock-sourced" from "originalRun-sourced".
+        var clock = new FakeClock { UtcNow = HorizonStart + TimeSpan.FromHours(2) };
+        var useCase = Build(optimizer, schedules, runs, clock: clock);
 
         var outcome = await useCase.ExecuteAsync(BuildCommand(), CancellationToken.None);
 
@@ -233,6 +236,15 @@ public sealed class DefaultScheduleOptimizationUseCaseTests
         Assert.Equal("concurrent-version-conflict", stored.TerminationCode);
         Assert.Equal("expected=3,actual=4", stored.TerminationDetail);
         Assert.Null(stored.ProducedSchedule);
+        // SolverName attributes the failure to the persistence-side CAS
+        // guard, not to the optimiser (review m-2). Dashboards that group
+        // by SolverName must not mis-count this as a solver failure.
+        Assert.Equal("schedule-cas-guard", stored.SolverName);
+        // CreatedAt is sourced from the clock injected into the use case
+        // (review m-3), not from the original Optimal run. A future
+        // refactor that wires originalRun.CreatedAt through would flip
+        // this assertion.
+        Assert.Equal(clock.UtcNow, stored.CreatedAt);
     }
 
     [Fact]

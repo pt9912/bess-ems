@@ -107,11 +107,13 @@ public sealed class ArchitectureTabusTests
         var modulesThatMustNotReference = new[]
         {
             ProjectAssemblies.Domain,
+            ProjectAssemblies.Api,
             ProjectAssemblies.Worker,
             ProjectAssemblies.Modbus,
             ProjectAssemblies.Mqtt,
             ProjectAssemblies.Telemetry,
             ProjectAssemblies.Optimization,
+            ProjectAssemblies.NativeInterop,
             ProjectAssemblies.Infrastructure,
             ProjectAssemblies.Host,
         };

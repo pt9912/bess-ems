@@ -7,7 +7,6 @@ namespace BatteryEms.Application.Markets;
 // persisted for (AssetId, ScheduleType). The use case catches
 // this and materialises a Failed OptimizationRun with
 // TerminationCode = "concurrent-version-conflict".
-[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
 public sealed class ScheduleConcurrencyConflictException : Exception
 {
     public string AssetId { get; } = string.Empty;
@@ -28,9 +27,15 @@ public sealed class ScheduleConcurrencyConflictException : Exception
         ActualVersion = actualVersion;
     }
 
-    // CA1032: keep the standard constructor surface.
+    // CA1032 boilerplate — never used by the production code paths
+    // (the typed 4-arg ctor carries the conflict shape callers depend
+    // on). Coverage is excluded only on these three so the meaningful
+    // ctor and BuildMessage stay measured.
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public ScheduleConcurrencyConflictException() { }
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public ScheduleConcurrencyConflictException(string message) : base(message) { }
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public ScheduleConcurrencyConflictException(string message, Exception inner) : base(message, inner) { }
 
     private static string BuildMessage(

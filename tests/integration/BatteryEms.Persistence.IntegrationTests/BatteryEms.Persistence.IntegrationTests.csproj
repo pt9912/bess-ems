@@ -22,6 +22,7 @@
     <ProjectReference Include="..\..\..\src\hexagon\BatteryEms.Domain\BatteryEms.Domain.csproj" />
     <ProjectReference Include="..\..\..\src\hexagon\BatteryEms.Application\BatteryEms.Application.csproj" />
     <ProjectReference Include="..\..\..\src\adapters\driven\BatteryEms.Adapters.Persistence\BatteryEms.Adapters.Persistence.csproj" />
+    <ProjectReference Include="..\..\..\src\host\BatteryEms.Host\BatteryEms.Host.csproj" />
   </ItemGroup>
 
 </Project>
