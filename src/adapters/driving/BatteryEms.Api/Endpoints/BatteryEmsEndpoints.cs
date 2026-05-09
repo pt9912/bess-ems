@@ -24,6 +24,7 @@ public static class BatteryEmsEndpoints
         MapCurrentSchedules(routes);
         MapOperatorStop(routes);
         MapDayAheadOptimize(routes);
+        MapIntradayReoptimize(routes);
         MapOptimizationRunStatus(routes);
         return routes;
     }
@@ -243,6 +244,64 @@ public static class BatteryEmsEndpoints
             .RequireAuthorization(AuthConstants.OperatorPolicy)
             .WithName("DayAheadOptimize")
             .WithSummary("Trigger a day-ahead schedule optimisation (LH-API-005).");
+    }
+
+    private static void MapIntradayReoptimize(IEndpointRouteBuilder routes)
+    {
+        // RM-M4-01: triggers a residual-horizon Intraday reoptimisation.
+        // The use case preserves past windows of the existing Intraday
+        // schedule and re-optimises the remainder under the
+        // RM-M3-FUP-02 CAS guard. Operator-policy guarded — schedule
+        // replace is a write action.
+        routes.MapPost("/markets/intraday/reoptimize", async (
+                IntradayReoptimizationRequestBody body,
+                IBatteryAssetRegistry assets,
+                IIntradayReoptimizationUseCase useCase,
+                CancellationToken ct) =>
+            {
+                if (body is null
+                    || string.IsNullOrWhiteSpace(body.AssetId)
+                    || body.TimeStepSeconds <= 0
+                    || body.ResidualStart >= body.HorizonEnd)
+                {
+                    return Results.BadRequest(new { error = "missing-or-invalid-field" });
+                }
+
+                var asset = assets.Find(body.AssetId);
+                if (asset is null)
+                {
+                    return Results.NotFound(new { error = "asset-not-registered", asset_id = body.AssetId });
+                }
+
+                IntradayReoptimizationCommand command;
+                try
+                {
+                    command = new IntradayReoptimizationCommand(
+                        assetId: body.AssetId,
+                        asset: asset,
+                        residualStart: body.ResidualStart,
+                        horizonEnd: body.HorizonEnd,
+                        timeStep: TimeSpan.FromSeconds(body.TimeStepSeconds),
+                        pricesPerStep: body.PricesPerStep,
+                        priceUnit: body.PriceUnit);
+                }
+                catch (ArgumentException ex)
+                {
+                    return Results.BadRequest(new { error = "invalid-request", detail = ex.Message });
+                }
+
+                var outcome = await useCase.ExecuteAsync(command, ct).ConfigureAwait(false);
+                return Results.Ok(new OptimizationResponse(
+                    RunId: outcome.RunId,
+                    Status: outcome.Status,
+                    HorizonStart: command.ResidualStart,
+                    HorizonEnd: command.HorizonEnd,
+                    ProducedScheduleVersion: outcome.ProducedScheduleVersion,
+                    TerminationReason: outcome.TerminationReason));
+            })
+            .RequireAuthorization(AuthConstants.OperatorPolicy)
+            .WithName("IntradayReoptimize")
+            .WithSummary("Trigger an Intraday residual-horizon reoptimisation (RM-M4-01).");
     }
 
     private static void MapOptimizationRunStatus(IEndpointRouteBuilder routes)

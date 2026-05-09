@@ -153,6 +153,21 @@ public sealed record OptimizationRequestBody(
     IReadOnlyList<double>? PricesPerStep = null,
     string? PriceUnit = null);
 
+// Body for POST /markets/intraday/reoptimize (RM-M4-01). ResidualStart
+// is the moment from which the residual horizon is reoptimised; it
+// must align to a window boundary of the existing Intraday schedule
+// (D-02). ScheduleType is fixed to "intraday" for this endpoint —
+// the use case enforces it; the request body is named distinctly to
+// keep wire-shape stable as the day-ahead body evolves separately.
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+public sealed record IntradayReoptimizationRequestBody(
+    string AssetId,
+    DateTimeOffset ResidualStart,
+    DateTimeOffset HorizonEnd,
+    double TimeStepSeconds,
+    IReadOnlyList<double>? PricesPerStep = null,
+    string? PriceUnit = null);
+
 [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
 public sealed record OptimizationResponse(
     Guid RunId,

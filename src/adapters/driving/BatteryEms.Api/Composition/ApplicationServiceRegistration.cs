@@ -61,6 +61,7 @@ public static class ApplicationServiceRegistration
         services.AddSingleton<IScheduleQuery, DefaultScheduleQuery>();
         services.AddSingleton<IOperatorStopUseCase, DefaultOperatorStopUseCase>();
         services.AddSingleton<IScheduleOptimizationUseCase, DefaultScheduleOptimizationUseCase>();
+        services.AddSingleton<IIntradayReoptimizationUseCase, DefaultIntradayReoptimizationUseCase>();
         return services;
     }
 

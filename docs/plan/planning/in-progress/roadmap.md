@@ -84,8 +84,18 @@ unter `in-progress/`.
 > ist abgeschlossen.
 >
 > **M4 gestartet:** [`plan-RM-M4.md`](plan-RM-M4.md) ist nach
-> `in-progress/` migriert. **RM-M4-02 ✅** (Reservierungs-Modell +
-> Solver-Constraints) ist abgeschlossen: Domain-Trio
+> `in-progress/` migriert. **RM-M4-01 ✅** (Intraday-Reoptimierung
+> Resthorizont): neuer Driving Port `IIntradayReoptimizationUseCase`,
+> Per-asset Lock, Baseline-Pflicht (D-01), Window-Boundary-Alignment
+> (D-02), Reserve-Bands für Resthorizont (RM-M4-02-Pfad), Combine
+> past+new + CAS via FUP-02; Endpoint `POST /markets/intraday/
+> reoptimize` (D-04 synchron). 13 Application-Unit-Pins + 7
+> API-Endpoint-Pins. Design-Entscheidungen D-01..D-04 inline im
+> Plan, Folgearbeiten F-01 (Cold-Start-Bootstrap) + F-02
+> (Alignment-Toleranz) in
+> [`../open/note-RM-M4-followups.md`](../open/note-RM-M4-followups.md)
+> als Trigger-Watch. **RM-M4-02 ✅** (Reservierungs-Modell +
+> Solver-Constraints): Domain-Trio
 > `ReserveProduct`/`ReserveDirection`/`ReserveBand`, Driven Port
 > `IReserveRepository` + `InMemoryReserveRepository`,
 > Use-Case-Verdrahtung über `ScheduleOptimizationRequest.Reserves`,
@@ -93,8 +103,8 @@ unter `in-progress/`.
 > Up/Down einseitig) und terminiert Über-Commit mit
 > `reserve-exceeds-capacity`; 9 Domain- + 11 OR-Tools-Pins inkl.
 > FCR-symmetrischem und AFRR-Up/Down-Profiltest. Andere M4-Pakete
-> (RM-M4-01 Intraday, RM-M4-03 Aktivierungssignal, RM-M4-04..08
-> OPC-UA/MQTT) bleiben abhängigkeits-/trigger-getrieben offen.
+> (RM-M4-03 Aktivierungssignal, RM-M4-04..08 OPC-UA/MQTT) bleiben
+> abhängigkeits-/trigger-getrieben offen.
 >
 > **M2-Welle 1 (Optimization-Slice, abgeschlossen):**
 > [`../done/plan-RM-M2-optimization.md`](../done/plan-RM-M2-optimization.md)
@@ -148,7 +158,7 @@ unter `in-progress/`.
 | ✅     | M1          | MVP — sichere Regelpipeline        | 1     | [Abgeschlossen](../done/plan-RM-M1.md) |
 | ✅     | M2          | Marktausbau und Optimierung        | 1 → 2 | Abgeschlossen ([Optimization-Slice](../done/plan-RM-M2-optimization.md), RM-M2-01..10, [Migrations-Tooling](../done/plan-RM-M2-migration.md), [HIL](../done/HIL-simulator.md)) |
 | ✅     | M3          | Native Control Core (Library)      | 2     | [`../done/plan-RM-M3.md`](../done/plan-RM-M3.md) — alle RM-M3-01..13 ✅ inkl. C-Pivot, doctest, vier Native-Quality-Gates, replay-basierter Parity, Doku-Sync und PID-Slice mit ABI-Minor-Bump 0.1→0.2; M3-D2 produktive Routing-Aktivierung ✅ ([`../done/plan-RM-M3-D2.md`](../done/plan-RM-M3-D2.md)); offene Follow-up-Slices (acht Items in zwei Blöcken) in [`../open/note-RM-M3-followups.md`](../open/note-RM-M3-followups.md) — Block A M3-Closure-Out-of-Scope, Block B M2-Folgewellen mit M3-Trigger; alle trigger-getrieben, kein aktiver Trigger heute |
-| 🟡     | M4          | Regelleistung und OPC-UA           | 2     | [`plan-RM-M4.md`](plan-RM-M4.md) — RM-M4-02 (Reservierungs-Modell + Solver-Constraints) als erste aktive Slice, andere Pakete trigger-/abhängigkeitsgetrieben offen |
+| 🟡     | M4          | Regelleistung und OPC-UA           | 2     | [`plan-RM-M4.md`](plan-RM-M4.md) — RM-M4-01 (Intraday-Reoptimierung) ✅, RM-M4-02 (Reservierungs-Modell + Solver-Constraints) ✅, andere Pakete (RM-M4-03 Aktivierungssignal, 04..08 OPC-UA/MQTT) trigger-/abhängigkeitsgetrieben offen; Folgearbeiten F-01/F-02 in `note-RM-M4-followups.md` |
 | ⬜     | M5          | MPC, Solver-Sidecar, Replay        | 3     | folgt mit Aktivierung |
 | ⬜     | M6          | Skalierung, UI, Edge / Multi-Asset | 4     | folgt mit Aktivierung |
 
@@ -321,7 +331,7 @@ bleibt Fallback und Referenz.
 
 | Status | ID         | Inhalt                                                              | LH-Bezug                |
 | ------ | ---------- | ------------------------------------------------------------------- | ----------------------- |
-| ⬜     | RM-M4-01   | Intraday-Reoptimierung (Resthorizont)                               | LH-MKT-002              |
+| ✅     | RM-M4-01   | Intraday-Reoptimierung (Resthorizont) — Driving Port `IIntradayReoptimizationUseCase` + `IntradayReoptimizationCommand` (composition mit `ScheduleOptimizationCommand` für geteilte Validierung) + `DefaultIntradayReoptimizationUseCase`. Per-asset Lock, Baseline-Existenz-Check (D-01: `intraday-baseline-missing`), Window-Boundary-Alignment (D-02: `residual-start-not-aligned`), Reserve-Bands für Resthorizont, Combine past+new + CAS via FUP-02-Pfad. CAS-Konflikt → `concurrent-version-conflict` Failed-Run. Solver-Failure ohne Replace. Endpoint `POST /markets/intraday/reoptimize` (D-04: synchron, Operator-policy-guarded). 13 Application-Unit-Pins + 7 API-Endpoint-Pins. **Design-Entscheidungen D-01..D-04** in der Plan-Zeile dokumentiert; **Folgearbeiten F-01 (Cold-Start-Bootstrap), F-02 (Alignment-Toleranz)** in `note-RM-M4-followups.md`. | LH-MKT-002              |
 | ✅     | RM-M4-02   | Reservierungs-Modell für Regelleistung + Solver-Constraints — Domain `ReserveProduct`/`ReserveDirection`/`ReserveBand` (FCR↔Symmetric, AFRR/MFRR↔Up oder Down, halboffenes Fenster, PowerKw als Magnitude). Driven Port `IReserveRepository` + `InMemoryReserveRepository`; `ScheduleOptimizationRequest.Reserves` (Default leer ⇒ M2-Pfad bit-identisch); `DefaultScheduleOptimizationUseCase` ruft `FindActive` und reicht durch. OR-Tools deduziert per Step die Caps (Symmetric beidseitig, Up nur Discharge, Down nur Charge); Über-Commit terminiert mit `reserve-exceeds-capacity` statt LP-infeasible. 9 Domain- + 11 OR-Tools-Tests inkl. FCR-symmetrischer Profiltest, AFRR-positiv- und AFRR-negativ-Profiltest, MFRR-Modellierbarkeit, ScheduleType-Theory (DayAhead+Intraday). **Bewusst draußen:** LP-Strafkosten für Reserveverletzung (RM-M2-04-OPT-RESERVE-Folge), persistente Dapper-`IReserveRepository`, API für Reserve-Pflege, Penalty/Pricing — alles eigene Slices wenn realer Konsument das fordert. | LH-MKT-004              |
 | ⬜     | RM-M4-03   | Regelleistungs-Aktivierungssignal-Verarbeitung mit Priorisierung    | LH-MKT-005, LH-MKT-006  |
 | ⬜     | RM-M4-04   | OPC-UA-Adapter (Lesen, Schreiben, Subscriptions, StatusCode)        | LH-OPCUA-001..004       |
