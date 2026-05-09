@@ -67,8 +67,8 @@ Multi-Asset-Bedienung.
   Drift-Auswertung zwischen Managed-, Native-, Solver- und
   Sidecar-Pfaden.
 - Metriken fuer Solverstatus, Solver-/MPC-Laufzeit, Sidecar-Health,
-  Deadline/Timeout, Fallback-Reason, `safe_stop`, `no_valid_plan` und
-  Command-Latenz.
+  Deadline/Timeout, `fallback_source`, `fallback_reason`,
+  Terminalzustand und Command-Latenz.
 - Container-Orchestrierungstests fuer Worker + Sidecar inklusive
   Healthcheck, Startreihenfolge, Crash/Restart und Fallback.
 
@@ -109,6 +109,7 @@ Optimierungs-Sidecars festhaelt.
 | Transportentscheidung | `AR-OPEN-002` ist geschlossen; ADR 0004 oder Architektur §13 nennt den finalen Transport (`gRPC` oder Alternative), Security-/Mocking-/CI-Konsequenzen und den Link zur Entscheidung. |
 | Transport-Mapping | Vor RM-M5-01-Freeze existiert ein versioniertes Transport-Mapping-Dokument, das konkrete Transportcodes auf die normierten Outcomes der Sidecar-Status-Taxonomie mappt und Retry-, Cancellation-, Deadline- und Unavailable-Regeln festlegt. |
 | Contract-Version | Worker und Sidecar melden `contract_version`, `min_compatible_version`, `max_compatible_version` und Feature-Flags im Health/Version-Check. Inkompatible Versionen blockieren Sidecar-Aktivierung hart und fallen vor Request-Start auf lokalen Fallback/Safe-Stop. |
+| Security-Freeze | Vor produktionsnahem RM-M5-01-Freeze ist der Sidecar-Security-Vertrag abgeschlossen: AuthN/AuthZ, verschluesselter Transport oder geschuetzter lokaler Socket, Secret-Handling und Negativtests fuer unautorisierte Clients sind dokumentiert und gate-faehig. |
 | Replay-Baseline | Bestehende M2/M3-Replay-Datensaetze sind referenzierbar; neue Datensaetze bekommen Manifest, Version und Vergleichsregeln. |
 | Toolchain | Transport-Codegen falls noetig, Sidecar-Build und Container-Build sind reproduzierbar in Docker/CI. |
 | Fallback | Fuer jeden Sidecar-Aufruf ist vor Aktivierung dokumentiert, welcher lokale Fallback benutzt wird und welche Semantik dadurch verloren geht. |
@@ -120,7 +121,7 @@ Optimierungs-Sidecars festhaelt.
 | Situation | Erwartetes Verhalten | Mindestnachweis |
 | --------- | -------------------- | --------------- |
 | Sidecar gesund | Worker ruft `optimization-core` ueber den konfigurierten Adapter auf; RunId, Solverstatus, Horizon und erzeugter Fahrplan werden wie im bestehenden Optimierungsmodell persistiert. | Contract-/Integrationstest mit Test-Sidecar und persistiertem `OptimizationRun`. |
-| Sidecar nicht erreichbar | Regelkreis und Worker bleiben lauffaehig; Optimierungsaufruf liefert kontrollierten Fehler/Fallback statt Crash oder haengendem Tick. | Timeout-/Unavailable-Test mit Fallback-Reason in Log/Metrik. |
+| Sidecar nicht erreichbar | Regelkreis und Worker bleiben lauffaehig; Optimierungsaufruf liefert kontrollierten Fehler/Fallback statt Crash oder haengendem Tick. | Timeout-/Unavailable-Test mit `fallback_reason` in Log/Metrik. |
 | Sidecar crasht waehrend Lauf | Offener Request endet deterministisch mit Fehlerstatus; nach Restart kann ein neuer Lauf starten. | Container-Orchestrierungstest Worker + Sidecar mit Crash/Restart. |
 | MPC erzeugt Trajektorie | MPC-Ausgabe respektiert SOC-, Leistungs-, Ramp- und Geraete-/Netzgrenzen; nachgelagerte Limiter muessen keine unzulaessige Trajektorie retten. | MPC-Testfall gegen definierte State-Space-/Horizon-Fixture plus Limiter-Invariantentest. |
 | Kalman-/State-Space-Schaetzung | Schaetzer liefert finite, plausible Zustandswerte und markiert unbrauchbare Eingaben als ungueltig. | Numerischer Kerneltest mit Rausch-/Missing-Measurement-Faellen. |
@@ -147,6 +148,28 @@ eindeutig mit `request_id` korrelierbar bleiben.
 | Timeout danach Antwort | Wenn ein spaeter Sidecar-Response fuer eine bereits als Timeout behandelte und per `fallback_committed` finalisierte `request_id` ankommt, darf er keinen neuen Plan aktivieren. Er darf nur als `late_response_ignored` observiert werden. |
 | Replay | Replay-Datensaetze speichern `request_id` oder eine deterministische Ableitungsregel, damit Retry-/Duplicate-Faelle reproduzierbar sind. |
 | Observability | Logs, `OptimizationRun`, Metriken und Container-Orchestrierungstests enthalten `request_id`, `run_id`, Terminalzustand und `fallback_reason`. |
+
+---
+
+## Fallback-Taxonomie
+
+Alle Fallback-Entscheidungen verwenden zwei kanonische Labels:
+`fallback_source` beschreibt den genutzten Ausfuehrungspfad,
+`fallback_reason` beschreibt den ausloesenden Grund. Zusammengesetzte
+Labels wie `last_valid_or_safe_stop` oder `local_optimizer_or_safe_stop`
+duerfen nicht als Metrik-, Replay- oder Run-Werte verwendet werden.
+
+| Feld | Erlaubte Werte |
+| ---- | -------------- |
+| `fallback_source` | `none`, `sidecar_result`, `local_optimizer`, `last_valid_schedule`, `safe_stop`, `no_activation` |
+| `fallback_reason` | `none`, `deadline_exceeded`, `sidecar_unavailable`, `transport_cancelled`, `transport_internal_error`, `invalid_request`, `solver_infeasible`, `solver_unbounded`, `solver_time_limit`, `solver_iteration_limit`, `no_valid_plan`, `fallback_plan_expired`, `fallback_context_mismatch`, `fallback_telemetry_drift`, `invalid_snapshot`, `invalid_mpc_state`, `contract_incompatible`, `unauthorized_client`, `duplicate_request`, `late_response_ignored` |
+
+Wenn eine Entscheidung fachlich zwischen altem Fahrplan und Safe-Stop
+waehlt, wird zuerst die Plan-Gueltigkeit geprueft. Danach ist der Wert
+eindeutig: `fallback_source=last_valid_schedule` bei frischem,
+kontextkompatiblem Plan oder `fallback_source=safe_stop` mit
+`fallback_reason=no_valid_plan` beziehungsweise konkretem
+Invalidierungsgrund.
 
 ---
 
@@ -184,10 +207,10 @@ nicht ein stiller Optimierungs-Fallback.
 | Fehlerklasse | Verbindlicher Fallback | Qualitaetsdegradation | Mindestnachweis |
 | ------------ | ---------------------- | -------------------- | --------------- |
 | Sidecar gesund, Solverstatus usable | Sidecar-Ergebnis wird ueber bestehende Ports uebernommen und persistiert. | Keine. | Contract-Test fuer erfolgreichen Lauf. |
-| Timeout/Deadline oder Unavailable vor Ergebnis | Horizon-Optimierung nutzt den konfigurierten lokalen `IScheduleOptimizer`, falls vorhanden; sonst wird keine neue Schedule-Version erzeugt. Der Regelkreis nutzt nur einen frischen, kontextkompatiblen Fahrplan; fehlt dieser, erzeugt der Control-Pfad Safe-Stop mit Reason `no_valid_plan`. | Optimierungsqualitaet kann auf lokalen LP-/NoOp-Pfad fallen; bei fehlendem oder invalidiertem Plan geht Verfuegbarkeit in Safe-Stop statt Optimierungsbetrieb. | Timeout-/Unavailable-Test mit `Failed`-Run, Fallback-Reason, abgelaufenem Plan, Kontext-Mismatch und `no_valid_plan`-Startfall. |
-| Sidecar-Crash waehrend Lauf oder Transportabbruch nach Request-Start | Lauf endet als fehlgeschlagener `OptimizationRun`; Worker bleibt aktiv. Fuer den Regelkreis gilt nur ein frischer, kontextkompatibler Fahrplan plus bestehende Limiter; ohne gueltigen Fahrplan gilt Safe-Stop mit Reason `no_valid_plan`. | Keine neue Optimierung fuer diesen Lauf; Dispatch folgt bestehendem Fahrplan oder Safe-Stop. | Container-Crash-Test mit weiterlaufendem Worker, abgelaufenem Plan und Startfall ohne Fahrplan. |
-| Sidecar liefert Infeasible/Failed ohne nutzbare Loesung | Keine neue Schedule-Version; ein frischer, kontextkompatibler Fahrplan bleibt aktiv. Ohne gueltigen Fahrplan erzeugt der Control-Pfad Safe-Stop mit Reason `no_valid_plan`. | Keine Reoptimierung; Ursache bleibt in Run/Metric sichtbar; bei Initialzustand kein Optimierungsbetrieb. | Solverstatus-Mapping-Test fuer nicht nutzbare Stati inklusive leerem Schedule-Store und Plan-Invalidation. |
-| Sidecar liefert nicht-finite, schema-ungueltige oder constraint-verletzende Trajektorie | Ergebnis wird verworfen; keine neue Schedule-Version; Dispatch-/Control-Pfad verwendet bestehenden Managed-Limiter mit frischem, kontextkompatiblem Fahrplan oder Safe-Stop mit Reason `no_valid_plan`, wenn kein gueltiger Setpoint existiert. | Sidecar-Ergebnis unbrauchbar; Safety hat Vorrang vor Optimierungsziel. | Negativtest fuer nicht-finite Werte, Constraint-Verletzung, Telemetrie-Drift und fehlenden gueltigen Setpoint. |
+| Timeout/Deadline oder Unavailable vor Ergebnis | Horizon-Optimierung nutzt den konfigurierten lokalen `IScheduleOptimizer`, falls vorhanden; sonst wird keine neue Schedule-Version erzeugt. Der Regelkreis nutzt nur einen frischen, kontextkompatiblen Fahrplan; fehlt dieser, erzeugt der Control-Pfad Safe-Stop mit `fallback_reason=no_valid_plan`. | Optimierungsqualitaet kann auf lokalen LP-/NoOp-Pfad fallen; bei fehlendem oder invalidiertem Plan geht Verfuegbarkeit in Safe-Stop statt Optimierungsbetrieb. | Timeout-/Unavailable-Test mit `Failed`-Run, `fallback_reason`, abgelaufenem Plan, Kontext-Mismatch und `no_valid_plan`-Startfall. |
+| Sidecar-Crash waehrend Lauf oder Transportabbruch nach Request-Start | Lauf endet als fehlgeschlagener `OptimizationRun`; Worker bleibt aktiv. Fuer den Regelkreis gilt nur ein frischer, kontextkompatibler Fahrplan plus bestehende Limiter; ohne gueltigen Fahrplan gilt Safe-Stop mit `fallback_reason=no_valid_plan`. | Keine neue Optimierung fuer diesen Lauf; Dispatch folgt bestehendem Fahrplan oder Safe-Stop. | Container-Crash-Test mit weiterlaufendem Worker, abgelaufenem Plan und Startfall ohne Fahrplan. |
+| Sidecar liefert Infeasible/Failed ohne nutzbare Loesung | Keine neue Schedule-Version; ein frischer, kontextkompatibler Fahrplan bleibt aktiv. Ohne gueltigen Fahrplan erzeugt der Control-Pfad Safe-Stop mit `fallback_reason=no_valid_plan`. | Keine Reoptimierung; Ursache bleibt in Run/Metric sichtbar; bei Initialzustand kein Optimierungsbetrieb. | Solverstatus-Mapping-Test fuer nicht nutzbare Stati inklusive leerem Schedule-Store und Plan-Invalidation. |
+| Sidecar liefert nicht-finite, schema-ungueltige oder constraint-verletzende Trajektorie | Ergebnis wird verworfen; keine neue Schedule-Version; Dispatch-/Control-Pfad verwendet bestehenden Managed-Limiter mit frischem, kontextkompatiblem Fahrplan oder Safe-Stop mit `fallback_reason=no_valid_plan`, wenn kein gueltiger Setpoint existiert. | Sidecar-Ergebnis unbrauchbar; Safety hat Vorrang vor Optimierungsziel. | Negativtest fuer nicht-finite Werte, Constraint-Verletzung, Telemetrie-Drift und fehlenden gueltigen Setpoint. |
 | Ungueltiger Snapshot, stale Telemetrie oder invalider MPC-State vor Sidecar-Aufruf | Kein Sidecar-Aufruf und kein Optimierer-Fallback mit denselben ungueltigen Eingaben; bestehender Control-Precheck erzeugt Safe-Stop/invaliden Snapshot-Pfad. | Optimierung/Dispatch wird abgebrochen, bis valide Eingaben vorliegen. | Precheck-Test mit Nachweis, dass kein Sidecar-Request gesendet wird. |
 
 ---
@@ -204,30 +227,31 @@ zusaetzlich `has_usable_solution` und `solution_quality` (`optimal`,
 Das konkrete Transport-Mapping ist ein eigenes versioniertes Artefakt und
 ist vor RM-M5-01-Freeze Pflicht.
 
-| Normierter Transportstatus | Solverstatus aus Sidecar | Usable-Signal | M2 `OptimizationSolverStatus` | Metric Tags / Reason | Fallback |
-| -------------------------- | ------------------------ | ------------- | ----------------------------- | -------------------- | -------- |
-| `success` | `optimal` | `has_usable_solution=true`, `solution_quality=optimal` | `Optimal` | `status=optimal`, `transport=success`, `fallback=none` | Ergebnis uebernehmen. |
-| `success` | `feasible` | `has_usable_solution=true`, `solution_quality=feasible` | `Feasible` | `status=feasible`, `transport=success`, `fallback=none` | Ergebnis uebernehmen, Qualitaetsinfo persistieren. |
-| `success` | `infeasible` | `has_usable_solution=false`, `solution_quality=none` | `Infeasible` | `status=infeasible`, `transport=success`, `fallback=last_valid_or_safe_stop` | Keine neue Version; Fallback-Matrix. |
-| `success` | `unbounded` | `has_usable_solution=false`, `solution_quality=none` | `Unbounded` | `status=unbounded`, `transport=success`, `fallback=last_valid_or_safe_stop` | Keine neue Version; Fallback-Matrix. |
-| `success` | `time_limit` | `has_usable_solution=true`, `solution_quality=feasible` | `Feasible` | `status=feasible`, `termination=time_limit_with_feasible_solution`, `transport=success`, `fallback=none` | Ergebnis uebernehmen; Resource-Limit bleibt in `TerminationReason`/Warnings sichtbar. |
-| `success` | `time_limit` | `has_usable_solution=false`, `solution_quality=none` | `TimeLimit` | `status=time_limit`, `transport=success`, `fallback=last_valid_or_safe_stop` | Keine neue Version; Fallback-Matrix. |
-| `success` | `iteration_limit` | `has_usable_solution=true`, `solution_quality=feasible` | `Feasible` | `status=feasible`, `termination=iteration_limit_with_feasible_solution`, `transport=success`, `fallback=none` | Ergebnis uebernehmen; Resource-Limit bleibt in `TerminationReason`/Warnings sichtbar. |
-| `success` | `iteration_limit` | `has_usable_solution=false`, `solution_quality=none` | `IterationLimit` | `status=iteration_limit`, `transport=success`, `fallback=last_valid_or_safe_stop` | Keine neue Version; Fallback-Matrix. |
-| `deadline_exceeded` | kein Ergebnis | `has_usable_solution=false`, `solution_quality=none` | `TimeLimit` | `status=time_limit`, `transport=deadline_exceeded`, `fallback=local_optimizer_or_safe_stop` | Fallback-Matrix Timeout/Deadline. |
-| `unavailable` | kein Ergebnis | `has_usable_solution=false`, `solution_quality=none` | `Failed` | `status=failed`, `transport=unavailable`, `fallback=local_optimizer_or_safe_stop` | Fallback-Matrix Unavailable. |
-| `cancelled` durch Caller | kein Ergebnis | `has_usable_solution=false`, `solution_quality=none` | `Failed` | `status=failed`, `transport=cancelled`, `fallback=last_valid_or_safe_stop` | Kein Retry; danach derselbe frische-Plan-oder-Safe-Stop-Fallback wie bei Transportabbruch. |
-| `invalid_request` / Schemafehler | kein Ergebnis | `has_usable_solution=false`, `solution_quality=none` | `Failed` | `status=failed`, `transport=invalid_request`, `fallback=safe_stop_if_no_valid_plan` | Ergebnis verwerfen; kein lokaler Optimierer mit denselben ungueltigen Eingaben. |
-| `internal_error` / Crash / Decode-Fehler / unbekannter Status | kein Ergebnis | `has_usable_solution=false`, `solution_quality=none` | `Failed` | `status=failed`, `transport=internal_error`, `fallback=last_valid_or_safe_stop` | Fallback-Matrix Crash/Transportabbruch. |
+| Normierter Transportstatus | Solverstatus aus Sidecar | Usable-Signal | M2 `OptimizationSolverStatus` | Kanonische Tags | Fallback |
+| -------------------------- | ------------------------ | ------------- | ----------------------------- | --------------- | -------- |
+| `success` | `optimal` | `has_usable_solution=true`, `solution_quality=optimal` | `Optimal` | `fallback_source=sidecar_result`, `fallback_reason=none` | Ergebnis uebernehmen. |
+| `success` | `feasible` | `has_usable_solution=true`, `solution_quality=feasible` | `Feasible` | `fallback_source=sidecar_result`, `fallback_reason=none` | Ergebnis uebernehmen, Qualitaetsinfo persistieren. |
+| `success` | `infeasible` | `has_usable_solution=false`, `solution_quality=none` | `Infeasible` | `fallback_source` aus Fallback-Matrix, `fallback_reason=solver_infeasible` | Keine neue Version; Fallback-Matrix. |
+| `success` | `unbounded` | `has_usable_solution=false`, `solution_quality=none` | `Unbounded` | `fallback_source` aus Fallback-Matrix, `fallback_reason=solver_unbounded` | Keine neue Version; Fallback-Matrix. |
+| `success` | `time_limit` | `has_usable_solution=true`, `solution_quality=feasible` | `Feasible` | `fallback_source=sidecar_result`, `fallback_reason=none`, `termination=time_limit_with_feasible_solution` | Ergebnis uebernehmen; Resource-Limit bleibt in `TerminationReason`/Warnings sichtbar. |
+| `success` | `time_limit` | `has_usable_solution=false`, `solution_quality=none` | `TimeLimit` | `fallback_source` aus Fallback-Matrix, `fallback_reason=solver_time_limit` | Keine neue Version; Fallback-Matrix. |
+| `success` | `iteration_limit` | `has_usable_solution=true`, `solution_quality=feasible` | `Feasible` | `fallback_source=sidecar_result`, `fallback_reason=none`, `termination=iteration_limit_with_feasible_solution` | Ergebnis uebernehmen; Resource-Limit bleibt in `TerminationReason`/Warnings sichtbar. |
+| `success` | `iteration_limit` | `has_usable_solution=false`, `solution_quality=none` | `IterationLimit` | `fallback_source` aus Fallback-Matrix, `fallback_reason=solver_iteration_limit` | Keine neue Version; Fallback-Matrix. |
+| `deadline_exceeded` | kein Ergebnis | `has_usable_solution=false`, `solution_quality=none` | `TimeLimit` | `fallback_source` aus Fallback-Matrix, `fallback_reason=deadline_exceeded` | Fallback-Matrix Timeout/Deadline. |
+| `unavailable` | kein Ergebnis | `has_usable_solution=false`, `solution_quality=none` | `Failed` | `fallback_source` aus Fallback-Matrix, `fallback_reason=sidecar_unavailable` | Fallback-Matrix Unavailable. |
+| `cancelled` durch Caller | kein Ergebnis | `has_usable_solution=false`, `solution_quality=none` | `Failed` | `fallback_source` aus Fallback-Matrix, `fallback_reason=transport_cancelled` | Kein Retry; danach derselbe frische-Plan-oder-Safe-Stop-Fallback wie bei Transportabbruch. |
+| `invalid_request` / Schemafehler | kein Ergebnis | `has_usable_solution=false`, `solution_quality=none` | `Failed` | `fallback_source=no_activation` oder `safe_stop`, `fallback_reason=invalid_request` | Ergebnis verwerfen; kein lokaler Optimierer mit denselben ungueltigen Eingaben. |
+| `internal_error` / Crash / Decode-Fehler / unbekannter Status | kein Ergebnis | `has_usable_solution=false`, `solution_quality=none` | `Failed` | `fallback_source` aus Fallback-Matrix, `fallback_reason=transport_internal_error` | Fallback-Matrix Crash/Transportabbruch. |
 
 Die Metrik-Statuslabels bleiben snake_case-kompatibel zu M2
 (`optimal`, `feasible`, `infeasible`, `unbounded`, `time_limit`,
 `iteration_limit`, `failed`). Neue Transport- oder Fallback-Labels duerfen
-keine neuen `OptimizationSolverStatus`-Werte erfinden; Details gehoeren in
-`TerminationReason`, Run-Warnings und Metric-Tags. Ein `ProducedSchedule`
-darf im heutigen M2-Modell nur bei `Optimal` oder `Feasible` persistiert
-werden; resource-limit Faelle mit nutzbarer Loesung muessen deshalb als
-`Feasible` mit passendem Termination-Code gemappt werden.
+keine neuen `OptimizationSolverStatus`-Werte erfinden und muessen aus der
+Fallback-Taxonomie stammen; Details gehoeren in `TerminationReason`,
+Run-Warnings und Metric-Tags. Ein `ProducedSchedule` darf im heutigen
+M2-Modell nur bei `Optimal` oder `Feasible` persistiert werden;
+resource-limit Faelle mit nutzbarer Loesung muessen deshalb als `Feasible`
+mit passendem Termination-Code gemappt werden.
 
 ---
 
@@ -288,7 +312,7 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
 | ⬜ | RM-M5-02 | MPC-Kernel (State-Space, Kalman, Vorhersagehorizont) | Kernel berechnet finite Trajektorien aus State-Space-Modell und Horizon; Kalman-/Schaetzerpfad behandelt Rauschen, Missing Measurements und unplausible Werte; Tests beweisen SOC-, Leistungs-, Ramp- und Constraint-Einhaltung; Fixture-Laeufe sind ueber Seed, Solver-Optionen und Runtime-/Numerik-Version reproduzierbar. |
 | ⬜ | RM-M5-03 | Hochfrequente Telemetrie-Filterung im Native Core (optional) | Aktivierung nur bei konkretem Bedarf aus RM-M5-02; Filtervertrag dokumentiert Samplingrate, Einheiten und Fehlerverhalten; .NET-Prechecks bleiben erhalten; Replay-/Numeriktests decken Drift und ungueltige Eingaben ab; invalider Filter-/MPC-State folgt der Fallback-Matrix. |
 | ⬜ | RM-M5-04 | Replay-Plattform mit Datensatz-Verwaltung und Sollwertvergleich | Versioniertes Manifest fuer Datensaetze; Loader fuer externe JSON-Fixtures validieren reject-by-default gegen bekannte Schema-Versionen und melden Inkompatibilitaet pro Fixture; Manifest-Schema klassifiziert Felder als required/optional/deprecated/tolerated_legacy; bestehende M2/M3-Fixtures bleiben ueber explizit versionierte Kompatibilitaets-Loader lauffaehig, bis 100 % der Pflichtfallliste in kleinen Folge-PRs mit Golden-Diff-Nachweis migriert sind; Manifest enthaelt Seed, Determinismusmodus, Runtime-/Numerik-Versionen, Solver-Optionen, `request_id`-Regel und Toleranzen; Runner vergleicht Commands/Sollwerte gegen Golden-Dateien und mehrere Engines; Diff-Report trennt erlaubte numerische Toleranz von fachlicher Drift. |
-| ⬜ | RM-M5-05 | Erweiterte Metriken / Solverstatus / Command-Latenz | Prometheus-Metriken decken Solverstatus, Laufzeit, Deadline/Timeout, Fallback-Reason, `safe_stop`, `no_valid_plan`, Sidecar-Health und Command-Latenz ab; Tests scrapen erfolgreiche und fehlerhafte Pfade. |
+| ⬜ | RM-M5-05 | Erweiterte Metriken / Solverstatus / Command-Latenz | Prometheus-Metriken decken Solverstatus, Laufzeit, Deadline/Timeout, `fallback_source`, `fallback_reason`, Terminalzustand, Sidecar-Health und Command-Latenz ab; Tests scrapen erfolgreiche und fehlerhafte Pfade. |
 | ⬜ | RM-M5-06 | Container-Orchestrierungstests (Worker + Sidecar) | Compose-/CI-Gate startet Worker und Sidecar, prueft Health, erfolgreichen Optimierungslauf, Sidecar-Crash, Restart und Fallback; Container-Logs enthalten korrelierbare RunId/RequestId. |
 
 ---
@@ -297,24 +321,28 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
 
 1. `AR-OPEN-002` schliessen: ADR 0004 oder Architektur §13 muss die
    finale Transportentscheidung inklusive Security-, Mocking- und
-   CI-Konsequenzen enthalten, bevor ein produktionsnaher Sidecar-Pfad
-   gemerged wird.
-2. RM-M5-01 zuerst als schmalen Contract-Slice bauen: Health, Version,
+   CI-Konsequenzen enthalten.
+2. Security-Freeze fuer RM-M5-01 abschliessen: AuthN/AuthZ,
+   Transportverschluesselung oder geschuetzter lokaler Socket,
+   Secret-Handling und Negativtests fuer unautorisierte Clients sind
+   Go/No-Go-Kriterien, bevor ein produktionsnaher Sidecar-Pfad gemerged
+   wird.
+3. RM-M5-01 zuerst als schmalen Contract-Slice bauen: Health, Version,
    Test-Sidecar, Deadline, Idempotenz, Fallback und Status-Mapping.
-3. RM-M5-05 parallel zum ersten Sidecar-Slice aktivieren, damit
+4. RM-M5-05 parallel zum ersten Sidecar-Slice aktivieren, damit
    Sidecar-Fehler, Deadlines und Fallbacks nicht nachtraeglich
    observierbar gemacht werden muessen.
-4. RM-M5-06 frueh als Container-Gate schneiden, sobald Worker und
+5. RM-M5-06 frueh als Container-Gate schneiden, sobald Worker und
    Test-Sidecar zusammenspielen.
-5. RM-M5-04 danach ausbauen und bestehende M2/M3-Replay-Fixtures
+6. RM-M5-04 danach ausbauen und bestehende M2/M3-Replay-Fixtures
    ueber Kompatibilitaets-Loader lauffaehig halten. Migrationen duerfen
    in kleinen Folge-PRs laufen; der alte Pfad wird erst entfernt, wenn
    Golden-Diff-Nachweise und ein ueberlappender CI-Lauf vorliegen. Neue
    MPC-Faelle bekommen eigene Manifestversion.
-6. RM-M5-02 erst auf stabilem Contract-/Replay-Fundament aktivieren,
+7. RM-M5-02 erst auf stabilem Contract-/Replay-Fundament aktivieren,
    damit numerische Drift und Constraint-Verletzungen reproduzierbar
    diskutiert werden koennen.
-7. RM-M5-03 nur ziehen, wenn RM-M5-02 eine echte hochfrequente
+8. RM-M5-03 nur ziehen, wenn RM-M5-02 eine echte hochfrequente
    Filteranforderung ausweist.
 
 ---
@@ -349,8 +377,8 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
 - Container-Gates pruefen Worker + Sidecar inklusive Health,
   Orchestrierung, Crash/Restart und Fallback.
 - Metriken fuer Solverstatus, Laufzeit, Deadline/Timeout,
-  Fallback-Reason, `safe_stop`, `no_valid_plan`, Sidecar-Health und
-  Command-Latenz sind getestet.
+  `fallback_source`, `fallback_reason`, Terminalzustand, Sidecar-Health
+  und Command-Latenz sind getestet.
 - Roadmap, Quality-Doku und Architektur werden beim Abschluss
   synchronisiert.
 
