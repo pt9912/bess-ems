@@ -121,6 +121,38 @@ M5-Sidecar-Schnitt entweder bestaetigt oder ergaenzt werden.
 
 ---
 
+## Fallback-Matrix
+
+RM-M5-01 muss diese Matrix als Default-Vertrag implementieren oder vor
+Code-Aktivierung per Plan-/ADR-Update aendern. Ein Fallback darf niemals
+ein stale Sidecar-Ergebnis wiederverwenden.
+
+| Fehlerklasse | Verbindlicher Fallback | Qualitaetsdegradation | Mindestnachweis |
+| ------------ | ---------------------- | -------------------- | --------------- |
+| Sidecar gesund, Solverstatus usable | Sidecar-Ergebnis wird ueber bestehende Ports uebernommen und persistiert. | Keine. | Contract-Test fuer erfolgreichen Lauf. |
+| Timeout/Deadline oder Unavailable vor Ergebnis | Horizon-Optimierung nutzt den konfigurierten lokalen `IScheduleOptimizer`, falls vorhanden; sonst wird keine neue Schedule-Version erzeugt und der letzte gueltige Fahrplan bleibt aktiv. | Optimierungsqualitaet kann auf lokalen LP-/NoOp-Pfad fallen; keine neue Version bei fehlendem lokalen Optimierer. | Timeout-/Unavailable-Test mit `Failed`-Run und Fallback-Reason. |
+| Sidecar-Crash waehrend Lauf oder Transportabbruch nach Request-Start | Lauf endet als fehlgeschlagener `OptimizationRun`; Worker bleibt aktiv. Fuer den Regelkreis gilt weiter der letzte gueltige Fahrplan plus bestehende Limiter. | Keine neue Optimierung fuer diesen Lauf; Dispatch folgt bestehendem Fahrplan. | Container-Crash-Test mit weiterlaufendem Worker. |
+| Sidecar liefert Infeasible/Failed ohne nutzbare Loesung | Keine neue Schedule-Version; letzter gueltiger Fahrplan bleibt aktiv. | Keine Reoptimierung; Ursache bleibt in Run/Metric sichtbar. | Solverstatus-Mapping-Test fuer nicht nutzbare Stati. |
+| Sidecar liefert nicht-finite, schema-ungueltige oder constraint-verletzende Trajektorie | Ergebnis wird verworfen; keine neue Schedule-Version; Dispatch-/Control-Pfad verwendet bestehenden Managed-Limiter oder Safe-Stop, wenn kein gueltiger Setpoint existiert. | Sidecar-Ergebnis unbrauchbar; Safety hat Vorrang vor Optimierungsziel. | Negativtest fuer nicht-finite Werte und Constraint-Verletzung. |
+| Ungueltiger Snapshot, stale Telemetrie oder invalider MPC-State vor Sidecar-Aufruf | Kein Sidecar-Aufruf und kein Optimierer-Fallback mit denselben ungueltigen Eingaben; bestehender Control-Precheck erzeugt Safe-Stop/invaliden Snapshot-Pfad. | Optimierung/Dispatch wird abgebrochen, bis valide Eingaben vorliegen. | Precheck-Test mit Nachweis, dass kein Sidecar-Request gesendet wird. |
+
+---
+
+## Replay-Kompatibilitaet
+
+RM-M5-04 fuehrt ein Manifest-/Golden-Diff-Format ein, darf bestehende
+M2/M3-Replay-Pipelines aber nicht still brechen.
+
+| Thema | Vorgabe |
+| ----- | ------- |
+| Formatversion | Neue Datensaetze starten mit Manifest `replay-manifest.v1`; jedes Fixture nennt Schema-Version, Engine-Ziele, Toleranzen, Zeitbasis und Golden-Artefakte. |
+| Bestehende M2-Fixtures | Der M2-Telemetrie-Replay-Shape bleibt ueber einen Kompatibilitaets-Loader lauffaehig, bis ein migriertes Manifest im selben PR eingecheckt ist. |
+| Bestehende M3-Fixtures | Native-Parity-Cases bleiben als Referenzdatensatz erhalten; M5 darf sie referenzieren oder maschinell nach Manifest v1 spiegeln, aber nicht ohne Ersatz loeschen. |
+| Migration | Falls ein Fixture-Format gebrochen wird, muss RM-M5-04 ein Migrationstool oder eine dokumentierte Fixture-Konvertierung mit Golden-Diff-Nachweis liefern. |
+| CI-Kompatibilitaet | Alte und neue Replay-Gates duerfen erst zusammengelegt werden, wenn beide fuer mindestens einen PR-Lauf dieselben fachlichen Faelle abdecken. |
+
+---
+
 ## Komponenten
 
 | Bereich | Artefakt | LH-Bezug |
@@ -141,10 +173,10 @@ M5-Sidecar-Schnitt entweder bestaetigt oder ergaenzt werden.
 
 | Status | ID | Paket | DoD |
 | ------ | -- | ----- | --- |
-| ⬜ | RM-M5-01 | gRPC-Sidecar `optimization-core` (LP/MILP/MPC) | Protobuf-Vertrag ist versioniert; .NET-Adapter ruft Sidecar mit Deadline/Cancellation auf; Health/Version sind testbar; Solverstatus und Fehler werden in bestehende Optimierungsmodelle gemappt; Unavailable/Timeout fuehrt zu kontrolliertem Fallback. |
+| ⬜ | RM-M5-01 | gRPC-Sidecar `optimization-core` (LP/MILP/MPC) | Protobuf-Vertrag ist versioniert; .NET-Adapter ruft Sidecar mit Deadline/Cancellation auf; Health/Version sind testbar; Solverstatus und Fehler werden in bestehende Optimierungsmodelle gemappt; alle Fehlerklassen aus der Fallback-Matrix sind getestet. |
 | ⬜ | RM-M5-02 | MPC-Kernel (State-Space, Kalman, Vorhersagehorizont) | Kernel berechnet finite Trajektorien aus State-Space-Modell und Horizon; Kalman-/Schaetzerpfad behandelt Rauschen, Missing Measurements und unplausible Werte; Tests beweisen SOC-, Leistungs-, Ramp- und Constraint-Einhaltung. |
-| ⬜ | RM-M5-03 | Hochfrequente Telemetrie-Filterung im Native Core (optional) | Aktivierung nur bei konkretem Bedarf aus RM-M5-02; Filtervertrag dokumentiert Samplingrate, Einheiten und Fehlerverhalten; .NET-Prechecks bleiben erhalten; Replay-/Numeriktests decken Drift und ungueltige Eingaben ab. |
-| ⬜ | RM-M5-04 | Replay-Plattform mit Datensatz-Verwaltung und Sollwertvergleich | Versioniertes Manifest fuer Datensaetze; Loader fuer externe JSON-Fixtures; Runner vergleicht Commands/Sollwerte gegen Golden-Dateien und mehrere Engines; Diff-Report trennt erlaubte numerische Toleranz von fachlicher Drift. |
+| ⬜ | RM-M5-03 | Hochfrequente Telemetrie-Filterung im Native Core (optional) | Aktivierung nur bei konkretem Bedarf aus RM-M5-02; Filtervertrag dokumentiert Samplingrate, Einheiten und Fehlerverhalten; .NET-Prechecks bleiben erhalten; Replay-/Numeriktests decken Drift und ungueltige Eingaben ab; invalider Filter-/MPC-State folgt der Fallback-Matrix. |
+| ⬜ | RM-M5-04 | Replay-Plattform mit Datensatz-Verwaltung und Sollwertvergleich | Versioniertes Manifest fuer Datensaetze; Loader fuer externe JSON-Fixtures; bestehende M2/M3-Fixtures bleiben ueber Kompatibilitaets-Loader oder Migration mit Golden-Diff-Nachweis lauffaehig; Runner vergleicht Commands/Sollwerte gegen Golden-Dateien und mehrere Engines; Diff-Report trennt erlaubte numerische Toleranz von fachlicher Drift. |
 | ⬜ | RM-M5-05 | Erweiterte Metriken / Solverstatus / Command-Latenz | Prometheus-Metriken decken Solverstatus, Laufzeit, Deadline/Timeout, Fallback-Reason, Sidecar-Health und Command-Latenz ab; Tests scrapen erfolgreiche und fehlerhafte Pfade. |
 | ⬜ | RM-M5-06 | Container-Orchestrierungstests (Worker + Sidecar) | Compose-/CI-Gate startet Worker und Sidecar, prueft Health, erfolgreichen Optimierungslauf, Sidecar-Crash, Restart und Fallback; Container-Logs enthalten korrelierbare RunId/RequestId. |
 
@@ -162,7 +194,8 @@ M5-Sidecar-Schnitt entweder bestaetigt oder ergaenzt werden.
 4. RM-M5-06 frueh als Container-Gate schneiden, sobald Worker und
    Test-Sidecar zusammenspielen.
 5. RM-M5-04 danach ausbauen und bestehende M2/M3-Replay-Fixtures
-   migrieren oder referenzieren; neue MPC-Faelle bekommen eigene
+   ueber Kompatibilitaets-Loader lauffaehig halten oder im selben Slice
+   mit Golden-Diff-Nachweis migrieren; neue MPC-Faelle bekommen eigene
    Manifestversion.
 6. RM-M5-02 erst auf stabilem Contract-/Replay-Fundament aktivieren,
    damit numerische Drift und Constraint-Verletzungen reproduzierbar
@@ -177,7 +210,7 @@ M5-Sidecar-Schnitt entweder bestaetigt oder ergaenzt werden.
 - MPC-Laeufe erzeugen zulaessige Trajektorien, die SOC-, Leistungs-,
   Ramp-, Geraete- und Netzgrenzen nicht verletzen.
 - Sidecar-Crash, Timeout oder Unavailable beeintraechtigt den Regelkreis
-  nicht; der dokumentierte Fallback bleibt funktionsfaehig und
+  nicht; die Fallback-Matrix ist implementiert, getestet und
   observierbar.
 - Optimierer bleiben ueber bestehende Ports austauschbar; Application und
   Domain referenzieren keinen konkreten Solver und keinen gRPC-Client.
@@ -185,7 +218,8 @@ M5-Sidecar-Schnitt entweder bestaetigt oder ergaenzt werden.
   Fehlergrund bleiben mit dem M2-Optimierungsmodell kompatibel.
 - Replay-Datensaetze sind versioniert, reproduzierbar und koennen
   Sollwerte/Commands zwischen Managed-, Native- und Sidecar-Pfaden
-  vergleichen.
+  vergleichen; bestehende M2/M3-Fixtures bleiben bis zu einer
+  nachgewiesenen Migration lauffaehig.
 - Container-Gates pruefen Worker + Sidecar inklusive Health,
   Orchestrierung, Crash/Restart und Fallback.
 - Metriken fuer Solverstatus, Laufzeit, Deadline/Timeout,
@@ -198,13 +232,16 @@ M5-Sidecar-Schnitt entweder bestaetigt oder ergaenzt werden.
 ## Risiken und Entscheidungen
 
 - **gRPC-Vertrag vs. Architektur-Drift.** Architektur §13 und ADR 0004
-  sehen gRPC fuer Phase-3-Sidecars vor, aber AR-OPEN-002 war als offene
-  Frage dokumentiert. M5 muss diese Entscheidung vor produktivem Code
-  schliessen oder bewusst neu begruenden.
+  sehen gRPC fuer Phase-3-Sidecars vor, aber das Architektur-Open-Item
+  `AR-OPEN-002` in `spec/architecture.md` fuehrt gRPC vs. REST-only fuer
+  externe Optimierungs-Sidecars noch als offen. M5 muss diese
+  Architekturfrage vor produktivem Code per ADR-Update oder
+  Architektur-Sync schliessen.
 - **Fallback-Semantik.** Ein Sidecar-Fallback kann Optimierungsqualitaet
-  verlieren. Jeder Pfad braucht einen expliziten Vertrag: NoOp,
-  bestehender LP-Adapter, letzter gueltiger Fahrplan oder Safe-Stop sind
-  fachlich unterschiedliche Antworten.
+  verlieren. Die Fallback-Matrix ist der verbindliche Default; jede
+  Abweichung braucht Plan-/ADR-Update, weil NoOp, bestehender LP-Adapter,
+  letzter gueltiger Fahrplan und Safe-Stop fachlich unterschiedliche
+  Antworten sind.
 - **Numerische Drift.** MPC, Kalman und native Solver koennen kleine
   Rundungsabweichungen erzeugen. Replay-Toleranzen muessen eng,
   einheitenbezogen und fachlich begruendet sein; Safety-Invarianten haben
@@ -217,5 +254,5 @@ M5-Sidecar-Schnitt entweder bestaetigt oder ergaenzt werden.
   Timeouts und Logs muessen Teil des Gates sein, nicht nur Deployment-Doku.
 - **Replay-Plattform-Scope.** M2 hat bewusst keinen Operator-Replay-CLI,
   JSON-Fixture-Loader oder Multi-Asset-Replay gebaut. M5 darf diese
-  Luecken schliessen, sollte aber UI- und Flottenfunktionen nicht
-  vorziehen.
+  Luecken schliessen, muss dabei aber die M2/M3-Kompatibilitaetsstrategie
+  einhalten und sollte UI- und Flottenfunktionen nicht vorziehen.
