@@ -27,7 +27,7 @@ Konkrete Slice-Pläne entstehen erst beim Trigger:
 - `plan-RM-M4-01-FUP-NN.md` für Folgearbeiten zum Intraday-Slice
   (F-01, F-02)
 - `plan-RM-M4-06-FUP-NN.md` für Folgearbeiten zum MQTT-Slice
-  (F-03, F-04, F-05)
+  (F-03, F-04, F-05, F-06)
 - Oder Carve-out-Sektion innerhalb des auslösenden Plans, falls
   der Trigger ein anderer Slice ist (z. B. Operator-API-Slice der
   F-01 + F-02 zusammenzieht; oder ein Production-Hardening-Slice
@@ -226,6 +226,47 @@ mit RM-M4-05) bündelt.
 **Aktivierungs-Pfad:** eigener `plan-RM-M4-06-FUP-tls-auth.md`,
 oder als Pflicht-Bestandteil eines übergreifenden
 Production-Hardening-Slice.
+
+---
+
+## Item F-06: Explizite ExactlyOnce-Acknowledgement-Gate
+
+**Quelle:** RM-M4-06 Design-Entscheidung D-03 — `ExactlyOnce` (QoS 2)
+ist heute voll konfigurierbar via `MqttAdapterOptions.QoS`, aber es
+gibt keine Startup-Validierung. „Warn-don't-block" ist die heutige
+Politik; wer ExactlyOnce will, kann es ohne Hindernis setzen.
+
+**Trigger** (eines reicht):
+
+- Eine Compliance-/Audit-Anforderung verlangt dass `ExactlyOnce`
+  nur über expliziten Acknowledgement-Mechanismus (analog zum
+  geplanten OPC-UA `AllowUnsecured=true`/`AllowUnsecuredReason`-
+  Pattern aus RM-M4-05) aktiviert werden darf — z. B. um
+  versehentliches Aktivieren auf Production-Profilen zu
+  verhindern.
+- Operations-Reibung: ExactlyOnce-Overhead (PUBREC/PUBREL/PUBCOMP-
+  Round-Trip) ist auf Production-Last sichtbar, und Operator
+  fragt nach einem strukturellen Hinweis statt nur Plan-Prosa.
+- Eine Telemetrie-Auswertung zeigt unbeabsichtigte ExactlyOnce-
+  Konfiguration in Production-Deployments.
+
+**Scope-Skizze** (wenn der Trigger zündet):
+
+- Neuer `AllowExactlyOnce: bool`-Flag plus `AllowExactlyOnceReason:
+  string?` in `MqttAdapterOptions` analog zum geplanten OPC-UA-
+  `AllowUnsecured`-Pattern.
+- Startup-Validierung in der Host-Bootstrap: wenn irgendein
+  QoS-Slot auf `ExactlyOnce` gesetzt ist, MUSS `AllowExactlyOnce=true`
+  plus nicht-leerer `AllowExactlyOnceReason` gesetzt sein, sonst
+  Startup-Failure mit strukturierter Diagnose.
+- Tests: Negativtest für ExactlyOnce-ohne-Flag (Startup-Throw),
+  Positivtest für ExactlyOnce-mit-Flag-und-Reason (durchläuft).
+
+**Aufwandsschätzung:** ~30-50 LOC inkl. Tests.
+
+**Aktivierungs-Pfad:** möglicherweise Carve-out im RM-M4-05-OPC-UA-
+Security-Slice (gleiches Pattern); sonst eigener kleiner
+`plan-RM-M4-06-FUP-exactly-once-gate.md`.
 
 ---
 

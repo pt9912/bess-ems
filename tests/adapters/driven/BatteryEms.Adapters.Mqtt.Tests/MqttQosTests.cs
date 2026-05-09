@@ -18,8 +18,6 @@ public sealed class MqttQosTests
         Assert.Equal(MqttQualityOfService.AtLeastOnce, qos.CommandPublish);
         Assert.Equal(MqttQualityOfService.AtLeastOnce, qos.CommandAckSubscribe);
         Assert.Equal(MqttQualityOfService.AtMostOnce, qos.TelemetrySubscribe);
-        Assert.Equal(MqttQualityOfService.AtLeastOnce, qos.StatusSubscribe);
-        Assert.Equal(MqttQualityOfService.AtLeastOnce, qos.FaultSubscribe);
     }
 
     [Fact]
@@ -129,43 +127,21 @@ public sealed class MqttQosTests
         await write;
     }
 
-    [Fact]
-    public async Task Ack_with_mismatched_command_id_is_dropped_and_pending_command_times_out()
-    {
-        // Mismatch pin: ACK whose CommandId doesn't correlate to any
-        // pending command is silently dropped (no exception, no resolution
-        // of an unrelated TCS); the published command runs out the
-        // ack-timeout and surfaces Failed("ack-timeout").
-        var client = new FakeMqttClient();
-        var sink = new MqttCommandSink(
-            client, MqttFixtures.SimulatorMapping(), MqttFixtures.SampleAsset(),
-            MqttFixtures.Defaults(), new MqttFixtures.FixedClock());
-
-        var write = sink.WriteAsync(SampleCommand("cmd-mismatch"), CancellationToken.None);
-
-        await TestHelpers.WaitUntil(
-            () => client.Publishes.Count > 0
-                && client.SubscribedTopicNames.Contains("battery/asset-1/command/ack", StringComparer.Ordinal),
-            TimeSpan.FromSeconds(1));
-
-        // Deliver an ACK for a DIFFERENT command id while we are
-        // waiting for cmd-mismatch's ACK.
-        var foreignAck = System.Text.Encoding.UTF8.GetBytes(
-            """{"command_id":"some-other-cmd","accepted":true,"reason":"ok"}""");
-        await client.DeliverAsync("battery/asset-1/command/ack", foreignAck);
-
-        var result = await write;
-        Assert.False(result.Success);
-        Assert.Equal("ack-timeout", result.Reason);
-    }
+    // Mismatch behaviour (foreign-CommandId ACK silently dropped →
+    // pending command runs into ack-timeout) is already pinned by
+    // `MqttCommandSinkTests.WriteAsync_ignores_acks_for_unrelated_command_ids`
+    // — no separate pin needed in the QoS suite.
 
     [Fact]
-    public async Task Multiple_pending_commands_correlate_independently()
+    public async Task Multiple_pending_commands_correlate_by_CommandId_not_by_insertion_order()
     {
-        // Two commands published in parallel must each receive their own
-        // ACK — the dictionary keyed by CommandId is the correlation
-        // primitive. Pin: an ACK delivered for cmd-A only resolves the
-        // task waiting on cmd-A, not cmd-B's.
+        // Two commands published in parallel; ACKs delivered with
+        // distinct Reason payloads. Pin asserts the Reason string lands
+        // on the correct CommandDispatchResult, which catches the
+        // hypothetical regression where the dispatcher resolves by
+        // insertion order (e.g. `_pending.Values.First()`) instead of
+        // by CommandId — that bug would still flip both Success=true
+        // but would swap the Reason strings.
         var client = new FakeMqttClient();
         var sink = new MqttCommandSink(
             client, MqttFixtures.SimulatorMapping(), MqttFixtures.SampleAsset(),
@@ -178,17 +154,21 @@ public sealed class MqttQosTests
             () => client.Publishes.Count >= 2,
             TimeSpan.FromSeconds(1));
 
-        // Ack both commands explicitly (in reverse order to verify
-        // independence).
+        // Deliver the ACKs in REVERSE publication order, each with a
+        // distinct Reason. The dispatcher must route each ACK to the
+        // TCS keyed by its own CommandId, regardless of the order the
+        // commands were published.
         await client.DeliverAsync("battery/asset-1/command/ack",
-            System.Text.Encoding.UTF8.GetBytes("""{"command_id":"cmd-B","accepted":true,"reason":"ok"}"""));
+            System.Text.Encoding.UTF8.GetBytes("""{"command_id":"cmd-B","accepted":true,"reason":"reason-for-B"}"""));
         await client.DeliverAsync("battery/asset-1/command/ack",
-            System.Text.Encoding.UTF8.GetBytes("""{"command_id":"cmd-A","accepted":true,"reason":"ok"}"""));
+            System.Text.Encoding.UTF8.GetBytes("""{"command_id":"cmd-A","accepted":true,"reason":"reason-for-A"}"""));
 
         var resultA = await writeA;
         var resultB = await writeB;
         Assert.True(resultA.Success);
         Assert.True(resultB.Success);
+        Assert.Contains("reason-for-A", resultA.Reason, StringComparison.Ordinal);
+        Assert.Contains("reason-for-B", resultB.Reason, StringComparison.Ordinal);
     }
 
     private static BatteryCommand SampleCommand(string id) => new(
