@@ -85,6 +85,12 @@ Alle ✅ — siehe [`plan-RM-M3.md`](plan-RM-M3.md):
 
 **Out of Scope (separate Folge-Slices):**
 
+> **Trigger-Watch-Liste:** alle vier nachfolgenden Items sind in
+> [`../open/note-RM-M3-followups.md`](../open/note-RM-M3-followups.md)
+> mit Trigger-Bedingungen, Scope-Skizze und Aktivierungs-Pfad
+> zentral geführt — diese Stelle hier ist die historische
+> Quelle, die Open-Note ist die Trigger-Watch-Quelle.
+
 - **PID native routing**. `BatteryEms.Domain.PidController.Step`
   ist heute nicht im Regelzyklus verdrahtet (RM-M2-08 lieferte
   PID als Domain-Primitive ohne produktive Verdrahtung). Native

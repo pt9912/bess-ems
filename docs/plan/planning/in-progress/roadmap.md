@@ -68,12 +68,18 @@ unter `in-progress/`.
 > Fallback bei Native-Fehler, opt-in `AbortOnAbiMismatch` als
 > Production-Policy. ADRs [0003](../../adr/0003-native-kernel-language.md)
 > (Sprache C) und [0004](../../adr/0004-native-kernel-process-isolation.md)
-> (In-Process P/Invoke) sind die Architektur-Anker. **Offen:**
-> ein zukünftiger PID-Routing-Slice (M3-D3) sobald ein konkreter
-> PID-Konsument im Regelzyklus vorhanden ist (PidController.Step
-> ist heute nicht verdrahtet); RM-M3-FUP-01..04-Carve-outs
-> (Migrationen, OP-OPEN-05/06, Replay-Folge-Slices) bleiben
-> trigger-getrieben offen.
+> (In-Process P/Invoke) sind die Architektur-Anker. **Offen
+> (alle trigger-getrieben, keine Trigger heute aktiv):** vier
+> Follow-up-Items zentral geführt in
+> [`../open/note-RM-M3-followups.md`](../open/note-RM-M3-followups.md)
+> — M3-D3 PID-Routing (sobald ein PID-Konsument im Regelzyklus
+> existiert; `PidController.Step` ist heute nicht verdrahtet),
+> Production-Profil-Defaults zentralisieren (Operations-Reibung
+> als Trigger), NativeControl-Health-Endpoint
+> (Operator-Anforderung), Out-of-Process/Sprach-Pivot (ADR
+> 0003/0004 Trigger). Plus die orthogonalen
+> RM-M3-FUP-01..04-Carve-outs (Migrationen, OP-OPEN-05/06,
+> Replay-Folge-Slices), ebenfalls trigger-getrieben offen.
 >
 > **M2-Welle 1 (Optimization-Slice, abgeschlossen):**
 > [`../done/plan-RM-M2-optimization.md`](../done/plan-RM-M2-optimization.md)
@@ -125,7 +131,7 @@ unter `in-progress/`.
 | ------ | ----------- | ---------------------------------- | ----- | ---------- |
 | ✅     | M1          | MVP — sichere Regelpipeline        | 1     | [Abgeschlossen](../done/plan-RM-M1.md) |
 | ✅     | M2          | Marktausbau und Optimierung        | 1 → 2 | Abgeschlossen ([Optimization-Slice](../done/plan-RM-M2-optimization.md), RM-M2-01..10, [Migrations-Tooling](../done/plan-RM-M2-migration.md), [HIL](../done/HIL-simulator.md)) |
-| ✅     | M3          | Native Control Core (Library)      | 2     | [`plan-RM-M3.md`](plan-RM-M3.md) — alle RM-M3-01..13 ✅ inkl. C-Pivot, doctest, vier Native-Quality-Gates, replay-basierter Parity, Doku-Sync und PID-Slice mit ABI-Minor-Bump 0.1→0.2; produktive Routing-Aktivierung (M3-D2) und FUP-Slices bleiben offen |
+| ✅     | M3          | Native Control Core (Library)      | 2     | [`plan-RM-M3.md`](plan-RM-M3.md) — alle RM-M3-01..13 ✅ inkl. C-Pivot, doctest, vier Native-Quality-Gates, replay-basierter Parity, Doku-Sync und PID-Slice mit ABI-Minor-Bump 0.1→0.2; M3-D2 produktive Routing-Aktivierung ✅ ([`../done/plan-RM-M3-D2.md`](../done/plan-RM-M3-D2.md)); offene Follow-up-Slices in [`../open/note-RM-M3-followups.md`](../open/note-RM-M3-followups.md) (M3-D3 PID-Routing, Production-Profil-Defaults, NativeControl-Health-Endpoint, Out-of-Process/Sprach-Pivot — alle trigger-getrieben, kein aktiver Trigger heute) |
 | ⬜     | M4          | Regelleistung und OPC-UA           | 2     | folgt mit Aktivierung |
 | ⬜     | M5          | MPC, Solver-Sidecar, Replay        | 3     | folgt mit Aktivierung |
 | ⬜     | M6          | Skalierung, UI, Edge / Multi-Asset | 4     | folgt mit Aktivierung |
