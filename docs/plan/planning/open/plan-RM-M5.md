@@ -139,9 +139,10 @@ eindeutig mit `request_id` korrelierbar bleiben.
 | ----- | ----- |
 | Deduplizierung | Wiederholte Requests mit gleicher `request_id` duerfen hoechstens einen `OptimizationRun` und hoechstens eine Schedule-Version erzeugen. |
 | Retry-Grenze | Automatische Retries sind nur fuer Transportfehler erlaubt, bei denen keine Sidecar-Annahme nachweisbar ist. Sie verwenden dieselbe `request_id`; neue `request_id` bedeutet neuer Lauf und braucht neuen Run-Kontext. |
-| Timeout danach Antwort | Wenn ein spaeter Sidecar-Response fuer eine bereits als Timeout behandelte `request_id` ankommt, darf er keinen neuen Plan aktivieren. Er darf nur als late/duplicate observiert werden. |
+| Atomare Finalisierung | Pro `request_id` gibt es genau einen atomaren Terminalzustand: `sidecar_committed`, `fallback_committed`, `cancelled` oder `failed_no_activation`. Die erste erfolgreiche Compare-and-Set-Finalisierung gewinnt; alle spaeteren Responses oder Retries muessen den vorhandenen Terminalzustand lesen und duerfen keine zweite Aktivierung ausloesen. |
+| Timeout danach Antwort | Wenn ein spaeter Sidecar-Response fuer eine bereits als Timeout behandelte und per `fallback_committed` finalisierte `request_id` ankommt, darf er keinen neuen Plan aktivieren. Er darf nur als `late_response_ignored` observiert werden. |
 | Replay | Replay-Datensaetze speichern `request_id` oder eine deterministische Ableitungsregel, damit Retry-/Duplicate-Faelle reproduzierbar sind. |
-| Observability | Logs, `OptimizationRun`, Metriken und Container-Orchestrierungstests enthalten `request_id`, `run_id` und `fallback_reason`. |
+| Observability | Logs, `OptimizationRun`, Metriken und Container-Orchestrierungstests enthalten `request_id`, `run_id`, Terminalzustand und `fallback_reason`. |
 
 ---
 
@@ -154,7 +155,7 @@ verwendbar, wenn er frisch und kontextkompatibel ist. Sonst gilt er als
 | Kriterium | Verbindliche Regel |
 | --------- | ------------------ |
 | Zeitindex | Der aktuelle Tick muss innerhalb des halboffenen Schedule-Horizonts liegen; ausserhalb des Horizon ist der Plan ungueltig. |
-| Maximales Alter | Fallback darf nur auf eine Schedule-Version zugreifen, deren Gueltigkeitsfenster den aktuellen Tick abdeckt und deren Version nicht aelter als der konfigurierte `MaxFallbackScheduleAge` ist. Der M5-Default fuer den ersten Sidecar-Slice ist hoechstens ein Optimierungs-/Dispatch-Horizon; ein laengerer Wert braucht Plan-/ADR-Update. |
+| Maximales Alter | `MaxFallbackScheduleAge` ist eine UTC-Dauer in Sekunden beziehungsweise eine .NET-`TimeSpan`-Konfiguration. Gemessen wird `current_tick_utc - schedule_created_at_utc`; wenn kein Schedule-Erstellzeitpunkt existiert, gilt `OptimizationRun.CreatedAt` der erzeugenden Version. Zusaetzlich muss der aktuelle Tick im Schedule-Gueltigkeitsfenster liegen. Der M5-Default fuer den ersten Sidecar-Slice ist `min(Schedule.TimeStep, 2 * ControlCycleInterval)` pro Asset/Schedule-Type; fehlt eine dieser Groessen, ist `MaxFallbackScheduleAge` explizit zu konfigurieren. |
 | Kontext-Stempel | Fallback-Entscheidungen vergleichen `asset_id`, Asset-Set, Schedule-Type, Horizon-Start/-Ende, Time-Step, Constraint-/Limit-Version und Markt-/Reserve-Kontext. Jede Abweichung invalidiert den Plan. |
 | Telemetrie-Drift | SOC, verfuegbare Lade-/Entladeleistung, Netzlimit, Temperatur-/Availability-Status oder Reserve-Kontext duerfen nicht ausserhalb der Toleranzen liegen, mit denen der Plan erzeugt wurde. Drift ausserhalb der Toleranz invalidiert den Plan hart. |
 | Versionierung | Ein neuerer erfolgreicher Plan fuer dasselbe Asset und denselben Schedule-Type ersetzt aeltere Fallback-Kandidaten. Versionskonflikt oder unbekannte Base-Version ist `no_valid_plan`. |
@@ -192,29 +193,35 @@ nicht ein stiller Optimierungs-Fallback.
 RM-M5-01 muss den transportneutralen Sidecar-Status vor produktivem Code
 als versionierten Contract festlegen. Der gewaehlte Transport mappt seine
 konkreten Statuscodes, zum Beispiel gRPC-Codes oder HTTP-Status, zuerst
-auf diese normierten Transport-Outcomes. Die .NET-Seite darf nur diese
-Tabelle in `OptimizationRun.Status`, `TerminationReason` und Metrik-Tags
-mappen.
+auf diese normierten Transport-Outcomes. Jede Sidecar-Antwort enthaelt
+zusaetzlich `has_usable_solution` und `solution_quality` (`optimal`,
+`feasible`, `none`). Die .NET-Seite darf nur diese Tabelle in
+`OptimizationRun.Status`, `TerminationReason` und Metrik-Tags mappen.
 
-| Normierter Transportstatus | Solverstatus aus Sidecar | M2 `OptimizationSolverStatus` | Metric Tags / Reason | Fallback |
-| -------------------------- | ------------------------ | ----------------------------- | -------------------- | -------- |
-| `success` | `optimal` | `Optimal` | `status=optimal`, `transport=success`, `fallback=none` | Ergebnis uebernehmen. |
-| `success` | `feasible` | `Feasible` | `status=feasible`, `transport=success`, `fallback=none` | Ergebnis uebernehmen, Qualitaetsinfo persistieren. |
-| `success` | `infeasible` | `Infeasible` | `status=infeasible`, `transport=success`, `fallback=last_valid_or_safe_stop` | Keine neue Version; Fallback-Matrix. |
-| `success` | `unbounded` | `Unbounded` | `status=unbounded`, `transport=success`, `fallback=last_valid_or_safe_stop` | Keine neue Version; Fallback-Matrix. |
-| `success` | `time_limit` | `TimeLimit` | `status=time_limit`, `transport=success`, `fallback=last_valid_or_safe_stop` | Nur uebernehmen, wenn Sidecar zugleich nutzbare `feasible`-Loesung markiert; sonst Fallback-Matrix. |
-| `success` | `iteration_limit` | `IterationLimit` | `status=iteration_limit`, `transport=success`, `fallback=last_valid_or_safe_stop` | Nur uebernehmen, wenn Sidecar zugleich nutzbare `feasible`-Loesung markiert; sonst Fallback-Matrix. |
-| `deadline_exceeded` | kein Ergebnis | `TimeLimit` | `status=time_limit`, `transport=deadline_exceeded`, `fallback=local_optimizer_or_safe_stop` | Fallback-Matrix Timeout/Deadline. |
-| `unavailable` | kein Ergebnis | `Failed` | `status=failed`, `transport=unavailable`, `fallback=local_optimizer_or_safe_stop` | Fallback-Matrix Unavailable. |
-| `cancelled` durch Caller | kein Ergebnis | `Failed` | `status=failed`, `transport=cancelled`, `fallback=last_valid_or_safe_stop` | Kein Retry; danach derselbe frische-Plan-oder-Safe-Stop-Fallback wie bei Transportabbruch. |
-| `invalid_request` / Schemafehler | kein Ergebnis | `Failed` | `status=failed`, `transport=invalid_request`, `fallback=safe_stop_if_no_valid_plan` | Ergebnis verwerfen; kein lokaler Optimierer mit denselben ungueltigen Eingaben. |
-| `internal_error` / Crash / Decode-Fehler / unbekannter Status | kein Ergebnis | `Failed` | `status=failed`, `transport=internal_error`, `fallback=last_valid_or_safe_stop` | Fallback-Matrix Crash/Transportabbruch. |
+| Normierter Transportstatus | Solverstatus aus Sidecar | Usable-Signal | M2 `OptimizationSolverStatus` | Metric Tags / Reason | Fallback |
+| -------------------------- | ------------------------ | ------------- | ----------------------------- | -------------------- | -------- |
+| `success` | `optimal` | `has_usable_solution=true`, `solution_quality=optimal` | `Optimal` | `status=optimal`, `transport=success`, `fallback=none` | Ergebnis uebernehmen. |
+| `success` | `feasible` | `has_usable_solution=true`, `solution_quality=feasible` | `Feasible` | `status=feasible`, `transport=success`, `fallback=none` | Ergebnis uebernehmen, Qualitaetsinfo persistieren. |
+| `success` | `infeasible` | `has_usable_solution=false`, `solution_quality=none` | `Infeasible` | `status=infeasible`, `transport=success`, `fallback=last_valid_or_safe_stop` | Keine neue Version; Fallback-Matrix. |
+| `success` | `unbounded` | `has_usable_solution=false`, `solution_quality=none` | `Unbounded` | `status=unbounded`, `transport=success`, `fallback=last_valid_or_safe_stop` | Keine neue Version; Fallback-Matrix. |
+| `success` | `time_limit` | `has_usable_solution=true`, `solution_quality=feasible` | `Feasible` | `status=feasible`, `termination=time_limit_with_feasible_solution`, `transport=success`, `fallback=none` | Ergebnis uebernehmen; Resource-Limit bleibt in `TerminationReason`/Warnings sichtbar. |
+| `success` | `time_limit` | `has_usable_solution=false`, `solution_quality=none` | `TimeLimit` | `status=time_limit`, `transport=success`, `fallback=last_valid_or_safe_stop` | Keine neue Version; Fallback-Matrix. |
+| `success` | `iteration_limit` | `has_usable_solution=true`, `solution_quality=feasible` | `Feasible` | `status=feasible`, `termination=iteration_limit_with_feasible_solution`, `transport=success`, `fallback=none` | Ergebnis uebernehmen; Resource-Limit bleibt in `TerminationReason`/Warnings sichtbar. |
+| `success` | `iteration_limit` | `has_usable_solution=false`, `solution_quality=none` | `IterationLimit` | `status=iteration_limit`, `transport=success`, `fallback=last_valid_or_safe_stop` | Keine neue Version; Fallback-Matrix. |
+| `deadline_exceeded` | kein Ergebnis | `has_usable_solution=false`, `solution_quality=none` | `TimeLimit` | `status=time_limit`, `transport=deadline_exceeded`, `fallback=local_optimizer_or_safe_stop` | Fallback-Matrix Timeout/Deadline. |
+| `unavailable` | kein Ergebnis | `has_usable_solution=false`, `solution_quality=none` | `Failed` | `status=failed`, `transport=unavailable`, `fallback=local_optimizer_or_safe_stop` | Fallback-Matrix Unavailable. |
+| `cancelled` durch Caller | kein Ergebnis | `has_usable_solution=false`, `solution_quality=none` | `Failed` | `status=failed`, `transport=cancelled`, `fallback=last_valid_or_safe_stop` | Kein Retry; danach derselbe frische-Plan-oder-Safe-Stop-Fallback wie bei Transportabbruch. |
+| `invalid_request` / Schemafehler | kein Ergebnis | `has_usable_solution=false`, `solution_quality=none` | `Failed` | `status=failed`, `transport=invalid_request`, `fallback=safe_stop_if_no_valid_plan` | Ergebnis verwerfen; kein lokaler Optimierer mit denselben ungueltigen Eingaben. |
+| `internal_error` / Crash / Decode-Fehler / unbekannter Status | kein Ergebnis | `has_usable_solution=false`, `solution_quality=none` | `Failed` | `status=failed`, `transport=internal_error`, `fallback=last_valid_or_safe_stop` | Fallback-Matrix Crash/Transportabbruch. |
 
 Die Metrik-Statuslabels bleiben snake_case-kompatibel zu M2
 (`optimal`, `feasible`, `infeasible`, `unbounded`, `time_limit`,
 `iteration_limit`, `failed`). Neue Transport- oder Fallback-Labels duerfen
 keine neuen `OptimizationSolverStatus`-Werte erfinden; Details gehoeren in
-`TerminationReason`, Run-Warnings und Metric-Tags.
+`TerminationReason`, Run-Warnings und Metric-Tags. Ein `ProducedSchedule`
+darf im heutigen M2-Modell nur bei `Optimal` oder `Feasible` persistiert
+werden; resource-limit Faelle mit nutzbarer Loesung muessen deshalb als
+`Feasible` mit passendem Termination-Code gemappt werden.
 
 ---
 
@@ -255,7 +262,7 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
 
 | Status | ID | Paket | DoD |
 | ------ | -- | ----- | --- |
-| ⬜ | RM-M5-01 | Sidecar `optimization-core` (LP/MILP/MPC) | Transportentscheidung fuer `AR-OPEN-002` ist abgeschlossen; Sidecar-Vertrag ist versioniert; .NET-Adapter ruft Sidecar mit Deadline/Cancellation und `request_id` auf; Health/Version sind testbar; Sidecar-Status-Taxonomie mappt normierten Transportstatus + Solverstatus exakt auf M2-`OptimizationRun`, `TerminationReason` und Metric-Tags; Retry-/Duplicate-Faelle sind idempotent; alle Fehlerklassen aus der Fallback-Matrix und alle Plan-Gueltigkeits-Invalidierungen sind getestet. |
+| ⬜ | RM-M5-01 | Sidecar `optimization-core` (LP/MILP/MPC) | Transportentscheidung fuer `AR-OPEN-002` ist abgeschlossen; Sidecar-Vertrag ist versioniert; .NET-Adapter ruft Sidecar mit Deadline/Cancellation und `request_id` auf; Health/Version sind testbar; Sidecar-Status-Taxonomie mappt normierten Transportstatus + Solverstatus + `has_usable_solution` exakt auf M2-`OptimizationRun`, `TerminationReason` und Metric-Tags; Request-Finalisierung ist atomar; Retry-/Duplicate-/Late-Response-Faelle sind idempotent; alle Fehlerklassen aus der Fallback-Matrix und alle Plan-Gueltigkeits-Invalidierungen sind getestet. |
 | ⬜ | RM-M5-02 | MPC-Kernel (State-Space, Kalman, Vorhersagehorizont) | Kernel berechnet finite Trajektorien aus State-Space-Modell und Horizon; Kalman-/Schaetzerpfad behandelt Rauschen, Missing Measurements und unplausible Werte; Tests beweisen SOC-, Leistungs-, Ramp- und Constraint-Einhaltung; Fixture-Laeufe sind ueber Seed, Solver-Optionen und Runtime-/Numerik-Version reproduzierbar. |
 | ⬜ | RM-M5-03 | Hochfrequente Telemetrie-Filterung im Native Core (optional) | Aktivierung nur bei konkretem Bedarf aus RM-M5-02; Filtervertrag dokumentiert Samplingrate, Einheiten und Fehlerverhalten; .NET-Prechecks bleiben erhalten; Replay-/Numeriktests decken Drift und ungueltige Eingaben ab; invalider Filter-/MPC-State folgt der Fallback-Matrix. |
 | ⬜ | RM-M5-04 | Replay-Plattform mit Datensatz-Verwaltung und Sollwertvergleich | Versioniertes Manifest fuer Datensaetze; Loader fuer externe JSON-Fixtures; bestehende M2/M3-Fixtures bleiben ueber Kompatibilitaets-Loader lauffaehig, bis 100 % der Pflichtfallliste in kleinen Folge-PRs mit Golden-Diff-Nachweis migriert sind; Manifest enthaelt Seed, Determinismusmodus, Runtime-/Numerik-Versionen, Solver-Optionen, `request_id`-Regel und Toleranzen; Runner vergleicht Commands/Sollwerte gegen Golden-Dateien und mehrere Engines; Diff-Report trennt erlaubte numerische Toleranz von fachlicher Drift. |
