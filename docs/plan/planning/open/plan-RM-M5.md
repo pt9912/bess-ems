@@ -107,6 +107,7 @@ Optimierungs-Sidecars festhaelt.
 | M4-Schnitt | Falls Regelleistungs-Reserve-Constraints Teil des MPC-/MILP-Modells werden, muss das M4-Reservemodell abgeschlossen oder als explizite Planannahme dokumentiert sein. |
 | ADR-Status | ADR 0004 wird fuer Sidecar-Transport, Supervisor-/Health-Verhalten, Fallback-Policy und Container-Topologie revalidiert. |
 | Transportentscheidung | `AR-OPEN-002` ist geschlossen; ADR 0004 oder Architektur §13 nennt den finalen Transport (`gRPC` oder Alternative), Security-/Mocking-/CI-Konsequenzen und den Link zur Entscheidung. |
+| Transport-Mapping | Vor RM-M5-01-Freeze existiert ein versioniertes Transport-Mapping-Dokument, das konkrete Transportcodes auf die normierten Outcomes der Sidecar-Status-Taxonomie mappt und Retry-, Cancellation-, Deadline- und Unavailable-Regeln festlegt. |
 | Replay-Baseline | Bestehende M2/M3-Replay-Datensaetze sind referenzierbar; neue Datensaetze bekommen Manifest, Version und Vergleichsregeln. |
 | Toolchain | Transport-Codegen falls noetig, Sidecar-Build und Container-Build sind reproduzierbar in Docker/CI. |
 | Fallback | Fuer jeden Sidecar-Aufruf ist vor Aktivierung dokumentiert, welcher lokale Fallback benutzt wird und welche Semantik dadurch verloren geht. |
@@ -138,6 +139,7 @@ eindeutig mit `request_id` korrelierbar bleiben.
 | Thema | Regel |
 | ----- | ----- |
 | Deduplizierung | Wiederholte Requests mit gleicher `request_id` duerfen hoechstens einen `OptimizationRun` und hoechstens eine Schedule-Version erzeugen. |
+| Persistenter Idempotency-Store | Sidecar- und Fallback-Aktivierung muessen vor jeder Wirkung einen persistenten Idempotency-Eintrag mit Unique-Constraint auf `request_id` anlegen oder laden. Der Terminalzustand wird atomar und restart-fest gespeichert; ein Worker-Restart darf dieselbe `request_id` nur anhand dieses Stores fortsetzen oder als Duplicate verwerfen. |
 | Retry-Grenze | Automatische Retries sind nur fuer Transportfehler erlaubt, bei denen keine Sidecar-Annahme nachweisbar ist. Sie verwenden dieselbe `request_id`; neue `request_id` bedeutet neuer Lauf und braucht neuen Run-Kontext. |
 | Atomare Finalisierung | Pro `request_id` gibt es genau einen atomaren Terminalzustand: `sidecar_committed`, `fallback_committed`, `cancelled` oder `failed_no_activation`. Die erste erfolgreiche Compare-and-Set-Finalisierung gewinnt; alle spaeteren Responses oder Retries muessen den vorhandenen Terminalzustand lesen und duerfen keine zweite Aktivierung ausloesen. |
 | Timeout danach Antwort | Wenn ein spaeter Sidecar-Response fuer eine bereits als Timeout behandelte und per `fallback_committed` finalisierte `request_id` ankommt, darf er keinen neuen Plan aktivieren. Er darf nur als `late_response_ignored` observiert werden. |
@@ -197,6 +199,8 @@ auf diese normierten Transport-Outcomes. Jede Sidecar-Antwort enthaelt
 zusaetzlich `has_usable_solution` und `solution_quality` (`optimal`,
 `feasible`, `none`). Die .NET-Seite darf nur diese Tabelle in
 `OptimizationRun.Status`, `TerminationReason` und Metrik-Tags mappen.
+Das konkrete Transport-Mapping ist ein eigenes versioniertes Artefakt und
+ist vor RM-M5-01-Freeze Pflicht.
 
 | Normierter Transportstatus | Solverstatus aus Sidecar | Usable-Signal | M2 `OptimizationSolverStatus` | Metric Tags / Reason | Fallback |
 | -------------------------- | ------------------------ | ------------- | ----------------------------- | -------------------- | -------- |
@@ -233,6 +237,7 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
 | Thema | Vorgabe |
 | ----- | ------- |
 | Formatversion | Neue Datensaetze starten mit Manifest `replay-manifest.v1`; jedes Fixture nennt Schema-Version, Engine-Ziele, Toleranzen, Zeitbasis, deterministische `request_id`-Ableitung und Golden-Artefakte. |
+| Schema-Validation | Replay-Loader validieren Manifest und Fixture vor Ausfuehrung strikt gegen versionierte Schemas. Unbekannte `schema_version`, unbekannte Pflichtfelder, unbekannte Top-Level-Felder oder nicht explizit erlaubte Legacy-Versionen werden reject-by-default mit maschinenlesbarem Fehler pro Fixture abgelehnt. |
 | Determinismus | Jedes Manifest dokumentiert `seed`, `solver_deterministic_mode`, Solver-/Runtime-/Numerik-Versionen, Time-Step, Rundungsmodus und aktivierte Solver-Optionen. Zufalls- oder Rauschmodelle duerfen nur ueber Manifest-Seed laufen. |
 | Bestehende M2-Fixtures | Der M2-Telemetrie-Replay-Shape bleibt ueber einen Kompatibilitaets-Loader lauffaehig. Migration darf in kleinen Folge-PRs erfolgen; der Kompatibilitaets-Loader darf erst entfernt werden, wenn ein migriertes Manifest dieselben fachlichen Faelle abdeckt und mindestens ein CI-Lauf beide Pfade verglichen hat. |
 | Bestehende M3-Fixtures | Native-Parity-Cases bleiben als Referenzdatensatz erhalten; M5 darf sie referenzieren oder maschinell nach Manifest v1 spiegeln, aber nicht ohne Ersatz loeschen. |
@@ -262,10 +267,10 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
 
 | Status | ID | Paket | DoD |
 | ------ | -- | ----- | --- |
-| ⬜ | RM-M5-01 | Sidecar `optimization-core` (LP/MILP/MPC) | Transportentscheidung fuer `AR-OPEN-002` ist abgeschlossen; Sidecar-Vertrag ist versioniert; .NET-Adapter ruft Sidecar mit Deadline/Cancellation und `request_id` auf; Health/Version sind testbar; Sidecar-Status-Taxonomie mappt normierten Transportstatus + Solverstatus + `has_usable_solution` exakt auf M2-`OptimizationRun`, `TerminationReason` und Metric-Tags; Request-Finalisierung ist atomar; Retry-/Duplicate-/Late-Response-Faelle sind idempotent; alle Fehlerklassen aus der Fallback-Matrix und alle Plan-Gueltigkeits-Invalidierungen sind getestet. |
+| ⬜ | RM-M5-01 | Sidecar `optimization-core` (LP/MILP/MPC) | Transportentscheidung fuer `AR-OPEN-002` ist abgeschlossen; Transport-Mapping-Dokument ist versioniert; Sidecar-Vertrag ist versioniert; .NET-Adapter ruft Sidecar mit Deadline/Cancellation und `request_id` auf; Health/Version sind testbar; Sidecar-Status-Taxonomie mappt normierten Transportstatus + Solverstatus + `has_usable_solution` exakt auf M2-`OptimizationRun`, `TerminationReason` und Metric-Tags; Request-Finalisierung laeuft ueber persistenten Idempotency-Store mit Unique-Constraint auf `request_id`; Retry-/Duplicate-/Late-Response-/Restart-Faelle sind idempotent; alle Fehlerklassen aus der Fallback-Matrix und alle Plan-Gueltigkeits-Invalidierungen sind getestet. |
 | ⬜ | RM-M5-02 | MPC-Kernel (State-Space, Kalman, Vorhersagehorizont) | Kernel berechnet finite Trajektorien aus State-Space-Modell und Horizon; Kalman-/Schaetzerpfad behandelt Rauschen, Missing Measurements und unplausible Werte; Tests beweisen SOC-, Leistungs-, Ramp- und Constraint-Einhaltung; Fixture-Laeufe sind ueber Seed, Solver-Optionen und Runtime-/Numerik-Version reproduzierbar. |
 | ⬜ | RM-M5-03 | Hochfrequente Telemetrie-Filterung im Native Core (optional) | Aktivierung nur bei konkretem Bedarf aus RM-M5-02; Filtervertrag dokumentiert Samplingrate, Einheiten und Fehlerverhalten; .NET-Prechecks bleiben erhalten; Replay-/Numeriktests decken Drift und ungueltige Eingaben ab; invalider Filter-/MPC-State folgt der Fallback-Matrix. |
-| ⬜ | RM-M5-04 | Replay-Plattform mit Datensatz-Verwaltung und Sollwertvergleich | Versioniertes Manifest fuer Datensaetze; Loader fuer externe JSON-Fixtures; bestehende M2/M3-Fixtures bleiben ueber Kompatibilitaets-Loader lauffaehig, bis 100 % der Pflichtfallliste in kleinen Folge-PRs mit Golden-Diff-Nachweis migriert sind; Manifest enthaelt Seed, Determinismusmodus, Runtime-/Numerik-Versionen, Solver-Optionen, `request_id`-Regel und Toleranzen; Runner vergleicht Commands/Sollwerte gegen Golden-Dateien und mehrere Engines; Diff-Report trennt erlaubte numerische Toleranz von fachlicher Drift. |
+| ⬜ | RM-M5-04 | Replay-Plattform mit Datensatz-Verwaltung und Sollwertvergleich | Versioniertes Manifest fuer Datensaetze; Loader fuer externe JSON-Fixtures validieren reject-by-default gegen bekannte Schema-Versionen und melden Inkompatibilitaet pro Fixture; bestehende M2/M3-Fixtures bleiben ueber explizit versionierte Kompatibilitaets-Loader lauffaehig, bis 100 % der Pflichtfallliste in kleinen Folge-PRs mit Golden-Diff-Nachweis migriert sind; Manifest enthaelt Seed, Determinismusmodus, Runtime-/Numerik-Versionen, Solver-Optionen, `request_id`-Regel und Toleranzen; Runner vergleicht Commands/Sollwerte gegen Golden-Dateien und mehrere Engines; Diff-Report trennt erlaubte numerische Toleranz von fachlicher Drift. |
 | ⬜ | RM-M5-05 | Erweiterte Metriken / Solverstatus / Command-Latenz | Prometheus-Metriken decken Solverstatus, Laufzeit, Deadline/Timeout, Fallback-Reason, `safe_stop`, `no_valid_plan`, Sidecar-Health und Command-Latenz ab; Tests scrapen erfolgreiche und fehlerhafte Pfade. |
 | ⬜ | RM-M5-06 | Container-Orchestrierungstests (Worker + Sidecar) | Compose-/CI-Gate startet Worker und Sidecar, prueft Health, erfolgreichen Optimierungslauf, Sidecar-Crash, Restart und Fallback; Container-Logs enthalten korrelierbare RunId/RequestId. |
 
