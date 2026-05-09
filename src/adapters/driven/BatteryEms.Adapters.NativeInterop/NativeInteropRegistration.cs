@@ -31,6 +31,17 @@ public static class NativeInteropRegistration
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        return AddBessNativeControl(
+            services,
+            configuration,
+            loadNativeControl: null);
+    }
+
+    internal static IServiceCollection AddBessNativeControl(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        Func<NativeControlOptions, NativeControlLoadResult>? loadNativeControl)
+    {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
@@ -48,7 +59,7 @@ public static class NativeInteropRegistration
         // garantiert, dass der teure dlopen + ABI-Check pro Host-
         // Instanz exakt einmal passiert.
         services.AddSingleton<IControlKernel>(sp =>
-            BuildControlKernel(options, sp));
+            BuildControlKernel(options, sp, loadNativeControl));
 
         return services;
     }
@@ -58,11 +69,12 @@ public static class NativeInteropRegistration
         Justification = "DI factory for IControlKernel: any unexpected error during the dlopen / ABI handshake must surface as a hard startup failure rather than a silent fallback, so we let the InvalidOperationException from ApplyAbortPolicy propagate and rethrow other unexpected errors with context.")]
     internal static IControlKernel BuildControlKernel(
         NativeControlOptions options,
-        IServiceProvider services)
+        IServiceProvider services,
+        Func<NativeControlOptions, NativeControlLoadResult>? loadNativeControl = null)
     {
-        var loaderLogger = services.GetRequiredService<ILogger<NativeControlLoader>>();
-        var loader = new NativeControlLoader(loaderLogger);
-        var loadResult = loader.TryLoad(options);
+        var loadResult = loadNativeControl is not null
+            ? loadNativeControl(options)
+            : LoadWithProductionGateway(options, services);
 
         // Production-policy escape hatch (`AbortOnAbiMismatch=true`):
         // ABI-Mismatch wird zum harten Startup-Fehler, statt still in
@@ -94,5 +106,14 @@ public static class NativeInteropRegistration
         var fallbackLogger =
             services.GetRequiredService<ILogger<NativeFallbackControlKernel>>();
         return new NativeFallbackControlKernel(native, managed, fallbackLogger);
+    }
+
+    private static NativeControlLoadResult LoadWithProductionGateway(
+        NativeControlOptions options,
+        IServiceProvider services)
+    {
+        var loaderLogger = services.GetRequiredService<ILogger<NativeControlLoader>>();
+        var loader = new NativeControlLoader(loaderLogger);
+        return loader.TryLoad(options);
     }
 }

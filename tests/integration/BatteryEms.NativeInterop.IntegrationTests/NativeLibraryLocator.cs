@@ -60,6 +60,15 @@ internal static class NativeLibraryLocator
             + $"Searched: {string.Join(", ", candidates)}");
     }
 
+    public static string RepoPath(params string[] segments)
+    {
+        ArgumentNullException.ThrowIfNull(segments);
+        var allSegments = new string[segments.Length + 1];
+        allSegments[0] = FindRepoRoot();
+        Array.Copy(segments, 0, allSegments, 1, segments.Length);
+        return Path.Combine(allSegments);
+    }
+
     private static string FindRepoRoot()
     {
         // The marker is the .git directory at the repo root; walking

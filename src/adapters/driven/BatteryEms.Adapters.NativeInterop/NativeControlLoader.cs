@@ -101,6 +101,7 @@ public sealed partial class NativeControlLoader
             // load-failed bucket as the dlopen path; the operator
             // distinguishes them through the detail message, not the
             // status enum.
+            _gateway.Free(handle);
             var failed = NativeControlLoadResult.LoadFailed(options.LibraryPath, ex.Message);
             LogLoadFailed(options.LibraryPath, ex.Message);
             return failed;
@@ -108,6 +109,7 @@ public sealed partial class NativeControlLoader
 
         if (!IsCompatible(reportedVersion))
         {
+            _gateway.Free(handle);
             var mismatch = NativeControlLoadResult.AbiMismatch(
                 options.LibraryPath, reportedVersion, ExpectedAbiVersion);
             LogAbiMismatch(options.LibraryPath, reportedVersion, ExpectedAbiVersion);

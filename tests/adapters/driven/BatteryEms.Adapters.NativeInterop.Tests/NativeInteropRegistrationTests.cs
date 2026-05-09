@@ -85,6 +85,54 @@ public sealed class NativeInteropRegistrationTests
     }
 
     [Fact]
+    public void Enabled_with_AbiMismatch_without_abort_falls_back_to_ManagedControlKernel()
+    {
+        // M3-D2 default policy: an incompatible native ABI does not
+        // stop the host unless the production fail-fast flag is set.
+        // The DI factory observes the loader result and chooses the
+        // managed kernel for the singleton registration.
+        var services = BuildServicesWithConfig(
+            new Dictionary<string, string?>
+            {
+                ["NativeControl:Enabled"] = "true",
+                ["NativeControl:LibraryPath"] = "/loaded/but/incompatible/libfake.so",
+            },
+            _ => NativeControlLoadResult.AbiMismatch(
+                "/loaded/but/incompatible/libfake.so",
+                reported: 0u,
+                expected: NativeControlLoader.ExpectedAbiVersion));
+
+        var resolved = services.GetRequiredService<IControlKernel>();
+
+        Assert.IsType<ManagedControlKernel>(resolved);
+    }
+
+    [Fact]
+    public void Enabled_with_AbiMismatch_and_abort_throws_on_kernel_resolve()
+    {
+        // The abort flag promotes only AbiMismatch to a hard startup
+        // error. The Microsoft DI container runs singleton factories
+        // lazily, so the observable failure happens on the first
+        // IControlKernel resolve, matching the loader policy contract.
+        var services = BuildServicesWithConfig(
+            new Dictionary<string, string?>
+            {
+                ["NativeControl:Enabled"] = "true",
+                ["NativeControl:LibraryPath"] = "/loaded/but/incompatible/libfake.so",
+                ["NativeControl:AbortOnAbiMismatch"] = "true",
+            },
+            _ => NativeControlLoadResult.AbiMismatch(
+                "/loaded/but/incompatible/libfake.so",
+                reported: 0u,
+                expected: NativeControlLoader.ExpectedAbiVersion));
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            services.GetRequiredService<IControlKernel>());
+
+        Assert.Contains("AbortOnAbiMismatch", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Singleton_lifetime_returns_same_instance_across_resolves()
     {
         // The Native-Loader path is expensive (dlopen + ABI export
@@ -100,7 +148,8 @@ public sealed class NativeInteropRegistrationTests
     }
 
     private static IServiceProvider BuildServicesWithConfig(
-        IDictionary<string, string?> values)
+        IDictionary<string, string?> values,
+        Func<NativeControlOptions, NativeControlLoadResult>? loadNativeControl = null)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(values)
@@ -109,7 +158,7 @@ public sealed class NativeInteropRegistrationTests
         var services = new ServiceCollection();
         services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
         services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
-        services.AddBessNativeControl(configuration);
+        services.AddBessNativeControl(configuration, loadNativeControl);
         return services.BuildServiceProvider();
     }
 }

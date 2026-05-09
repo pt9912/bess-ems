@@ -31,6 +31,7 @@
     <ProjectReference Include="..\..\..\src\hexagon\BatteryEms.Domain\BatteryEms.Domain.csproj" />
     <ProjectReference Include="..\..\..\src\hexagon\BatteryEms.Application\BatteryEms.Application.csproj" />
     <ProjectReference Include="..\..\..\src\adapters\driven\BatteryEms.Adapters.NativeInterop\BatteryEms.Adapters.NativeInterop.csproj" />
+    <ProjectReference Include="..\..\..\src\host\BatteryEms.Host\BatteryEms.Host.csproj" />
   </ItemGroup>
 
   <!-- RM-M3-10: copy the versioned native↔managed parity dataset

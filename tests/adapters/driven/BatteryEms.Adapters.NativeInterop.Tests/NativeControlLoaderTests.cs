@@ -87,6 +87,7 @@ public sealed class NativeControlLoaderTests
 
         Assert.Equal(NativeControlStatus.LoadFailed, result.Status);
         Assert.Contains("entry point", result.Detail!, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, gateway.FreeCalls);
     }
 
     [Fact]
@@ -111,6 +112,7 @@ public sealed class NativeControlLoaderTests
         Assert.Equal(LibraryMajor1Minor0, result.AbiVersion);
         Assert.Equal(NativeControlLoader.ExpectedAbiVersion, result.ExpectedAbiVersion);
         Assert.Contains("not compatible", result.Detail!, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, gateway.FreeCalls);
     }
 
     [Fact]
@@ -160,6 +162,7 @@ public sealed class NativeControlLoaderTests
         Assert.True(result.IsLoaded);
         Assert.Equal(NativeControlLoader.ExpectedAbiVersion, result.AbiVersion);
         Assert.Equal(NativeControlLoader.ExpectedAbiVersion, result.ExpectedAbiVersion);
+        Assert.Equal(0, gateway.FreeCalls);
         // M3-D2-01: a successful load now carries the OS handle so a
         // DI factory can construct NativeControlKernel without a
         // second dlopen.
@@ -273,6 +276,7 @@ public sealed class NativeControlLoaderTests
 
         public int FileExistsCalls { get; private set; }
         public int LoadCalls { get; private set; }
+        public int FreeCalls { get; private set; }
 
         public bool FileExists(string path)
         {
@@ -326,8 +330,7 @@ public sealed class NativeControlLoaderTests
 
         public void Free(nint handle)
         {
-            // No-op: the loader test fixtures don't manage the handle
-            // lifetime explicitly.
+            FreeCalls++;
         }
     }
 }

@@ -1,5 +1,6 @@
 using BatteryEms.Adapters.NativeInterop;
 using BatteryEms.Application.Control;
+using BatteryEms.Host;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -23,6 +24,31 @@ namespace BatteryEms.NativeInterop.IntegrationTests;
 [Collection("native-library")]
 public sealed class NativeInteropRegistrationIntegrationTests
 {
+    [Fact]
+    public async Task Host_build_with_real_library_registers_NativeFallbackControlKernel()
+    {
+        // M3-D2-06 requires the real Host composition path, not only
+        // the adapter-level ServiceCollection. BuildApp loads the
+        // runtime JSON config, wires Application + Worker + driven
+        // adapters, then resolves IControlKernel from the final host
+        // provider with the native profile enabled.
+        var libraryPath = NativeLibraryLocator.Locate();
+        var schemaDirectory = NativeLibraryLocator.RepoPath("config", "schema");
+        var assetConfigPath = NativeLibraryLocator.RepoPath(
+            "config", "examples", "asset.single-bess.json");
+        await using var app = BessHostBuilder.BuildApp(
+        [
+            $"--Bess:SchemaDirectory={schemaDirectory}",
+            $"--Bess:AssetConfigPath={assetConfigPath}",
+            "--NativeControl:Enabled=true",
+            $"--NativeControl:LibraryPath={libraryPath}",
+        ]);
+
+        var resolved = app.Services.GetRequiredService<IControlKernel>();
+
+        Assert.IsType<NativeFallbackControlKernel>(resolved);
+    }
+
     [Fact]
     public void Enabled_with_real_library_registers_NativeFallbackControlKernel()
     {

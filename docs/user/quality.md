@@ -518,11 +518,34 @@ nicht gesetzt), `library-missing` (Pfad existiert nicht),
 (major != erwartet oder minor < erwartet) und `loaded`. Major muss
 exakt matchen, minor darf höher sein (additive Backward-Compat).
 
+Seit **M3-D2** ist der Loader-Pfad im Host-Wiring aktiv:
+`NativeInteropRegistration.AddBessNativeControl(IConfiguration)`
+registriert `IControlKernel` als Singleton. Die Default-Konfiguration in
+`src/host/BatteryEms.Host/appsettings.json` setzt
+`NativeControl:Enabled=false`; damit startet der Host mit
+`ManagedControlKernel`, auch wenn `/app/native/libbattery_control_core.so`
+im Runtime-Image vorhanden ist. Ein produktionsnahes Native-Profil
+aktiviert den Pfad explizit, z. B. per Environment:
+
+```bash
+NativeControl__Enabled=true
+NativeControl__LibraryPath=/app/native/libbattery_control_core.so
+```
+
+Bei `NativeControl:Enabled=true` und kompatibler `.so` registriert der
+Host `NativeFallbackControlKernel`; native `ok`/`limited`-Ergebnisse
+werden verwendet, native Fehler aus validem .NET-Kontext fallen
+deterministisch im selben Tick auf `ManagedControlKernel` zurück. Bei
+`library-missing`, `load-failed` oder `abi-mismatch` ohne Abort-Flag
+registriert der Host ebenfalls den Managed-Pfad und startet weiter.
+
 Ein Startabbruch bei erwarteter, aber inkompatibler Library ist keine
 M3-Default-Policy. Er braucht den expliziten
 `NativeControlOptions.AbortOnAbiMismatch`-Wert (Default `false`) und
-einen eigenen Integrationstest. Solange das Flag false ist, fällt
-der Host bei `abi-mismatch` auf den Managed-Pfad zurück.
+einen eigenen Test. Solange das Flag false ist, fällt der Host bei
+`abi-mismatch` auf den Managed-Pfad zurück; mit
+`NativeControl__AbortOnAbiMismatch=true` führt `abi-mismatch` beim
+ersten `IControlKernel`-Resolve zum harten Startup-Fehler.
 
 ### 5.3 Adapter-Mapping-Schema
 
