@@ -871,6 +871,313 @@ public sealed class JsonFileConfigurationLoaderTests
         }
     }
 
+    // ----- RM-M4-07 OPC-UA mapping tests --------------------------------
+
+    [Fact]
+    public void Loads_example_opcua_simulator_mapping()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var mapping = loader.LoadOpcUaMapping(
+            Path.Combine(ExamplesDirectory, "adapters", "opcua.simulator.json"));
+
+        Assert.Equal("v1", mapping.SchemaVersion);
+        Assert.Equal("opcua-simulator", mapping.ProfileName);
+        Assert.NotEmpty(mapping.Nodes);
+
+        var soc = mapping.Nodes.First(n => n.Name == "soc_percent");
+        Assert.Equal("ns=2;s=Battery.Soc", soc.NodeId);
+        Assert.Equal("subscribe", soc.Direction);
+        Assert.Equal("float", soc.DataType);
+        Assert.False(soc.Writable);
+        Assert.Equal(1000, soc.MonitoringIntervalMs);
+        Assert.NotNull(soc.DevicePoint);
+        Assert.Equal("State of charge", soc.DevicePoint!.DisplayName);
+        Assert.Equal("%", soc.DevicePoint.Unit);
+
+        var setpoint = mapping.Nodes.First(n => n.Name == "active_power_setpoint_kw");
+        Assert.Equal("write", setpoint.Direction);
+        Assert.True(setpoint.Writable);
+        Assert.Equal("cyclic", setpoint.WriteCadence);
+        Assert.Equal("token", setpoint.AuthRequired);
+
+        var faultCode = mapping.Nodes.First(n => n.Name == "fault_code");
+        Assert.NotNull(faultCode.DevicePoint?.ValueExplanation);
+        Assert.Equal("isolation-fault", faultCode.DevicePoint!.ValueExplanation!["1"]);
+    }
+
+    [Fact]
+    public void Opcua_with_missing_required_field_fails_schema()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        // Missing `data_type` on the only node.
+        var path = WriteTempJson("""
+            {
+              "schema_version": "v1",
+              "profile_name": "p",
+              "nodes": [
+                {
+                  "name": "x",
+                  "node_id": "ns=1;i=42",
+                  "direction": "read",
+                  "auth_required": "none"
+                }
+              ]
+            }
+            """);
+        try
+        {
+            var ex = Assert.Throws<ConfigurationValidationException>(() => loader.LoadOpcUaMapping(path));
+            Assert.Contains("Schema validation failed", ex.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Opcua_with_zero_scale_factor_fails_schema()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson("""
+            {
+              "schema_version": "v1",
+              "profile_name": "p",
+              "nodes": [
+                {
+                  "name": "x",
+                  "node_id": "ns=1;i=42",
+                  "direction": "read",
+                  "data_type": "float",
+                  "scale_factor": 0,
+                  "auth_required": "none"
+                }
+              ]
+            }
+            """);
+        try
+        {
+            Assert.Throws<ConfigurationValidationException>(() => loader.LoadOpcUaMapping(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Opcua_with_malformed_node_id_fails_schema()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        // node_id missing the i=/s=/g=/b= prefix.
+        var path = WriteTempJson("""
+            {
+              "schema_version": "v1",
+              "profile_name": "p",
+              "nodes": [
+                {
+                  "name": "x",
+                  "node_id": "Battery.Soc",
+                  "direction": "read",
+                  "data_type": "float",
+                  "auth_required": "none"
+                }
+              ]
+            }
+            """);
+        try
+        {
+            Assert.Throws<ConfigurationValidationException>(() => loader.LoadOpcUaMapping(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Opcua_with_writable_true_but_missing_write_cadence_fails_schema()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson("""
+            {
+              "schema_version": "v1",
+              "profile_name": "p",
+              "nodes": [
+                {
+                  "name": "x",
+                  "node_id": "ns=1;i=42",
+                  "direction": "write",
+                  "data_type": "float",
+                  "writable": true,
+                  "auth_required": "token"
+                }
+              ]
+            }
+            """);
+        try
+        {
+            Assert.Throws<ConfigurationValidationException>(() => loader.LoadOpcUaMapping(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Opcua_with_direction_write_but_writable_false_fails_schema()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson("""
+            {
+              "schema_version": "v1",
+              "profile_name": "p",
+              "nodes": [
+                {
+                  "name": "x",
+                  "node_id": "ns=1;i=42",
+                  "direction": "write",
+                  "data_type": "float",
+                  "writable": false,
+                  "auth_required": "token"
+                }
+              ]
+            }
+            """);
+        try
+        {
+            Assert.Throws<ConfigurationValidationException>(() => loader.LoadOpcUaMapping(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Opcua_with_unknown_field_fails_schema()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        // Unknown field at the node level — additionalProperties:false
+        // + unevaluatedProperties:false must reject it.
+        var path = WriteTempJson("""
+            {
+              "schema_version": "v1",
+              "profile_name": "p",
+              "nodes": [
+                {
+                  "name": "x",
+                  "node_id": "ns=1;i=42",
+                  "direction": "read",
+                  "data_type": "float",
+                  "auth_required": "none",
+                  "made_up_field": 42
+                }
+              ]
+            }
+            """);
+        try
+        {
+            Assert.Throws<ConfigurationValidationException>(() => loader.LoadOpcUaMapping(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Opcua_with_deprecated_schema_version_v0_surfaces_unsupported_schema_version()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson("""
+            {
+              "schema_version": "v0",
+              "profile_name": "p",
+              "nodes": [
+                {
+                  "name": "x",
+                  "node_id": "ns=1;i=42",
+                  "direction": "read",
+                  "data_type": "float",
+                  "auth_required": "none"
+                }
+              ]
+            }
+            """);
+        try
+        {
+            var ex = Assert.Throws<ConfigurationValidationException>(() => loader.LoadOpcUaMapping(path));
+            Assert.Contains("unsupported-schema-version", ex.Message, StringComparison.Ordinal);
+            Assert.Contains("v0", ex.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Opcua_with_future_incompatible_schema_version_v2_surfaces_unsupported_schema_version()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson("""
+            {
+              "schema_version": "v2",
+              "profile_name": "p",
+              "nodes": [
+                {
+                  "name": "x",
+                  "node_id": "ns=1;i=42",
+                  "direction": "read",
+                  "data_type": "float",
+                  "auth_required": "none"
+                }
+              ]
+            }
+            """);
+        try
+        {
+            var ex = Assert.Throws<ConfigurationValidationException>(() => loader.LoadOpcUaMapping(path));
+            Assert.Contains("unsupported-schema-version", ex.Message, StringComparison.Ordinal);
+            Assert.Contains("v2", ex.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Opcua_with_missing_schema_version_fails_with_dedicated_diagnose()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson("""
+            {
+              "profile_name": "p",
+              "nodes": [
+                {
+                  "name": "x",
+                  "node_id": "ns=1;i=42",
+                  "direction": "read",
+                  "data_type": "float",
+                  "auth_required": "none"
+                }
+              ]
+            }
+            """);
+        try
+        {
+            var ex = Assert.Throws<ConfigurationValidationException>(() => loader.LoadOpcUaMapping(path));
+            Assert.Contains("schema_version", ex.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     private static string WriteTempJson(string content)
     {
         var path = Path.Combine(Path.GetTempPath(), $"bess-cfg-{Guid.NewGuid():N}.json");

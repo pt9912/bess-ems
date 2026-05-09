@@ -10,6 +10,8 @@ public interface IConfigurationLoader
 
     MqttMappingConfiguration LoadMqttMapping(string filePath);
 
+    OpcUaMappingConfiguration LoadOpcUaMapping(string filePath);
+
     Schedule LoadSchedule(string filePath);
 
     RetentionPolicy LoadRetentionPolicy(string filePath);

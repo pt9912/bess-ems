@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bess-ems.io/schema/opcua-mapping.json",
+  "title": "OPC-UA adapter mapping",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "profile_name", "nodes"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["v1"],
+      "description": "Mapping-file schema version. RM-M4-07 ships v1; new versions must add a tested migration or backward-compatibility path before being accepted by the loader (Folgearbeit F-07)."
+    },
+    "profile_name": { "type": "string", "minLength": 1 },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/node" }
+    }
+  },
+  "$defs": {
+    "node": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "https://bess-ems.io/schema/device-point.json#/$defs/device_point_base" },
+        {
+          "required": ["node_id", "direction", "data_type", "auth_required"],
+          "properties": {
+            "node_id": {
+              "type": "string",
+              "pattern": "^(ns=\\d+;)?(i=\\d+|s=.+|g=[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|b=[A-Za-z0-9+/]+=*)$",
+              "description": "OPC-UA NodeId per the spec: numeric (i=42), string (s=Battery.Soc), GUID (g=...) or opaque/base64 (b=...). Optional namespace prefix ns=N;. Validation is structural only (RM-M4-07 D-04); semantic existence in the server namespace is verified by RM-M4-04 at adapter discovery time."
+            },
+            "direction": {
+              "type": "string",
+              "enum": ["read", "write", "subscribe"],
+              "description": "EMS-perspective direction. 'read' = the EMS reads on demand; 'subscribe' = the EMS receives MonitoredItem updates; 'write' = the EMS writes setpoints."
+            },
+            "data_type": {
+              "type": "string",
+              "enum": ["bool", "int16", "uint16", "int32", "uint32", "int64", "uint64", "float", "double", "string"],
+              "description": "OPC-UA built-in data type. Maps onto the .NET runtime type at the adapter boundary."
+            },
+            "scale_factor": {
+              "type": "number",
+              "not": { "const": 0 },
+              "description": "engineering_value = raw_value * scale_factor; scale_factor=0 would collapse all reads to 0 and divide writes by zero. Default 1 if omitted."
+            },
+            "writable": { "type": "boolean" },
+            "write_cadence": {
+              "type": "string",
+              "enum": ["cyclic", "once_per_day", "one_shot", "heartbeat", "cooldown"]
+            },
+            "auth_required": {
+              "type": "string",
+              "enum": ["none", "network", "token"]
+            },
+            "monitoring_interval_ms": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "MonitoredItem sampling interval in milliseconds. Only meaningful for direction='subscribe'; ignored otherwise."
+            }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "writable": { "const": true } }, "required": ["writable"] },
+              "then": { "required": ["write_cadence", "auth_required"] }
+            },
+            {
+              "if": { "properties": { "direction": { "const": "write" } }, "required": ["direction"] },
+              "then": { "required": ["writable"], "properties": { "writable": { "const": true } } }
+            }
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}

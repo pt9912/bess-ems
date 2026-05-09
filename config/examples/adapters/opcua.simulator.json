@@ -1,0 +1,95 @@
+{
+  "schema_version": "v1",
+  "profile_name": "opcua-simulator",
+  "nodes": [
+    {
+      "name": "soc_percent",
+      "display_name": "State of charge",
+      "unit": "%",
+      "node_id": "ns=2;s=Battery.Soc",
+      "direction": "subscribe",
+      "data_type": "float",
+      "scale_factor": 1.0,
+      "writable": false,
+      "auth_required": "none",
+      "monitoring_interval_ms": 1000,
+      "alarm": { "min": 5, "max": 95, "severity": "warning" }
+    },
+    {
+      "name": "active_power_kw",
+      "display_name": "Active power",
+      "unit": "kW",
+      "node_id": "ns=2;s=Battery.ActivePower",
+      "direction": "subscribe",
+      "data_type": "float",
+      "scale_factor": 1.0,
+      "writable": false,
+      "auth_required": "none",
+      "monitoring_interval_ms": 250
+    },
+    {
+      "name": "reactive_power_kvar",
+      "display_name": "Reactive power",
+      "unit": "kvar",
+      "node_id": "ns=2;s=Battery.ReactivePower",
+      "direction": "subscribe",
+      "data_type": "float",
+      "scale_factor": 1.0,
+      "writable": false,
+      "auth_required": "none",
+      "monitoring_interval_ms": 250
+    },
+    {
+      "name": "temperature_celsius",
+      "display_name": "Battery temperature",
+      "unit": "°C",
+      "node_id": "ns=2;s=Battery.Temperature",
+      "direction": "read",
+      "data_type": "float",
+      "scale_factor": 1.0,
+      "writable": false,
+      "auth_required": "none"
+    },
+    {
+      "name": "fault_code",
+      "display_name": "Fault code",
+      "node_id": "ns=2;s=Battery.FaultCode",
+      "direction": "subscribe",
+      "data_type": "uint16",
+      "scale_factor": 1.0,
+      "writable": false,
+      "auth_required": "none",
+      "monitoring_interval_ms": 500,
+      "value_explanation": {
+        "0": "ok",
+        "1": "isolation-fault",
+        "2": "thermal-runaway",
+        "3": "communication-loss"
+      }
+    },
+    {
+      "name": "active_power_setpoint_kw",
+      "display_name": "Active power setpoint",
+      "unit": "kW",
+      "node_id": "ns=2;s=Battery.Setpoint.ActivePower",
+      "direction": "write",
+      "data_type": "float",
+      "scale_factor": 1.0,
+      "writable": true,
+      "write_cadence": "cyclic",
+      "auth_required": "token"
+    },
+    {
+      "name": "reactive_power_setpoint_kvar",
+      "display_name": "Reactive power setpoint",
+      "unit": "kvar",
+      "node_id": "ns=2;s=Battery.Setpoint.ReactivePower",
+      "direction": "write",
+      "data_type": "float",
+      "scale_factor": 1.0,
+      "writable": true,
+      "write_cadence": "cyclic",
+      "auth_required": "token"
+    }
+  ]
+}

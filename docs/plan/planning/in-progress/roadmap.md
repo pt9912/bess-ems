@@ -84,7 +84,17 @@ unter `in-progress/`.
 > ist abgeschlossen.
 >
 > **M4 gestartet:** [`plan-RM-M4.md`](plan-RM-M4.md) ist nach
-> `in-progress/` migriert. **RM-M4-06 ✅** (MQTT QoS +
+> `in-progress/` migriert. **RM-M4-07 ✅** (Versionierte OPC-UA-
+> Mappings): JSON-Schema mit `schema_version: ["v1"]`, NodeId-
+> Pattern, `direction`/`data_type`-Enums, `if/then`-Validierung
+> für writable/write_cadence und direction=write/writable. Loader
+> prüft `schema_version` vor JSON-Schema-Validation für strukturierte
+> `unsupported-schema-version`-Diagnose. Beispiel-Mapping mit 7
+> realistischen Nodes (read/subscribe/write-Mix). 10 Loader-Pins
+> (gültig/ungültig/veraltet/inkompatibel). Design-Entscheidungen
+> D-01..D-04 inline; F-07 Migration-Template als Trigger-Watch in
+> [`../open/note-RM-M4-followups.md`](../open/note-RM-M4-followups.md).
+> **RM-M4-06 ✅** (MQTT QoS +
 > Command-ACK-Korrelation): `MqttQualityOfService`-Enum +
 > `MqttQosOptions` mit per-Channel-Defaults, `IMqttClient`-Port um
 > QoS-Parameter erweitert, `MqttNetClient` mappt zu MQTTnet,
@@ -166,7 +176,7 @@ unter `in-progress/`.
 | ✅     | M1          | MVP — sichere Regelpipeline        | 1     | [Abgeschlossen](../done/plan-RM-M1.md) |
 | ✅     | M2          | Marktausbau und Optimierung        | 1 → 2 | Abgeschlossen ([Optimization-Slice](../done/plan-RM-M2-optimization.md), RM-M2-01..10, [Migrations-Tooling](../done/plan-RM-M2-migration.md), [HIL](../done/HIL-simulator.md)) |
 | ✅     | M3          | Native Control Core (Library)      | 2     | [`../done/plan-RM-M3.md`](../done/plan-RM-M3.md) — alle RM-M3-01..13 ✅ inkl. C-Pivot, doctest, vier Native-Quality-Gates, replay-basierter Parity, Doku-Sync und PID-Slice mit ABI-Minor-Bump 0.1→0.2; M3-D2 produktive Routing-Aktivierung ✅ ([`../done/plan-RM-M3-D2.md`](../done/plan-RM-M3-D2.md)); offene Follow-up-Slices (acht Items in zwei Blöcken) in [`../open/note-RM-M3-followups.md`](../open/note-RM-M3-followups.md) — Block A M3-Closure-Out-of-Scope, Block B M2-Folgewellen mit M3-Trigger; alle trigger-getrieben, kein aktiver Trigger heute |
-| 🟡     | M4          | Regelleistung und OPC-UA           | 2     | [`plan-RM-M4.md`](plan-RM-M4.md) — RM-M4-01 ✅, RM-M4-02 ✅, RM-M4-06 ✅; andere Pakete (RM-M4-03 Aktivierungssignal, 04/05/07/08 OPC-UA) trigger-/abhängigkeitsgetrieben offen; Folgearbeiten F-01..F-05 in `note-RM-M4-followups.md` (F-04 TLS/Auth ist Pflicht-Slice vor Production-MQTT) |
+| 🟡     | M4          | Regelleistung und OPC-UA           | 2     | [`plan-RM-M4.md`](plan-RM-M4.md) — RM-M4-01 ✅, RM-M4-02 ✅, RM-M4-06 ✅, RM-M4-07 ✅; andere Pakete (RM-M4-03 Aktivierungssignal, 04/05/08 OPC-UA-Adapter/Security/Tests) trigger-/abhängigkeitsgetrieben offen; Folgearbeiten F-01..F-07 in `note-RM-M4-followups.md` (F-04 TLS/Auth ist Pflicht-Slice vor Production-MQTT) |
 | ⬜     | M5          | MPC, Solver-Sidecar, Replay        | 3     | folgt mit Aktivierung |
 | ⬜     | M6          | Skalierung, UI, Edge / Multi-Asset | 4     | folgt mit Aktivierung |
 
@@ -345,7 +355,7 @@ bleibt Fallback und Referenz.
 | ⬜     | RM-M4-04   | OPC-UA-Adapter (Lesen, Schreiben, Subscriptions, StatusCode)        | LH-OPCUA-001..004       |
 | ⬜     | RM-M4-05   | OPC-UA-Security (Zertifikate, Security Mode/Policy)                 | LH-OPCUA-005            |
 | ✅     | RM-M4-06   | MQTT QoS und Command-ACK-Korrelation — `MqttQualityOfService`-Enum + `MqttQosOptions`-Record mit per-Channel-Defaults (CommandPublish/CommandAckSubscribe/Status/Fault = `AtLeastOnce`, Telemetry = `AtMostOnce`). `MqttAdapterOptions.QoS` mit `QoSOrDefault`-Fallback. `IMqttClient.PublishAsync`/`SubscribeAsync` mit QoS-Parameter; `MqttNetClient` mappt zu MQTTnet-Symbol. CommandSink/TelemetrySource ziehen per-Channel-QoS durch. ACK-Mismatch-Pin: fremde CommandId silent gedropt → Pending in `ack-timeout`-Failed. Multiple-Pending-Pin: CommandId-basierte Korrelation. SECURITY-Kommentar auf F-04 umgestellt. 9 neue Mqtt-Adapter-Pins. **Design-Entscheidungen D-01..D-04** in der Plan-Zeile, **Folgearbeiten F-03 (Persistente ACK), F-04 (TLS/Auth — Pflicht-Slice vor Production), F-05 (MQTTv5)** in `note-RM-M4-followups.md`. | LH-MQTT-004/005         |
-| ⬜     | RM-M4-07   | Versionierte OPC-UA-Mappings in Config                              | LH-CONF-002             |
+| ✅     | RM-M4-07   | Versionierte OPC-UA-Mappings in Config — `config/schema/opcua-mapping.schema.json` mit `schema_version: ["v1"]`, NodeId-Pattern (OPC-UA-Notation), `direction`/`data_type`-Enums, `scale_factor`-Schutz, `if/then`-Validierung (writable+write_cadence, direction=write+writable=true), `device-point.json`-Embed für LH-DOM-005. Application: `OpcUaMappingConfiguration` + `OpcUaNodeMapping` Records. Loader: `LoadOpcUaMapping` prüft `schema_version` vor JSON-Schema-Validation für `unsupported-schema-version`-Diagnose. Beispiel: `config/examples/adapters/opcua.simulator.json` mit 7 Nodes (SOC/ActivePower/ReactivePower/Temperature/FaultCode + 2 Setpoints, Mix `read`/`subscribe`/`write`). 10 Loader-Pins (gültig/ungültig/veraltet/inkompatibel). **Design-Entscheidungen D-01..D-04** in der Plan-Zeile, **Folgearbeit F-07 (Migration v1→v2 Template-Slice)** in `note-RM-M4-followups.md`. | LH-CONF-002             |
 | ⬜     | RM-M4-08   | Integrationstests OPC-UA gg. Simulator                              | LH-TEST-003 (n. MVP-Teil) |
 
 ### Abnahmekriterien

@@ -10,9 +10,18 @@ namespace BatteryEms.Infrastructure.Configuration;
 
 public sealed class JsonFileConfigurationLoader : IConfigurationLoader
 {
+    // RM-M4-07 D-02: only v1 ships today. Adding v2+ requires a
+    // tested migration path (see follow-up F-07 in
+    // note-RM-M4-followups.md). The loader pre-validates this list
+    // before the JSON-schema run so an old/new file format gets a
+    // structured "unsupported-schema-version" diagnose instead of a
+    // generic enum-violation message.
+    private static readonly string[] SupportedOpcUaSchemaVersions = ["v1"];
+
     private readonly JsonSchema _assetSchema;
     private readonly JsonSchema _modbusSchema;
     private readonly JsonSchema _mqttSchema;
+    private readonly JsonSchema _opcuaSchema;
     private readonly JsonSchema _scheduleSchema;
     private readonly JsonSchema _retentionSchema;
     private readonly JsonSerializerOptions _serializerOptions;
@@ -40,6 +49,7 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
         _assetSchema = LoadSchema(schemaDirectory, "asset.schema.json");
         _modbusSchema = LoadSchema(schemaDirectory, "modbus-mapping.schema.json");
         _mqttSchema = LoadSchema(schemaDirectory, "mqtt-mapping.schema.json");
+        _opcuaSchema = LoadSchema(schemaDirectory, "opcua-mapping.schema.json");
         _scheduleSchema = LoadSchema(schemaDirectory, "schedule.schema.json");
         _retentionSchema = LoadSchema(schemaDirectory, "retention.schema.json");
 
@@ -143,6 +153,75 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
             .ToList();
 
         return new MqttMappingConfiguration(dto.ProfileName, topics);
+    }
+
+    public OpcUaMappingConfiguration LoadOpcUaMapping(string filePath)
+    {
+        // RM-M4-07: pre-validate `schema_version` for a structured
+        // diagnose path. JSON-schema validation also enforces the
+        // enum, but its error message would be generic. By reading
+        // the field first we surface "unsupported-schema-version"
+        // with the actual value plus the supported set — operator-
+        // actionable signal beats opaque schema-validation noise.
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+        if (!File.Exists(filePath))
+        {
+            throw new ConfigurationValidationException($"Configuration file not found: {filePath}");
+        }
+
+        JsonNode? rawNode;
+        try
+        {
+            rawNode = JsonNode.Parse(File.ReadAllText(filePath));
+        }
+        catch (JsonException ex)
+        {
+            throw new ConfigurationValidationException($"Configuration file is not valid JSON: {filePath}", ex);
+        }
+        if (rawNode is null)
+        {
+            throw new ConfigurationValidationException($"Configuration file is empty: {filePath}");
+        }
+
+        var declaredVersion = rawNode["schema_version"]?.GetValue<string>();
+        if (string.IsNullOrWhiteSpace(declaredVersion))
+        {
+            throw new ConfigurationValidationException(
+                $"OPC-UA mapping {filePath} is missing required field 'schema_version'.");
+        }
+        if (!SupportedOpcUaSchemaVersions.Contains(declaredVersion, StringComparer.Ordinal))
+        {
+            throw new ConfigurationValidationException(
+                $"OPC-UA mapping {filePath} declares unsupported-schema-version '{declaredVersion}'; supported: [{string.Join(", ", SupportedOpcUaSchemaVersions)}].");
+        }
+
+        var node = LoadAndValidate(filePath, _opcuaSchema);
+
+        var dto = node.Deserialize<OpcUaMappingDto>(_serializerOptions)
+            ?? throw new ConfigurationValidationException($"Failed to deserialize {filePath} as OPC-UA mapping.");
+
+        if (dto.Nodes is null)
+        {
+            throw new ConfigurationValidationException($"{filePath} has no node list.");
+        }
+
+        var nodes = dto.Nodes
+            .Select(n => new OpcUaNodeMapping(
+                Name: n.Name,
+                NodeId: n.NodeId,
+                Direction: n.Direction,
+                DataType: n.DataType,
+                ScaleFactor: n.ScaleFactor ?? 1.0,
+                Writable: n.Writable ?? false,
+                AuthRequired: n.AuthRequired,
+                WriteCadence: n.WriteCadence,
+                MonitoringIntervalMs: n.MonitoringIntervalMs)
+            {
+                DevicePoint = BuildDevicePoint(n.DisplayName, n.Unit, n.Exportable, n.Alarm, n.ValueExplanation),
+            })
+            .ToList();
+
+        return new OpcUaMappingConfiguration(dto.SchemaVersion, dto.ProfileName, nodes);
     }
 
     public RetentionPolicy LoadRetentionPolicy(string filePath)
@@ -428,6 +507,34 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
         string PayloadFormat,
         bool Retained,
         string AuthRequired,
+        // LH-DOM-005 device-point base (optional).
+        string? DisplayName = null,
+        string? Unit = null,
+        bool Exportable = true,
+        DevicePointAlarmDto? Alarm = null,
+        Dictionary<string, string>? ValueExplanation = null);
+
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "Instantiated by JsonSerializer via reflection.")]
+    private sealed record OpcUaMappingDto(
+        string SchemaVersion,
+        string ProfileName,
+        List<OpcUaNodeDto>? Nodes);
+
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "Instantiated by JsonSerializer via reflection.")]
+    private sealed record OpcUaNodeDto(
+        string Name,
+        string NodeId,
+        string Direction,
+        string DataType,
+        string AuthRequired,
+        // Optional schema fields — defaults handled at the mapping
+        // layer (ScaleFactor=1.0 if null, Writable=false if null).
+        double? ScaleFactor = null,
+        bool? Writable = null,
+        string? WriteCadence = null,
+        int? MonitoringIntervalMs = null,
         // LH-DOM-005 device-point base (optional).
         string? DisplayName = null,
         string? Unit = null,
