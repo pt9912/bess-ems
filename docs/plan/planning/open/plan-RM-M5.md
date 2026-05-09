@@ -67,7 +67,8 @@ Multi-Asset-Bedienung.
   Drift-Auswertung zwischen Managed-, Native-, Solver- und
   Sidecar-Pfaden.
 - Metriken fuer Solverstatus, Solver-/MPC-Laufzeit, Sidecar-Health,
-  Deadline/Timeout, Fallback-Reason und Command-Latenz.
+  Deadline/Timeout, Fallback-Reason, `safe_stop`, `no_valid_plan` und
+  Command-Latenz.
 - Container-Orchestrierungstests fuer Worker + Sidecar inklusive
   Healthcheck, Startreihenfolge, Crash/Restart und Fallback.
 
@@ -125,15 +126,18 @@ M5-Sidecar-Schnitt entweder bestaetigt oder ergaenzt werden.
 
 RM-M5-01 muss diese Matrix als Default-Vertrag implementieren oder vor
 Code-Aktivierung per Plan-/ADR-Update aendern. Ein Fallback darf niemals
-ein stale Sidecar-Ergebnis wiederverwenden.
+ein stale Sidecar-Ergebnis wiederverwenden. Wenn kein lokaler Optimierer
+und kein gueltiger letzter Fahrplan oder Setpoint existiert, ist
+`no_valid_plan` immer ein expliziter Safe-Stop-Pfad mit Log/Metrik/Event,
+nicht ein stiller Optimierungs-Fallback.
 
 | Fehlerklasse | Verbindlicher Fallback | Qualitaetsdegradation | Mindestnachweis |
 | ------------ | ---------------------- | -------------------- | --------------- |
 | Sidecar gesund, Solverstatus usable | Sidecar-Ergebnis wird ueber bestehende Ports uebernommen und persistiert. | Keine. | Contract-Test fuer erfolgreichen Lauf. |
-| Timeout/Deadline oder Unavailable vor Ergebnis | Horizon-Optimierung nutzt den konfigurierten lokalen `IScheduleOptimizer`, falls vorhanden; sonst wird keine neue Schedule-Version erzeugt und der letzte gueltige Fahrplan bleibt aktiv. | Optimierungsqualitaet kann auf lokalen LP-/NoOp-Pfad fallen; keine neue Version bei fehlendem lokalen Optimierer. | Timeout-/Unavailable-Test mit `Failed`-Run und Fallback-Reason. |
-| Sidecar-Crash waehrend Lauf oder Transportabbruch nach Request-Start | Lauf endet als fehlgeschlagener `OptimizationRun`; Worker bleibt aktiv. Fuer den Regelkreis gilt weiter der letzte gueltige Fahrplan plus bestehende Limiter. | Keine neue Optimierung fuer diesen Lauf; Dispatch folgt bestehendem Fahrplan. | Container-Crash-Test mit weiterlaufendem Worker. |
-| Sidecar liefert Infeasible/Failed ohne nutzbare Loesung | Keine neue Schedule-Version; letzter gueltiger Fahrplan bleibt aktiv. | Keine Reoptimierung; Ursache bleibt in Run/Metric sichtbar. | Solverstatus-Mapping-Test fuer nicht nutzbare Stati. |
-| Sidecar liefert nicht-finite, schema-ungueltige oder constraint-verletzende Trajektorie | Ergebnis wird verworfen; keine neue Schedule-Version; Dispatch-/Control-Pfad verwendet bestehenden Managed-Limiter oder Safe-Stop, wenn kein gueltiger Setpoint existiert. | Sidecar-Ergebnis unbrauchbar; Safety hat Vorrang vor Optimierungsziel. | Negativtest fuer nicht-finite Werte und Constraint-Verletzung. |
+| Timeout/Deadline oder Unavailable vor Ergebnis | Horizon-Optimierung nutzt den konfigurierten lokalen `IScheduleOptimizer`, falls vorhanden; sonst wird keine neue Schedule-Version erzeugt. Der Regelkreis nutzt den letzten gueltigen Fahrplan; fehlt auch dieser, erzeugt der Control-Pfad Safe-Stop mit Reason `no_valid_plan`. | Optimierungsqualitaet kann auf lokalen LP-/NoOp-Pfad fallen; bei fehlendem Plan geht Verfuegbarkeit in Safe-Stop statt Optimierungsbetrieb. | Timeout-/Unavailable-Test mit `Failed`-Run, Fallback-Reason und `no_valid_plan`-Startfall. |
+| Sidecar-Crash waehrend Lauf oder Transportabbruch nach Request-Start | Lauf endet als fehlgeschlagener `OptimizationRun`; Worker bleibt aktiv. Fuer den Regelkreis gilt der letzte gueltige Fahrplan plus bestehende Limiter; ohne gueltigen Fahrplan gilt Safe-Stop mit Reason `no_valid_plan`. | Keine neue Optimierung fuer diesen Lauf; Dispatch folgt bestehendem Fahrplan oder Safe-Stop. | Container-Crash-Test mit weiterlaufendem Worker und Startfall ohne Fahrplan. |
+| Sidecar liefert Infeasible/Failed ohne nutzbare Loesung | Keine neue Schedule-Version; letzter gueltiger Fahrplan bleibt aktiv. Ohne gueltigen Fahrplan erzeugt der Control-Pfad Safe-Stop mit Reason `no_valid_plan`. | Keine Reoptimierung; Ursache bleibt in Run/Metric sichtbar; bei Initialzustand kein Optimierungsbetrieb. | Solverstatus-Mapping-Test fuer nicht nutzbare Stati inklusive leerem Schedule-Store. |
+| Sidecar liefert nicht-finite, schema-ungueltige oder constraint-verletzende Trajektorie | Ergebnis wird verworfen; keine neue Schedule-Version; Dispatch-/Control-Pfad verwendet bestehenden Managed-Limiter mit gueltigem Fahrplan oder Safe-Stop mit Reason `no_valid_plan`, wenn kein gueltiger Setpoint existiert. | Sidecar-Ergebnis unbrauchbar; Safety hat Vorrang vor Optimierungsziel. | Negativtest fuer nicht-finite Werte, Constraint-Verletzung und fehlenden gueltigen Setpoint. |
 | Ungueltiger Snapshot, stale Telemetrie oder invalider MPC-State vor Sidecar-Aufruf | Kein Sidecar-Aufruf und kein Optimierer-Fallback mit denselben ungueltigen Eingaben; bestehender Control-Precheck erzeugt Safe-Stop/invaliden Snapshot-Pfad. | Optimierung/Dispatch wird abgebrochen, bis valide Eingaben vorliegen. | Precheck-Test mit Nachweis, dass kein Sidecar-Request gesendet wird. |
 
 ---
@@ -146,7 +150,7 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
 | Thema | Vorgabe |
 | ----- | ------- |
 | Formatversion | Neue Datensaetze starten mit Manifest `replay-manifest.v1`; jedes Fixture nennt Schema-Version, Engine-Ziele, Toleranzen, Zeitbasis und Golden-Artefakte. |
-| Bestehende M2-Fixtures | Der M2-Telemetrie-Replay-Shape bleibt ueber einen Kompatibilitaets-Loader lauffaehig, bis ein migriertes Manifest im selben PR eingecheckt ist. |
+| Bestehende M2-Fixtures | Der M2-Telemetrie-Replay-Shape bleibt ueber einen Kompatibilitaets-Loader lauffaehig. Migration darf in kleinen Folge-PRs erfolgen; der Kompatibilitaets-Loader darf erst entfernt werden, wenn ein migriertes Manifest dieselben fachlichen Faelle abdeckt und mindestens ein CI-Lauf beide Pfade verglichen hat. |
 | Bestehende M3-Fixtures | Native-Parity-Cases bleiben als Referenzdatensatz erhalten; M5 darf sie referenzieren oder maschinell nach Manifest v1 spiegeln, aber nicht ohne Ersatz loeschen. |
 | Migration | Falls ein Fixture-Format gebrochen wird, muss RM-M5-04 ein Migrationstool oder eine dokumentierte Fixture-Konvertierung mit Golden-Diff-Nachweis liefern. |
 | CI-Kompatibilitaet | Alte und neue Replay-Gates duerfen erst zusammengelegt werden, wenn beide fuer mindestens einen PR-Lauf dieselben fachlichen Faelle abdecken. |
@@ -176,8 +180,8 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
 | ⬜ | RM-M5-01 | gRPC-Sidecar `optimization-core` (LP/MILP/MPC) | Protobuf-Vertrag ist versioniert; .NET-Adapter ruft Sidecar mit Deadline/Cancellation auf; Health/Version sind testbar; Solverstatus und Fehler werden in bestehende Optimierungsmodelle gemappt; alle Fehlerklassen aus der Fallback-Matrix sind getestet. |
 | ⬜ | RM-M5-02 | MPC-Kernel (State-Space, Kalman, Vorhersagehorizont) | Kernel berechnet finite Trajektorien aus State-Space-Modell und Horizon; Kalman-/Schaetzerpfad behandelt Rauschen, Missing Measurements und unplausible Werte; Tests beweisen SOC-, Leistungs-, Ramp- und Constraint-Einhaltung. |
 | ⬜ | RM-M5-03 | Hochfrequente Telemetrie-Filterung im Native Core (optional) | Aktivierung nur bei konkretem Bedarf aus RM-M5-02; Filtervertrag dokumentiert Samplingrate, Einheiten und Fehlerverhalten; .NET-Prechecks bleiben erhalten; Replay-/Numeriktests decken Drift und ungueltige Eingaben ab; invalider Filter-/MPC-State folgt der Fallback-Matrix. |
-| ⬜ | RM-M5-04 | Replay-Plattform mit Datensatz-Verwaltung und Sollwertvergleich | Versioniertes Manifest fuer Datensaetze; Loader fuer externe JSON-Fixtures; bestehende M2/M3-Fixtures bleiben ueber Kompatibilitaets-Loader oder Migration mit Golden-Diff-Nachweis lauffaehig; Runner vergleicht Commands/Sollwerte gegen Golden-Dateien und mehrere Engines; Diff-Report trennt erlaubte numerische Toleranz von fachlicher Drift. |
-| ⬜ | RM-M5-05 | Erweiterte Metriken / Solverstatus / Command-Latenz | Prometheus-Metriken decken Solverstatus, Laufzeit, Deadline/Timeout, Fallback-Reason, Sidecar-Health und Command-Latenz ab; Tests scrapen erfolgreiche und fehlerhafte Pfade. |
+| ⬜ | RM-M5-04 | Replay-Plattform mit Datensatz-Verwaltung und Sollwertvergleich | Versioniertes Manifest fuer Datensaetze; Loader fuer externe JSON-Fixtures; bestehende M2/M3-Fixtures bleiben ueber Kompatibilitaets-Loader lauffaehig, bis Migrationen in kleinen Folge-PRs mit Golden-Diff-Nachweis abgeschlossen sind; Runner vergleicht Commands/Sollwerte gegen Golden-Dateien und mehrere Engines; Diff-Report trennt erlaubte numerische Toleranz von fachlicher Drift. |
+| ⬜ | RM-M5-05 | Erweiterte Metriken / Solverstatus / Command-Latenz | Prometheus-Metriken decken Solverstatus, Laufzeit, Deadline/Timeout, Fallback-Reason, `safe_stop`, `no_valid_plan`, Sidecar-Health und Command-Latenz ab; Tests scrapen erfolgreiche und fehlerhafte Pfade. |
 | ⬜ | RM-M5-06 | Container-Orchestrierungstests (Worker + Sidecar) | Compose-/CI-Gate startet Worker und Sidecar, prueft Health, erfolgreichen Optimierungslauf, Sidecar-Crash, Restart und Fallback; Container-Logs enthalten korrelierbare RunId/RequestId. |
 
 ---
@@ -194,9 +198,10 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
 4. RM-M5-06 frueh als Container-Gate schneiden, sobald Worker und
    Test-Sidecar zusammenspielen.
 5. RM-M5-04 danach ausbauen und bestehende M2/M3-Replay-Fixtures
-   ueber Kompatibilitaets-Loader lauffaehig halten oder im selben Slice
-   mit Golden-Diff-Nachweis migrieren; neue MPC-Faelle bekommen eigene
-   Manifestversion.
+   ueber Kompatibilitaets-Loader lauffaehig halten. Migrationen duerfen
+   in kleinen Folge-PRs laufen; der alte Pfad wird erst entfernt, wenn
+   Golden-Diff-Nachweise und ein ueberlappender CI-Lauf vorliegen. Neue
+   MPC-Faelle bekommen eigene Manifestversion.
 6. RM-M5-02 erst auf stabilem Contract-/Replay-Fundament aktivieren,
    damit numerische Drift und Constraint-Verletzungen reproduzierbar
    diskutiert werden koennen.
@@ -211,7 +216,8 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
   Ramp-, Geraete- und Netzgrenzen nicht verletzen.
 - Sidecar-Crash, Timeout oder Unavailable beeintraechtigt den Regelkreis
   nicht; die Fallback-Matrix ist implementiert, getestet und
-  observierbar.
+  observierbar. Wenn kein gueltiger Fahrplan oder Setpoint existiert,
+  ist `no_valid_plan` ein expliziter Safe-Stop, kein stiller Fallback.
 - Optimierer bleiben ueber bestehende Ports austauschbar; Application und
   Domain referenzieren keinen konkreten Solver und keinen gRPC-Client.
 - Solverstatus, RunId, Horizon, Objective-/Qualitaetsinformationen und
@@ -223,7 +229,8 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
 - Container-Gates pruefen Worker + Sidecar inklusive Health,
   Orchestrierung, Crash/Restart und Fallback.
 - Metriken fuer Solverstatus, Laufzeit, Deadline/Timeout,
-  Fallback-Reason, Sidecar-Health und Command-Latenz sind getestet.
+  Fallback-Reason, `safe_stop`, `no_valid_plan`, Sidecar-Health und
+  Command-Latenz sind getestet.
 - Roadmap, Quality-Doku und Architektur werden beim Abschluss
   synchronisiert.
 
