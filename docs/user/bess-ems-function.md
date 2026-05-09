@@ -23,13 +23,13 @@ flowchart LR
   Market[Markt / Fahrplan<br/>Preise, Gebote,<br/>Abrufe] --> EMS[BESS EMS]
   Forecast[Prognosen<br/>Last, PV/Wind,<br/>Verfügbarkeit] --> EMS
   Measurements --> EMS
-  BMS[BMS<br/>SOC, SOH,<br/>Limits, Alarme] --> EMS
+  BMS[BMS<br/>SOC, SOH,<br/>Limits, Freigaben,<br/>Alarme] --> EMS
 
-  EMS --> Optimizer[Optimierung<br/>Ziel, Randbedingungen,<br/>Prioritäten]
-  Optimizer --> Dispatcher[Dispatch<br/>Sollwertbildung]
+  EMS --> ScheduleOptimizer[Horizon-Optimierung<br/>Fahrplan / Zielverlauf]
+  ScheduleOptimizer --> Dispatcher[Echtzeit-Dispatch<br/>aktueller Sollwert,<br/>Safety- und Ramp-Limits]
+  BMS --> Dispatcher
 
   Dispatcher --> PCS[PCS / Wechselrichter<br/>P/Q-Sollwerte]
-  Dispatcher --> BMS
 
   Battery[Batterie] <--> BMS
   Battery <--> PCS
@@ -39,16 +39,20 @@ flowchart LR
   BMS --> Measurements
 ```
 
-Der Regelkreis besteht aus fünf wiederkehrenden Schritten:
+Die EMS-Funktion lässt sich in sechs wiederkehrende Schritte gliedern:
 
 1. **Messen:** aktuelle Anlagen-, Batterie- und Netzwerte erfassen.
 2. **Bewerten:** technische Grenzen, Alarme, SOC/SOH und Datenqualität
    prüfen.
-3. **Optimieren:** bestes Verhalten für Fahrplan, Markt, Netz oder
-   Eigenverbrauch bestimmen.
-4. **Dispatchen:** konkrete Wirk- und Blindleistungssollwerte an PCS
-   und BMS ausgeben.
-5. **Nachregeln:** Istwerte beobachten und im nächsten Zyklus
+3. **Optimieren:** Fahrpläne oder Zielverläufe über einen Horizont
+   bestimmen. Dieser Schritt läuft nicht zwingend in jedem
+   Regelzyklus, sondern kann zeit-, ereignis- oder operatorgetrieben
+   aktualisieren.
+4. **Dispatchen:** den aktuell gültigen Sollwert auswählen, priorisieren
+   und durch Safety- und Ramp-Limits begrenzen.
+5. **Ausgeben:** konkrete Wirk- und Blindleistungssollwerte an den PCS
+   beziehungsweise den Feldadapter senden.
+6. **Nachregeln:** Istwerte beobachten und im nächsten Zyklus
    korrigieren.
 
 ---
@@ -58,7 +62,7 @@ Der Regelkreis besteht aus fünf wiederkehrenden Schritten:
 | Quelle             | Typische Daten                                     | Zweck im EMS                                              |
 | ------------------ | -------------------------------------------------- | --------------------------------------------------------- |
 | Netzanschlusspunkt | Wirkleistung, Blindleistung, Spannung, Frequenz    | Rückmeldung, ob der Zielwert am PCC erreicht wird         |
-| Batterie/BMS       | SOC, SOH, Zell-/Rack-Limits, Temperaturen, Alarme  | Schutzgrenzen und verfügbare Lade-/Entladeleistung        |
+| Batterie/BMS       | SOC, SOH, Zell-/Rack-Limits, Temperaturen, Freigaben, Alarme | Schutzgrenzen und verfügbare Lade-/Entladeleistung |
 | PCS/Wechselrichter | aktueller P/Q-Wert, Status, Fehler, Verfügbarkeit  | Umsetzung und Plausibilisierung des Dispatchs             |
 | Markt/Fahrplan     | Day-Ahead-Fahrplan, Intraday-Änderungen, Abrufe    | wirtschaftliche oder vertragliche Zielvorgabe             |
 | Prognosen          | Last, Erzeugung, Preise, Verfügbarkeit             | vorausschauende Optimierung statt reiner Momentanregelung |
@@ -82,8 +86,15 @@ Typische Entscheidungslogik:
 - Bei schlechter Datenqualität oder kritischen Alarmen in einen
   sicheren Zustand wechseln.
 
-Die Optimierung ist damit immer ein Abgleich aus Ziel und
-Randbedingungen:
+Die Optimierung ist dabei zweigeteilt:
+
+- **Horizon-Optimierung:** erzeugt oder aktualisiert Fahrpläne und
+  Zielverläufe für einen Zeitraum, ohne direkt Feldgeräte anzusteuern.
+- **Echtzeit-Dispatch:** wählt im Regelzyklus den gerade gültigen
+  Sollwert, kombiniert ihn mit aktiven Prioritäten und begrenzt ihn
+  durch technische Schutz- und Rampenregeln.
+
+Das Ergebnis ist immer ein Abgleich aus Ziel und Randbedingungen:
 
 ```text
 Zielwert = wirtschaftliches / netzdienliches Ziel
@@ -96,21 +107,25 @@ Zielwert = wirtschaftliches / netzdienliches Ziel
 
 ## 4. Ausgaben
 
-Das Ergebnis des EMS ist ein Dispatch an die nachgelagerten technischen
-Systeme.
+Das Ergebnis des EMS ist ein begrenzter Dispatch an die nachgelagerten
+technischen Systeme. Das BMS liefert dafür Schutzgrenzen, Freigaben und
+Batteriezustand; P/Q-Sollwerte werden an PCS beziehungsweise
+Feldadapter ausgegeben.
 
 | Zielsystem              | Ausgabe                                       | Bedeutung                                         |
 | ----------------------- | --------------------------------------------- | ------------------------------------------------- |
 | PCS / Wechselrichter    | `P`-Sollwert                                  | Laden oder Entladen der Batterie                  |
 | PCS / Wechselrichter    | `Q`-Sollwert                                  | Blindleistungsbereitstellung, falls aktiv         |
-| BMS                     | Betriebsfreigaben, Limits, Modusinformationen | Abstimmung mit Batterieschutz und Batteriezustand |
 | Persistenz / Monitoring | Telemetrie, Commands, Audit-Events            | Nachvollziehbarkeit und Betriebsauswertung        |
 | Operator-Oberfläche     | Status, Fehler, aktueller Modus               | Transparenz für Leitwarte und Betrieb             |
 
-Die Vorzeichenkonvention muss in der Anlage eindeutig festgelegt sein.
-In vielen EMS-Kontexten bedeutet positive Wirkleistung am
-Netzanschlusspunkt Einspeisung, negative Wirkleistung Bezug. Entscheidend
-ist, dass EMS, PCS, Messung und Reporting dieselbe Konvention verwenden.
+Intern gilt die BESS-EMS-Vorzeichenkonvention des Systems: positive
+Wirkleistung bedeutet Entladen beziehungsweise Einspeisen aus der
+Batterie, negative Wirkleistung bedeutet Laden beziehungsweise Bezug in
+die Batterie, `0 kW` bedeutet kein aktiver Lade- oder Entladebefehl.
+Abweichende Gerätekonventionen werden in Protokolladaptern umgesetzt,
+damit Fahrpläne, Optimierung, Limiter, Commands und Persistenz intern
+dieselbe Konvention verwenden.
 
 ---
 
@@ -148,7 +163,7 @@ Praktisch bedeutet das:
 ## 7. Kurzform
 
 ```text
-Messen -> Bewerten -> Optimieren -> Dispatchen -> Überwachen -> Nachregeln
+Messen -> Bewerten -> Optimieren -> Dispatchen -> Ausgeben -> Nachregeln
 ```
 
 Ein BESS EMS ist damit die Schicht, die aus technischen Messwerten,
