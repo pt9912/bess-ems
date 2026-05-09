@@ -84,9 +84,11 @@ Replay-Fixture.
 
 **Aktivierungs-Pfad:** eigener `plan-RM-M3-D3.md`, nach
 `docs/plan/planning/open/` während der Planung, dann nach
-`in-progress/` für die Umsetzung, dann nach `done/`. Roadmap-Eintrag
-unter „Aktueller Stand" + neue Zeile in `plan-RM-M3.md` (oder
-direkt als „RM-M3-D3"-Eintrag).
+`in-progress/` für die Umsetzung, dann nach `done/`. Roadmap-
+Eintrag unter „Aktueller Stand" und in der Übersichts-Tabelle.
+Der Master-Plan `done/plan-RM-M3.md` bekommt **keinen** Nach-
+Eintrag — er ist abgeschlossen; M3-D3 läuft als eigener
+Slice-Plan analog zu `plan-RM-M3-D2.md`.
 
 ---
 
@@ -121,9 +123,11 @@ Stages. Aktuell leben Konfigurations-Defaults verteilt:
 **Aufwandsschätzung:** grob 1 Woche, primär Operations- und Doku-
 Arbeit; null Application-Code.
 
-**Aktivierungs-Pfad:** eher als RM-M3-FUP-Carve-out im Zuge eines
-Operations-Hardening-Slices (z. B. Multi-Replica-Deployment,
-Compliance-Audit) als eigener M3-Slice.
+**Aktivierungs-Pfad:** eigener Operations-Hardening-Slice (z. B.
+im Zuge eines Multi-Replica-Deployments oder eines Compliance-
+Audits). **Nicht** als `RM-M3-FUP-NN`-Eintrag — die FUP-Reservierung
+01..04 gehört Block B (M2-Folgewellen mit M3-Trigger). Eigene
+ID-Klasse oder direkt als Operations-Slice ohne RM-M3-Prefix.
 
 ---
 
@@ -166,10 +170,13 @@ in den strukturierten Logs (`native_control_status=*`).
 **Aufwandsschätzung:** grob 2–3 PT, kleiner Slice. Primär API-
 Endpoint + DI-Anpassung + Metric.
 
-**Aktivierungs-Pfad:** eigener kleiner Slice, möglicherweise als
-RM-M3-FUP-Eintrag oder direkt in einem Observability-Slice
-(zusammen mit z. B. `bess_native_control_calls_total` /
-`bess_native_control_fallback_total` Counter-Metriken).
+**Aktivierungs-Pfad:** eigener kleiner Slice, möglicherweise
+gebündelt mit anderen Observability-Erweiterungen (z. B.
+`bess_native_control_calls_total` /
+`bess_native_control_fallback_total` Counter-Metriken). **Nicht**
+als `RM-M3-FUP-NN`-Eintrag — die FUP-Reservierung 01..04 gehört
+Block B. Eigene ID-Klasse oder direkt als Observability-Slice
+ohne RM-M3-Prefix.
 
 ---
 
