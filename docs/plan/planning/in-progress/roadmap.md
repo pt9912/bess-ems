@@ -120,9 +120,38 @@ unter `in-progress/`.
 > OR-Tools deduziert Charge-/Discharge-Caps (Symmetric beidseitig,
 > Up/Down einseitig) und terminiert Über-Commit mit
 > `reserve-exceeds-capacity`; 9 Domain- + 11 OR-Tools-Pins inkl.
-> FCR-symmetrischem und AFRR-Up/Down-Profiltest. Andere M4-Pakete
-> (RM-M4-03 Aktivierungssignal, RM-M4-04..08 OPC-UA/MQTT) bleiben
-> abhängigkeits-/trigger-getrieben offen.
+> FCR-symmetrischem und AFRR-Up/Down-Profiltest.
+> **RM-M4-03 ✅** (Regelleistungs-Aktivierungssignal-Verarbeitung):
+> Domain `RegelleistungActivation` + `TimebaseDebounceState`,
+> Use-Case mit 4-Step-Pipeline (Schema → UTC → Timebase →
+> Dedupe), `IActivationDispatchSource` (D-09 c additiv),
+> `DapperActivationDedupeStore` mit `0002_regelleistung_activations`-
+> Migration (erster RM-M3-FUP-01-Konsument), Production-Gate mit
+> vier Pre-Conditions (`security-profile-enforcement-not-wired`
+> bis F-12 zündet), `/health/regelleistung`-Endpoint. ~110
+> Application-Pins + 12 Persistence-Integration-Pins.
+> **RM-M4-04 ✅** (OPC-UA-Adapter): `BatteryEms.Adapters.OpcUa`
+> bindet die OPC-Foundation-Reference-Stack 1.5.378.x (MIT);
+> `OpcUaTelemetrySource` mit Read+Subscribe + Worst-of-DataQuality
+> + Sticky-Overflow-Flag + IAsyncDisposable-Lifecycle;
+> `OpcUaCommandSink` mit ScaleFactor-Reverse + StatusCode-
+> Auswertung; `IoAdapterTriage` macht Multi-IO-Konfiguration
+> fail-closed; Embedded TestServer-Fixture mit 5 pinned
+> End-to-End-Tests (Read/Subscribe/Write/StatusCode/Reconnect).
+> Security: `MessageSecurityMode.None` + AllowUnsecured-Bool-Guard
+> bis RM-M4-05 die Härtung dranhängt.
+> **RM-M4-08 ✅** (Integrationstests OPC-UA): 2 zusätzliche Pins
+> (Multi-Cycle-Reconnect + Concurrent-Source-Sink-mit-Restart) im
+> `OpcUaNegativeTests.cs`-Projekt; `make test-hil-opcua` jetzt
+> Pflicht-Gate in `make gates` und `make ci`. Bug-Fund in M4-08-A:
+> Subscription-Leak in `OpcUaClient._subscriptions` (SDK setzt
+> `Subscription.Id` nach `DeleteAsync` zurück) — gefixt via
+> cached-Id im Wrapper.
+> **RM-M4-05 🟡 (Detail-Plan in-progress)** — OPC-UA-Security
+> mit `RuntimeProfile`-Field (adapter-lokal per D-01; F-12 ergänzt
+> später globale Quelle), SignAndEncrypt + Basic256Sha256-
+> Allowlist als Production-Default, Cert-Trust-Bridge im Test-
+> Server. 5 pinned Security-Pins.
 >
 > **M2-Welle 1 (Optimization-Slice, abgeschlossen):**
 > [`../done/plan-RM-M2-optimization.md`](../done/plan-RM-M2-optimization.md)
@@ -176,7 +205,7 @@ unter `in-progress/`.
 | ✅     | M1          | MVP — sichere Regelpipeline        | 1     | [Abgeschlossen](../done/plan-RM-M1.md) |
 | ✅     | M2          | Marktausbau und Optimierung        | 1 → 2 | Abgeschlossen ([Optimization-Slice](../done/plan-RM-M2-optimization.md), RM-M2-01..10, [Migrations-Tooling](../done/plan-RM-M2-migration.md), [HIL](../done/HIL-simulator.md)) |
 | ✅     | M3          | Native Control Core (Library)      | 2     | [`../done/plan-RM-M3.md`](../done/plan-RM-M3.md) — alle RM-M3-01..13 ✅ inkl. C-Pivot, doctest, vier Native-Quality-Gates, replay-basierter Parity, Doku-Sync und PID-Slice mit ABI-Minor-Bump 0.1→0.2; M3-D2 produktive Routing-Aktivierung ✅ ([`../done/plan-RM-M3-D2.md`](../done/plan-RM-M3-D2.md)); offene Follow-up-Slices (acht Items in zwei Blöcken) in [`../open/note-RM-M3-followups.md`](../open/note-RM-M3-followups.md) — Block A M3-Closure-Out-of-Scope, Block B M2-Folgewellen mit M3-Trigger; alle trigger-getrieben, kein aktiver Trigger heute |
-| 🟡     | M4          | Regelleistung und OPC-UA           | 2     | [`plan-RM-M4.md`](plan-RM-M4.md) — RM-M4-01 ✅, RM-M4-02 ✅, RM-M4-06 ✅, RM-M4-07 ✅; andere Pakete (RM-M4-03 Aktivierungssignal, 04/05/08 OPC-UA-Adapter/Security/Tests) trigger-/abhängigkeitsgetrieben offen; Folgearbeiten F-01..F-07 in `note-RM-M4-followups.md` (F-04 TLS/Auth ist Pflicht-Slice vor Production-MQTT) |
+| 🟡     | M4          | Regelleistung und OPC-UA           | 2     | [`plan-RM-M4.md`](plan-RM-M4.md) — RM-M4-01 ✅, RM-M4-02 ✅, RM-M4-03 ✅, RM-M4-04 ✅, RM-M4-06 ✅, RM-M4-07 ✅, RM-M4-08 ✅; **RM-M4-05 🟡** (OPC-UA-Security, Detail-Plan in-progress, einziges offenes Pflicht-Slice für M4-Tag); Folgearbeiten F-01..F-19 in `note-RM-M4-followups.md` (F-04 TLS/Auth ist Pflicht-Slice vor Production-MQTT; F-09 OPC-UA-Activation-Source-Adapter trägt die Failover-Replay-via-Reconnect-Obligation; F-12 Cross-Adapter-RuntimeProfile bleibt Aktivierungs-Use-Case-Pflicht-Trigger; F-17/18/19 von M4-05 angelegt) |
 | ⬜     | M5          | MPC, Solver-Sidecar, Replay        | 3     | folgt mit Aktivierung |
 | ⬜     | M6          | Skalierung, UI, Edge / Multi-Asset | 4     | folgt mit Aktivierung |
 
@@ -351,12 +380,12 @@ bleibt Fallback und Referenz.
 | ------ | ---------- | ------------------------------------------------------------------- | ----------------------- |
 | ✅     | RM-M4-01   | Intraday-Reoptimierung (Resthorizont) — Driving Port `IIntradayReoptimizationUseCase` + `IntradayReoptimizationCommand` (composition mit `ScheduleOptimizationCommand` für geteilte Validierung) + `DefaultIntradayReoptimizationUseCase`. Per-asset Lock, Baseline-Existenz-Check (D-01: `intraday-baseline-missing`), Window-Boundary-Alignment (D-02: `residual-start-not-aligned`), Reserve-Bands für Resthorizont, Combine past+new + CAS via FUP-02-Pfad. CAS-Konflikt → `concurrent-version-conflict` Failed-Run. Solver-Failure ohne Replace. Endpoint `POST /markets/intraday/reoptimize` (D-04: synchron, Operator-policy-guarded). 13 Application-Unit-Pins + 7 API-Endpoint-Pins. **Design-Entscheidungen D-01..D-04** in der Plan-Zeile dokumentiert; **Folgearbeiten F-01 (Cold-Start-Bootstrap), F-02 (Alignment-Toleranz)** in `note-RM-M4-followups.md`. | LH-MKT-002              |
 | ✅     | RM-M4-02   | Reservierungs-Modell für Regelleistung + Solver-Constraints — Domain `ReserveProduct`/`ReserveDirection`/`ReserveBand` (FCR↔Symmetric, AFRR/MFRR↔Up oder Down, halboffenes Fenster, PowerKw als Magnitude). Driven Port `IReserveRepository` + `InMemoryReserveRepository`; `ScheduleOptimizationRequest.Reserves` (Default leer ⇒ M2-Pfad bit-identisch); `DefaultScheduleOptimizationUseCase` ruft `FindActive` und reicht durch. OR-Tools deduziert per Step die Caps (Symmetric beidseitig, Up nur Discharge, Down nur Charge); Über-Commit terminiert mit `reserve-exceeds-capacity` statt LP-infeasible. 9 Domain- + 11 OR-Tools-Tests inkl. FCR-symmetrischer Profiltest, AFRR-positiv- und AFRR-negativ-Profiltest, MFRR-Modellierbarkeit, ScheduleType-Theory (DayAhead+Intraday). **Bewusst draußen:** LP-Strafkosten für Reserveverletzung (RM-M2-04-OPT-RESERVE-Folge), persistente Dapper-`IReserveRepository`, API für Reserve-Pflege, Penalty/Pricing — alles eigene Slices wenn realer Konsument das fordert. | LH-MKT-004              |
-| ⬜     | RM-M4-03   | Regelleistungs-Aktivierungssignal-Verarbeitung mit Priorisierung    | LH-MKT-005, LH-MKT-006  |
-| ⬜     | RM-M4-04   | OPC-UA-Adapter (Lesen, Schreiben, Subscriptions, StatusCode)        | LH-OPCUA-001..004       |
-| ⬜     | RM-M4-05   | OPC-UA-Security (Zertifikate, Security Mode/Policy)                 | LH-OPCUA-005            |
+| ✅     | RM-M4-03   | Regelleistungs-Aktivierungssignal-Verarbeitung mit Priorisierung — Domain `RegelleistungActivation` + `TimebaseDebounceState` (3-in-10/5-stable, Konstanten domain-verdrahtet), 4-Step-Validation-Pipeline (Schema → UTC → Timebase → Dedupe), `IActivationDispatchSource`-Driving-Port (D-09 c additiv) im `ScheduleFollowingDispatchOptimizer`, `DapperActivationDedupeStore` mit `0002_regelleistung_activations`-Migration (erster RM-M3-FUP-01-Konsument), Production-Gate mit vier Pre-Conditions (`security-profile-enforcement-not-wired` fail-closed bis F-12), `/health/regelleistung`-Endpoint. ~110 Application-Pins + 12 Persistence-Integration-Pins + 1 API-Pin. **Design-Entscheidungen D-01..D-09**, **Folgearbeiten F-08..F-12** in `note-RM-M4-followups.md`. | LH-MKT-005, LH-MKT-006  |
+| ✅     | RM-M4-04   | OPC-UA-Adapter (Lesen, Schreiben, Subscriptions, StatusCode) — Adapter-Projekt `BatteryEms.Adapters.OpcUa` bindet OPC-Foundation-Reference-Stack 1.5.378.x (MIT). `OpcUaTelemetrySource` mit Read+Subscribe + Worst-of-DataQuality (LH-OPCUA-004) + Sticky-Overflow-Flag + IAsyncDisposable; `OpcUaCommandSink` mit ScaleFactor-Reverse + StatusCode-Auswertung; `IoAdapterTriage` macht Multi-IO-Konfiguration fail-closed; Embedded TestServer-Fixture mit 5 pinned End-to-End-Tests (Read/Subscribe/Write/StatusCode/Reconnect). Security pre-M4-05: `MessageSecurityMode.None` + AllowUnsecured-Bool-Guard (D-04). **Design-Entscheidungen D-01..D-09**, **Folgearbeiten F-09 (Activation-Source-Adapter), F-13 (Multi-Server), F-14 (Method-Calls), F-15 (Type-System), F-16 (Compose-Sidecar)** in `note-RM-M4-followups.md`. | LH-OPCUA-001..004       |
+| 🟡     | RM-M4-05   | OPC-UA-Security (Zertifikate, Security Mode/Policy) — Detail-Plan [`plan-RM-M4-05.md`](plan-RM-M4-05.md) in-progress; OPC-UA-lokales `RuntimeProfile`-Field (D-01: F-12 ergänzt später globale Quelle ohne Schema-Bruch), SignAndEncrypt + Basic256Sha256-Allowlist als Production-Default, Cert-Trust-Bridge im Test-Server, 5 pinned Security-Pins. F-17/F-18/F-19 (Allowlist-Erweiterung, Cert-Rotation, User-Identity) werden bei Closure angelegt. Einziges offenes Pflicht-Slice für M4-Tag. | LH-OPCUA-005            |
 | ✅     | RM-M4-06   | MQTT QoS und Command-ACK-Korrelation — `MqttQualityOfService`-Enum + `MqttQosOptions`-Record mit per-Channel-Defaults (CommandPublish/CommandAckSubscribe/Status/Fault = `AtLeastOnce`, Telemetry = `AtMostOnce`). `MqttAdapterOptions.QoS` mit `QoSOrDefault`-Fallback. `IMqttClient.PublishAsync`/`SubscribeAsync` mit QoS-Parameter; `MqttNetClient` mappt zu MQTTnet-Symbol. CommandSink/TelemetrySource ziehen per-Channel-QoS durch. ACK-Mismatch-Pin: fremde CommandId silent gedropt → Pending in `ack-timeout`-Failed. Multiple-Pending-Pin: CommandId-basierte Korrelation. SECURITY-Kommentar auf F-04 umgestellt. 9 neue Mqtt-Adapter-Pins. **Design-Entscheidungen D-01..D-04** in der Plan-Zeile, **Folgearbeiten F-03 (Persistente ACK), F-04 (TLS/Auth — Pflicht-Slice vor Production), F-05 (MQTTv5)** in `note-RM-M4-followups.md`. | LH-MQTT-004/005         |
 | ✅     | RM-M4-07   | Versionierte OPC-UA-Mappings in Config — `config/schema/opcua-mapping.schema.json` mit `schema_version: ["v1"]`, NodeId-Pattern (OPC-UA-Notation), `direction`/`data_type`-Enums, `scale_factor`-Schutz, `if/then`-Validierung (writable+write_cadence, direction=write+writable=true), `device-point.json`-Embed für LH-DOM-005. Application: `OpcUaMappingConfiguration` + `OpcUaNodeMapping` Records. Loader: `LoadOpcUaMapping` prüft `schema_version` vor JSON-Schema-Validation für `unsupported-schema-version`-Diagnose. Beispiel: `config/examples/adapters/opcua.simulator.json` mit 7 Nodes (SOC/ActivePower/ReactivePower/Temperature/FaultCode + 2 Setpoints, Mix `read`/`subscribe`/`write`). 10 Loader-Pins (gültig/ungültig/veraltet/inkompatibel). **Design-Entscheidungen D-01..D-04** in der Plan-Zeile, **Folgearbeit F-07 (Migration v1→v2 Template-Slice)** in `note-RM-M4-followups.md`. | LH-CONF-002             |
-| ⬜     | RM-M4-08   | Integrationstests OPC-UA gg. Simulator                              | LH-TEST-003 (n. MVP-Teil) |
+| ✅     | RM-M4-08   | Integrationstests OPC-UA gg. Simulator — 2 zusätzliche Pins (Multi-Cycle-Reconnect mit `SubscriptionCount==1`/`==0`-Assertions, Concurrent-Source-Sink-mit-Restart-Injection probt `_connectGate`/`_stateGate`-Contention) im `OpcUaNegativeTests.cs`-Projekt; per-class Fixture-Isolation (D-06); `make test-hil-opcua` jetzt Pflicht-Gate in `make gates` und `make ci` (D-02). Race/Tiebreak/Dedupe-Pins bleiben **RM-M4-03 ✅** (D-01: keine OPC-UA-Wire-Duplikation). **Bug-Fund** in M4-08-A: client-seitiger Subscription-Leak in `OpcUaClient._subscriptions` (SDK setzt `Subscription.Id` nach `DeleteAsync` zurück) — gefixt via cached-Id im Wrapper. **Failover-Replay-via-OPC-UA-Reconnect** wandert mit benanntem Trigger zu **F-09 (b)** in `note-RM-M4-followups.md`. **Design-Entscheidungen D-01..D-07**. | LH-TEST-003 (n. MVP-Teil) |
 
 ### Abnahmekriterien
 
