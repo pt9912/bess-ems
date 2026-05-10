@@ -73,7 +73,7 @@ public sealed class DefaultProductionPreconditionProvider : IProductionPrecondit
         {
             return new ProductionPreconditionStatus(
                 productTrust, timeSync, dedupeHealth, SecurityProfile: false,
-                ReasonCode: ActivationValidationReasons.NotDispatchRelevant,
+                ReasonCode: ActivationValidationReasons.ProductTrustNotEstablished,
                 Details: "product-trust not established (set Regelleistung:ProductTrustEstablished=true).");
         }
         if (!timeSync)

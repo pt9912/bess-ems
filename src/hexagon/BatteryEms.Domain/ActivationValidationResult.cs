@@ -55,5 +55,6 @@ public static class ActivationValidationReasons
 
     // Use-case + production-gate outcomes (Sub-Slice D).
     public const string NotDispatchRelevant = "not-dispatch-relevant";
+    public const string ProductTrustNotEstablished = "product-trust-not-established";
     public const string SecurityProfileEnforcementNotWired = "security-profile-enforcement-not-wired";
 }

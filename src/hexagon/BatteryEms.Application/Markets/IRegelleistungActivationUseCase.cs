@@ -1,5 +1,6 @@
 using BatteryEms.Application.Time;
 using BatteryEms.Domain;
+using Microsoft.Extensions.Logging;
 
 namespace BatteryEms.Application.Markets;
 
@@ -29,7 +30,7 @@ public sealed record ActivationOutcome(
     string Details,
     bool DispatchRelevant);
 
-public sealed class DefaultRegelleistungActivationUseCase : IRegelleistungActivationUseCase
+public sealed partial class DefaultRegelleistungActivationUseCase : IRegelleistungActivationUseCase
 {
     private readonly ActivationValidator _validator;
     private readonly ITimebaseHealthSource _timebaseSource;
@@ -38,6 +39,7 @@ public sealed class DefaultRegelleistungActivationUseCase : IRegelleistungActiva
     private readonly IRegelleistungActivationStateStore _stateStore;
     private readonly RegelleistungOptions _options;
     private readonly IClock _clock;
+    private readonly ILogger<DefaultRegelleistungActivationUseCase> _logger;
 
     public DefaultRegelleistungActivationUseCase(
         ActivationValidator validator,
@@ -46,7 +48,8 @@ public sealed class DefaultRegelleistungActivationUseCase : IRegelleistungActiva
         IProductionPreconditionProvider preconditions,
         IRegelleistungActivationStateStore stateStore,
         RegelleistungOptions options,
-        IClock clock)
+        IClock clock,
+        ILogger<DefaultRegelleistungActivationUseCase> logger)
     {
         ArgumentNullException.ThrowIfNull(validator);
         ArgumentNullException.ThrowIfNull(timebaseSource);
@@ -55,6 +58,7 @@ public sealed class DefaultRegelleistungActivationUseCase : IRegelleistungActiva
         ArgumentNullException.ThrowIfNull(stateStore);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(logger);
         options.EnsureValid();
         _validator = validator;
         _timebaseSource = timebaseSource;
@@ -63,6 +67,7 @@ public sealed class DefaultRegelleistungActivationUseCase : IRegelleistungActiva
         _stateStore = stateStore;
         _options = options;
         _clock = clock;
+        _logger = logger;
     }
 
     public async Task<ActivationOutcome> ReceiveAsync(
@@ -104,8 +109,30 @@ public sealed class DefaultRegelleistungActivationUseCase : IRegelleistungActiva
             DispatchRelevant: outcome.DispatchRelevant,
             Details: outcome.Details));
 
+        // Audit trail (plan-RM-M4-03 §147): every outcome — accepted
+        // and rejected — emits a structured log event so the forensic
+        // history persists in the host's stdout stream beyond the
+        // single-slot in-memory state holder. Persistent DB-backed
+        // audit is a follow-up when forensic retention requirements
+        // get specified.
+        LogActivationOutcome(
+            _logger,
+            activation.SourceId,
+            activation.ActivationId,
+            outcome.ReasonCode,
+            outcome.DispatchRelevant);
+
         return outcome;
     }
+
+    [LoggerMessage(EventId = 4100, Level = LogLevel.Information,
+        Message = "regelleistung activation outcome: source={SourceId} id={ActivationId} reason={ReasonCode} dispatch_relevant={DispatchRelevant}")]
+    private static partial void LogActivationOutcome(
+        ILogger logger,
+        string sourceId,
+        string activationId,
+        string reasonCode,
+        bool dispatchRelevant);
 
     private ActivationOutcome ApplyProductionGate(RegelleistungActivation activation)
     {

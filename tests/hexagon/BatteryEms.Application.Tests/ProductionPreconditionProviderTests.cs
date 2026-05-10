@@ -28,7 +28,7 @@ public sealed class ProductionPreconditionProviderTests
 
         Assert.False(status.IsGreen);
         Assert.False(status.ProductTrust);
-        Assert.Equal(ActivationValidationReasons.NotDispatchRelevant, status.ReasonCode);
+        Assert.Equal(ActivationValidationReasons.ProductTrustNotEstablished, status.ReasonCode);
     }
 
     [Fact]

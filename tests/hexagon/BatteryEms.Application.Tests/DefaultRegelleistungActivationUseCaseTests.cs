@@ -1,6 +1,7 @@
 using BatteryEms.Application.Markets;
 using BatteryEms.Application.Time;
 using BatteryEms.Domain;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace BatteryEms.Application.Tests;
@@ -45,7 +46,8 @@ public sealed class DefaultRegelleistungActivationUseCaseTests
         {
             var validator = new ActivationValidator(Options, Dedupe, Clock);
             return new DefaultRegelleistungActivationUseCase(
-                validator, Timebase, DispatchSource, Preconditions, StateStore, Options, Clock);
+                validator, Timebase, DispatchSource, Preconditions, StateStore, Options, Clock,
+                NullLogger<DefaultRegelleistungActivationUseCase>.Instance);
         }
     }
 
@@ -53,7 +55,6 @@ public sealed class DefaultRegelleistungActivationUseCaseTests
     public async Task Production_disabled_returns_not_dispatch_relevant()
     {
         var harness = new TestHarness { Options = new RegelleistungOptions { ProductionActivationEnabled = false } };
-        harness.Dedupe.GetType(); // touch to silence unused
         var useCase = harness.Build();
 
         var outcome = await useCase.ReceiveAsync(Activation());
@@ -230,20 +231,23 @@ public sealed class DefaultRegelleistungActivationUseCaseTests
     {
         var harness = new TestHarness();
         var validator = new ActivationValidator(harness.Options, harness.Dedupe, harness.Clock);
+        var logger = NullLogger<DefaultRegelleistungActivationUseCase>.Instance;
 
         Assert.Throws<ArgumentNullException>(() => new DefaultRegelleistungActivationUseCase(
-            null!, harness.Timebase, harness.DispatchSource, harness.Preconditions, harness.StateStore, harness.Options, harness.Clock));
+            null!, harness.Timebase, harness.DispatchSource, harness.Preconditions, harness.StateStore, harness.Options, harness.Clock, logger));
         Assert.Throws<ArgumentNullException>(() => new DefaultRegelleistungActivationUseCase(
-            validator, null!, harness.DispatchSource, harness.Preconditions, harness.StateStore, harness.Options, harness.Clock));
+            validator, null!, harness.DispatchSource, harness.Preconditions, harness.StateStore, harness.Options, harness.Clock, logger));
         Assert.Throws<ArgumentNullException>(() => new DefaultRegelleistungActivationUseCase(
-            validator, harness.Timebase, null!, harness.Preconditions, harness.StateStore, harness.Options, harness.Clock));
+            validator, harness.Timebase, null!, harness.Preconditions, harness.StateStore, harness.Options, harness.Clock, logger));
         Assert.Throws<ArgumentNullException>(() => new DefaultRegelleistungActivationUseCase(
-            validator, harness.Timebase, harness.DispatchSource, null!, harness.StateStore, harness.Options, harness.Clock));
+            validator, harness.Timebase, harness.DispatchSource, null!, harness.StateStore, harness.Options, harness.Clock, logger));
         Assert.Throws<ArgumentNullException>(() => new DefaultRegelleistungActivationUseCase(
-            validator, harness.Timebase, harness.DispatchSource, harness.Preconditions, null!, harness.Options, harness.Clock));
+            validator, harness.Timebase, harness.DispatchSource, harness.Preconditions, null!, harness.Options, harness.Clock, logger));
         Assert.Throws<ArgumentNullException>(() => new DefaultRegelleistungActivationUseCase(
-            validator, harness.Timebase, harness.DispatchSource, harness.Preconditions, harness.StateStore, null!, harness.Clock));
+            validator, harness.Timebase, harness.DispatchSource, harness.Preconditions, harness.StateStore, null!, harness.Clock, logger));
         Assert.Throws<ArgumentNullException>(() => new DefaultRegelleistungActivationUseCase(
-            validator, harness.Timebase, harness.DispatchSource, harness.Preconditions, harness.StateStore, harness.Options, null!));
+            validator, harness.Timebase, harness.DispatchSource, harness.Preconditions, harness.StateStore, harness.Options, null!, logger));
+        Assert.Throws<ArgumentNullException>(() => new DefaultRegelleistungActivationUseCase(
+            validator, harness.Timebase, harness.DispatchSource, harness.Preconditions, harness.StateStore, harness.Options, harness.Clock, null!));
     }
 }
