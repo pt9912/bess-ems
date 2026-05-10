@@ -244,7 +244,7 @@ mit klar benannten DoD-Sätzen aus dem ursprünglichen Plan.
 
 **Status:** Abgeschlossen durch RM-M4-03-B (Sub-Slice B des
 Regelleistungs-Aktivierungssignal-Plans
-[`../in-progress/plan-RM-M4-03.md`](../in-progress/plan-RM-M4-03.md)).
+[`../done/plan-RM-M4-03.md`](../done/plan-RM-M4-03.md)).
 
 **Auslieferung:** `schema/schema.yaml` um den Tisch
 `regelleistung_activations` (PK `(source_id, activation_id)`, Index
