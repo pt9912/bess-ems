@@ -125,8 +125,43 @@ internal sealed class EmbeddedTestServerHost : IAsyncDisposable
     private async Task StartServerAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _server = new BessEmsTestServer(_nodeManagerFactory);
-        await _application.StartAsync(_server).ConfigureAwait(false);
+        // Review-Fix M6: kernel `TIME_WAIT` kann den Re-Bind auf
+        // demselben Port nach `StopAsync` kurz blockieren. Die
+        // Reconnect-Pin braucht den gleichen Port, weil die Adapter-
+        // Options statisch sind und der Mid-Stream-Recovery-Pfad gegen
+        // dieselbe `EndpointUrl` re-konnektiert (sonst wäre's kein
+        // echter Mid-Stream-Reconnect mehr). Wir geben dem Bind ein
+        // paar 200ms-Slots Zeit; modernes Linux mit `tcp_tw_reuse=1`
+        // greift normalerweise im ersten Versuch.
+        const int maxAttempts = 10;
+        const int delayMs = 200;
+        Exception? lastError = null;
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _server = new BessEmsTestServer(_nodeManagerFactory);
+            try
+            {
+                await _application.StartAsync(_server).ConfigureAwait(false);
+                return;
+            }
+#pragma warning disable CA1031 // Bind-Error-Klassifikation ist SDK-typenabhängig.
+            catch (Exception ex)
+#pragma warning restore CA1031
+            {
+                lastError = ex;
+                try { _server.Dispose(); }
+#pragma warning disable CA1031 // Bind-Failure-Cleanup ist best-effort.
+                catch { }
+#pragma warning restore CA1031
+                _server = null;
+                if (attempt == maxAttempts) { break; }
+                await Task.Delay(delayMs, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        throw new InvalidOperationException(
+            $"Embedded test server failed to bind {EndpointUrl} after "
+            + $"{maxAttempts} attempts.", lastError);
     }
 
     private async Task StopServerAsync()

@@ -174,6 +174,22 @@ public sealed class OpcUaTelemetrySource : IBatteryTelemetrySource, IAsyncDispos
                 yield return sample;
             }
 
+            // Review-Fix H6: Mid-Stream-Reconnect. Recovery zündet wenn
+            // (a) die TCP-Schicht den Disconnect schon erkannt hat
+            // (`!_client.IsConnected`), oder (b) wir wiederholt
+            // Read-Fehler sehen. (b) ist nötig weil der SDK-
+            // `Session.Connected` über den Keepalive-Timer aktualisiert
+            // wird und nach einem Server-Stop bis zu `KeepAliveInterval`
+            // hinterherhinkt — währenddessen würden Reads silently
+            // throwen ohne dass die Health-Statusmaschine recovery
+            // anfordert.
+            if (!token.IsCancellationRequested
+                && !_disposed
+                && (!_client.IsConnected || ShouldRecoverAfterFailures()))
+            {
+                await RecoverConnectionAsync(token).ConfigureAwait(false);
+            }
+
             try
             {
                 await Task.Delay(_options.PollingInterval, token).ConfigureAwait(false);
@@ -182,6 +198,86 @@ public sealed class OpcUaTelemetrySource : IBatteryTelemetrySource, IAsyncDispos
             {
                 yield break;
             }
+        }
+    }
+
+    private bool ShouldRecoverAfterFailures()
+    {
+        // Schwelle: zwei aufeinanderfolgende Read-Failures sind
+        // typischerweise schon ein dead-session-Signal (transient-
+        // single-failure-Fenster bleibt unangetastet). Master-DoD
+        // Reconnect-Schleife wird damit zuverlässig getriggert,
+        // ohne dass jeder Einmal-Fehler eine teure Recovery zündet.
+        lock (_stateGate)
+        {
+            return _status.ConsecutiveFailures >= 2;
+        }
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031",
+        Justification = "Recovery is best-effort: any exception is surfaced via AdapterStatus and re-tried on the next tick.")]
+    private async Task RecoverConnectionAsync(CancellationToken cancellationToken)
+    {
+        OpcUaTelemetrySourceLog.LogReconnectAttempt(_logger);
+        Task? oldPump;
+        IOpcUaSubscription? oldSub;
+        lock (_stateGate)
+        {
+            oldPump = _notificationPump;
+            oldSub = _subscription;
+            _notificationPump = null;
+            _subscription = null;
+        }
+        if (oldSub is not null)
+        {
+            try { await oldSub.DisposeAsync().ConfigureAwait(false); }
+            catch (Exception ex)
+            {
+                OpcUaTelemetrySourceLog.LogSubscriptionDisposeFailure(_logger, ex);
+            }
+        }
+        if (oldPump is not null)
+        {
+            // Old pump exits on its own when the disposed subscription's
+            // channel completes — but we wait for it (briefly) so the
+            // new pump doesn't race with it on the shared overflow
+            // channel.
+            try { await oldPump.ConfigureAwait(false); }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                OpcUaTelemetrySourceLog.LogPumpDisposeFailure(_logger, ex);
+            }
+        }
+
+        try
+        {
+            // Force-Disconnect bevor Reconnect: ohne diesen Schritt
+            // würde `OpcUaClient.ConnectAsync` early-return-en, wenn der
+            // SDK-`Session.Connected` noch true ist (Keepalive-Timer
+            // hat den TCP-Drop noch nicht gemerkt). Wir wissen aus der
+            // Failure-Schwelle, dass die Session de-facto tot ist.
+            try
+            {
+                using var disconnectCts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                await _client.DisconnectAsync(disconnectCts.Token).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                OpcUaTelemetrySourceLog.LogClientDisposeFailure(_logger, ex);
+            }
+            await ConnectWithBackoffAsync(cancellationToken).ConfigureAwait(false);
+            await EnsureSubscriptionAsync(cancellationToken).ConfigureAwait(false);
+            UpdateStatusOnSuccess();
+            OpcUaTelemetrySourceLog.LogReconnectSuccess(_logger);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            UpdateStatusOnFailure(ex);
         }
     }
 
@@ -366,7 +462,10 @@ public sealed class OpcUaTelemetrySource : IBatteryTelemetrySource, IAsyncDispos
             .ConfigureAwait(false);
         foreach (var node in _subscribeNodes)
         {
-            subscription.AddMonitoredItem(node.NodeId, node.DataType, node.SamplingIntervalMs);
+            await subscription
+                .AddMonitoredItemAsync(
+                    node.NodeId, node.DataType, node.SamplingIntervalMs, cancellationToken)
+                .ConfigureAwait(false);
         }
 
         // If DisposeAsync ran between CreateSubscriptionAsync and this
@@ -490,4 +589,12 @@ internal static partial class OpcUaTelemetrySourceLog
         Message = "opcua client DisposeAsync threw.")]
     public static partial void LogClientDisposeFailure(
         ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 4215, Level = LogLevel.Information,
+        Message = "opcua mid-stream reconnect attempt: session lost, rebuilding.")]
+    public static partial void LogReconnectAttempt(ILogger logger);
+
+    [LoggerMessage(EventId = 4216, Level = LogLevel.Information,
+        Message = "opcua mid-stream reconnect succeeded.")]
+    public static partial void LogReconnectSuccess(ILogger logger);
 }

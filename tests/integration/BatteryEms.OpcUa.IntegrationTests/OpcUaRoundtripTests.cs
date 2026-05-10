@@ -35,7 +35,26 @@ public sealed class OpcUaRoundtripTests : IClassFixture<OpcUaTestServerFixture>,
         _asset = loader.LoadAsset(AssetPath);
     }
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    // Review-Fix M7: jeder Test startet mit einer bekannten Baseline.
+    // Ohne diesen Reset ist die Test-Reihenfolge bias-anfällig — der
+    // StatusCode-Pin lässt z. B. einen Bad-Status auf `Battery.Soc`
+    // zurück, den ein folgender Test sehen würde, wenn er die Variable
+    // nicht selbst überschreibt. Test-Affordance `SetValue` resettet
+    // den StatusCode bereits intern (siehe BatteryTestNodeManager.cs),
+    // aber der explizite Reset hier macht die Invariante sichtbar.
+    public Task InitializeAsync()
+    {
+        var nm = _fixture.Host.NodeManager;
+        nm.SetValue("Battery.Soc", 50.0f);
+        nm.SetValue("Battery.ActivePower", 0.0f);
+        nm.SetValue("Battery.ReactivePower", 0.0f);
+        nm.SetValue("Battery.Temperature", 22.0f);
+        nm.SetValue("Battery.FaultCode", (ushort)0);
+        nm.SetValue("Battery.Setpoint.ActivePower", 0.0f);
+        nm.SetValue("Battery.Setpoint.ReactivePower", 0.0f);
+        return Task.CompletedTask;
+    }
+
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
@@ -181,30 +200,59 @@ public sealed class OpcUaRoundtripTests : IClassFixture<OpcUaTestServerFixture>,
     }
 
     [Fact]
-    public async Task EndToEnd_Reconnect_after_server_restart_recovers_read_path()
+    public async Task EndToEnd_Reconnect_after_server_restart_keeps_stream_alive()
     {
+        // Plan-RM-M4-04 §4 Sub-Slice D Reconnect-Pin: "Server abreissen
+        // + neu starten, Adapter reconnected, Stream läuft weiter".
+        // Die existierende Source läuft durch — kein zweiter Client.
+        // Der Mid-Stream-Recovery-Pfad in OpcUaTelemetrySource (siehe
+        // Review-Fix H6) ist hier der eigentliche Pin: nach dem
+        // Server-Restart muss der Stream WEITER Telemetrie liefern.
         var host = _fixture.Host;
         host.NodeManager.SetValue("Battery.Soc", 40.0f);
         host.NodeManager.SetValue("Battery.Temperature", 25.0f);
 
         await using var client = new OpcUaClient(Defaults.ForHilSimulator(host.EndpointUrl));
-        // First Connect + Read — primes the session.
-        await client.ConnectAsync(CancellationToken.None);
-        var first = await client.ReadAsync("ns=2;s=Battery.Temperature", CancellationToken.None);
-        Assert.Equal(StatusCodes.Good, first.StatusCode);
+        await using var source = new OpcUaTelemetrySource(
+            client, _mapping, Defaults.ForHilSimulator(host.EndpointUrl),
+            _asset, new SystemClock(), NullLogger<OpcUaTelemetrySource>.Instance);
 
-        // Tear down the server; the existing session is now stale.
-        using var restartCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        await host.RestartAsync(restartCts.Token);
-        // After restart, a fresh client connects to the (same-port-)
-        // restarted endpoint. The existing client's session is dead —
-        // the Reconnect pin verifies that a re-Connect+Read against
-        // the restarted server succeeds (i.e., the embedded server is
-        // actually reachable on the same endpoint after a restart).
-        await using var client2 = new OpcUaClient(Defaults.ForHilSimulator(host.EndpointUrl));
-        await client2.ConnectAsync(CancellationToken.None);
-        var second = await client2.ReadAsync("ns=2;s=Battery.Temperature", CancellationToken.None);
-        Assert.Equal(StatusCodes.Good, second.StatusCode);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        BatteryTelemetry? before = null;
+        BatteryTelemetry? afterRestart = null;
+        var restarted = false;
+        var samples = new List<BatteryTelemetry>();
+
+        await foreach (var s in source.ReadAsync(cts.Token))
+        {
+            samples.Add(s);
+            if (before is null && s.TemperatureCelsius > 0)
+            {
+                before = s;
+                // Restart; gleicher Port, gleicher Endpoint.
+                using var restartCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                await host.RestartAsync(restartCts.Token);
+                // Frische Test-Daten setzen, damit ein nachfolgendes
+                // Sample ein erkennbares Marker-Paar trägt.
+                host.NodeManager.SetValue("Battery.Temperature", 31.0f);
+                restarted = true;
+                continue;
+            }
+            // Nach dem Restart: warten bis ein Sample mit dem neuen
+            // Temperature-Wert ankommt — das beweist, dass der Mid-
+            // Stream-Recovery-Pfad neu konnektiert + neu read'ed hat.
+            if (restarted && s.TemperatureCelsius > 30 && s.DataQuality.Flag == DataQualityState.Valid)
+            {
+                afterRestart = s;
+                break;
+            }
+        }
+
+        Assert.True(before is not null,
+            $"Pre-restart sample never arrived. Saw {samples.Count} samples.");
+        Assert.True(afterRestart is not null,
+            $"Stream did not recover after restart. Saw {samples.Count} samples; "
+            + $"last Temperature values: [{string.Join(",", samples.TakeLast(5).Select(x => x.TemperatureCelsius))}].");
     }
 
     private static string SchemaDirectory =>
@@ -216,8 +264,11 @@ public sealed class OpcUaRoundtripTests : IClassFixture<OpcUaTestServerFixture>,
 
     private static string RepoRoot()
     {
+        // Review-Fix L8: 20 Levels statt 12 — robuster gegen tief
+        // geschachtelte CI-Workspace-Pfade (Docker BuildKit Volumes,
+        // /var/lib/docker/...).
         var dir = AppContext.BaseDirectory;
-        for (var i = 0; i < 12 && dir is not null; i++)
+        for (var i = 0; i < 20 && dir is not null; i++)
         {
             if (File.Exists(Path.Combine(dir, "BatteryEms.sln")))
             {

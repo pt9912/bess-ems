@@ -22,9 +22,13 @@ internal sealed class BatteryTestNodeManager : CustomNodeManager2
 {
     public const string NamespaceUri = "urn:bess-ems:test-server";
 
+    // Single-lock-Strategie (Review-Fix M5): nur die SDK-eigene `Lock`
+    // bewacht die Variable-Map und den Address-Space. Die Map-Mutation
+    // findet ausschließlich in `CreateAddressSpace` statt (single-thread
+    // Init), Reads laufen unter `Lock`. Damit gibt es keinen Lock-Order-
+    // Footgun mehr zwischen test-affordances und SDK-internen Hooks.
     private readonly Dictionary<string, BaseDataVariableState> _variablesByName =
         new(StringComparer.Ordinal);
-    private readonly object _testGate = new();
 
     public BatteryTestNodeManager(
         IServerInternal server,
@@ -43,18 +47,9 @@ internal sealed class BatteryTestNodeManager : CustomNodeManager2
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(value);
-        BaseDataVariableState variable;
-        lock (_testGate)
-        {
-            if (!_variablesByName.TryGetValue(name, out var v))
-            {
-                throw new InvalidOperationException(
-                    $"Unknown test variable '{name}'.");
-            }
-            variable = v;
-        }
         lock (Lock)
         {
+            var variable = RequireVariable(name);
             variable.Value = value;
             // Setzt den StatusCode unkonditional zurück auf Good. Ohne
             // dieses Reset würde ein vorheriger SetStatusCode-Aufruf (z.
@@ -72,18 +67,9 @@ internal sealed class BatteryTestNodeManager : CustomNodeManager2
     public void SetStatusCode(string name, StatusCode statusCode)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        BaseDataVariableState variable;
-        lock (_testGate)
-        {
-            if (!_variablesByName.TryGetValue(name, out var v))
-            {
-                throw new InvalidOperationException(
-                    $"Unknown test variable '{name}'.");
-            }
-            variable = v;
-        }
         lock (Lock)
         {
+            var variable = RequireVariable(name);
             variable.StatusCode = statusCode;
             variable.Timestamp = DateTime.UtcNow;
             variable.ClearChangeMasks(SystemContext, false);
@@ -93,17 +79,17 @@ internal sealed class BatteryTestNodeManager : CustomNodeManager2
     public object? GetWrittenValue(string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        BaseDataVariableState variable;
-        lock (_testGate)
+        lock (Lock) { return RequireVariable(name).Value; }
+    }
+
+    private BaseDataVariableState RequireVariable(string name)
+    {
+        if (!_variablesByName.TryGetValue(name, out var variable))
         {
-            if (!_variablesByName.TryGetValue(name, out var v))
-            {
-                throw new InvalidOperationException(
-                    $"Unknown test variable '{name}'.");
-            }
-            variable = v;
+            throw new InvalidOperationException(
+                $"Unknown test variable '{name}'.");
         }
-        lock (Lock) { return variable.Value; }
+        return variable;
     }
 
     public override void CreateAddressSpace(
@@ -180,7 +166,9 @@ internal sealed class BatteryTestNodeManager : CustomNodeManager2
         };
         parent.AddChild(variable);
         AddPredefinedNode(SystemContext, variable);
-        lock (_testGate) { _variablesByName[name] = variable; }
+        // CreateAddressSpace runs single-threaded under SDK Lock at
+        // server start; the map is thereafter read-only.
+        _variablesByName[name] = variable;
         return variable;
     }
 

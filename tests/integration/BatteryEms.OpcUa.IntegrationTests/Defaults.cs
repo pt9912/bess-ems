@@ -10,6 +10,14 @@ namespace BatteryEms.OpcUa.IntegrationTests;
 //
 // Tests können die Defaults überschreiben — dies ist nur der
 // Zero-Boilerplate-Pfad gegen den embedded Simulator.
+//
+// Hinweis (Review-Fix L7): die Timing-Werte hier sind **bewusst**
+// agressiver als die Production-Defaults aus `OpcUaAdapterOptions`
+// (PollingInterval 100ms statt 1s, DefaultMonitoringIntervalMs 200ms
+// statt 1000, ReconnectBackoffMax 2s statt 30s). Tests sollen schnell
+// pinnen; die Production-Linie hat andere SLO-Anforderungen. Eine
+// Derive-via-`with`-Strategie würde die intentional-aggressiven
+// Test-Werte verschleiern.
 internal static class Defaults
 {
     public const string ForHilSimulatorReason = "hil-simulator-pre-m4-05";

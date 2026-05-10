@@ -251,14 +251,18 @@ public sealed class FakeOpcUaSubscription : IOpcUaSubscription
         get { lock (_gate) { return _items.ToArray(); } }
     }
 
-    public void AddMonitoredItem(string nodeId, OpcUaDataType dataType, int samplingIntervalMs)
+    public Task AddMonitoredItemAsync(
+        string nodeId, OpcUaDataType dataType, int samplingIntervalMs,
+        CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeId);
+        cancellationToken.ThrowIfCancellationRequested();
         lock (_gate)
         {
             ThrowIfDisposed();
             _items.Add(new FakeMonitoredItem(nodeId, dataType, samplingIntervalMs));
         }
+        return Task.CompletedTask;
     }
 
     public IAsyncEnumerable<OpcUaNotification> NotificationsAsync(

@@ -16,24 +16,34 @@ namespace BatteryEms.Adapters.OpcUa;
 // AllowUnsecured-Startup-Guard auf der bool-Achse (D-04). M4-05 layert
 // die RuntimeProfile-Awareness drauf. Hier wird das per
 // `useSecurity=false`-Endpoint-Selection und einem auto-akzeptierenden
-// `CertificateValidator` umgesetzt.
+// `CertificateValidator` umgesetzt — der Handler-Slot wird in
+// `DisposeAsync` wieder unhooked, damit `OpcUaClient`-Instanzen nicht
+// einander auf einem geteilten Validator-Handler-Slot belasten.
 //
 // Cancellation: das SDK honoriert `CancellationToken` historisch nicht
 // durchgängig auf langen Reads (siehe plan §7 Risiken). Der Wrapper
-// reicht den Token an alle Async-SDK-Aufrufe durch und setzt den
-// Session-`KeepAliveInterval` aus Options, damit die Session nicht
-// silent stale wird.
+// reicht den Token an alle Async-SDK-Aufrufe durch und cap-t den
+// Connect-Pfad zusätzlich mit `OpcUaAdapterOptions.ConnectTimeout`,
+// damit ein still-stehender Handshake nicht unbeschränkt hängt
+// (Review-Fix H1).
 public sealed class OpcUaClient : IOpcUaClient
 {
     private readonly OpcUaAdapterOptions _options;
     private readonly SemaphoreSlim _connectGate = new(1, 1);
     private readonly object _stateGate = new();
     private readonly ConcurrentDictionary<uint, OpcUaSubscription> _subscriptions = new();
+    // Per-Instanz-PKI-Verzeichnis. Eindeutig durch GUID, plattform-
+    // portabel über `Path.GetTempPath()` (Review-Fix H5). Wird in
+    // DisposeAsync best-effort wieder entsorgt.
+    private readonly string _pkiRoot = Path.Combine(
+        Path.GetTempPath(), "BatteryEms", "OpcUa", "pki",
+        $"{Guid.NewGuid():N}");
 
     private ITelemetryContext? _telemetry;
     private IDisposable? _telemetryDisposable;
     private ApplicationInstance? _application;
     private ApplicationConfiguration? _appConfig;
+    private CertificateValidationEventHandler? _certificateAutoAcceptHandler;
     private Session? _session;
     private bool _disposed;
 
@@ -45,7 +55,11 @@ public sealed class OpcUaClient : IOpcUaClient
 
     public bool IsConnected
     {
-        get { lock (_stateGate) { return _session is not null && _session.Connected; } }
+        // Best-effort snapshot: `_session.Connected` ist SDK-seitig
+        // volatile (Keepalive-Thread setzt das ohne unseren Lock).
+        // Der Lock schützt nur die Reference-Zuweisung _session. Das
+        // ist die dokumentierte Semantik — siehe Review-Fix L2.
+        get { lock (_stateGate) { return _session?.Connected ?? false; } }
     }
 
     public async Task ConnectAsync(CancellationToken cancellationToken)
@@ -58,7 +72,18 @@ public sealed class OpcUaClient : IOpcUaClient
         {
             if (_session is { Connected: true }) { return; }
 
-            await EnsureApplicationConfiguredAsync(cancellationToken).ConfigureAwait(false);
+            // Review-Fix H6 support: stale Session aufräumen, bevor wir
+            // eine neue bauen — sonst leakt jeder Mid-Stream-Reconnect
+            // eine alte Session-Instanz (samt Keepalive-Thread).
+            await DisposeStaleSessionAsync(cancellationToken).ConfigureAwait(false);
+
+            // Review-Fix H1: ConnectTimeout wirklich enforcen.
+            using var connectCts = CancellationTokenSource
+                .CreateLinkedTokenSource(cancellationToken);
+            connectCts.CancelAfter(_options.ConnectTimeout);
+            var token = connectCts.Token;
+
+            await EnsureApplicationConfiguredAsync(token).ConfigureAwait(false);
 
             var endpointDescription = await CoreClientUtils
                 .SelectEndpointAsync(
@@ -66,7 +91,7 @@ public sealed class OpcUaClient : IOpcUaClient
                     _options.EndpointUrl.ToString(),
                     useSecurity: false,
                     _telemetry!,
-                    cancellationToken)
+                    token)
                 .ConfigureAwait(false);
             var endpointConfiguration = EndpointConfiguration.Create(_appConfig!);
             var endpoint = new ConfiguredEndpoint(null, endpointDescription, endpointConfiguration);
@@ -81,9 +106,13 @@ public sealed class OpcUaClient : IOpcUaClient
                     sessionTimeout: 60_000,
                     identity: null,
                     preferredLocales: default,
-                    cancellationToken)
+                    token)
                 .ConfigureAwait(false);
 
+            // Review-Fix L3: das SDK unterstützt diesen Setter nach
+            // `CreateAsync`-Return; es restartet den Keepalive-Timer mit
+            // dem neuen Intervall. Kurzes Fenster mit SDK-Default ist
+            // harmlos.
             session.KeepAliveInterval = (int)_options.KeepAliveInterval.TotalMilliseconds;
             lock (_stateGate) { _session = session; }
         }
@@ -106,6 +135,24 @@ public sealed class OpcUaClient : IOpcUaClient
         {
             toClose.Dispose();
         }
+    }
+
+    private async Task DisposeStaleSessionAsync(CancellationToken cancellationToken)
+    {
+        Session? stale;
+        lock (_stateGate) { stale = _session; _session = null; }
+        if (stale is null) { return; }
+        try
+        {
+            await stale.CloseAsync(cancellationToken).ConfigureAwait(false);
+        }
+#pragma warning disable CA1031 // Stale-Cleanup ist best-effort.
+        catch { }
+#pragma warning restore CA1031
+        try { stale.Dispose(); }
+#pragma warning disable CA1031
+        catch { }
+#pragma warning restore CA1031
     }
 
     public async Task<OpcUaReadResult> ReadAsync(string nodeId, CancellationToken cancellationToken)
@@ -131,11 +178,17 @@ public sealed class OpcUaClient : IOpcUaClient
         ObjectDisposedException.ThrowIf(_disposed, this);
         var session = RequireSession();
         var nid = NodeId.Parse(nodeId);
+        // Review-Fix H2: dataType durchsetzen statt silent ignorieren.
+        // Mismatch zwischen vorgefertigtem CLR-Typ (Sink boxed bereits
+        // typkorrekt) und Mapping-DataType wird hier sichtbar — kein
+        // silent-Variant-Default mehr, der dem Operator wie ein
+        // Adapter-Bug aussehen würde.
+        var variant = BuildVariant(value, dataType);
         var write = new WriteValue
         {
             NodeId = nid,
             AttributeId = Attributes.Value,
-            Value = new DataValue { Value = new Variant(value) },
+            Value = new DataValue { Value = variant },
         };
         var request = new WriteValueCollection { write };
         var response = await session.WriteAsync(null, request, cancellationToken)
@@ -166,12 +219,34 @@ public sealed class OpcUaClient : IOpcUaClient
         };
         if (!session.AddSubscription(sdkSubscription))
         {
+            sdkSubscription.Dispose();
             throw new InvalidOperationException(
                 "opcua-subscription-add-failed: session refused AddSubscription.");
         }
-        await sdkSubscription.CreateAsync(cancellationToken).ConfigureAwait(false);
+        // Review-Fix H3: ohne dieses try/catch leakt eine bereits per
+        // `AddSubscription` registrierte Subscription auf dem Server,
+        // wenn `CreateAsync` throwed/cancelled — sie ist dann weder
+        // im _subscriptions-Tracker noch in unserem Wrapper-Lifecycle.
+        try
+        {
+            await sdkSubscription.CreateAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            try
+            {
+                await session.RemoveSubscriptionAsync(sdkSubscription, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+#pragma warning disable CA1031 // Best-effort cleanup; rethrow original exception below.
+            catch { }
+#pragma warning restore CA1031
+            sdkSubscription.Dispose();
+            throw;
+        }
 
-        var wrapper = new OpcUaSubscription(sdkSubscription, this);
+        var wrapper = new OpcUaSubscription(
+            sdkSubscription, this, session, _options.SubscriptionChannelCapacity);
         _subscriptions.TryAdd(sdkSubscription.Id, wrapper);
         return wrapper;
     }
@@ -197,8 +272,39 @@ public sealed class OpcUaClient : IOpcUaClient
 #pragma warning disable CA1031
         catch { }
 #pragma warning restore CA1031
+
+        // Review-Fix L6: Cert-Validator-Handler in Dispose -=
+        // unhooken — der `CertificateValidator` lebt am `_appConfig`,
+        // das wir bei einer Sub-Slice-Erweiterung evtl. teilen wollten;
+        // heute ist es per-Instanz, aber das aufräumen ist trotzdem
+        // korrekt.
+        if (_appConfig is not null && _certificateAutoAcceptHandler is not null)
+        {
+            try
+            {
+                _appConfig.CertificateValidator.CertificateValidation -=
+                    _certificateAutoAcceptHandler;
+            }
+#pragma warning disable CA1031
+            catch { }
+#pragma warning restore CA1031
+            _certificateAutoAcceptHandler = null;
+        }
         _telemetryDisposable?.Dispose();
         _connectGate.Dispose();
+
+        // Review-Fix H5: PKI-Verzeichnis aufräumen, sodass parallele
+        // Test-Runs keinen Cert-Pool-Bloat in /tmp anhäufen.
+        try
+        {
+            if (Directory.Exists(_pkiRoot))
+            {
+                Directory.Delete(_pkiRoot, recursive: true);
+            }
+        }
+#pragma warning disable CA1031
+        catch { }
+#pragma warning restore CA1031
     }
 
     internal void RemoveSubscription(uint subscriptionId)
@@ -219,44 +325,115 @@ public sealed class OpcUaClient : IOpcUaClient
     private async Task EnsureApplicationConfiguredAsync(CancellationToken cancellationToken)
     {
         if (_appConfig is not null) { return; }
-        if (_telemetry is null)
+        // Review-Fix M1/M2: partial-failure-Cleanup. Bauen in lokale
+        // Variablen; nur bei Erfolg auf die Felder commiten. Throw vor
+        // dem Commit räumt die lokalen Refs ab, sodass Retry sauber
+        // neu baut statt Cert-Validator-Handler zu duplizieren oder
+        // ApplicationInstance-Zombies zu hinterlassen.
+        ITelemetryContext? telemetry = _telemetry;
+        IDisposable? telemetryDisposable = _telemetryDisposable;
+        if (telemetry is null)
         {
             var defaultTelemetry = DefaultTelemetry.Create(b => { });
-            _telemetry = defaultTelemetry;
-            _telemetryDisposable = defaultTelemetry as IDisposable;
+            telemetry = defaultTelemetry;
+            telemetryDisposable = defaultTelemetry as IDisposable;
         }
 
         var subject = $"CN={_options.SessionName}, O=BatteryEms, DC=localhost";
-        var pkiRoot = "%TEMP%/BatteryEms/OpcUa/pki";
+        Directory.CreateDirectory(_pkiRoot);
         var certs = ApplicationConfigurationBuilder.CreateDefaultApplicationCertificates(
-            subject, CertificateStoreType.Directory, pkiRoot);
+            subject, CertificateStoreType.Directory, _pkiRoot);
 
-        _application = new ApplicationInstance(_telemetry)
+        var application = new ApplicationInstance(telemetry)
         {
             ApplicationName = _options.SessionName,
             ApplicationType = ApplicationType.Client,
         };
 
-        await _application
-            .Build(
-                applicationUri: $"urn:bess-ems:opcua-client:{_options.SessionName}",
-                productUri: "urn:bess-ems:opcua-client")
-            .AsClient()
-            .AddSecurityConfiguration(certs, pkiRoot)
-            .SetAutoAcceptUntrustedCertificates(true)
-            .CreateAsync(cancellationToken)
-            .ConfigureAwait(false);
+        try
+        {
+            await application
+                .Build(
+                    applicationUri: $"urn:bess-ems:opcua-client:{_options.SessionName}",
+                    productUri: "urn:bess-ems:opcua-client")
+                .AsClient()
+                .AddSecurityConfiguration(certs, _pkiRoot)
+                .SetAutoAcceptUntrustedCertificates(true)
+                .CreateAsync(cancellationToken)
+                .ConfigureAwait(false);
 
-        await _application
-            .CheckApplicationInstanceCertificatesAsync(
-                silent: true,
-                CertificateFactory.DefaultLifeTime,
-                cancellationToken)
-            .ConfigureAwait(false);
+            await application
+                .CheckApplicationInstanceCertificatesAsync(
+                    silent: true,
+                    CertificateFactory.DefaultLifeTime,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch
+        {
+            // Wenn wir die Telemetry hier just-in-time gebaut haben
+            // (war vorher null), Dispose'n wir sie auch hier — das
+            // OpcUaClient.DisposeAsync würde sie sonst nicht sehen.
+            if (_telemetry is null)
+            {
+                telemetryDisposable?.Dispose();
+            }
+            throw;
+        }
 
-        _appConfig = _application.ApplicationConfiguration;
-        _appConfig.CertificateValidator.CertificateValidation +=
-            (sender, e) => e.Accept = true;
+        var appConfig = application.ApplicationConfiguration;
+        // Named handler statt Lambda, damit Dispose -= denselben
+        // Handler-Slot trifft (Review-Fix L6 + M1).
+        var handler = new CertificateValidationEventHandler(
+            (sender, e) => e.Accept = true);
+        appConfig.CertificateValidator.CertificateValidation += handler;
+
+        // Atomic commit: nur jetzt, nach allen await-Punkten ohne
+        // Throw, übernehmen wir die lokalen Werte in die Felder.
+        _telemetry = telemetry;
+        _telemetryDisposable = telemetryDisposable;
+        _application = application;
+        _appConfig = appConfig;
+        _certificateAutoAcceptHandler = handler;
+    }
+
+    // Review-Fix H2: typsicheres Variant-Build. Sink boxed bereits per
+    // `OpcUaCommandSink.TryBoxForDataType` auf den passenden CLR-Typ;
+    // wir verifizieren, dass das CLR-Boxing zum Mapping-DataType passt.
+    // Mismatch ist ein Operator-/Code-Bug, kein Wire-Fehler — Throw mit
+    // klarem Reason, damit das nicht silent als Bad-StatusCode auftaucht.
+    private static Variant BuildVariant(object value, OpcUaDataType dataType)
+    {
+        switch (dataType)
+        {
+            case OpcUaDataType.Bool when value is bool b:
+                return new Variant(b);
+            case OpcUaDataType.Int16 when value is short s:
+                return new Variant(s);
+            case OpcUaDataType.Int32 when value is int i:
+                return new Variant(i);
+            case OpcUaDataType.Int64 when value is long l:
+                return new Variant(l);
+            case OpcUaDataType.UInt16 when value is ushort us:
+                return new Variant(us);
+            case OpcUaDataType.UInt32 when value is uint ui:
+                return new Variant(ui);
+            case OpcUaDataType.UInt64 when value is ulong ul:
+                return new Variant(ul);
+            case OpcUaDataType.Float when value is float f:
+                return new Variant(f);
+            case OpcUaDataType.Double when value is double d:
+                return new Variant(d);
+            case OpcUaDataType.String when value is string str:
+                return new Variant(str);
+            default:
+                throw new ArgumentException(
+                    $"opcua-client-type-mismatch: dataType={dataType} requires a "
+                    + $"matching CLR type, got {value.GetType().Name}. "
+                    + "Caller (e.g. OpcUaCommandSink) must box the value before "
+                    + "calling WriteAsync.",
+                    nameof(value));
+        }
     }
 }
 
@@ -266,20 +443,51 @@ internal sealed class OpcUaSubscription : IOpcUaSubscription
 {
     private readonly Subscription _sdkSubscription;
     private readonly OpcUaClient _owner;
-    private readonly Channel<OpcUaNotification> _channel =
-        Channel.CreateUnbounded<OpcUaNotification>();
-    private bool _disposed;
+    private readonly Session _session;
+    private readonly Channel<OpcUaNotification> _channel;
+    private int _disposed;
 
-    public OpcUaSubscription(Subscription sdkSubscription, OpcUaClient owner)
+    public OpcUaSubscription(
+        Subscription sdkSubscription,
+        OpcUaClient owner,
+        Session session,
+        int channelCapacity)
     {
         _sdkSubscription = sdkSubscription;
         _owner = owner;
+        _session = session;
+        // Review-Fix M4: bounded Channel mit DropOldest, Kapazität aus
+        // den OpcUaAdapterOptions. Der frühere unbounded Channel hier
+        // hätte die D-03-Backpressure-Garantie der Source unterlaufen
+        // (Source-Bounded-Channel hätte nie Pressure gesehen, weil
+        // dieser hier erst alles gepuffert hätte).
+        _channel = Channel.CreateBounded<OpcUaNotification>(
+            new BoundedChannelOptions(channelCapacity)
+            {
+                FullMode = BoundedChannelFullMode.DropOldest,
+                SingleReader = true,
+                SingleWriter = false,
+            });
     }
 
-    public void AddMonitoredItem(string nodeId, OpcUaDataType dataType, int samplingIntervalMs)
+    // Review-Fix H4: async + CT — der Apply ist eine echte Server-
+    // Round-Trip-Operation (`CreateMonitoredItems`-Service). Sync-over-
+    // async hier hat ohnehin nur funktioniert, weil alle Caller
+    // ThreadPool-driven sind.
+    public async Task AddMonitoredItemAsync(
+        string nodeId, OpcUaDataType dataType, int samplingIntervalMs,
+        CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeId);
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+        cancellationToken.ThrowIfCancellationRequested();
+        // Review-Fix H2: dataType wird hier (noch) nicht in Variant-
+        // Decoding genutzt — die Source-Seite mappt SDK-Variant über
+        // OpcUaDataTypeParser.TryToDouble, der den CLR-Wert direkt
+        // liest. Wir parken ihn als Diagnose-Hilfe für ein zukünftiges
+        // Per-Item-DecodeFilter (F-15 Type-System-Erweiterung); aktuell
+        // ist die Funktion ein No-op-Touch.
+        _ = dataType;
         var item = new MonitoredItem(_sdkSubscription.DefaultItem)
         {
             StartNodeId = NodeId.Parse(nodeId),
@@ -301,12 +509,7 @@ internal sealed class OpcUaSubscription : IOpcUaSubscription
             }
         };
         _sdkSubscription.AddItem(item);
-        // ApplyChangesAsync bei jedem Add ist konservativ — das SDK
-        // publisht den MonitoredItem damit ohne explizite Apply-Phase
-        // im Sub-Slice-B-Read-Loop. Token-less Aufruf weil das hier
-        // keine Cancellation-Erwartung hat (synchroner SDK-Pfad
-        // hinter der Async-Fassade).
-        _sdkSubscription.ApplyChangesAsync(default).GetAwaiter().GetResult();
+        await _sdkSubscription.ApplyChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public IAsyncEnumerable<OpcUaNotification> NotificationsAsync(CancellationToken cancellationToken)
@@ -314,14 +517,27 @@ internal sealed class OpcUaSubscription : IOpcUaSubscription
 
     public async ValueTask DisposeAsync()
     {
-        if (_disposed) { return; }
-        _disposed = true;
+        // Review-Fix M3: Volatile-Compare-Exchange — _disposed wird von
+        // mehreren Threads (Source-Pump, Source-Dispose, Owner-Dispose)
+        // geschrieben/gelesen.
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) { return; }
         _channel.Writer.TryComplete();
         try
         {
             await _sdkSubscription.DeleteAsync(silent: true).ConfigureAwait(false);
         }
 #pragma warning disable CA1031 // Adapter boundary — Dispose must not throw.
+        catch { }
+#pragma warning restore CA1031
+        // Review-Fix L5: Subscription auch von der Session entkoppeln,
+        // damit langlebige Sessions (z.B. Mid-Stream-Recovery, F-13
+        // Multi-Server) keinen wachsenden Subscription-Slot-Pool tragen.
+        try
+        {
+            await _session.RemoveSubscriptionAsync(_sdkSubscription, default)
+                .ConfigureAwait(false);
+        }
+#pragma warning disable CA1031
         catch { }
 #pragma warning restore CA1031
         _owner.RemoveSubscription(_sdkSubscription.Id);

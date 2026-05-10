@@ -89,7 +89,9 @@ public sealed class FakeOpcUaClientTests
             publishingIntervalMs: 1000, CancellationToken.None);
         await using (subscription.ConfigureAwait(false))
         {
-            subscription.AddMonitoredItem("ns=2;s=Soc", OpcUaDataType.Double, samplingIntervalMs: 250);
+            await subscription.AddMonitoredItemAsync(
+                "ns=2;s=Soc", OpcUaDataType.Double, samplingIntervalMs: 250,
+                CancellationToken.None);
 
             var fake = (FakeOpcUaSubscription)subscription;
             Assert.Single(fake.Items);

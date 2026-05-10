@@ -58,14 +58,18 @@ public interface IOpcUaClient : IAsyncDisposable
 // DisposeAsync deletes the subscription on the server.
 public interface IOpcUaSubscription : IAsyncDisposable
 {
-    // Add a node to the subscription's MonitoredItem set. The
-    // samplingIntervalMs is the OPC-UA SamplingInterval for this
-    // particular item; values <= 0 mean "use the subscription's
-    // PublishingInterval" (server-side default behaviour).
-    void AddMonitoredItem(
+    // Add a node to the subscription's MonitoredItem set and apply the
+    // change on the server. The samplingIntervalMs is the OPC-UA
+    // SamplingInterval for this particular item; values <= 0 mean
+    // "use the subscription's PublishingInterval" (server-side default
+    // behaviour). Async because applying the change is a real network
+    // round-trip (server-side `CreateMonitoredItems`); the CT honours
+    // the caller's cancellation rather than the SDK's internal default.
+    Task AddMonitoredItemAsync(
         string nodeId,
         OpcUaDataType dataType,
-        int samplingIntervalMs);
+        int samplingIntervalMs,
+        CancellationToken cancellationToken);
 
     // Pull-side stream of notifications from this subscription. The
     // server-pushed MonitoredItem updates land on this enumerator;
