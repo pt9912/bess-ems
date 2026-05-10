@@ -660,7 +660,8 @@ public sealed class PersistenceRoundtripTests : IAsyncLifetime
         {
             await using var cmd = new NpgsqlCommand(
                 "TRUNCATE telemetry, commands, schedule_windows, schedules, audit_events, "
-                + "optimization_objective_breakdowns, optimization_runs RESTART IDENTITY CASCADE;",
+                + "optimization_objective_breakdowns, optimization_runs, "
+                + "regelleistung_activations RESTART IDENTITY CASCADE;",
                 connection);
             await cmd.ExecuteNonQueryAsync();
         }

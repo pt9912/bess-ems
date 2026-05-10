@@ -240,26 +240,31 @@ Operations-Themen aus M3-D2) sind die Block-B-Items
 Erweiterung, Optimization-Lock-Eviction, Replay-Werkzeuge —
 mit klar benannten DoD-Sätzen aus dem ursprünglichen Plan.
 
-## Item 5: RM-M3-FUP-01 — Erste echte Folgemigration aktivieren
+## Item 5: RM-M3-FUP-01 ✅ — Erste echte Folgemigration aktiviert
 
-**Trigger:** OP-OPEN-05 oder OP-OPEN-06 wird konkretisiert, oder
-eine andere echte Schema-Änderung wird gebraucht. Heute fährt der
-Migrationspfad aus
-[`../done/plan-RM-M2-migration.md`](../done/plan-RM-M2-migration.md)
-nur den `0001_initial.sql`-Snapshot; eine zweite Migration ist
-noch nicht erzeugt.
+**Status:** Abgeschlossen durch RM-M4-03-B (Sub-Slice B des
+Regelleistungs-Aktivierungssignal-Plans
+[`../in-progress/plan-RM-M4-03.md`](../in-progress/plan-RM-M4-03.md)).
 
-**DoD (aus plan-RM-M3.md übernommen):** Der abgeschlossene
-Migrationspfad wird konsumiert: `schema/schema.yaml` wird
-angepasst, eine echte `Migrations/RunOnce/0002_*.sql` wird
-erzeugt/committed, Drafts bleiben nicht eingebettet,
-`schema-validate`/`schema-drift-check` bleiben grün und der
-Runtime-Migrator appliziert die Änderung idempotent.
+**Auslieferung:** `schema/schema.yaml` um den Tisch
+`regelleistung_activations` (PK `(source_id, activation_id)`, Index
+`idx_regelleistung_activations_source_chosen_at`) erweitert;
+`schema-generate` produziert das aktualisierte
+`Migrations/RunOnce/0001_initial.sql` (zero-diff-promise auf
+`schema-drift-check`); zusätzlich
+`Migrations/RunOnce/0002_regelleistung_activations.sql` als
+**idempotente** Delta-Migration (`CREATE TABLE IF NOT EXISTS` +
+`CREATE INDEX IF NOT EXISTS`), damit eine Bestands-DB mit dem alten
+0001 die Tabelle materialisiert und eine fresh DB, die das neue
+0001-Snapshot fährt, das 0002 als No-Op behandelt. DbUp-Migrator
+appliziert beide Skripte idempotent; Persistence-Integrationstest
+`Migration_0002_is_idempotent_on_second_call` pinnt das.
 
-**Aktivierungs-Pfad:** eigener `plan-RM-M3-FUP-01.md` mit dem
-Auslöser-Trigger im Body, oder als Carve-out-Slice innerhalb des
-auslösenden Plans (z. B. wenn OP-OPEN-05 zündet, wird FUP-01 Teil
-des OP-OPEN-05-Slices).
+**Pattern für künftige Migrationen:** Neue Tabellen via
+`schema.yaml` deklarieren → `make schema-generate` (regeneriert
+0001) → ein neues `00NN_*.sql` mit idempotentem DDL hand-schreiben →
+`make schema-drift-check` grün halten. RM-M4-03-B ist das
+Referenzbeispiel.
 
 ---
 

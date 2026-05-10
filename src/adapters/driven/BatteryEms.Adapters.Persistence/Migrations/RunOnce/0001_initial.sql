@@ -50,6 +50,16 @@ CREATE TABLE "optimization_runs" (
     PRIMARY KEY ("run_id")
 );
 
+CREATE TABLE "regelleistung_activations" (
+    "activation_id" TEXT NOT NULL,
+    "payload_hash" TEXT NOT NULL,
+    "sequence_number" BIGINT NOT NULL,
+    "signal_timestamp_utc" TIMESTAMP WITH TIME ZONE NOT NULL,
+    "source_id" TEXT NOT NULL,
+    "winner_chosen_at" TIMESTAMP WITH TIME ZONE NOT NULL,
+    PRIMARY KEY ("source_id", "activation_id")
+);
+
 CREATE TABLE "schedules" (
     "asset_id" TEXT NOT NULL,
     "market_bid_area" TEXT NOT NULL,
@@ -102,5 +112,7 @@ CREATE INDEX "idx_audit_recorded_at" ON "audit_events" ("recorded_at" DESC);
 CREATE INDEX "idx_commands_asset_issued_at" ON "commands" ("asset_id", "issued_at" DESC);
 
 CREATE INDEX "idx_optimization_runs_asset_created_at" ON "optimization_runs" ("asset_id", "created_at");
+
+CREATE INDEX "idx_regelleistung_activations_source_chosen_at" ON "regelleistung_activations" ("source_id", "winner_chosen_at");
 
 CREATE INDEX "idx_telemetry_asset_recorded_at" ON "telemetry" ("asset_id", "recorded_at" DESC);

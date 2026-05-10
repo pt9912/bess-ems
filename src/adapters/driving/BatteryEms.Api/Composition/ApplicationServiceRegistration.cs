@@ -7,6 +7,7 @@ using BatteryEms.Application.Optimization;
 using BatteryEms.Application.Persistence;
 using BatteryEms.Application.Realtime;
 using BatteryEms.Application.Time;
+using BatteryEms.Domain;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace BatteryEms.Api.Composition;
@@ -28,6 +29,18 @@ public static class ApplicationServiceRegistration
         services.AddSingleton<IScheduleRepository>(_ => new InMemoryScheduleRepository());
         services.AddSingleton<IScheduleTracker, DefaultScheduleTracker>();
         services.AddSingleton<IReserveRepository>(_ => new InMemoryReserveRepository());
+
+        // RM-M4-03-B: Regelleistung activation dedupe tracker. Default
+        // bindings are in-memory; AddBessPersistence replaces the store
+        // with the Dapper variant when persistence is wired. The
+        // RegelleistungOptions singleton uses the master-DoD defaults
+        // (MaxAge=2s, FutureSkewTolerance=500ms, DedupeWindow=10s);
+        // Sub-Slice D adds IConfiguration binding for operator overrides.
+        services.AddSingleton(_ => new RegelleistungOptions());
+        services.AddSingleton<IActivationDedupeStore>(sp => new InMemoryActivationDedupeStore(
+            sp.GetRequiredService<RegelleistungOptions>(),
+            sp.GetRequiredService<IClock>()));
+
         services.AddSingleton<IOperatorStopRegistry, InMemoryOperatorStopRegistry>();
         services.AddSingleton<IOperatorAuditLog, InMemoryOperatorAuditLog>();
 

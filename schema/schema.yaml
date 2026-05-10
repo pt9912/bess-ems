@@ -193,6 +193,36 @@ tables:
       columns:
       - asset_id
       - created_at
+  regelleistung_activations:
+    columns:
+      activation_id:
+        type: text
+        required: true
+      payload_hash:
+        type: text
+        required: true
+      sequence_number:
+        type: biginteger
+        required: true
+      signal_timestamp_utc:
+        type: datetime
+        timezone: true
+        required: true
+      source_id:
+        type: text
+        required: true
+      winner_chosen_at:
+        type: datetime
+        timezone: true
+        required: true
+    primary_key:
+    - source_id
+    - activation_id
+    indices:
+    - name: idx_regelleistung_activations_source_chosen_at
+      columns:
+      - source_id
+      - winner_chosen_at
   schedule_windows:
     columns:
       asset_id:

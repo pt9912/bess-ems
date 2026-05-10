@@ -34,6 +34,7 @@ public static class PersistenceRegistration
         services.AddSingleton<ITelemetryRepository, DapperTelemetryRepository>();
         services.AddSingleton<ICommandRepository, DapperCommandRepository>();
         services.AddSingleton<IScheduleRepository, DapperScheduleRepository>();
+        services.AddSingleton<IActivationDedupeStore, DapperActivationDedupeStore>();
         services.AddSingleton<IOperatorAuditLog, DapperOperatorAuditLog>();
         services.AddSingleton<IRetentionRepository, DapperRetentionRepository>();
         services.AddSingleton<IOptimizationRunRepository, DapperOptimizationRunRepository>();
