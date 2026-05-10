@@ -13,6 +13,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Worker", "src\ad
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Adapters.Modbus", "src\adapters\driven\BatteryEms.Adapters.Modbus\BatteryEms.Adapters.Modbus.csproj", "{DD2DC981-3E80-4273-95E8-C6474A37CE7A}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Adapters.OpcUa", "src\adapters\driven\BatteryEms.Adapters.OpcUa\BatteryEms.Adapters.OpcUa.csproj", "{5200A7AE-CAFE-4B04-8871-269EADC064FC}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Adapters.OpcUa.Tests", "tests\adapters\driven\BatteryEms.Adapters.OpcUa.Tests\BatteryEms.Adapters.OpcUa.Tests.csproj", "{BF3E9331-C8F6-47E4-874E-57DBF56BBD51}"
+EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Adapters.Mqtt", "src\adapters\driven\BatteryEms.Adapters.Mqtt\BatteryEms.Adapters.Mqtt.csproj", "{0DF5BDA6-076B-4E18-AA56-2AC1FB7610FA}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Adapters.Persistence", "src\adapters\driven\BatteryEms.Adapters.Persistence\BatteryEms.Adapters.Persistence.csproj", "{22B0C599-7CE2-4F4E-81A3-FF28BB4DE564}"
@@ -149,6 +153,30 @@ Global
 		{DD2DC981-3E80-4273-95E8-C6474A37CE7A}.Release|x64.Build.0 = Release|Any CPU
 		{DD2DC981-3E80-4273-95E8-C6474A37CE7A}.Release|x86.ActiveCfg = Release|Any CPU
 		{DD2DC981-3E80-4273-95E8-C6474A37CE7A}.Release|x86.Build.0 = Release|Any CPU
+		{5200A7AE-CAFE-4B04-8871-269EADC064FC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5200A7AE-CAFE-4B04-8871-269EADC064FC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5200A7AE-CAFE-4B04-8871-269EADC064FC}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{5200A7AE-CAFE-4B04-8871-269EADC064FC}.Debug|x64.Build.0 = Debug|Any CPU
+		{5200A7AE-CAFE-4B04-8871-269EADC064FC}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{5200A7AE-CAFE-4B04-8871-269EADC064FC}.Debug|x86.Build.0 = Debug|Any CPU
+		{5200A7AE-CAFE-4B04-8871-269EADC064FC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5200A7AE-CAFE-4B04-8871-269EADC064FC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5200A7AE-CAFE-4B04-8871-269EADC064FC}.Release|x64.ActiveCfg = Release|Any CPU
+		{5200A7AE-CAFE-4B04-8871-269EADC064FC}.Release|x64.Build.0 = Release|Any CPU
+		{5200A7AE-CAFE-4B04-8871-269EADC064FC}.Release|x86.ActiveCfg = Release|Any CPU
+		{5200A7AE-CAFE-4B04-8871-269EADC064FC}.Release|x86.Build.0 = Release|Any CPU
+		{BF3E9331-C8F6-47E4-874E-57DBF56BBD51}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BF3E9331-C8F6-47E4-874E-57DBF56BBD51}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BF3E9331-C8F6-47E4-874E-57DBF56BBD51}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{BF3E9331-C8F6-47E4-874E-57DBF56BBD51}.Debug|x64.Build.0 = Debug|Any CPU
+		{BF3E9331-C8F6-47E4-874E-57DBF56BBD51}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{BF3E9331-C8F6-47E4-874E-57DBF56BBD51}.Debug|x86.Build.0 = Debug|Any CPU
+		{BF3E9331-C8F6-47E4-874E-57DBF56BBD51}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BF3E9331-C8F6-47E4-874E-57DBF56BBD51}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BF3E9331-C8F6-47E4-874E-57DBF56BBD51}.Release|x64.ActiveCfg = Release|Any CPU
+		{BF3E9331-C8F6-47E4-874E-57DBF56BBD51}.Release|x64.Build.0 = Release|Any CPU
+		{BF3E9331-C8F6-47E4-874E-57DBF56BBD51}.Release|x86.ActiveCfg = Release|Any CPU
+		{BF3E9331-C8F6-47E4-874E-57DBF56BBD51}.Release|x86.Build.0 = Release|Any CPU
 		{0DF5BDA6-076B-4E18-AA56-2AC1FB7610FA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{0DF5BDA6-076B-4E18-AA56-2AC1FB7610FA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0DF5BDA6-076B-4E18-AA56-2AC1FB7610FA}.Debug|x64.ActiveCfg = Debug|Any CPU
