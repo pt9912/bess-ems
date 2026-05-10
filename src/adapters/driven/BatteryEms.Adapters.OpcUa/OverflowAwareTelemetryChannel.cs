@@ -7,17 +7,24 @@ namespace BatteryEms.Adapters.OpcUa;
 // underlying Channel runs with BoundedChannelFullMode.DropOldest so
 // TryWrite always returns true — Drop-Erkennung passiert über die
 // monotonen Interlocked-Counter `_writeSeq` und `_readSeq`. Wenn die
-// Differenz die Capacity übersteigt, wird das sticky `_overflow`-Flag
-// gesetzt.
+// Differenz die Capacity übersteigt, wird das `_overflow`-Flag gesetzt.
 //
-// Race-Eigenschaft: die Zähler sind monoton wachsend; Set/Clear des
-// Overflow-Flags läuft über Interlocked.Exchange. Ein Read kann
-// zwischen Producer-Increment und Counter-Lesung dazwischenfallen,
-// aber das führt höchstens zu einer leicht verzögerten Set-/Clear-
-// Aktion. Es kann **keine** Bad-StatusCode-Notification silent
-// verschwinden — sobald ein Drop passiert, ist der Flag gesetzt
-// (und damit die DataQuality des nächsten emittierten Samples
-// degradiert), bis der Channel komplett gedraint ist.
+// Flag-Semantik (plan §148): das Flag steht solange in einem
+// Backlog-Zustand und wird beim **nächsten Drain** unkonditional
+// gelöscht — der Channel ist nach dem TryRead-Loop per Definition
+// leer. **Counter-Equality wäre die falsche Clear-Bedingung**: writeSeq
+// zählt jeden TryWrite (inkl. der gedroppten); readSeq nur tatsächlich
+// gelieferte Items. Nach dem ersten Drop-Event divergieren die beiden
+// permanent — die Equality-Bedingung würde das Flag für immer
+// stehenlassen, was nicht der Plan-Vorgabe entspricht.
+//
+// Race-Eigenschaft: die Zähler sind monoton wachsend; Set/Clear läuft
+// via Interlocked.Exchange. Set kann leicht verzögert sein (Producer
+// inkrementiert writeSeq, dann Reader bedient sich, _bevor_ Producer
+// die Differenz prüft) — das verzögert nur den Set, verliert aber
+// keine Bad-StatusCode-Notification (die wartet im Channel oder ist
+// als Drop bereits in der Differenz sichtbar). Clear ist
+// unkonditional am Drain-Ende, also race-frei mit Producer-Inkrement.
 internal sealed class OverflowAwareTelemetryChannel
 {
     private readonly Channel<OpcUaNotification> _channel;
@@ -70,9 +77,11 @@ internal sealed class OverflowAwareTelemetryChannel
     }
 
     // Consumer-side: drain everything currently buffered. Returns the
-    // notifications in FIFO order (oldest-first per Channel
-    // semantics); after a clean drain (writer == reader), the sticky
-    // overflow flag is cleared.
+    // notifications in FIFO order (oldest-first per Channel semantics).
+    // The overflow flag is cleared unconditionally at the end of the
+    // drain — the bounded channel is empty by definition after the
+    // TryRead loop, which matches plan §148. Subsequent overflow
+    // detection (next TryWrite that drops) re-arms the flag.
     public IReadOnlyList<OpcUaNotification> DrainAll()
     {
         var collected = new List<OpcUaNotification>();
@@ -81,10 +90,7 @@ internal sealed class OverflowAwareTelemetryChannel
             Interlocked.Increment(ref _readSeq);
             collected.Add(notification);
         }
-        if (Interlocked.Read(ref _writeSeq) == Interlocked.Read(ref _readSeq))
-        {
-            Interlocked.Exchange(ref _overflow, 0);
-        }
+        Interlocked.Exchange(ref _overflow, 0);
         return collected;
     }
 

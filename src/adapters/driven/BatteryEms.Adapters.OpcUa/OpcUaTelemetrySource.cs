@@ -26,6 +26,21 @@ namespace BatteryEms.Adapters.OpcUa;
 // Knoten im Mapping ODER aktive Subscription). Bei rein read-only
 // Mappings gibt es keine Subscription, und der Source darf nicht
 // fälschlich als Disconnected gemeldet werden.
+//
+// **Bekannte Lücke (M4-04-B-Scope-Stop):** Mid-Stream-Subscription-
+// Tod wird nicht aktiv erkannt oder repariert. Wenn der Server die
+// Subscription kappt (Session noch aktiv), endet der Pump-Task
+// silent; `Status.Connected` bleibt true (Session ist intakt) während
+// neue Subscribe-Werte nicht mehr fließen. Read-direction-Knoten
+// funktionieren weiter; der DataQuality-Pfad bleibt für die nicht
+// mehr aktualisierten Subscribe-Knoten am letzten gespeicherten Wert
+// hängen. Eine echte Recovery-Schleife (Subscription neu anlegen,
+// MonitoredItems re-attachen) ist explizit Sub-Slice-D-HIL-Test-
+// Trigger oder Folgearbeit (analog zur F-13 Multi-Server-Linie). Der
+// Modbus-Adapter delegiert die Recovery an den FluentModbusClient
+// und hat dieselbe Semantik auf der Source-Schicht; OPC-UA wird
+// vergleichbar wenn der OPC-Foundation-SDK-Wrapper später eine
+// Subscription-Lifecycle-Notification anbietet.
 public sealed class OpcUaTelemetrySource : IBatteryTelemetrySource, IAsyncDisposable
 {
     private readonly IOpcUaClient _client;
@@ -80,6 +95,30 @@ public sealed class OpcUaTelemetrySource : IBatteryTelemetrySource, IAsyncDispos
             if (node.Direction.Equals("write", StringComparison.OrdinalIgnoreCase) || node.Writable)
             {
                 continue;
+            }
+            // Defensive structural checks (the JSON-loader normally
+            // rejects these via the schema, but programmatic /
+            // alternative-loader paths could slip them through; better
+            // to throw at construction than emit telemetry with
+            // empty NodeId).
+            if (string.IsNullOrWhiteSpace(node.Name))
+            {
+                throw new ArgumentException(
+                    "OPC-UA mapping node has a null/empty 'name'.", nameof(mapping));
+            }
+            if (string.IsNullOrWhiteSpace(node.NodeId))
+            {
+                throw new ArgumentException(
+                    $"OPC-UA mapping node '{node.Name}' has a null/empty 'node_id'.",
+                    nameof(mapping));
+            }
+            if (!double.IsFinite(node.ScaleFactor) || node.ScaleFactor == 0.0)
+            {
+                throw new ArgumentException(
+                    $"OPC-UA mapping node '{node.Name}' has a non-finite or zero scale_factor "
+                    + $"({node.ScaleFactor}); the JSON schema rejects scale_factor=0 at the loader, "
+                    + "but a programmatic mapping could slip it through and trigger a divide-by-zero "
+                    + "in the Sub-Slice-C command sink.", nameof(mapping));
             }
             var dataType = OpcUaDataTypeParser.Parse(node.DataType);
             var binding = new NodeBinding(
@@ -189,6 +228,13 @@ public sealed class OpcUaTelemetrySource : IBatteryTelemetrySource, IAsyncDispos
             OpcUaTelemetrySourceLog.LogClientDisposeFailure(_logger, ex);
         }
 #pragma warning restore CA1031
+        // _shutdownCts.Dispose() runs after Cancel + after every
+        // awaited consumer has yielded. The linked-CTS in ReadAsync
+        // (CreateLinkedTokenSource(externalToken, _shutdownCts.Token))
+        // is `using`-disposed by the consumer's caller scope, so the
+        // registration on this CTS is unhooked before this Dispose.
+        // Reading from a token of a disposed CTS is documented as
+        // safe; only `Cancel` would throw, which is no longer needed.
         _shutdownCts.Dispose();
     }
 
@@ -311,16 +357,41 @@ public sealed class OpcUaTelemetrySource : IBatteryTelemetrySource, IAsyncDispos
         {
             subscription.AddMonitoredItem(node.NodeId, node.DataType, node.SamplingIntervalMs);
         }
-        Task pump;
+
+        // If DisposeAsync ran between CreateSubscriptionAsync and this
+        // point, the freshly created server-side subscription would
+        // leak unless we dispose it explicitly. The lock answers
+        // *whether* we own it; the actual disposal happens out-of-
+        // lock to avoid awaiting under a sync lock.
+        bool disposedRace;
+        Task? pump = null;
         lock (_stateGate)
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-            _subscription = subscription;
-            pump = Task.Run(
-                () => PumpNotificationsAsync(subscription, _shutdownCts.Token),
-                _shutdownCts.Token);
-            _notificationPump = pump;
+            disposedRace = _disposed;
+            if (!disposedRace)
+            {
+                _subscription = subscription;
+                pump = Task.Run(
+                    () => PumpNotificationsAsync(subscription, _shutdownCts.Token),
+                    _shutdownCts.Token);
+                _notificationPump = pump;
+            }
         }
+
+        if (disposedRace)
+        {
+            try { await subscription.DisposeAsync().ConfigureAwait(false); }
+#pragma warning disable CA1031 // best-effort cleanup on the dispose-race path
+            catch (Exception ex)
+            {
+                OpcUaTelemetrySourceLog.LogSubscriptionDisposeFailure(_logger, ex);
+            }
+#pragma warning restore CA1031
+            throw new ObjectDisposedException(nameof(OpcUaTelemetrySource));
+        }
+        // Touch `pump` to silence the "assigned but not used" hint
+        // in case future refactors split this further.
+        _ = pump;
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031",

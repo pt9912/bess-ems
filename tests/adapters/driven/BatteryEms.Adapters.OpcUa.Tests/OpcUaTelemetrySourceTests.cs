@@ -446,4 +446,120 @@ public sealed class OpcUaTelemetrySourceTests
         Assert.Throws<ArgumentException>(() =>
             BuildSource(new FakeOpcUaClient(), Mapping(bad)));
     }
+
+    // Sub-Slice-B review-fix #5: defensive node-validation. Empty
+    // Name / NodeId or scale_factor=0 throw at construction so the
+    // programmatic-mapping path cannot slip through what the JSON
+    // loader's schema rejects.
+    [Fact]
+    public void Constructor_with_empty_node_id_throws()
+    {
+        var bad = new OpcUaNodeMapping(
+            Name: "soc_percent",
+            NodeId: "",
+            Direction: "read",
+            DataType: "float",
+            ScaleFactor: 1.0,
+            Writable: false,
+            AuthRequired: "none");
+        Assert.Throws<ArgumentException>(() =>
+            BuildSource(new FakeOpcUaClient(), Mapping(bad)));
+    }
+
+    [Fact]
+    public void Constructor_with_empty_name_throws()
+    {
+        var bad = new OpcUaNodeMapping(
+            Name: "",
+            NodeId: "ns=2;A",
+            Direction: "read",
+            DataType: "float",
+            ScaleFactor: 1.0,
+            Writable: false,
+            AuthRequired: "none");
+        Assert.Throws<ArgumentException>(() =>
+            BuildSource(new FakeOpcUaClient(), Mapping(bad)));
+    }
+
+    [Fact]
+    public void Constructor_with_zero_scale_factor_throws()
+    {
+        var bad = new OpcUaNodeMapping(
+            Name: "soc_percent",
+            NodeId: "ns=2;A",
+            Direction: "read",
+            DataType: "float",
+            ScaleFactor: 0.0,
+            Writable: false,
+            AuthRequired: "none");
+        Assert.Throws<ArgumentException>(() =>
+            BuildSource(new FakeOpcUaClient(), Mapping(bad)));
+    }
+
+    // Sub-Slice-B review-fix #4: post-drain flag-clear pin (plan §148).
+    // After an overflow burst forces the channel into Stale, a clean
+    // drain (no further pushes) takes the next sample back to Valid.
+    [Fact]
+    public async Task Subscription_overflow_clears_after_drain_and_subsequent_sample_is_valid_again()
+    {
+        var client = new FakeOpcUaClient();
+        client.SetValue("ns=2;Soc", 50.0);
+        var options = Options(channelCapacity: 2);
+        var src = BuildSource(client, Mapping(
+            Node("soc_percent", "ns=2;Soc", "subscribe", monitoringIntervalMs: 100)),
+            options);
+        await using (src)
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            var enumerator = src.ReadAsync(cts.Token).GetAsyncEnumerator(cts.Token);
+            await using (enumerator)
+            {
+                while (client.Subscriptions.Count == 0)
+                {
+                    await Task.Delay(10);
+                }
+                var sub = client.Subscriptions[0];
+
+                // Burst far past capacity to force a definitive drop.
+                for (var i = 0; i < 30; i++)
+                {
+                    sub.PushNotification(new OpcUaNotification(
+                        "ns=2;Soc", 50.0 + i, 0u, Now));
+                }
+                await Task.Delay(50);
+
+                // Confirm we hit the overflow path.
+                var sawStale = false;
+                while (await enumerator.MoveNextAsync())
+                {
+                    if (enumerator.Current.DataQuality.Flag == DataQualityState.Stale
+                        && enumerator.Current.DataQuality.Reason == "opcua-subscription-overflow")
+                    {
+                        sawStale = true;
+                        break;
+                    }
+                }
+                Assert.True(sawStale,
+                    "expected at least one Stale sample with opcua-subscription-overflow reason.");
+
+                // No further pushes — the channel drains naturally on
+                // the next tick. With the bugfix the next sample must
+                // come back to DataQuality.Valid.
+                var sawValidAfter = false;
+                using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                while (await enumerator.MoveNextAsync())
+                {
+                    if (enumerator.Current.DataQuality.Flag == DataQualityState.Valid)
+                    {
+                        sawValidAfter = true;
+                        break;
+                    }
+                    if (deadline.IsCancellationRequested) { break; }
+                }
+                Assert.True(sawValidAfter,
+                    "expected the overflow flag to clear after a clean drain so "
+                    + "subsequent samples return to DataQuality.Valid.");
+            }
+        }
+    }
 }
