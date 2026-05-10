@@ -69,6 +69,9 @@ Das System adressiert unter anderem:
 
 ## Architekturschichten
 
+Ausführliche Definitionen, Verantwortlichkeiten und Grenzen sind in
+[`spec/architecture.md`](spec/architecture.md) dokumentiert.
+
 - Domain Layer
 - Market Layer
 - Optimization Layer
