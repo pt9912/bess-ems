@@ -57,5 +57,8 @@ public sealed class ActivationValidationResultTests
         Assert.Equal("dedupe-conflict", ActivationValidationReasons.DedupeConflict);
         Assert.Equal("ambiguous-duplicate", ActivationValidationReasons.AmbiguousDuplicate);
         Assert.Equal("dedupe-store-invalid", ActivationValidationReasons.DedupeStoreInvalid);
+        Assert.Equal("not-dispatch-relevant", ActivationValidationReasons.NotDispatchRelevant);
+        Assert.Equal("security-profile-enforcement-not-wired",
+            ActivationValidationReasons.SecurityProfileEnforcementNotWired);
     }
 }

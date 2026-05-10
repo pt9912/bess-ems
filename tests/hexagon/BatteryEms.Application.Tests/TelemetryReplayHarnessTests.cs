@@ -1,4 +1,5 @@
 using BatteryEms.Adapters.Optimization;
+using BatteryEms.Application.Markets;
 using BatteryEms.Application.Optimization;
 using BatteryEms.Domain;
 using Xunit;
@@ -84,7 +85,7 @@ public sealed class TelemetryReplayHarnessTests
 
         var harness = new TelemetryReplayHarness(
             asset,
-            new ScheduleFollowingDispatchOptimizer(),
+            new ScheduleFollowingDispatchOptimizer(new NoOpActivationDispatchSource()),
             new[] { schedule });
 
         var commands = await harness.RunAsync(AssetId, fixture, CancellationToken.None);

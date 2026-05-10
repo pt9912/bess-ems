@@ -19,6 +19,7 @@ public static class BatteryEmsEndpoints
     {
         ArgumentNullException.ThrowIfNull(routes);
         MapHealth(routes);
+        MapRegelleistungHealth(routes);
         MapBatteryStatus(routes);
         MapCurrentCommand(routes);
         MapCurrentSchedules(routes);
@@ -47,6 +48,39 @@ public static class BatteryEmsEndpoints
             })
             .WithName("Health")
             .WithSummary("Liveness probe (LH-API-001).");
+    }
+
+    private static void MapRegelleistungHealth(IEndpointRouteBuilder routes)
+    {
+        // RM-M4-03-D: surfaces the timebase debounce health, dedupe-
+        // store health, production-gate state + four pre-conditions,
+        // and the last activation outcome from the in-memory state
+        // store. JSON keys snake-case via the host's serializer config.
+        routes.MapGet("/health/regelleistung", (IRegelleistungHealthQuery query) =>
+            {
+                var snap = query.Probe();
+                var response = new RegelleistungHealthResponse(
+                    At: snap.At,
+                    Timebase: snap.Timebase,
+                    DedupeStore: snap.DedupeStore,
+                    ProductionGate: snap.ProductionGate,
+                    Preconditions: new RegelleistungPreconditionsView(
+                        snap.Preconditions.ProductTrust,
+                        snap.Preconditions.TimeSync,
+                        snap.Preconditions.DedupeStoreHealth,
+                        snap.Preconditions.SecurityProfile,
+                        snap.Preconditions.ReasonCode),
+                    LastActivation: snap.LastActivation is null ? null : new LastActivationView(
+                        snap.LastActivation.SourceId,
+                        snap.LastActivation.ActivationId,
+                        snap.LastActivation.ReceivedAt,
+                        snap.LastActivation.ReasonCode,
+                        snap.LastActivation.DispatchRelevant,
+                        snap.LastActivation.Details));
+                return Results.Ok(response);
+            })
+            .WithName("RegelleistungHealth")
+            .WithSummary("Regelleistung activation pipeline health (RM-M4-03-D).");
     }
 
     private static void MapBatteryStatus(IEndpointRouteBuilder routes)

@@ -241,3 +241,30 @@ public sealed record ScheduleReferenceView(
         return new(reference.AssetId, reference.Type, reference.Version);
     }
 }
+
+// RM-M4-03-D: GET /health/regelleistung wire shapes.
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+public sealed record RegelleistungHealthResponse(
+    DateTimeOffset At,
+    string Timebase,
+    string DedupeStore,
+    string ProductionGate,
+    RegelleistungPreconditionsView Preconditions,
+    LastActivationView? LastActivation);
+
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+public sealed record RegelleistungPreconditionsView(
+    bool ProductTrust,
+    bool TimeSync,
+    bool DedupeStoreHealth,
+    bool SecurityProfile,
+    string ReasonCode);
+
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+public sealed record LastActivationView(
+    string SourceId,
+    string ActivationId,
+    DateTimeOffset ReceivedAt,
+    string ReasonCode,
+    bool DispatchRelevant,
+    string Details);

@@ -103,6 +103,11 @@ public sealed class InMemoryActivationDedupeStore : IActivationDedupeStore
         }
     }
 
+    public bool IsInvalid
+    {
+        get { lock (_gate) { return _invalid; } }
+    }
+
     private void CompactSource(Dictionary<string, DedupeEntry> perSource, DateTimeOffset now)
     {
         // Replay window: signals older than this can no longer pass the

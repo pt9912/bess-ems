@@ -1,3 +1,4 @@
+using BatteryEms.Application.Markets;
 using BatteryEms.Application.Optimization;
 using BatteryEms.Domain;
 using Xunit;
@@ -51,7 +52,7 @@ public sealed class ScheduleFollowingDispatchOptimizerTests
     [Fact]
     public async Task Empty_commitments_falls_back_to_idle()
     {
-        var optimizer = new ScheduleFollowingDispatchOptimizer();
+        var optimizer = new ScheduleFollowingDispatchOptimizer(new NoOpActivationDispatchSource());
 
         var result = await optimizer.OptimizeAsync(Request(), CancellationToken.None);
 
@@ -63,7 +64,7 @@ public sealed class ScheduleFollowingDispatchOptimizerTests
     [Fact]
     public async Task All_released_or_violated_commitments_falls_back_to_idle()
     {
-        var optimizer = new ScheduleFollowingDispatchOptimizer();
+        var optimizer = new ScheduleFollowingDispatchOptimizer(new NoOpActivationDispatchSource());
         var request = Request(
             Commitment(MarketType.DayAhead, CommitmentBindingState.Released),
             Commitment(MarketType.Intraday, CommitmentBindingState.Violated));
@@ -78,7 +79,7 @@ public sealed class ScheduleFollowingDispatchOptimizerTests
     [Fact]
     public async Task Single_binding_DayAhead_drives_setpoint_to_commitment_power()
     {
-        var optimizer = new ScheduleFollowingDispatchOptimizer();
+        var optimizer = new ScheduleFollowingDispatchOptimizer(new NoOpActivationDispatchSource());
         var request = Request(Commitment(MarketType.DayAhead, CommitmentBindingState.Binding, powerKw: 25));
 
         var result = await optimizer.OptimizeAsync(request, CancellationToken.None);
@@ -94,7 +95,7 @@ public sealed class ScheduleFollowingDispatchOptimizerTests
     {
         // Sign convention: discharge positive, charge negative. The
         // optimiser does not clamp; downstream limiters do.
-        var optimizer = new ScheduleFollowingDispatchOptimizer();
+        var optimizer = new ScheduleFollowingDispatchOptimizer(new NoOpActivationDispatchSource());
         var request = Request(Commitment(MarketType.DayAhead, CommitmentBindingState.Binding, powerKw: -15));
 
         var result = await optimizer.OptimizeAsync(request, CancellationToken.None);
@@ -107,7 +108,7 @@ public sealed class ScheduleFollowingDispatchOptimizerTests
     {
         // LH-MKT-006: #3 RegelLeistung over #4 verbindliche Markt-
         // verpflichtung — even when RegelLeistung is Pending.
-        var optimizer = new ScheduleFollowingDispatchOptimizer();
+        var optimizer = new ScheduleFollowingDispatchOptimizer(new NoOpActivationDispatchSource());
         var request = Request(
             Commitment(MarketType.DayAhead, CommitmentBindingState.Binding, powerKw: 30),
             Commitment(MarketType.RegelLeistung, CommitmentBindingState.Pending, powerKw: 5));
@@ -121,7 +122,7 @@ public sealed class ScheduleFollowingDispatchOptimizerTests
     [Fact]
     public async Task Binding_DayAhead_takes_precedence_over_pending_Intraday()
     {
-        var optimizer = new ScheduleFollowingDispatchOptimizer();
+        var optimizer = new ScheduleFollowingDispatchOptimizer(new NoOpActivationDispatchSource());
         var request = Request(
             Commitment(MarketType.Intraday, CommitmentBindingState.Pending, powerKw: 8),
             Commitment(MarketType.DayAhead, CommitmentBindingState.Binding, powerKw: 22));
@@ -140,7 +141,7 @@ public sealed class ScheduleFollowingDispatchOptimizerTests
         // refactors. Pre-RM-M2-01 audit consumers saw the NoOp reason
         // "noop-optimizer"; the new convention is "follows-{market}-
         // {state}-rank-{N}".
-        var optimizer = new ScheduleFollowingDispatchOptimizer();
+        var optimizer = new ScheduleFollowingDispatchOptimizer(new NoOpActivationDispatchSource());
         var request = Request(Commitment(MarketType.RegelLeistung, CommitmentBindingState.Pending, powerKw: 5));
 
         var result = await optimizer.OptimizeAsync(request, CancellationToken.None);
@@ -151,7 +152,7 @@ public sealed class ScheduleFollowingDispatchOptimizerTests
     [Fact]
     public async Task RequestId_is_deterministic_for_identical_inputs()
     {
-        var optimizer = new ScheduleFollowingDispatchOptimizer();
+        var optimizer = new ScheduleFollowingDispatchOptimizer(new NoOpActivationDispatchSource());
         var request = Request(Commitment(MarketType.DayAhead, CommitmentBindingState.Binding));
 
         var a = await optimizer.OptimizeAsync(request, CancellationToken.None);
@@ -163,8 +164,88 @@ public sealed class ScheduleFollowingDispatchOptimizerTests
     [Fact]
     public async Task Null_request_throws()
     {
-        var optimizer = new ScheduleFollowingDispatchOptimizer();
+        var optimizer = new ScheduleFollowingDispatchOptimizer(new NoOpActivationDispatchSource());
         await Assert.ThrowsAsync<ArgumentNullException>(() =>
             optimizer.OptimizeAsync(null!, CancellationToken.None));
+    }
+
+    // RM-M4-03-D order pin: an active activation always beats every
+    // MarketCommitment (rank 3 > ranks 4-6). The optimizer pulls the
+    // PowerKw from the activation, signed by Direction (Up=positive,
+    // Down=negative), and the reason carries the rank-3 tag.
+    [Fact]
+    public async Task Activation_wins_over_day_ahead_schedule()
+    {
+        var source = new InMemoryActivationDispatchSource();
+        source.Submit(new RegelleistungActivation(
+            sourceId: "tso-source",
+            activationId: "act-1",
+            sequenceNumber: 1,
+            signalTimestampUtc: Now,
+            product: ReserveProduct.Afrr,
+            direction: ReserveDirection.Up,
+            powerKw: 30,
+            validFrom: Now,
+            validUntil: Now + TimeSpan.FromMinutes(15),
+            payloadHash: "sha256:a"));
+        var optimizer = new ScheduleFollowingDispatchOptimizer(source);
+
+        var result = await optimizer.OptimizeAsync(
+            Request(Commitment(MarketType.DayAhead, CommitmentBindingState.Binding, powerKw: 10)),
+            CancellationToken.None);
+
+        Assert.True(result.IsValid);
+        Assert.Equal(30, result.TargetActivePowerKw);
+        Assert.Contains("regelleistung-activation-rank-3", result.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Activation_with_direction_down_emits_negative_setpoint()
+    {
+        var source = new InMemoryActivationDispatchSource();
+        source.Submit(new RegelleistungActivation(
+            sourceId: "tso-source",
+            activationId: "act-1",
+            sequenceNumber: 1,
+            signalTimestampUtc: Now,
+            product: ReserveProduct.Afrr,
+            direction: ReserveDirection.Down,
+            powerKw: 20,
+            validFrom: Now,
+            validUntil: Now + TimeSpan.FromMinutes(15),
+            payloadHash: "sha256:a"));
+        var optimizer = new ScheduleFollowingDispatchOptimizer(source);
+
+        var result = await optimizer.OptimizeAsync(Request(), CancellationToken.None);
+
+        Assert.Equal(-20, result.TargetActivePowerKw);
+    }
+
+    // Plan §147: optimizer verwirft abgelaufene Kandidaten aktiv pro
+    // Tick gegen request.RequestTime. An expired activation falls
+    // through to the schedule path.
+    [Fact]
+    public async Task Expired_activation_falls_through_to_market_commitment()
+    {
+        var source = new InMemoryActivationDispatchSource();
+        source.Submit(new RegelleistungActivation(
+            sourceId: "tso-source",
+            activationId: "act-1",
+            sequenceNumber: 1,
+            signalTimestampUtc: Now,
+            product: ReserveProduct.Afrr,
+            direction: ReserveDirection.Up,
+            powerKw: 30,
+            validFrom: Now - TimeSpan.FromMinutes(30),
+            validUntil: Now - TimeSpan.FromMinutes(5),
+            payloadHash: "sha256:a"));
+        var optimizer = new ScheduleFollowingDispatchOptimizer(source);
+
+        var result = await optimizer.OptimizeAsync(
+            Request(Commitment(MarketType.DayAhead, CommitmentBindingState.Binding, powerKw: 10)),
+            CancellationToken.None);
+
+        Assert.Equal(10, result.TargetActivePowerKw);
+        Assert.DoesNotContain("regelleistung-activation", result.Reason, StringComparison.Ordinal);
     }
 }

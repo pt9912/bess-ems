@@ -45,6 +45,19 @@ public static class ApplicationServiceRegistration
         // and the dedupe store in the DoD-pinned order.
         services.AddSingleton<ActivationValidator>();
 
+        // RM-M4-03-D: timebase health source (cycle owner writes,
+        // activation pipeline reads), the activation dispatch source
+        // (use-case writes after Accepted, optimizer reads per tick),
+        // last-activation state holder (audit + /health surface), the
+        // production-gate provider (fail-closed on security-profile
+        // until F-12), and the activation use-case itself.
+        services.AddSingleton<ITimebaseHealthSource, InMemoryTimebaseHealthSource>();
+        services.AddSingleton<IActivationDispatchSource, InMemoryActivationDispatchSource>();
+        services.AddSingleton<IRegelleistungActivationStateStore, InMemoryRegelleistungActivationStateStore>();
+        services.AddSingleton<IProductionPreconditionProvider, DefaultProductionPreconditionProvider>();
+        services.AddSingleton<IRegelleistungActivationUseCase, DefaultRegelleistungActivationUseCase>();
+        services.AddSingleton<IRegelleistungHealthQuery, DefaultRegelleistungHealthQuery>();
+
         services.AddSingleton<IOperatorStopRegistry, InMemoryOperatorStopRegistry>();
         services.AddSingleton<IOperatorAuditLog, InMemoryOperatorAuditLog>();
 

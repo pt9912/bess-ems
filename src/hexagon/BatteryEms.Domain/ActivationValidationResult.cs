@@ -53,6 +53,7 @@ public static class ActivationValidationReasons
     public const string AmbiguousDuplicate = "ambiguous-duplicate";
     public const string DedupeStoreInvalid = "dedupe-store-invalid";
 
-    // Additional codes (not-dispatch-relevant,
-    // security-profile-enforcement-not-wired) land with Sub-Slice D.
+    // Use-case + production-gate outcomes (Sub-Slice D).
+    public const string NotDispatchRelevant = "not-dispatch-relevant";
+    public const string SecurityProfileEnforcementNotWired = "security-profile-enforcement-not-wired";
 }

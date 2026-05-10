@@ -18,6 +18,13 @@ public interface IActivationDedupeStore
     Task<AcceptResult> TryAcceptAsync(
         RegelleistungActivation activation,
         CancellationToken cancellationToken = default);
+
+    // Read-only health surface for the /health/regelleistung endpoint
+    // (Sub-Slice D) and the production-gate pre-condition. True after
+    // any of the four tracker-load fail-closed sub-cases (a/b/c/d)
+    // has fired; remains true until the operator triggers an explicit
+    // recovery (Dapper variant) or in-memory recover (test variant).
+    bool IsInvalid { get; }
 }
 
 // Outcome of a dedupe-store accept attempt. Plan §145 enumerates the

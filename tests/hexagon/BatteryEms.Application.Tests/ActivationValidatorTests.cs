@@ -274,5 +274,6 @@ public sealed class ActivationValidatorTests
             RegelleistungActivation activation,
             CancellationToken cancellationToken = default)
             => Task.FromResult(_result);
+        public bool IsInvalid => _result == AcceptResult.RejectedDedupeStoreInvalid;
     }
 }

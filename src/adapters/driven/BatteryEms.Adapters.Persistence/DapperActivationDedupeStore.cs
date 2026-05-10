@@ -163,6 +163,11 @@ public sealed partial class DapperActivationDedupeStore : IActivationDedupeStore
         _loadGate.Dispose();
     }
 
+    public bool IsInvalid
+    {
+        get { lock (_stateGate) { return _invalid; } }
+    }
+
     // Idempotent: runs the four-sub-case validation on first call and
     // caches the result. Host wires this at startup so the first real
     // TryAccept doesn't pay the validation cost; tests can call it
