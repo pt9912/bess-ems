@@ -6,6 +6,13 @@ namespace BatteryEms.OpcUa.IntegrationTests;
 // pro Test-Klasse hoch und reisst ihn am Ende sauber ab. Pro Test-Klasse
 // ein Server-Lifecycle, damit der StatusCode-Pin und der Reconnect-Pin
 // keinen State an spätere Pins durchreichen.
+//
+// Plan-RM-M4-08 D-06: Per-class Fixture-Instanz statt collection-shared
+// — `OpcUaIntegrationCollection` trägt absichtlich KEINEN
+// `ICollectionFixture<OpcUaTestServerFixture>`, damit jede Test-Klasse
+// (`OpcUaRoundtripTests`, `OpcUaNegativeTests`) ihre eigene Fixture
+// bekommt. Multi-Cycle-Reconnect-State würde sonst zwischen Klassen
+// bluten.
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812",
     Justification = "xUnit instantiates the fixture via the IClassFixture<T> contract.")]
 public sealed class OpcUaTestServerFixture : IAsyncLifetime
@@ -28,5 +35,23 @@ public sealed class OpcUaTestServerFixture : IAsyncLifetime
             await _host.DisposeAsync().ConfigureAwait(false);
             _host = null;
         }
+    }
+
+    // Setzt alle Test-Knoten auf eine bekannte Baseline (Plan-RM-M4-08
+    // M2/M7-Konsequenz). Beide Test-Klassen rufen das in ihrem
+    // `IAsyncLifetime.InitializeAsync` auf, damit jeder Test mit
+    // konsistenten Werten startet — der StatusCode-Pin lässt sonst
+    // einen `Bad`-Status auf `Battery.Soc` zurück, der Subscribe-Pin
+    // einen high-Wert, etc.
+    internal void ResetNodeBaseline()
+    {
+        var nm = Host.NodeManager;
+        nm.SetValue("Battery.Soc", 50.0f);
+        nm.SetValue("Battery.ActivePower", 0.0f);
+        nm.SetValue("Battery.ReactivePower", 0.0f);
+        nm.SetValue("Battery.Temperature", 22.0f);
+        nm.SetValue("Battery.FaultCode", (ushort)0);
+        nm.SetValue("Battery.Setpoint.ActivePower", 0.0f);
+        nm.SetValue("Battery.Setpoint.ReactivePower", 0.0f);
     }
 }

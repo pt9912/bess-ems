@@ -361,6 +361,78 @@ Tests.
 
 ---
 
+## Item F-09: OPC-UA-Activation-Source-Adapter (incl. Failover-Replay-via-Reconnect)
+
+**Quelle:** RM-M4-03 D-06 / §9 (Source-Adapter für Aktivierungssignal-
+Empfang sind eigene Slices), RM-M4-04 D-05 (M4-04 deckt nur Telemetrie/
+Command, M4-04-Carve-out für OPC-UA-Activation explizit abgelehnt),
+RM-M4-08-A D-01/D-03 (M4-08 dupliziert RM-M4-03-Use-Case-Pins nicht via
+OPC-UA-Wire; **Failover-Replay-Pin via OPC-UA-Reconnect** erbt hierher).
+
+Heute ist der `IRegelleistungActivationUseCase`-Driving-Port der
+Eingangspunkt für Aktivierungssignale; die Use-Case-Schicht ist
+wire-agnostisch und durch RM-M4-03 mit ~110 Application-Pins +
+12 Persistence-Integration-Pins gepinnt. Was fehlt: ein konkreter
+Wire-Source-Adapter, der OPC-UA-Subscriptions auf den Driving-Port
+hebelt.
+
+**Trigger** (eines reicht):
+
+- TSO-/Vendor-Spec verlangt Aktivierungssignale auf einem OPC-UA-
+  Endpoint (`opc.tcp://...`-Subscribe statt heutige Driving-Port-Form
+  via REST/HTTP/Worker-Schedule).
+- Operator-Anforderung nach Mid-Stream-Reconnect-Replay-Verifikation
+  via OPC-UA — der Master-DoD-Begriff „Failover-Replay" aus RM-M4-08
+  koppelt sich an OPC-UA-Reconnect-Re-Delivery (`plan-RM-M4.md:295-
+  298`); ohne Wire-Source-Adapter ist dieser Pfad heute strukturell
+  nicht testbar.
+- Konkrete Operator-Sicht-Anforderung nach Aktivierungsjitter-
+  Profilen über OPC-UA (Timestamp-Drift-Pins, Subscription-
+  Buffering-Reorder).
+
+**Scope-Skizze** (wenn der Trigger zündet):
+
+Drei Sub-Bullets, die zusammen die F-09-Lieferung definieren:
+
+- **(a) OPC-UA-Activation-Source-Adapter selbst**:
+  Implementiert `IRegelleistungActivationSource` über eine
+  OPC-UA-Subscription auf einen Aktivierungs-NodeId; pro
+  Subscribe-Notification wird ein `RegelleistungActivation`-Domain-
+  Objekt zusammengebaut (NodeId-Mapping via Activation-Mapping-Schema
+  analog zur Telemetrie-Mapping-Linie aus M4-07) und an
+  `IRegelleistungActivationUseCase.ReceiveAsync` gehebelt. Reconnect-
+  und Mid-Stream-Recovery-Mechanik ist von RM-M4-04-D bereits
+  implementiert (`OpcUaTelemetrySource` Pattern); Reuse via einer
+  gemeinsamen Recovery-Schicht oder per Sub-Source-Pattern.
+
+- **(b) Failover-Replay-Pin via OPC-UA-Reconnect**:
+  Pin-Test gegen die Embedded TestServer-Fixture aus RM-M4-04-D
+  (oder eine neue F-09-spezifische Fixture). Sequenz: Server emittet
+  Aktivierung mit `payload_hash=H1` → Use-Case akzeptiert → Server
+  kappt die Session → F-09-Source reconnectet → Server liefert
+  dieselbe Aktivierung erneut → Use-Case erkennt sie als Replay-
+  Idempotent (gleicher `payload_hash` → `Accepted`-Outcome
+  `Replay_Idempotent` aus M4-03-B). Diese Sub-Obligation erbt den
+  in RM-M4-08-A explicit-deferred Master-DoD-Begriff „Failover-
+  Replay aus persistentem Dedupe-Tracker" und macht ihn testbar.
+
+- **(c) Aktivierungsjitter-Profile-Pins**:
+  Pin-getestet mit verschiedenen `valid_from`/`valid_until`-Skews
+  gegen `IClock.UtcNow` (M4-03 hat das auf der Use-Case-Schicht;
+  hier auf der Wire-Schicht), Timestamp-Drift gegen
+  `RegelleistungOptions.FutureSkewTolerance`,
+  Subscription-Buffering-Reorder (mehrere Notifications kommen
+  out-of-order an, Tiebreak via `§148`-Logik bleibt deterministisch).
+
+**Aufwandsschätzung:** grob 2-3 Wochen. ~600-1000 LOC inkl.
+Tests. Sub-Slice-Aufteilung wahrscheinlich (Adapter / Failover-Pin /
+Jitter-Pins).
+
+**Aktivierungs-Pfad:** eigener `plan-RM-M4-FUP-opcua-activation-
+source.md` mit eigenem Detail-Plan und Review-Pass-Pattern.
+
+---
+
 ## Trigger-Watch-Disziplin
 
 Diese Notiz wird **nicht aktiv abgearbeitet**. Sie wird gescannt:

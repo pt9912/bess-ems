@@ -310,6 +310,15 @@ public sealed class OpcUaClient : IOpcUaClient
     internal void RemoveSubscription(uint subscriptionId)
         => _subscriptions.TryRemove(subscriptionId, out _);
 
+    // Plan-RM-M4-08 D-05: einziger Test-Hook für die Multi-Cycle-
+    // Reconnect-Pin-Linie (`OpcUaNegativeTests`). Liefert nur den
+    // Count, nicht das Dictionary selbst — der Wrapper-Typ
+    // `OpcUaSubscription` und der Subscription-Id-Schlüssel bleiben
+    // private. Tests asserten zwei Invarianten: post-Sample pro Cycle
+    // `SubscriptionCount == 1` (Recovery hat alte abgeräumt + neue
+    // registriert), post-Dispose `SubscriptionCount == 0`.
+    internal int SubscriptionCount => _subscriptions.Count;
+
     internal Session RequireSession()
     {
         Session? session;
@@ -444,6 +453,13 @@ internal sealed class OpcUaSubscription : IOpcUaSubscription
     private readonly Subscription _sdkSubscription;
     private readonly OpcUaClient _owner;
     private readonly Session _session;
+    // Plan-RM-M4-08-A Bug-Fix: die Subscription-Id wird beim Add im
+    // Konstruktor geschnappt und intern gehalten. Der OPC-Foundation-
+    // SDK setzt `Subscription.Id` nach `DeleteAsync(silent: true)`
+    // u. U. zurück — Mitstreiter wäre dann die Map-Entry mit der
+    // ursprünglichen Id verwaist. Cached-Id macht
+    // `_owner.RemoveSubscription(...)` deterministisch.
+    private readonly uint _subscriptionId;
     private readonly Channel<OpcUaNotification> _channel;
     private int _disposed;
 
@@ -456,6 +472,7 @@ internal sealed class OpcUaSubscription : IOpcUaSubscription
         _sdkSubscription = sdkSubscription;
         _owner = owner;
         _session = session;
+        _subscriptionId = sdkSubscription.Id;
         // Review-Fix M4: bounded Channel mit DropOldest, Kapazität aus
         // den OpcUaAdapterOptions. Der frühere unbounded Channel hier
         // hätte die D-03-Backpressure-Garantie der Source unterlaufen
@@ -540,7 +557,7 @@ internal sealed class OpcUaSubscription : IOpcUaSubscription
 #pragma warning disable CA1031
         catch { }
 #pragma warning restore CA1031
-        _owner.RemoveSubscription(_sdkSubscription.Id);
+        _owner.RemoveSubscription(_subscriptionId);
         _sdkSubscription.Dispose();
     }
 }

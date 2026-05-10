@@ -16,4 +16,11 @@
     <ProjectReference Include="..\..\..\hexagon\BatteryEms.Domain\BatteryEms.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Plan-RM-M4-08 D-05: SubscriptionCount-Property als Test-Hook
+         für die Multi-Cycle-Reconnect-Pin-Linie. -->
+    <InternalsVisibleTo Include="BatteryEms.Adapters.OpcUa.Tests" />
+    <InternalsVisibleTo Include="BatteryEms.OpcUa.IntegrationTests" />
+  </ItemGroup>
+
 </Project>

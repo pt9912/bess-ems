@@ -17,6 +17,13 @@ namespace BatteryEms.OpcUa.IntegrationTests;
 [CollectionDefinition("OpcUa Integration", DisableParallelization = true)]
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "CA1711",
     Justification = "xUnit's CollectionDefinition convention requires the 'Collection' suffix.")]
+// Plan-RM-M4-08 D-06 / Regression-Guard: bewusst KEIN
+// `ICollectionFixture<OpcUaTestServerFixture>` hier — per-Test-Class-
+// Fixture-Instanz ist gefordert, damit Multi-Cycle-Reconnect-State
+// zwischen `OpcUaRoundtripTests` und `OpcUaNegativeTests` isoliert
+// bleibt. Wenn jemand das hier später als Optimierung ergänzt, kippt
+// die per-class Isolation silent (Multi-Cycle-Test würde State-bleed
+// in den Roundtrip-Pin tragen). DO NOT ADD ICollectionFixture<...>.
 public sealed class OpcUaIntegrationCollection { }
 
 [Trait("Category", "Integration")]
@@ -35,23 +42,12 @@ public sealed class OpcUaRoundtripTests : IClassFixture<OpcUaTestServerFixture>,
         _asset = loader.LoadAsset(AssetPath);
     }
 
-    // Review-Fix M7: jeder Test startet mit einer bekannten Baseline.
-    // Ohne diesen Reset ist die Test-Reihenfolge bias-anfällig — der
-    // StatusCode-Pin lässt z. B. einen Bad-Status auf `Battery.Soc`
-    // zurück, den ein folgender Test sehen würde, wenn er die Variable
-    // nicht selbst überschreibt. Test-Affordance `SetValue` resettet
-    // den StatusCode bereits intern (siehe BatteryTestNodeManager.cs),
-    // aber der explizite Reset hier macht die Invariante sichtbar.
+    // Plan-RM-M4-08 M7: jeder Test startet mit einer bekannten Baseline.
+    // Implementiert in `OpcUaTestServerFixture.ResetNodeBaseline()`,
+    // beide Test-Klassen rufen es im InitializeAsync auf.
     public Task InitializeAsync()
     {
-        var nm = _fixture.Host.NodeManager;
-        nm.SetValue("Battery.Soc", 50.0f);
-        nm.SetValue("Battery.ActivePower", 0.0f);
-        nm.SetValue("Battery.ReactivePower", 0.0f);
-        nm.SetValue("Battery.Temperature", 22.0f);
-        nm.SetValue("Battery.FaultCode", (ushort)0);
-        nm.SetValue("Battery.Setpoint.ActivePower", 0.0f);
-        nm.SetValue("Battery.Setpoint.ReactivePower", 0.0f);
+        _fixture.ResetNodeBaseline();
         return Task.CompletedTask;
     }
 

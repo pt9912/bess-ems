@@ -167,8 +167,9 @@ gates: lint arch-check test test-safety coverage-gate \
 	simulator-lint simulator-test simulator-race simulator-coverage-gate \
 	native-build native-lint native-sanitizer \
 	native-coverage-gate native-coverage-exclusions \
-	test-native-interop test-native-parity
-	@echo "[gates] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, simulator-{lint,test,race,coverage-gate}) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity})"
+	test-native-interop test-native-parity \
+	test-hil-opcua
+	@echo "[gates] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, simulator-{lint,test,race,coverage-gate}) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua)"
 
 # --- Welle 3 (partially active) --------------------------------------------
 
@@ -359,8 +360,9 @@ ci: lint arch-check test test-safety coverage-gate \
     native-build native-lint native-sanitizer \
     native-coverage-gate native-coverage-exclusions \
     test-native-interop test-native-parity \
+    test-hil-opcua \
     test-integration
-	@echo "[ci] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, simulator-*) + M2 schema (validate, drift-check) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + test-integration"
+	@echo "[ci] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, simulator-*) + M2 schema (validate, drift-check) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + test-integration"
 
 # Fresh-clone-naher Komplettlauf: alle CI-Gates plus Runtime-Image und
 # Compose-Smoke. Letzte Stufe vor einem M1-Tag (RM-M1-20).

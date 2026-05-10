@@ -252,6 +252,42 @@ P-Sprungantwort: 25 kW Setpoint via `ModbusCommandSink` →
 Konvergenz-Read via `ModbusTelemetrySource` mit ±5 kW Toleranz
 (PCS-Dynamik braucht ~1 s).
 
+#### 2.2.2 OPC-UA-Roundtrip-Pfad (Mandatory, RM-M4-04 + RM-M4-08)
+
+```bash
+make test-hil-opcua   # process-internal Embedded TestServer
+```
+
+Filter: `Category=Integration` im
+`BatteryEms.OpcUa.IntegrationTests`-Projekt. **Pflicht-Gate** —
+verdrahtet sowohl in `make gates` als auch in `make ci`, analog
+zu `test-native-{interop,parity}`. Im Gegensatz zum HIL-Modbus-Pfad
+braucht dieser Lauf **kein externes Asset**: der OPC-UA-TestServer
+läuft `OPCFoundation.NetStandard.Opc.Ua.Server`-basiert im selben
+Test-Prozess (`EmbeddedTestServerHost`, loopback-TCP-Port via
+Kernel-Allocate).
+
+**Pin-Inventory** (7 Pins gesamt):
+
+| Datei | Pin | Quelle |
+| ----- | --- | ------ |
+| `OpcUaRoundtripTests.cs` | EndToEnd_Read_emits_telemetry_with_mapped_values | RM-M4-04-D |
+| `OpcUaRoundtripTests.cs` | EndToEnd_Subscribe_picks_up_value_change_within_two_intervals | RM-M4-04-D |
+| `OpcUaRoundtripTests.cs` | EndToEnd_Write_setpoint_roundtrips_through_server | RM-M4-04-D |
+| `OpcUaRoundtripTests.cs` | EndToEnd_StatusCode_bad_surfaces_as_protocol_error | RM-M4-04-D |
+| `OpcUaRoundtripTests.cs` | EndToEnd_Reconnect_after_server_restart_keeps_stream_alive | RM-M4-04-D |
+| `OpcUaNegativeTests.cs` | Multi_cycle_reconnect_keeps_stream_alive_and_does_not_leak_subscriptions | RM-M4-08-A |
+| `OpcUaNegativeTests.cs` | Concurrent_source_and_sink_survive_restart_under_contention | RM-M4-08-A |
+
+**Konventions-Abgrenzung**:
+
+- `make test-integration` → Modbus + MQTT + Postgres-Roundtrips via
+  Compose-Sidecars; deckt die NICHT-OPC-UA-Adapter-Linien.
+- `make test-hil-modbus` → opt-in HIL gegen externes
+  `bess-hil-simulator:local`-Image.
+- `make test-hil-opcua` → mandatory, process-internal Embedded
+  TestServer; das einzige OPC-UA-spezifische End-to-End-Gate.
+
 | Voraussetzung | Wer liefert |
 | ------------- | ----------- |
 | `bess-hil-simulator:local` lokal gebaut (HIL-OPEN-01) | Schwesterprojekt-Operator |
@@ -358,6 +394,7 @@ Fall mit Native Core das erfolgreiche Laden der `.so`-Bibliothek
 | Sicherheitsfälle     | `make test-safety`               | `Category=Safety`          |
 | Integration          | `make test-integration`          | `Category=Integration`     |
 | HIL (optional)       | `make test-hil-modbus`           | `Category=HIL`             |
+| OPC-UA-Roundtrip     | `make test-hil-opcua`            | `Category=Integration` im OPC-UA-IntegrationTests-Projekt |
 | Native Interop       | `make test-native-interop`       | `Category!=Parity` im NativeInterop-IntegrationTests-Projekt |
 | Native Parity        | `make test-native-parity`        | `Category=Parity` im NativeInterop-IntegrationTests-Projekt |
 | Replay               | `make test-replay`               | `Category=Replay`          |
@@ -683,6 +720,7 @@ make native-coverage-gate
 make native-coverage-exclusions
 make test-native-interop
 make test-native-parity
+make test-hil-opcua
 make test-integration
 make test-container
 make build                # erzeugt Runtime-Image
