@@ -23,6 +23,13 @@ public sealed record OpcUaAdapterOptions
 
     public TimeSpan ReadTimeout { get; init; } = TimeSpan.FromSeconds(5);
 
+    // Source-Loop-Cadence (analog zu ModbusAdapterOptions.PollingInterval):
+    // pro Iteration der `IAsyncEnumerable<BatteryTelemetry>`-Schleife
+    // wartet der Source diese Zeit, bevor er die nächste Probe
+    // assembliert + emittiert. Subscribe-Notifications werden in
+    // diesem Intervall aus dem Channel gedraint.
+    public TimeSpan PollingInterval { get; init; } = TimeSpan.FromSeconds(1);
+
     public TimeSpan KeepAliveInterval { get; init; } = TimeSpan.FromSeconds(10);
 
     public TimeSpan ReconnectBackoffStart { get; init; } = TimeSpan.FromSeconds(1);
@@ -74,6 +81,11 @@ public sealed record OpcUaAdapterOptions
         {
             throw new InvalidOperationException(
                 $"ReadTimeout must be positive (got {ReadTimeout}).");
+        }
+        if (PollingInterval <= TimeSpan.Zero)
+        {
+            throw new InvalidOperationException(
+                $"PollingInterval must be positive (got {PollingInterval}).");
         }
         if (KeepAliveInterval <= TimeSpan.Zero)
         {

@@ -20,6 +20,22 @@ public sealed class FakeOpcUaClient : IOpcUaClient
     private readonly List<FakeWriteRecord> _writes = new();
     private bool _connected;
     private bool _disposed;
+    private int _connectAttempts;
+
+    // Test affordance: number of consecutive ConnectAsync attempts to
+    // fail with InvalidOperationException before the next attempt
+    // succeeds. Resets to 0 once the failure budget is consumed.
+    public int FailingConnectAttempts { get; set; }
+
+    public int ConnectAttempts
+    {
+        get { lock (_gate) { return _connectAttempts; } }
+    }
+
+    public IReadOnlyList<FakeOpcUaSubscription> Subscriptions
+    {
+        get { lock (_gate) { return _subscriptions.ToArray(); } }
+    }
 
     public bool IsConnected
     {
@@ -38,6 +54,13 @@ public sealed class FakeOpcUaClient : IOpcUaClient
         lock (_gate)
         {
             ThrowIfDisposed();
+            _connectAttempts++;
+            if (FailingConnectAttempts > 0)
+            {
+                FailingConnectAttempts--;
+                throw new InvalidOperationException(
+                    "FakeOpcUaClient ConnectAsync simulated transient failure.");
+            }
             _connected = true;
         }
         return Task.CompletedTask;
