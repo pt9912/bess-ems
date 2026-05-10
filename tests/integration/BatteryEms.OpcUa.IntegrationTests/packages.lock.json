@@ -2,6 +2,15 @@
   "version": 2,
   "dependencies": {
     "net10.0": {
+      "Microsoft.Extensions.Logging.Abstractions": {
+        "type": "Direct",
+        "requested": "[10.0.7, )",
+        "resolved": "10.0.7",
+        "contentHash": "tIEcQ2gvERrH2KiCjdsVcHGhXt9lIsuDStfOIeZWr7/fP8IXhGiYfx0/80PNI7WPO2IYuFtlZLSlnTS8+/Mchw==",
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.7"
+        }
+      },
       "Microsoft.NET.Test.Sdk": {
         "type": "Direct",
         "requested": "[18.5.1, )",
@@ -12,13 +21,30 @@
           "Microsoft.TestPlatform.TestHost": "18.5.1"
         }
       },
-      "NetArchTest.Rules": {
+      "OPCFoundation.NetStandard.Opc.Ua": {
         "type": "Direct",
-        "requested": "[1.3.2, )",
-        "resolved": "1.3.2",
-        "contentHash": "puPyNXkwJq8/UwXhHV8NrzNzkQl4IxEbcP+3PU0xLRiOedsVpaSdpwHhvOZfI0VwTcRvawCNxYQcSRbD4RUg4w==",
+        "requested": "[1.5.378.134, )",
+        "resolved": "1.5.378.134",
+        "contentHash": "s71WafZcLHAkiD2QcFmWqzor8inUwPq0Gg4kD8BXQfSWqAKaNcbXzLGZzHo8th838CmUajaAfKRabVJxsfGVPw==",
         "dependencies": {
-          "Mono.Cecil": "0.11.3"
+          "OPCFoundation.NetStandard.Opc.Ua.Client": "1.5.378.134",
+          "OPCFoundation.NetStandard.Opc.Ua.Configuration": "1.5.378.134",
+          "OPCFoundation.NetStandard.Opc.Ua.Core": "1.5.378.134",
+          "OPCFoundation.NetStandard.Opc.Ua.Gds.Client.Common": "1.5.378.134",
+          "OPCFoundation.NetStandard.Opc.Ua.Gds.Server.Common": "1.5.378.134",
+          "OPCFoundation.NetStandard.Opc.Ua.Security.Certificates": "1.5.378.134",
+          "OPCFoundation.NetStandard.Opc.Ua.Server": "1.5.378.134",
+          "OPCFoundation.NetStandard.Opc.Ua.Types": "1.5.378.134"
+        }
+      },
+      "OPCFoundation.NetStandard.Opc.Ua.Server": {
+        "type": "Direct",
+        "requested": "[1.5.378.134, )",
+        "resolved": "1.5.378.134",
+        "contentHash": "qdM5DQwo42cBsW9V+5w4wHD/fDXwjBpbuFYEgXTm9zrB2Cy3dadIsmVDswV3oZWm45k6DwzMy1SB2+xzIK/ppQ==",
+        "dependencies": {
+          "OPCFoundation.NetStandard.Opc.Ua.Configuration": "1.5.378.134",
+          "OPCFoundation.NetStandard.Opc.Ua.Core": "1.5.378.134"
         }
       },
       "xunit": {
@@ -206,11 +232,6 @@
           "Microsoft.TestPlatform.ObjectModel": "18.5.1",
           "Newtonsoft.Json": "13.0.3"
         }
-      },
-      "Mono.Cecil": {
-        "type": "Transitive",
-        "resolved": "0.11.3",
-        "contentHash": "DNYE+io5XfEE8+E+5padThTPHJARJHbz1mhbhMPNrrWGKVKKqj/KEeLvbawAmbIcT73NuxLV7itHZaYCZcVWGg=="
       },
       "Newtonsoft.Json": {
         "type": "Transitive",
@@ -401,17 +422,6 @@
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.7, )"
         }
       },
-      "batteryems.adapters.nativeinterop": {
-        "type": "Project",
-        "dependencies": {
-          "BatteryEms.Application": "[1.0.0, )",
-          "BatteryEms.Domain": "[1.0.0, )",
-          "Microsoft.Extensions.Configuration.Abstractions": "[10.0.7, )",
-          "Microsoft.Extensions.Configuration.Binder": "[10.0.7, )",
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.7, )",
-          "Microsoft.Extensions.Logging.Abstractions": "[10.0.7, )"
-        }
-      },
       "batteryems.adapters.opcua": {
         "type": "Project",
         "dependencies": {
@@ -474,24 +484,6 @@
       },
       "batteryems.domain": {
         "type": "Project"
-      },
-      "batteryems.host": {
-        "type": "Project",
-        "dependencies": {
-          "BatteryEms.Adapters.Modbus": "[1.0.0, )",
-          "BatteryEms.Adapters.Mqtt": "[1.0.0, )",
-          "BatteryEms.Adapters.NativeInterop": "[1.0.0, )",
-          "BatteryEms.Adapters.OpcUa": "[1.0.0, )",
-          "BatteryEms.Adapters.Optimization": "[1.0.0, )",
-          "BatteryEms.Adapters.Persistence": "[1.0.0, )",
-          "BatteryEms.Adapters.Telemetry": "[1.0.0, )",
-          "BatteryEms.Api": "[1.0.0, )",
-          "BatteryEms.Application": "[1.0.0, )",
-          "BatteryEms.Domain": "[1.0.0, )",
-          "BatteryEms.Infrastructure": "[1.0.0, )",
-          "BatteryEms.Worker": "[1.0.0, )",
-          "prometheus-net.AspNetCore": "[8.2.1, )"
-        }
       },
       "batteryems.infrastructure": {
         "type": "Project",
@@ -617,15 +609,6 @@
         "resolved": "10.0.7",
         "contentHash": "Z6mfFEaFcwCfSboxJwOLfu7/31npCY9q70WUamHW/vRQhDvBKOT4Vf9YkZj5J6hLvJpb0oDEYfHunQZj0xxvKw=="
       },
-      "Microsoft.Extensions.Logging.Abstractions": {
-        "type": "CentralTransitive",
-        "requested": "[10.0.7, )",
-        "resolved": "10.0.7",
-        "contentHash": "tIEcQ2gvERrH2KiCjdsVcHGhXt9lIsuDStfOIeZWr7/fP8IXhGiYfx0/80PNI7WPO2IYuFtlZLSlnTS8+/Mchw==",
-        "dependencies": {
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.7"
-        }
-      },
       "Microsoft.Extensions.Options.ConfigurationExtensions": {
         "type": "CentralTransitive",
         "requested": "[10.0.7, )",
@@ -652,32 +635,6 @@
         "contentHash": "q5RfBI+wywJSFUNDE1L4ZbHEHCFTblo8Uf6A6oe4feOUFYiUQXyAf9GBh5qEZpvJaHiEbpBPkQumjEhXCJxdrg==",
         "dependencies": {
           "Microsoft.Extensions.Logging.Abstractions": "10.0.0"
-        }
-      },
-      "OPCFoundation.NetStandard.Opc.Ua": {
-        "type": "CentralTransitive",
-        "requested": "[1.5.378.134, )",
-        "resolved": "1.5.378.134",
-        "contentHash": "s71WafZcLHAkiD2QcFmWqzor8inUwPq0Gg4kD8BXQfSWqAKaNcbXzLGZzHo8th838CmUajaAfKRabVJxsfGVPw==",
-        "dependencies": {
-          "OPCFoundation.NetStandard.Opc.Ua.Client": "1.5.378.134",
-          "OPCFoundation.NetStandard.Opc.Ua.Configuration": "1.5.378.134",
-          "OPCFoundation.NetStandard.Opc.Ua.Core": "1.5.378.134",
-          "OPCFoundation.NetStandard.Opc.Ua.Gds.Client.Common": "1.5.378.134",
-          "OPCFoundation.NetStandard.Opc.Ua.Gds.Server.Common": "1.5.378.134",
-          "OPCFoundation.NetStandard.Opc.Ua.Security.Certificates": "1.5.378.134",
-          "OPCFoundation.NetStandard.Opc.Ua.Server": "1.5.378.134",
-          "OPCFoundation.NetStandard.Opc.Ua.Types": "1.5.378.134"
-        }
-      },
-      "OPCFoundation.NetStandard.Opc.Ua.Server": {
-        "type": "CentralTransitive",
-        "requested": "[1.5.378.134, )",
-        "resolved": "1.5.378.134",
-        "contentHash": "qdM5DQwo42cBsW9V+5w4wHD/fDXwjBpbuFYEgXTm9zrB2Cy3dadIsmVDswV3oZWm45k6DwzMy1SB2+xzIK/ppQ==",
-        "dependencies": {
-          "OPCFoundation.NetStandard.Opc.Ua.Configuration": "1.5.378.134",
-          "OPCFoundation.NetStandard.Opc.Ua.Core": "1.5.378.134"
         }
       },
       "OpenTelemetry": {

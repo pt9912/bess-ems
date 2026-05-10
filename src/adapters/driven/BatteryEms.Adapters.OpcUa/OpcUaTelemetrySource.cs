@@ -307,7 +307,18 @@ public sealed class OpcUaTelemetrySource : IBatteryTelemetrySource, IAsyncDispos
         var quality = OpcUaStatusCodeMapper.Map(statusCode);
         if (!OpcUaDataTypeParser.TryToDouble(value, out var raw))
         {
-            quality = DataQuality.ProtocolError("opcua-type-mismatch");
+            // Bad/Uncertain StatusCodes häufig mit Null-Value ankommen;
+            // der Server lässt die Value-Bytes weg wenn die Severity-Bits
+            // gesetzt sind (LH-OPCUA-004). In dem Fall ist der echte
+            // Fehler die Severity, nicht das Type-Mismatch — also nicht
+            // überschreiben. Nur wenn StatusCode=Good ist und der Wert
+            // trotzdem nicht parsebar, surfaced wir das als
+            // `opcua-type-mismatch` (echter Mapping-Bug auf Operator-
+            // Seite — Mapping sagt z. B. Float, Server liefert String).
+            if (quality.Flag == DataQualityState.Valid)
+            {
+                quality = DataQuality.ProtocolError("opcua-type-mismatch");
+            }
             raw = 0;
         }
         var scaled = raw * node.ScaleFactor;

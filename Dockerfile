@@ -365,6 +365,23 @@ RUN dotnet test tests/integration/BatteryEms.NativeInterop.IntegrationTests/Batt
     --logger "console;verbosity=normal"
 
 # ---------------------------------------------------------------------------
+# test-hil-opcua (RM-M4-04 Sub-Slice D): 5 pinned end-to-end Tests gegen
+# einen embedded OPC-UA-TestServer, der im selben Test-Prozess hochfährt
+# (kein Compose-Sidecar, kein externes Asset). Der Server bindet auf
+# loopback an einen vom Kernel zugewiesenen freien TCP-Port; der Adapter
+# verbindet auf denselben Port. Dieses Stage ist ein eigenes Target,
+# damit `make test-hil-opcua` schnell iterierbar bleibt — `make ci` zieht
+# es separat über `gates` ein.
+# ---------------------------------------------------------------------------
+FROM lint AS test-hil-opcua
+ARG BUILD_CONFIGURATION
+RUN dotnet test tests/integration/BatteryEms.OpcUa.IntegrationTests/BatteryEms.OpcUa.IntegrationTests.csproj \
+    --configuration "${BUILD_CONFIGURATION}" \
+    --no-build \
+    --no-restore \
+    --logger "console;verbosity=normal"
+
+# ---------------------------------------------------------------------------
 # native-lint (RM-M3-09): clang-tidy against the native control core
 # using the project's `.clang-tidy` config. CMAKE_EXPORT_COMPILE_COMMANDS
 # emits the compile_commands.json clang-tidy needs to see the same

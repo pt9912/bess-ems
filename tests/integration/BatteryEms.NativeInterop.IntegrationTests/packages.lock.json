@@ -287,15 +287,6 @@
           "OPCFoundation.NetStandard.Opc.Ua.Types": "1.5.378.134"
         }
       },
-      "OPCFoundation.NetStandard.Opc.Ua.Server": {
-        "type": "Transitive",
-        "resolved": "1.5.378.134",
-        "contentHash": "qdM5DQwo42cBsW9V+5w4wHD/fDXwjBpbuFYEgXTm9zrB2Cy3dadIsmVDswV3oZWm45k6DwzMy1SB2+xzIK/ppQ==",
-        "dependencies": {
-          "OPCFoundation.NetStandard.Opc.Ua.Configuration": "1.5.378.134",
-          "OPCFoundation.NetStandard.Opc.Ua.Core": "1.5.378.134"
-        }
-      },
       "OPCFoundation.NetStandard.Opc.Ua.Types": {
         "type": "Transitive",
         "resolved": "1.5.378.134",
@@ -663,6 +654,16 @@
           "OPCFoundation.NetStandard.Opc.Ua.Security.Certificates": "1.5.378.134",
           "OPCFoundation.NetStandard.Opc.Ua.Server": "1.5.378.134",
           "OPCFoundation.NetStandard.Opc.Ua.Types": "1.5.378.134"
+        }
+      },
+      "OPCFoundation.NetStandard.Opc.Ua.Server": {
+        "type": "CentralTransitive",
+        "requested": "[1.5.378.134, )",
+        "resolved": "1.5.378.134",
+        "contentHash": "qdM5DQwo42cBsW9V+5w4wHD/fDXwjBpbuFYEgXTm9zrB2Cy3dadIsmVDswV3oZWm45k6DwzMy1SB2+xzIK/ppQ==",
+        "dependencies": {
+          "OPCFoundation.NetStandard.Opc.Ua.Configuration": "1.5.378.134",
+          "OPCFoundation.NetStandard.Opc.Ua.Core": "1.5.378.134"
         }
       },
       "OpenTelemetry": {

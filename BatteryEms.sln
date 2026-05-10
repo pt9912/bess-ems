@@ -43,6 +43,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Adapters.Mqtt.Te
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Mqtt.IntegrationTests", "tests\integration\BatteryEms.Mqtt.IntegrationTests\BatteryEms.Mqtt.IntegrationTests.csproj", "{464DB15B-45C9-4207-B771-C1E38CBE912E}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.OpcUa.IntegrationTests", "tests\integration\BatteryEms.OpcUa.IntegrationTests\BatteryEms.OpcUa.IntegrationTests.csproj", "{D8E6A1F2-7C39-4B5D-9C7E-9F1A1F2C3D4E}"
+EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Persistence.IntegrationTests", "tests\integration\BatteryEms.Persistence.IntegrationTests\BatteryEms.Persistence.IntegrationTests.csproj", "{2E8EBFE9-71BC-4FD0-95D1-8119B6B2B719}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BatteryEms.Api.Tests", "tests\adapters\driving\BatteryEms.Api.Tests\BatteryEms.Api.Tests.csproj", "{7DE34922-0FCF-4CFA-BF8C-262CA9C887AA}"
@@ -333,6 +335,18 @@ Global
 		{464DB15B-45C9-4207-B771-C1E38CBE912E}.Release|x64.Build.0 = Release|Any CPU
 		{464DB15B-45C9-4207-B771-C1E38CBE912E}.Release|x86.ActiveCfg = Release|Any CPU
 		{464DB15B-45C9-4207-B771-C1E38CBE912E}.Release|x86.Build.0 = Release|Any CPU
+		{D8E6A1F2-7C39-4B5D-9C7E-9F1A1F2C3D4E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D8E6A1F2-7C39-4B5D-9C7E-9F1A1F2C3D4E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D8E6A1F2-7C39-4B5D-9C7E-9F1A1F2C3D4E}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{D8E6A1F2-7C39-4B5D-9C7E-9F1A1F2C3D4E}.Debug|x64.Build.0 = Debug|Any CPU
+		{D8E6A1F2-7C39-4B5D-9C7E-9F1A1F2C3D4E}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D8E6A1F2-7C39-4B5D-9C7E-9F1A1F2C3D4E}.Debug|x86.Build.0 = Debug|Any CPU
+		{D8E6A1F2-7C39-4B5D-9C7E-9F1A1F2C3D4E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D8E6A1F2-7C39-4B5D-9C7E-9F1A1F2C3D4E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D8E6A1F2-7C39-4B5D-9C7E-9F1A1F2C3D4E}.Release|x64.ActiveCfg = Release|Any CPU
+		{D8E6A1F2-7C39-4B5D-9C7E-9F1A1F2C3D4E}.Release|x64.Build.0 = Release|Any CPU
+		{D8E6A1F2-7C39-4B5D-9C7E-9F1A1F2C3D4E}.Release|x86.ActiveCfg = Release|Any CPU
+		{D8E6A1F2-7C39-4B5D-9C7E-9F1A1F2C3D4E}.Release|x86.Build.0 = Release|Any CPU
 		{2E8EBFE9-71BC-4FD0-95D1-8119B6B2B719}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{2E8EBFE9-71BC-4FD0-95D1-8119B6B2B719}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2E8EBFE9-71BC-4FD0-95D1-8119B6B2B719}.Debug|x64.ActiveCfg = Debug|Any CPU
