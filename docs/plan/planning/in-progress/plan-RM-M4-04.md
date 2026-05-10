@@ -5,7 +5,7 @@
 **Bezug:**
 [`plan-RM-M4.md`](plan-RM-M4.md) (Master-Plan, RM-M4-04-Zeile mit DoD und LH-Bezug),
 [`../done/plan-RM-M4-03.md`](../done/plan-RM-M4-03.md) (RM-M4-03 D-06 + F-09: Driving-Port-Form für Aktivierungs-Source — OPC-UA-Activation-Subscription bleibt Folgearbeit, nicht in M4-04),
-[`../open/note-RM-M4-followups.md`](../open/note-RM-M4-followups.md) (F-07 OPC-UA-Mapping-Migration v1→v2 als Template-Slice; F-09 Source-Wire-Adapter inkl. OPC-UA-Activation-Source),
+[`../open/note-RM-M4-followups.md`](../open/note-RM-M4-followups.md) (F-07 OPC-UA-Mapping-Migration v1→v2 als Template-Slice; F-09 alle Source-Wire-Adapter inkl. eines OPC-UA-Activation-Source-Adapters — M4-04 lehnt das F-09-Carve-out ab und lässt es bei F-09),
 [`../../../../spec/lastenheft.md`](../../../../spec/lastenheft.md) (LH-OPCUA-001 Lesen, LH-OPCUA-002 Schreiben, LH-OPCUA-003 Subscriptions, LH-OPCUA-004 StatusCode, LH-OPCUA-005 Security — letzteres separater Slice RM-M4-05)
 
 ---
@@ -106,8 +106,10 @@ den Simulator (D-04).
 - **OPC-UA-Activation-Source** — RM-M4-03 D-06 / F-09. Der
   `IRegelleistungActivationUseCase`-Driving-Port ist heute der
   Eingangspunkt; ein OPC-UA-Subscribe-Adapter, der Aktivierungs-
-  Signale auf den Use-Case hebelt, ist Folgearbeit (entweder als
-  Carve-out hier oder als eigener F-09-Slice).
+  Signale auf den Use-Case hebelt, ist **F-09-Folgearbeit** — M4-04
+  lehnt das von plan-RM-M4-03 §9 angebotene M4-04-Carve-out ab
+  (siehe D-05). Die F-ID bleibt einheitlich F-09 in der M4-Followup-
+  Notiz.
 - **Mapping-Migration v1→v2** — F-07 (Template-Slice), zündet sobald
   ein realer Schema-Bruch im Mapping-Format gefordert ist.
 - **Server-Seitige OPC-UA-Funktionen** (Method-Calls,
@@ -126,8 +128,8 @@ den Simulator (D-04).
 
 | Status | ID | Paket | DoD |
 | ------ | -- | ----- | --- |
-| ⬜ | RM-M4-04-A | Adapter-Projekt + `IOpcUaClient`-Port + `FakeOpcUaClient` + `OpcUaAdapterOptions` + StatusCode-Mapper-Primitiv — **~500-700 LOC** | Neues Projekt `src/adapters/driven/BatteryEms.Adapters.OpcUa/` mit `BatteryEms.Adapters.OpcUa.csproj` (PackageReference auf das gewählte OPC-UA-NuGet, ProjectReferences auf Application + Domain analog zu Modbus/Mqtt). `AssemblyMarker.cs` als Trockenlink für Architektur-Tests. `Directory.Packages.props` bekommt den Version-Pin (siehe D-01). Driven Port `IOpcUaClient` mit den DoD-pflichtigen Operationen: `Task ConnectAsync(CancellationToken)`, `Task DisconnectAsync(CancellationToken)`, `Task<OpcUaReadResult> ReadAsync(string nodeId, CancellationToken)`, `Task<OpcUaWriteResult> WriteAsync(string nodeId, object value, OpcUaDataType dataType, CancellationToken)`, `Task<IOpcUaSubscription> CreateSubscriptionAsync(int monitoringIntervalMs, CancellationToken)`. `IOpcUaSubscription` exponiert `AddMonitoredItem(string nodeId, OpcUaDataType dataType)` und `IAsyncEnumerable<OpcUaNotification> NotificationsAsync(CancellationToken)`. **`OpcUaReadResult`/`OpcUaWriteResult`/`OpcUaNotification`** als Records mit `NodeId`, `Value` (object?, type-discriminated), `StatusCode` (uint32 — die OPC-UA-Wire-Repräsentation, siehe D-06), `SourceTimestamp`. **`FakeOpcUaClient`** für Tests: in-memory Knoten-Map, scriptable StatusCodes, fakeable Subscription-Notifications-Stream. **`OpcUaAdapterOptions`** mit `EndpointUrl` (required), `SessionName` (Default `"bess-ems"`), `ReadTimeout=TimeSpan.FromSeconds(5)`, `ConnectTimeout=TimeSpan.FromSeconds(15)`, `KeepAliveInterval=TimeSpan.FromSeconds(10)`, `ReconnectBackoffStart=TimeSpan.FromSeconds(1)`, `ReconnectBackoffMax=TimeSpan.FromSeconds(30)`, `DefaultMonitoringIntervalMs=1000` (Fallback wenn Mapping-Knoten kein per-Knoten-`MonitoringIntervalMs` trägt), `SubscriptionChannelCapacity=256`, plus die Pre-M4-05-Security-Slots `SecurityMode=None`, `SecurityPolicy=""`, `AllowUnsecured=false`, `AllowUnsecuredReason=null` (siehe D-04 — diese Felder existieren in M4-04-A bewusst, damit M4-05 die Härtung ohne Options-Schema-Bruch dranhängen kann), `EnsureValid()`-Pattern. **`OpcUaStatusCodeMapper`** als pure static: `Map(uint statusCode) → DataQuality` — gut/uncertain/bad-Klassen aus dem OPC-UA-StatusCode-Top-Bit-Schema; Bad → `DataQuality.ProtocolError($"opcua-bad-{statusCodeName}")`, Uncertain → `DataQuality.Stale($"opcua-uncertain-{statusCodeName}")`, Good → `DataQuality.Valid` (siehe D-06). Tests (Adapters.OpcUa.Tests, neues Test-Projekt): IOpcUaClient-Konstruktor-Guards, FakeOpcUaClient-Roundtrip (Read/Write/Subscribe), Options-Validation (Defaults-Pin auf `EndpointUrl`-Required + Timeout-Plausibility), StatusCode-Mapping pro OPC-UA-Severity-Klasse (Good/Bad/Uncertain mit konkreten Codes wie `Bad_NotConnected=0x80AB0000`, `Uncertain_LastUsableValue=0x40A40000`). |
-| ⬜ | RM-M4-04-B | `OpcUaTelemetrySource` (Read + Subscribe + StatusCode + IAsyncEnumerable) — **~500-700 LOC** | `OpcUaTelemetrySource` implementiert `IBatteryTelemetrySource`. Konstruktor: `(IOpcUaClient, OpcUaMappingConfiguration, OpcUaAdapterOptions, IClock, ILogger)`. Beim ersten `ReadAsync(ct)`-Aufruf: `ConnectAsync` (mit Reconnect-Backoff bei Failure), Subscriptions für alle Mapping-Knoten mit `direction=subscribe` anlegen, `MonitoringIntervalMs` aus dem Mapping pro Knoten verwenden — wenn ein Subscribe-Knoten `MonitoringIntervalMs=null` trägt, fällt der Adapter auf `OpcUaAdapterOptions.DefaultMonitoringIntervalMs` (Default 1000ms) zurück (Pin-Test). **Read-Pfad** (`direction=read`): per Tick die Lese-Knoten samplen, Werte über `ScaleFactor` skalieren, in eine `BatteryTelemetry`-Domain-Instanz aggregieren. **Subscribe-Pfad** (`direction=subscribe`): Notifications aus `IOpcUaSubscription.NotificationsAsync` lesen und per `Channel<BatteryTelemetry>` an `ReadAsync` weiterreichen (D-03). **DataQuality-Aggregation**: das schlechteste StatusCode pro Telemetry-Sample dominiert die DataQuality des emittierten `BatteryTelemetry`-Eintrags (LH-OPCUA-004 — Pin: ein einzelner `Bad`-Knoten setzt das gesamte Sample auf `ProtocolError`, ein `Uncertain` ohne `Bad` setzt auf `Stale`, alle `Good` ⇒ `DataQuality.Valid`). **`AdapterStatus`** wird pro Connect/Disconnect aktualisiert; `Status.Connected` = aktive Session und Subscription am Ziel. Reconnect-Schleife auf transienten Fehlern mit exponentiellem Backoff bis `ReconnectBackoffMax`; cancellation cooperative. **Domain-Mapping-Helper** `OpcUaTelemetryAssembler` extrahiert die Soc/Soh/Power-Felder aus den verfügbaren Mappings und füllt `BatteryTelemetry` (analog zur `ModbusTelemetryAssembler`-Linie). Tests (Adapters.OpcUa.Tests): Read-Sample-Pin (gemappte Werte → BatteryTelemetry-Felder), Subscribe-Notification-Pin (Push aus FakeSubscription → ReadAsync emittiert), StatusCode-Aggregation-Pin (worst-of), ScaleFactor-Pin, Reconnect-Backoff-Pin (zwei aufeinanderfolgende ConnectAsync-Failures dann Success), Cancellation-aborts-Read, fehlende Mapping-Pflichtfelder ⇒ Konstruktor-Throw, Konstruktor-Null-Args. |
+| ⬜ | RM-M4-04-A | Adapter-Projekt + `IOpcUaClient`-Port + `FakeOpcUaClient` + `OpcUaAdapterOptions` + StatusCode-Mapper-Primitiv — **~500-700 LOC** | Neues Projekt `src/adapters/driven/BatteryEms.Adapters.OpcUa/` mit `BatteryEms.Adapters.OpcUa.csproj` (PackageReference auf das gewählte OPC-UA-NuGet, ProjectReferences auf Application + Domain analog zu Modbus/Mqtt). `AssemblyMarker.cs` als Trockenlink für Architektur-Tests. `Directory.Packages.props` bekommt den Version-Pin (siehe D-01). Driven Port `IOpcUaClient` mit den DoD-pflichtigen Operationen: `Task ConnectAsync(CancellationToken)`, `Task DisconnectAsync(CancellationToken)`, `Task<OpcUaReadResult> ReadAsync(string nodeId, CancellationToken)`, `Task<OpcUaWriteResult> WriteAsync(string nodeId, object value, OpcUaDataType dataType, CancellationToken)`, `Task<IOpcUaSubscription> CreateSubscriptionAsync(int monitoringIntervalMs, CancellationToken)`. `IOpcUaSubscription` exponiert `AddMonitoredItem(string nodeId, OpcUaDataType dataType)` und `IAsyncEnumerable<OpcUaNotification> NotificationsAsync(CancellationToken)`. **`OpcUaReadResult`/`OpcUaWriteResult`/`OpcUaNotification`** als Records mit `NodeId`, `Value` (object?, type-discriminated), `StatusCode` (uint32 — die OPC-UA-Wire-Repräsentation, siehe D-06), `SourceTimestamp`. **`FakeOpcUaClient`** für Tests: in-memory Knoten-Map, scriptable StatusCodes, fakeable Subscription-Notifications-Stream. **`OpcUaAdapterOptions`** mit `EndpointUrl` (required), `SessionName` (Default `"bess-ems"`), `ReadTimeout=TimeSpan.FromSeconds(5)`, `ConnectTimeout=TimeSpan.FromSeconds(15)`, `KeepAliveInterval=TimeSpan.FromSeconds(10)`, `ReconnectBackoffStart=TimeSpan.FromSeconds(1)`, `ReconnectBackoffMax=TimeSpan.FromSeconds(30)`, `DefaultMonitoringIntervalMs=1000` (Fallback wenn Mapping-Knoten kein per-Knoten-`MonitoringIntervalMs` trägt), `SubscriptionChannelCapacity=256`, plus die Pre-M4-05-Security-Slots `SecurityMode=None`, `SecurityPolicy=""`, `AllowUnsecured=false`, `AllowUnsecuredReason=null` (siehe D-04 — diese Felder existieren in M4-04-A bewusst, damit M4-05 die Härtung ohne Options-Schema-Bruch dranhängen kann), `EnsureValid()`-Pattern. **`OpcUaStatusCodeMapper`** als pure static: `Map(uint statusCode) → DataQuality` — gut/uncertain/bad-Klassen aus dem OPC-UA-StatusCode-Top-Bit-Schema; Bad → `DataQuality.ProtocolError($"opcua-bad-{statusCodeName}")`, Uncertain → `DataQuality.Stale($"opcua-uncertain-{statusCodeName}")`, Good → `DataQuality.Valid` (siehe D-06). Tests (Adapters.OpcUa.Tests, neues Test-Projekt): IOpcUaClient-Konstruktor-Guards, FakeOpcUaClient-Roundtrip (Read/Write/Subscribe), Options-Validation (Defaults-Pin auf `EndpointUrl`-Required + Timeout-Plausibility), **Security-Startup-Guard (D-04)** — drei Pins: (a) Default-Options (`SecurityMode=None`, `AllowUnsecured=false`) → `EnsureValid()` wirft mit `opcua-security-not-hardened`; (b) `AllowUnsecured=true` + leerer `AllowUnsecuredReason` → wirft mit `opcua-security-not-hardened`; (c) `AllowUnsecured=true` + nicht-leerer `AllowUnsecuredReason` → `EnsureValid()` lässt durch, ILogger-Warning emittiert mit kebab-Reason. StatusCode-Mapping pro OPC-UA-Severity-Klasse (Good/Bad/Uncertain mit konkreten Codes wie `Bad_NotConnected=0x80AB0000`, `Uncertain_LastUsableValue=0x40A40000`). |
+| ⬜ | RM-M4-04-B | `OpcUaTelemetrySource` (Read + Subscribe + StatusCode + IAsyncEnumerable) — **~500-700 LOC** | `OpcUaTelemetrySource` implementiert `IBatteryTelemetrySource`. Konstruktor: `(IOpcUaClient, OpcUaMappingConfiguration, OpcUaAdapterOptions, IClock, ILogger)`. Beim ersten `ReadAsync(ct)`-Aufruf: `ConnectAsync` (mit Reconnect-Backoff bei Failure), Subscriptions für alle Mapping-Knoten mit `direction=subscribe` anlegen, `MonitoringIntervalMs` aus dem Mapping pro Knoten verwenden — wenn ein Subscribe-Knoten `MonitoringIntervalMs=null` trägt, fällt der Adapter auf `OpcUaAdapterOptions.DefaultMonitoringIntervalMs` (Default 1000ms) zurück (Pin-Test). **Read-Pfad** (`direction=read`): per Tick die Lese-Knoten samplen, Werte über `ScaleFactor` skalieren, in eine `BatteryTelemetry`-Domain-Instanz aggregieren. **Subscribe-Pfad** (`direction=subscribe`): Notifications aus `IOpcUaSubscription.NotificationsAsync` lesen und per bounded `Channel<BatteryTelemetry>` mit `DropOldest` + non-blocking `TryWrite` aus dem SDK-Callback an `ReadAsync` weiterreichen (D-03). **Sticky Overflow-Flag**: bei Channel-voll-Detection wird `_subscriptionOverflowFlag` gesetzt; solange gesetzt, ist die emittierte `DataQuality` mindestens `Stale("opcua-subscription-overflow")`; Flag wird gelöscht sobald der nächste Read-Tick den Channel leer drained (Pin-Test). **DataQuality-Aggregation**: das schlechteste StatusCode pro Telemetry-Sample dominiert die DataQuality des emittierten `BatteryTelemetry`-Eintrags (LH-OPCUA-004 — Pin: ein einzelner `Bad`-Knoten setzt das gesamte Sample auf `ProtocolError`, ein `Uncertain` ohne `Bad` setzt auf `Stale`, alle `Good` ⇒ `DataQuality.Valid`). **`AdapterStatus`** wird pro Connect/Disconnect aktualisiert; `Status.Connected` = aktive Session und Subscription am Ziel. Reconnect-Schleife auf transienten Fehlern mit exponentiellem Backoff bis `ReconnectBackoffMax`; cancellation cooperative. **Domain-Mapping-Helper** `OpcUaTelemetryAssembler` extrahiert die Soc/Soh/Power-Felder aus den verfügbaren Mappings und füllt `BatteryTelemetry` (analog zur `ModbusTelemetryAssembler`-Linie). Tests (Adapters.OpcUa.Tests): Read-Sample-Pin (gemappte Werte → BatteryTelemetry-Felder), Subscribe-Notification-Pin (Push aus FakeSubscription → ReadAsync emittiert), StatusCode-Aggregation-Pin (worst-of), ScaleFactor-Pin, Reconnect-Backoff-Pin (zwei aufeinanderfolgende ConnectAsync-Failures dann Success), Cancellation-aborts-Read, **Subscription-Overflow-Pin** (Channel über `BoundedChannelFullMode.DropOldest`-Schwelle treiben → `_subscriptionOverflowFlag` gesetzt → emittierte Samples `DataQuality.Stale("opcua-subscription-overflow")` → Channel drainen → nächste Samples wieder Valid), fehlende Mapping-Pflichtfelder ⇒ Konstruktor-Throw, Konstruktor-Null-Args. |
 | ⬜ | RM-M4-04-C | `OpcUaCommandSink` + DI + Composition-Root + Bootstrap-Loader-Wiring — **~400-600 LOC** | `OpcUaCommandSink` implementiert `IBatteryCommandSink`. Konstruktor: `(IOpcUaClient, OpcUaMappingConfiguration, BatteryAsset, OpcUaAdapterOptions, IClock, ILogger)`. `WriteAsync(BatteryCommand, ct)` schlägt den ActivePower-Setpoint-Knoten (und ggf. ReactivePower) im Mapping nach (Knoten mit `direction=write` + `writable=true`), wendet den (umgekehrten) `ScaleFactor` an, ruft `IOpcUaClient.WriteAsync`, mappt das Ergebnis: Good-StatusCode ⇒ `CommandDispatchResult.Ok(...)`; Bad-StatusCode ⇒ `CommandDispatchResult.Failure($"opcua-write-bad-{statusCodeName}")`; Mismatch (Knoten nicht writable / nicht im Mapping) ⇒ `CommandDispatchResult.Failure("opcua-mapping-not-writable")`. **`AdapterWriteLimiter`-Pfad**: das Setpoint-Clamping bleibt vor dem Sink (`ConstraintLimiter`/`AdapterWriteLimiter` aus M2/M3); der Sink schreibt, was er bekommt. **`OpcUaRegistration.AddBessOpcUa(...)`** in `Adapters.OpcUa/OpcUaRegistration.cs` analog zu `AddBessModbus`/`AddBessMqtt`: registriert `OpcUaMappingConfiguration` + `OpcUaAdapterOptions` + `IOpcUaClient` (Production: `OpcUaClient`, Test: caller injects) + `IBatteryTelemetrySource` + `IBatteryCommandSink`. **`BessHostOptions`** erhält `OpcUaMappingPath`, `OpcUaEndpointUrl`, `OpcUaSessionName?`. **`BessConfigurationBootstrap`** lädt das Mapping über `JsonFileConfigurationLoader.LoadOpcUaMapping(path)` (RM-M4-07-Pfad). **`BessHostBuilder`** bekommt eine OPC-UA-Branch in den Modbus/MQTT/NoOp-Triage. **Mehrfach-Konfiguration ist fail-closed**: wenn der Operator gleichzeitig Modbus, MQTT und/oder OPC-UA konfiguriert hat (mehr als eine Adapter-Familie mit `MappingPath` + Endpoint gesetzt), wirft der Composition-Root einen Startup-Fehler `multiple-io-adapters-configured` mit der Liste der erkannten Konfigurationen — der Operator muss sich für genau eine Quelle entscheiden. Diese Pin-Linie verhindert silent-override-Bugs durch wechselnde if/else-Reihenfolgen. Ist genau eine Familie konfiguriert, wird sie wie heute (Modbus/MQTT) bzw. neu (OPC-UA) registriert; ist keine konfiguriert, bleibt der NoOp-Pfad. Die Reihenfolge der Branches im Code ist damit semantisch ohne Wirkung (alle exklusiv) und kann der Reviewability dienen (z. B. Modbus → MQTT → OPC-UA). Tests (Adapters.OpcUa.Tests): Sink-Write-Pin (Setpoint-Mapping + ScaleFactor + Good-StatusCode → Ok), Bad-StatusCode → Failure mit kebab-Reason, Knoten-nicht-writable → Failure, Mapping-nicht-vorhanden → Failure, **`ScaleFactor==0` im Mapping → Sink fail-closed** (`opcua-mapping-scale-zero`; das JSON-Schema verbietet `scale_factor=0` bereits am Loader, aber programmatisch konstruierte Mappings — z. B. in Tests, oder via einer zukünftigen non-JSON-Quelle — würden im Sink durch Null teilen; defensive Pin), Konstruktor-Null-Args. Tests (Host.Tests / Worker.Tests bei Bedarf): Composition-Root-Branch wählt OPC-UA wenn konfiguriert; sonst NoOp-Pin. |
 | ⬜ | RM-M4-04-D | HIL-Integration gegen OPC-UA-Simulator + End-to-End-Roundtrip — **~300-500 LOC** (Swing-Item, siehe §7) | Neues Test-Projekt `tests/integration/BatteryEms.OpcUa.IntegrationTests/` analog zur Modbus/Mqtt-Integration-Linie (oder Carve-out in `BatteryEms.Hil.IntegrationTests` — siehe D-07). Setup gegen einen OPC-UA-Simulator: entweder `OPCFoundation.NetStandard.Opc.Ua.Server`-Embedded-TestServer im Test-Prozess (kein zusätzliches Compose-Asset; D-07 Wahl a) oder ein Sidecar-Container im `tests/integration/docker-compose.yml` (D-07 Wahl b). Pinned Tests: **End-to-End-Read** — Simulator emittiert SOC/Power/Temp-Werte, `OpcUaTelemetrySource.ReadAsync` produziert `BatteryTelemetry` mit DataQuality.Valid und korrekten Zahlen. **End-to-End-Subscribe** — Simulator ändert einen Subscribe-Knoten, der Telemetry-Stream emittiert die neue Probe innerhalb `MonitoringIntervalMs * 2`. **End-to-End-Write** — `OpcUaCommandSink.WriteAsync` schreibt den Setpoint, der Simulator zeigt den geschriebenen Wert (Roundtrip-Verifikation). **End-to-End-StatusCode** — Simulator markiert einen Knoten mit Bad-StatusCode (z. B. via Override-Hook), das emittierte Sample trägt `DataQuality.ProtocolError(...)`. **End-to-End-Reconnect** — Server abreissen + neu starten, Adapter reconnected, Stream läuft weiter. **`make test-hil-opcua`**-Target (oder `make test-integration`-Erweiterung) führt das Projekt aus. |
 
@@ -171,42 +173,100 @@ zum SDK (D-01), und Konsistenz mit dem etablierten Modbus
 zusätzlicher Wrapper-Code; der zugehörige Test-Coverage-Gewinn ist
 deutlich grösser. Tradeoff akzeptiert.
 
-**D-03 Subscription-Update-Stream über `Channel<BatteryTelemetry>`
-mit Wait-Backpressure (default).** Optionen:
+**D-03 Subscription-Update-Stream über bounded
+`Channel<BatteryTelemetry>` mit `DropOldest` + non-blocking
+`TryWrite` aus dem SDK-Callback + sticky Overflow-Flag.** Optionen
+zum Kanal-Backbone:
 
 - (a) **`System.Threading.Channels.Channel<BatteryTelemetry>`** —
-  bounded, mit Backpressure-Policy. Producer (Subscription-Notification-
-  Handler) `WriteAsync`, Consumer (`OpcUaTelemetrySource.ReadAsync`)
-  `ReadAllAsync`. Lock-frei, async-nativ, Standard-BCL.
+  bounded, mit konfigurierbarer FullMode-Policy. Producer
+  (Subscription-Notification-Handler) `TryWrite` (synchron, lock-frei),
+  Consumer (`OpcUaTelemetrySource.ReadAsync`) `ReadAllAsync`.
+  Standard-BCL.
 - (b) `BlockingCollection<BatteryTelemetry>` — synchron, älter, nicht
   async-friendly.
 - (c) `Subject<BatteryTelemetry>` aus Reactive-Extensions — würde
   zusätzliche NuGet-Dependency einführen.
 
-**Wahl: (a) mit `BoundedChannelFullMode.Wait`.** Begründung: ein
-gedropptes Sample mit `Bad`-StatusCode würde silent verschwinden,
-weil die Worst-of-Aggregation in Sub-Slice B nur auf das aktuelle
-Sample greift, nicht auf gedroppte Notifications. `Wait` setzt
-Backpressure auf den Notification-Handler-Pfad und ist der
-fail-closed-Default für eine Control-Loop-Telemetrie-Quelle.
-Channel-Capacity per Options konfigurierbar (Default 256). Wenn ein
-realer Last-Fall zeigt, dass der Notification-Producer den Consumer
-durchgängig überholt (was bei `MonitoringIntervalMs >= 100ms` und
-einem Sub-Slice-B-Read-Tick im 1-Hz-Bereich nicht plausibel ist),
-ist Umschalten auf `DropOldest` plus sticky `subscription-overflow`-
-Flag (Sample während Overflow ⇒ `DataQuality.Stale("opcua-subscription-
-overflow")` bis zum nächsten Clean-Read) F-Folgearbeit, kein Default.
+**Wahl: (a)** mit der konkreten Backpressure-Strategie:
 
-**D-04 Security-Default für M4-04 ist `SecurityMode=None`.** Master-
-Plan-Trennung M4-04 (Connectivity) vs. M4-05 (Security). M4-04
-liefert einen funktionsfähigen Adapter gegen den Simulator mit
-unverschlüsselter Verbindung; die Konfig-Validierung emittiert eine
-strukturierte Warnung („opcua-security-not-hardened"); der Adapter
-ist **nicht produktiv freigegeben** bis M4-05 zündet — analog zur
-M4-06-`MqttNetClient`-Linie und D-04 dort. M4-04-A's
-`OpcUaAdapterOptions` enthält bereits `SecurityMode`/
-`SecurityPolicy`-Properties (Default `None`/`""`), damit M4-05 die
-Härtung ohne Options-Schema-Bruch dranhängen kann.
+1. **Channel-Konfiguration:** bounded mit
+   `BoundedChannelFullMode.DropOldest` und Default-Capacity 256
+   (per Options konfigurierbar).
+2. **Producer-Pfad (SDK-Notification-Callback)** ist
+   **non-blocking**: der Callback ruft `Channel.Writer.TryWrite(...)`
+   und kehrt sofort zurück. Damit kann der OPC-Foundation-SDK-
+   Dispatcher-Thread niemals durch unsere Backpressure blockieren —
+   genau die Falle, die ein `Wait`-Mode beim Callback-Pfad
+   erzeugen würde.
+3. **Drop-Detection + sticky Overflow-Flag:**
+   `BoundedChannelFullMode.DropOldest` lässt `TryWrite` immer
+   `true` zurück (alter Eintrag wird gedropt). Um den Drop trotzdem
+   zu detektieren, hält der Source einen Counter
+   `_droppedNotificationCount` und ein paralleles
+   `_subscriptionOverflowFlag`: wenn der Channel beim
+   `TryWrite`-Zeitpunkt **voll war** (Implementierung über einen
+   simplen pre-check `Reader.Count >= Capacity` oder über einen
+   separaten Wrapper, der den Drop-Event surfaced), wird der Flag
+   gesetzt. **Sub-Slice-B-Aggregation** liest den Flag: solange
+   gesetzt, ist die `DataQuality` jedes emittierten
+   `BatteryTelemetry`-Samples **mindestens** `Stale("opcua-
+   subscription-overflow")` (Pin-Test). Der Flag wird gelöscht,
+   sobald der Channel beim nächsten `ReadAsync`-Cycle vollständig
+   gedrained ist.
+4. **Optional: Background-Drainer** falls der Sub-Slice-B-Code-Pfad
+   einfacher wird, kann ein dedizierter Background-Task den SDK-
+   Notification-Dispatch (Producer) vom Aggregations-Tick
+   (Consumer) entkoppeln — der Reviewer hatte das vorgeschlagen.
+   Sub-Slice-B-Implementation entscheidet darüber bei der konkreten
+   Codestruktur; Default ohne Background-Task ist akzeptabel weil
+   der Callback ohnehin nur `TryWrite` macht.
+
+Damit greifen beide Sicherheits-Eigenschaften: (i) der SDK-Thread
+**blockiert nie** auf Backpressure (non-blocking TryWrite); (ii)
+ein verlorenes `Bad`-StatusCode-Sample wird **nicht silent
+geschluckt**, sondern degradiert die nächsten emittierten Samples
+auf `DataQuality.Stale("opcua-subscription-overflow")` bis der
+Drainer aufholt. Das deckt sowohl die first-pass-Review-Kritik an
+`DropOldest` (Bad-Sample-silent-loss) als auch die external-pass-
+Review-Kritik an `Wait` (Callback-Thread-Blockade) ab.
+
+**D-04 Security-Default für M4-04 ist `SecurityMode=None` mit
+hartem `AllowUnsecured`-Startup-Guard.** Master-Plan-Trennung M4-04
+(Connectivity) vs. M4-05 (Security). M4-04 liefert einen
+funktionsfähigen Adapter gegen den Simulator mit unverschlüsselter
+Verbindung — aber **nicht silent**: die Master-Plan-RM-M4-05-Zeile
+pinnt das Pattern „`SecurityMode=None` braucht explizites
+`AllowUnsecured=true` plus nicht-leeren `AllowUnsecuredReason`,
+emittiert eine strukturierte Warnung und ist bei `RuntimeProfile=
+Production` ein Startup-Fehler." M4-04-A implementiert davon den
+**bool-Layer**: `OpcUaAdapterOptions.EnsureValid()` schlägt fehl
+mit `opcua-security-not-hardened` wenn `SecurityMode == None` und
+`AllowUnsecured == false`, ODER wenn `AllowUnsecured == true` aber
+`AllowUnsecuredReason` leer/null ist. Bei akzeptiertem
+`AllowUnsecured=true` + nicht-leerem `AllowUnsecuredReason` startet
+der Adapter mit einer strukturierten ILogger-Warnung
+(LoggerMessage-EventId, kebab-case-Reason). M4-05 layert die
+**RuntimeProfile-Awareness** drauf (Production-Profil ⇒ auch
+`AllowUnsecured=true` reicht nicht), ohne den Options-Shape zu
+brechen.
+
+Das ist der **non-blocking-warning vs. blocker**-Split, den ein
+Reviewer mit Recht klar sehen möchte: M4-04 ist **blocker auf der
+bool-Achse** (kein Startup ohne `AllowUnsecured=true`), nur warning
+auf der RuntimeProfile-Achse (M4-05 dreht das in einen weiteren
+Blocker um, sobald RuntimeProfile materialisiert ist). Akzeptanz-
+Kriterien §6 + Sub-Slice-A-Tests pinnen den Startup-Failure
+explizit.
+
+M4-04-A's `OpcUaAdapterOptions` enthält damit `SecurityMode=None`,
+`SecurityPolicy=""`, `AllowUnsecured=false`, `AllowUnsecuredReason=null`
+als Defaults — Operator muss sich aktiv für unverschlüsselten
+Betrieb entscheiden (zwei explizite Felder), bevor der Adapter
+überhaupt startet. Analog zum M4-06-`MqttNetClient`-Pattern
+(F-04-Verweis) bleibt der Adapter **nicht für Production gegen
+einen echten Server freigegeben**, bevor M4-05 die volle Härtung
+dranhängt.
 
 **D-05 OPC-UA-Activation-Source nicht in M4-04.** RM-M4-03 D-06
 hat den `IRegelleistungActivationUseCase`-Driving-Port als
@@ -220,11 +280,12 @@ des heutigen `OpcUaNodeMapping.Direction`-Enum um
 Plan-RM-M4-03 §9 F-09 hat dieses Carve-out explizit M4-04 angeboten
 ("falls RM-M4-04 bei seiner Implementierung den Scope erweitert,
 kann ein OPC-UA-Activation-Source-Carve-out dort landen, sonst ist
-es F-09"); **M4-04 lehnt ab und schiebt es nach F-13** (siehe §9 in
-diesem Plan). M4-04-D pinnt explizit, dass Activation-Source-
+es F-09"); **M4-04 lehnt ab — die F-ID bleibt F-09**, kein
+neues F-Item für die OPC-UA-Spezialisierung (das wäre Doppel-
+Tracking). M4-04-D pinnt explizit, dass Activation-Source-
 Subscriptions **nicht** bedient werden, und der Health-Endpoint
 `/health/regelleistung` aus M4-03 zeigt weiter `last_activation:
-null`, solange F-13 nicht zündet.
+null`, solange F-09 nicht zündet.
 
 **D-06 StatusCode → DataQuality-Mapping nutzt das OPC-UA-Severity-
 Top-Bit-Schema.** OPC-UA-StatusCodes sind 32-bit Integers; die
@@ -294,6 +355,14 @@ Sub-Slices.
   (negativer Tabu-Test — der einzige, den der Architektur-Suite hier
   fährt). Der neue Adapter muss diese Eigenschaft beim Bau nicht
   brechen; ein positiver „Adapter darf"-Test wird nicht eingeführt.
+- **Security-Startup-Guard (D-04)**: `OpcUaAdapterOptions.EnsureValid()`
+  wirft mit `opcua-security-not-hardened` wenn `SecurityMode==None`
+  und `AllowUnsecured==false`, ODER wenn `AllowUnsecured==true` mit
+  leerem `AllowUnsecuredReason`. Bei akzeptiertem `AllowUnsecured=
+  true` + nicht-leerem Reason startet der Adapter mit strukturiertem
+  ILogger-Warning. **Pin in Sub-Slice A** (`Options-Defaults-werfen`,
+  `AllowUnsecured-true-ohne-Reason-wirft`, `AllowUnsecured-true-
+  mit-Reason-startet-mit-Warning`).
 - **Adapter-Modul-Trennung**: `OpcUaTelemetrySource`/`OpcUaCommandSink`
   schreiben **nicht** ohne Setpoint-Clamping (`AdapterWriteLimiter`-
   Pfad bleibt vorgeschaltet).
@@ -339,7 +408,7 @@ Sub-Slices.
   kleinen Test-NodeManager-Subtype mit per-Test-konfigurierbarem
   `StatusCode`-Feld (~80-150 LOC). Falls dieser Subtype-Aufwand das
   Sub-Slice-D-Budget sprengt, ist Wechsel auf D-07 Wahl (b)
-  Docker-Sidecar das Fallback (F-17 zündet).
+  Docker-Sidecar das Fallback (F-16 zündet).
 - **Sub-Slice-D-LOC-Budget realistisch.** Die Master-Tabelle nennt
   300-500 LOC; mit dem oben genannten Test-NodeManager-Subtype
   (~80-150 LOC) plus Reconnect-Test plus 5 End-to-End-Pins liegt der
@@ -416,30 +485,29 @@ Commit:
 Die folgenden Items werden bei diesem Slice nicht implementiert,
 gehen aber als F-Items in die Trigger-Watch-Notiz:
 
-- **F-13 OPC-UA-Activation-Subscribe** — Trigger: TSO-/Vendor-Spec
-  liefert ein OPC-UA-basiertes Aktivierungs-Subscription-Profil.
-  Scope: Erweiterung des Mapping-Schemas (v1→v2 via F-07-Pattern) um
-  `activation-subscribe`-Direction; neuer Adapter, der die Notifications
-  auf `IRegelleistungActivationUseCase.ReceiveAsync` hebelt. Aufwand
-  grob 1-2 Wochen, eigener Slice. Verschiebt `last_activation: null`
-  auf produktive Werte im `/health/regelleistung`-Endpoint.
-- **F-14 OPC-UA-Multi-Server / Endpoint-Failover** — Trigger: konkret
+**Kein neues F-Item für OPC-UA-Activation-Source-Subscribe.** Die
+Folgearbeit liegt bei **F-09** (M4-03-Followups Item) — siehe D-05
+oben. M4-04 lehnt das M4-03-§9-Carve-out ab; F-09 bleibt der
+Tracking-Home, wenn ein TSO-/Vendor-Spec ein OPC-UA-basiertes
+Aktivierungs-Subscription-Profil verlangt.
+
+- **F-13 OPC-UA-Multi-Server / Endpoint-Failover** — Trigger: konkret
   z. B. dual-Verteilnetzbetreiber-Endpoint mit Hot-Standby für
   N-1-Resilienz, oder ein Vendor-spezifisches Redundancy-Cluster-
   Profil aus der TSO-Spec. Heute: Single-Endpoint pro Asset; der
   `OpcUaAdapterOptions.EndpointUrl` ist eine einzelne URL.
-- **F-15 OPC-UA-Method-Calls / HistoricalAccess / Events** — Trigger:
+- **F-14 OPC-UA-Method-Calls / HistoricalAccess / Events** — Trigger:
   konkret z. B. TSO-Spec verlangt Aufruf einer Server-Method
   (`Reset`, `RequestStatus`) als Teil des Aktivierungs-/
   Quittierungs-Pfades, oder Auslesen historischer Frequenz-Werte
   über HistoricalAccess für Compliance-Auditing.
-- **F-16 OPC-UA-Type-System-Erweiterung** (Strukturen, Arrays, Enums) —
+- **F-15 OPC-UA-Type-System-Erweiterung** (Strukturen, Arrays, Enums) —
   Trigger: konkret z. B. ein BMS-Vendor exportiert Cell-Voltage-
   Arrays oder strukturierte Fault-Codes als OPC-UA-`ExtensionObject`,
   die sich nicht in den heutigen `bool`/`int*`/`uint*`/`float`/
   `double`/`string`-`OpcUaDataType` mappen lassen. Verbindet sich
   mit F-07 (Mapping-Migration v1→v2).
-- **F-17 Dockerized OPC-UA-Simulator-Sidecar** — Trigger:
+- **F-16 Dockerized OPC-UA-Simulator-Sidecar** — Trigger:
   Vendor-Compat-Profil-Tests verlangen einen realen externen Server
   statt des Embedded-TestServers (D-07 Wahl b), **oder** der
   Embedded-TestServer-`StatusCode`-Override-Aufwand (siehe §7) bricht
