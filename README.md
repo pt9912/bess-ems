@@ -8,12 +8,7 @@ Sicherheitsanforderungen. Das System ist modular aufgebaut, containerisiert und
 so konzipiert, dass Marktoptimierung und technische Regelung strikt getrennt
 sind.
 
-> **Status:** M1 in Umsetzung — Spezifikation, Architektur, .NET-Solution,
-> Kernlogik, Adapter, Persistenz, API-Anfänge, Simulator und Tests sind
-> vorhanden. Der MVP ist noch nicht vollständig abgeschlossen.
-> Maßgebliche Dokumente: [`spec/lastenheft.md`](spec/lastenheft.md),
-> [`spec/architecture.md`](spec/architecture.md) und
-> [`docs/plan/planning/in-progress/roadmap.md`](docs/plan/planning/in-progress/roadmap.md).
+> **Status:** M1, M2 und M3 sind abgeschlossen ([docs/plan/planning/in-progress/roadmap.md](docs/plan/planning/in-progress/roadmap.md))
 
 ---
 
@@ -59,16 +54,16 @@ Das System adressiert unter anderem:
 
 ## Technologie-Stack
 
-| Bereich                        | Technologie                                     |
-| ------------------------------ | ----------------------------------------------- |
-| Hauptplattform                 | C# / .NET 10                                    |
-| API                            | ASP.NET Core Minimal API                        |
-| Performance-kritischer Kern    | C / C++ (optionaler Native Core über C-ABI)     |
-| Persistenz (MVP)               | PostgreSQL über Dapper + Npgsql                 |
-| Messaging / Feldbus            | MQTTnet, FluentModbus; OPC-UA nach MVP          |
-| Simulator                      | Go-Feldsimulator für Modbus/MQTT                |
-| Betrieb / Gates                | Linux, Docker, Dockerfile-Stages, Makefile      |
-| Observability                  | Strukturierte Logs; Prometheus/OTel schrittweise |
+| Bereich                     | Technologie                                      |
+| --------------------------- | ------------------------------------------------ |
+| Hauptplattform              | C# / .NET 10                                     |
+| API                         | ASP.NET Core Minimal API                         |
+| Performance-kritischer Kern | C / C++ (optionaler Native Core über C-ABI)      |
+| Persistenz (MVP)            | PostgreSQL über Dapper + Npgsql                  |
+| Messaging / Feldbus         | MQTTnet, FluentModbus; OPC-UA nach MVP           |
+| Simulator                   | Go-Feldsimulator für Modbus/MQTT                 |
+| Betrieb / Gates             | Linux, Docker, Dockerfile-Stages, Makefile       |
+| Observability               | Strukturierte Logs; Prometheus/OTel schrittweise |
 
 ---
 
@@ -128,7 +123,7 @@ Not-Aus, keine BMS-Schutztechnik und keine herstellerspezifischen
 Wechselrichter-Schutzfunktionen. Harte Echtzeit- und zertifizierungsrelevante
 Funktionen sind außerhalb des Docker-basierten EMS abzubilden.
 
-Der Go-Feldsimulator unter `simulators/bess-field-sim` ist ein M1-Testwerkzeug:
+Der Go-Feldsimulator unter `simulators/bess-field-sim` ist ein Testwerkzeug:
 MQTT läuft dort bewusst anonym und plaintext über `tcp://` ohne TLS oder
 Credentials. Dies ist nur für lokale Mosquitto-/CI-Simulationen gedacht und
 nicht für Produktions-Broker.
@@ -152,45 +147,6 @@ nicht für Produktions-Broker.
 - Docker Compose
 - Unit Tests für Kernlogik
 
-### Aktueller Implementierungsstand
-
-Vorhanden sind derzeit unter anderem:
-
-- `BatteryEms.sln` mit hexagonaler Struktur unter `src/`
-- Domain-Modell, State Machine, Constraint Limiter, Ramp Limiter,
-  Adapter-Schreibbegrenzung und Retention-Modell
-- Application Ports/Use-Cases für Snapshot Store, Regelzyklus,
-  Schedule Tracking, NoOp-Dispatch-Optimierung und Retention
-- Modbus- und MQTT-Adapter mit Lese-/Schreibpfad und Unit-/Integrationstests
-- PostgreSQL-Persistenzadapter mit Dapper/Npgsql, idempotenter DDL und
-  Roundtrip-Integrationstest
-- API-Anfänge für Health, Battery Status, Current Command und aktuelle
-  Schedules
-- JSON-Schemas und Beispielkonfigurationen unter `config/`
-- Go-Feldsimulator unter `simulators/bess-field-sim`
-- Architektur-, Domain-, Application-, Adapter-, Infrastructure- und
-  Integrationstests
-- Dockerfile-Stages und Makefile-Ziele für aktive M1-Gates
-
-Noch in Arbeit bzw. nicht vollständig verdrahtet sind insbesondere:
-
-- vollständiger Worker-/Runtime-Composition-Root
-- Root-Compose für das Gesamtsystem `bess-ems` + PostgreSQL + MQTT-Broker
-- AuthN/AuthZ und schreibende Operator-Stop-API
-- vollständige strukturierte Logs, Metriken und Runtime-Smoke-Gates
-- produktiver Solver, Intraday, Regelleistung, OPC-UA und Native Core
-
-### Nach MVP
-
-OPC-UA-Adapter, Intraday-Reoptimierung, Regelleistungsreservierung
-und -aktivierung, MILP-Optimierung, Native C/C++ Control Core,
-OpenTelemetry-Tracing, Replay-Testumgebung.
-
-### Spätere Erweiterungen
-
-MPC, State-Space-Modelle, Kalman-Filter, native Solver-Sidecar, TimescaleDB,
-Operator UI, Multi-Asset-Flottensteuerung, Kubernetes-Deployment,
-zertifizierungsnahe Regelleistungsintegration.
 
 ---
 
@@ -210,8 +166,6 @@ Einstiegspunkte im Repository sind:
 - `simulators/bess-field-sim/` — Go-Feldsimulator
 - `docs/plan/` — Roadmap, aktive und offene Detailpläne
 
-Native-Core-Module sind noch nicht vorhanden; sie folgen erst in einer
-späteren Roadmap-Phase.
 
 ---
 
@@ -229,10 +183,6 @@ make coverage-gate
 make simulator-test
 make test-integration
 ```
-
-`make build`, `make runtime`, `make ci`, `make test-container` und
-`make fullbuild` sind als spätere M1/Welle-5-Ziele vorbereitet, aber noch
-nicht aktiv.
 
 ---
 
