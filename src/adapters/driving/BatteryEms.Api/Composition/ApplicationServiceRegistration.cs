@@ -40,6 +40,10 @@ public static class ApplicationServiceRegistration
         services.AddSingleton<IActivationDedupeStore>(sp => new InMemoryActivationDedupeStore(
             sp.GetRequiredService<RegelleistungOptions>(),
             sp.GetRequiredService<IClock>()));
+        // RM-M4-03-C: pipeline orchestrator. Composes the per-sample
+        // schema check, ActivationTimeValidator, TimebaseDegraded gate,
+        // and the dedupe store in the DoD-pinned order.
+        services.AddSingleton<ActivationValidator>();
 
         services.AddSingleton<IOperatorStopRegistry, InMemoryOperatorStopRegistry>();
         services.AddSingleton<IOperatorAuditLog, InMemoryOperatorAuditLog>();

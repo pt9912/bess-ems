@@ -44,13 +44,18 @@ public sealed class ActivationValidationResultTests
     }
 
     // Pin canonical kebab-case reason codes; later sub-slices extend the
-    // set, but the codes introduced in A must not silently rename.
+    // set, but the codes introduced through A/B/C must not silently rename.
     [Fact]
     public void Reason_code_constants_are_canonical_kebab_case()
     {
         Assert.Equal("accepted", ActivationValidationReasons.Accepted);
+        Assert.Equal("schema-invalid", ActivationValidationReasons.SchemaInvalid);
         Assert.Equal("timestamp-stale", ActivationValidationReasons.TimestampStale);
         Assert.Equal("timestamp-future-skew", ActivationValidationReasons.TimestampFutureSkew);
         Assert.Equal("timebase-degraded", ActivationValidationReasons.TimebaseDegraded);
+        Assert.Equal("replay-idempotent", ActivationValidationReasons.ReplayIdempotent);
+        Assert.Equal("dedupe-conflict", ActivationValidationReasons.DedupeConflict);
+        Assert.Equal("ambiguous-duplicate", ActivationValidationReasons.AmbiguousDuplicate);
+        Assert.Equal("dedupe-store-invalid", ActivationValidationReasons.DedupeStoreInvalid);
     }
 }

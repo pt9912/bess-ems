@@ -33,6 +33,11 @@ public static class ActivationValidationReasons
 {
     public const string Accepted = "accepted";
 
+    // Schema check (Sub-Slice C): structural-format gate that runs
+    // first in the pipeline so malformed identifiers / payload hashes
+    // never reach the time validator or dedupe store.
+    public const string SchemaInvalid = "schema-invalid";
+
     // Time-validator outcomes (Sub-Slice A).
     public const string TimestampStale = "timestamp-stale";
     public const string TimestampFutureSkew = "timestamp-future-skew";
@@ -42,8 +47,12 @@ public static class ActivationValidationReasons
     // pinned in A for cross-slice cohesion).
     public const string TimebaseDegraded = "timebase-degraded";
 
-    // Additional codes (replay-idempotent, dedupe-conflict,
-    // ambiguous-duplicate, dedupe-store-invalid, schema-invalid,
-    // not-dispatch-relevant, security-profile-enforcement-not-wired)
-    // land with Sub-Slices B/C/D.
+    // Dedupe outcomes (Sub-Slice C maps from AcceptResult).
+    public const string ReplayIdempotent = "replay-idempotent";
+    public const string DedupeConflict = "dedupe-conflict";
+    public const string AmbiguousDuplicate = "ambiguous-duplicate";
+    public const string DedupeStoreInvalid = "dedupe-store-invalid";
+
+    // Additional codes (not-dispatch-relevant,
+    // security-profile-enforcement-not-wired) land with Sub-Slice D.
 }
