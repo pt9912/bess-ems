@@ -286,6 +286,39 @@ Betrieb entscheiden (zwei explizite Felder), bevor der Adapter
 einen echten Server freigegeben**, bevor M4-05 die volle Härtung
 dranhängt.
 
+**Test- und Integrations-Details für D-04.** Sub-Slice-A pinnt das
+Verhalten auf drei Ebenen: (i) **Options-Validation** in
+`OpcUaAdapterOptionsTests` — drei `[Theory]`-Pins mit explizitem
+Reason-Code-Vergleich `Assert.Equal("opcua-security-not-hardened",
+ex.Message)` für (default), (`AllowUnsecured=true` ohne Reason),
+(`AllowUnsecured=true` mit leerem Reason); plus ein positiver Pin
+(`AllowUnsecured=true` + `Reason="hil-simulator"` → `EnsureValid()`
+returns `this` ohne Throw). (ii) **ILogger-Warning-Format** —
+LoggerMessage-Source-Generator-Methode `LogUnsecuredOpcUaConnection
+(ILogger logger, string endpointUrl, string reason)` mit EventId
+4200 (analog zur DapperActivationDedupeStore-EventId-4001-Linie),
+Level `LogLevel.Warning`, Template `"opcua adapter starting unsecured
+against {EndpointUrl}: {Reason}"`. Pin-Test: `EnsureValid()` schreibt
+genau eine Warning mit dem formatierten Message-Template. (iii)
+**Composition-Root-Integration** in Sub-Slice C — Pin-Test im
+Worker.Tests / Host.Tests-Pfad: ein `BessHostBuilder.BuildApp`-Run
+mit `OpcUaMappingPath` + `OpcUaEndpointUrl` gesetzt, aber
+`OpcUaAllowUnsecured=false`, wirft beim Boot eine
+`InvalidOperationException` mit dem `opcua-security-not-hardened`-
+Reason; der Host startet **nicht** silent in den NoOp-Pfad zurück.
+Operator-UX: stdout enthält die strukturierte Warning bevor die
+Validation-Exception fliegt, sodass der Operator den Reason im
+Klartext sieht.
+
+**M4-05-Übergangsvertrag.** Wenn M4-05 zündet, ändert sich für
+M4-04-Operator-Konfigurationen nichts an den Options-Slots — die
+neue RuntimeProfile-Awareness lebt **zusätzlich** zur bool-Achse.
+Konkret: `EnsureValid()` bekommt in M4-05 einen RuntimeProfile-
+Parameter; bei `RuntimeProfile=Production` schlägt jedes
+`SecurityMode=None`-Setup fehl, unabhängig von `AllowUnsecured`.
+Test-Stub `Defaults.ForHilSimulator()` (Sub-Slice D) bleibt
+gültig — er produziert ein Non-Production-Profil-Setup.
+
 **D-05 OPC-UA-Activation-Source nicht in M4-04.** RM-M4-03 D-06
 hat den `IRegelleistungActivationUseCase`-Driving-Port als
 Eingangspunkt fixiert; ein OPC-UA-Subscribe-Adapter, der TSO-
@@ -349,6 +382,71 @@ den gelesenen Wert vor der Domain-Aufbereitung; der Command-Sink
 **dividiert** vor dem Schreiben (Round-Trip-Erhaltung). Pin in beiden
 Sub-Slices.
 
+**D-09 Lifecycle: `IAsyncDisposable` durch alle drei Hauptkomponenten,
+mit deterministischem Tear-down-Vertrag.** Bei Host-Shutdown,
+Reconfiguration oder Test-Fixture-Dispose müssen OPC-UA-Session,
+Subscription und der `OverflowAwareTelemetryChannel` ohne
+Resource-Leaks und ohne post-Dispose-Callback-Crashes herunter.
+
+- **`IOpcUaClient` ist `IAsyncDisposable`.** `DisposeAsync()` ruft
+  `Session.CloseAsync` (mit kurzem `OperationTimeout=2s`-Cap, damit
+  Shutdown nicht durch eine kaputte Verbindung blockiert), gibt
+  alle aktiven `IOpcUaSubscription`-Instanzen frei (jede
+  Subscription ist selbst `IAsyncDisposable` und delete-by-server),
+  und ist idempotent (zweimal Dispose ist OK; nach Dispose werfen
+  weitere Operationen `ObjectDisposedException`).
+- **`OpcUaTelemetrySource` ist `IAsyncDisposable`.** `DisposeAsync()`
+  (i) signalisiert dem internen Cancellation-Token-Source, sodass
+  pending `ReadAsync`-Aufrufer cooperative cancellieren; (ii)
+  `Channel.Writer.Complete()` für den `OverflowAwareTelemetryChannel`
+  damit `ReadAllAsync`-Konsumenten sauber beenden; (iii)
+  `await _opcUaClient.DisposeAsync()` (Session/Subscription
+  herunter); (iv) post-Dispose-SDK-Notifications (die der SDK-
+  Dispatcher noch im Flug hat) treffen einen Disposed-Channel —
+  ein guarded `TryWrite`-Pfad (atomarer `_disposed`-Bool-Check)
+  swallowed sie ohne Throw. **Pin-Test (Sub-Slice B):**
+  `DisposeAsync` während eines aktiven `ReadAsync` lässt den
+  Consumer mit `OperationCanceledException` aussteigen, kein
+  Hang, keine `ObjectDisposedException`.
+- **`OpcUaCommandSink` ist `IAsyncDisposable`.** `DisposeAsync()`
+  ruft `await _opcUaClient.DisposeAsync()` (falls der Sink den
+  Client co-owned; im DI-shared-Fall ist der Client per Container-
+  Lifecycle gemanagt — der Sink markiert sich nur als disposed
+  und antwortet auf weitere `WriteAsync`-Aufrufe mit
+  `CommandDispatchResult.Failure("opcua-sink-disposed")`).
+  **Pin-Test (Sub-Slice C):** post-Dispose-`WriteAsync` returnt
+  Failure statt Throw.
+- **DI-Lifecycle-Vertrag:** `IOpcUaClient` ist als Singleton
+  registriert; `OpcUaTelemetrySource` und `OpcUaCommandSink` sind
+  Singletons, die den Singleton-Client teilen. Container-Shutdown
+  (`IHost.StopAsync` → ASP.NET-Container-Dispose) bringt erst
+  Source + Sink (parallel oder seriell, je nach Host-Reihenfolge),
+  dann den Client herunter. Das passt zur etablierten Modbus/MQTT-
+  Linie. **Reconfiguration** (z. B. Mapping-Reload) ist im M4-04-
+  Scope **nicht unterstützt** — der Host muss neu starten; ein
+  Hot-Reload-Pfad ist F-Folgearbeit.
+- **HIL-Test-Tear-down (Sub-Slice D):** `IAsyncLifetime.DisposeAsync`
+  ruft Source + Sink + Embedded-TestServer in dieser Reihenfolge
+  herunter. Pin: zwei Test-Klassen-Lifecycles in Folge (xUnit
+  parallel-disabled per Postgres-Linie analog) leak-frei; ein
+  Test-Reconnect-Szenario (Server abreissen, Adapter reagiert)
+  hinterlässt am Test-Ende keine offenen TCP-Sockets gegen den
+  Test-Port.
+
+**Status-Connected Open-Question (von der Review-Linie):** der Plan
+definiert `Status.Connected` als **transport-state-only** — aktive
+Session AND (keine Subscribe-Knoten ODER aktive Subscription). Read-
+Failure-Debounce ist bewusst **nicht** im M4-04-Scope: der `DataQuality`-
+Pfad pro Sample (LH-OPCUA-004 + StatusCode-Mapping) trägt die per-
+Read-Health, und ein cross-adapter Health-Debounce-Primitive (analog
+zur `TimebaseDebounceState` aus RM-M4-03 §144) wäre breiter als ein
+M4-04-Concern und kollidiert mit RM-M4-05 / F-12-Logik. Falls eine
+zukünftige Compliance-/Operations-Linie ein konsolidiertes Adapter-
+Health-Signal verlangt (z. B. „3 stale Reads in 10 Cycles → Disconnected"),
+zündet das als **F-17 Adapter-Health-Debounce-Primitive** (siehe §9
+Folgearbeit) und kann von Modbus/MQTT/OPC-UA gemeinsam konsumiert
+werden.
+
 ---
 
 ## 6. Akzeptanzkriterien
@@ -381,6 +479,16 @@ Sub-Slices.
   ILogger-Warning. **Pin in Sub-Slice A** (`Options-Defaults-werfen`,
   `AllowUnsecured-true-ohne-Reason-wirft`, `AllowUnsecured-true-
   mit-Reason-startet-mit-Warning`).
+- **Lifecycle-Tear-down (D-09)**: `IOpcUaClient`,
+  `OpcUaTelemetrySource`, `OpcUaCommandSink` sind alle
+  `IAsyncDisposable` und idempotent dispose-bar. Pin pro Sub-Slice:
+  (A) `IOpcUaClient.DisposeAsync` zweimal — kein Throw, kein Leak.
+  (B) `OpcUaTelemetrySource.DisposeAsync` während aktivem `ReadAsync`
+  → Consumer beendet mit `OperationCanceledException`, kein Hang.
+  (C) `OpcUaCommandSink.DisposeAsync` + post-Dispose-`WriteAsync`
+  → `Failure("opcua-sink-disposed")` ohne Throw.
+  (D) HIL-Test-Klassen-Tear-down hinterlässt keine offenen Sockets
+  am Test-Port (Sub-Slice-D-Pin).
 - **Adapter-Modul-Trennung**: `OpcUaTelemetrySource`/`OpcUaCommandSink`
   schreiben **nicht** ohne Setpoint-Clamping (`AdapterWriteLimiter`-
   Pfad bleibt vorgeschaltet).
@@ -530,3 +638,13 @@ Aktivierungs-Subscription-Profil verlangt.
   statt des Embedded-TestServers (D-07 Wahl b), **oder** der
   Embedded-TestServer-`StatusCode`-Override-Aufwand (siehe §7) bricht
   das Sub-Slice-D-Budget.
+- **F-17 Adapter-Health-Debounce-Primitive** — Trigger: konkret
+  z. B. eine Compliance-/Operations-Linie verlangt ein konsolidiertes
+  cross-adapter Health-Signal („3 stale Reads in 10 Cycles → Adapter-
+  Disconnected"), das Modbus/MQTT/OPC-UA gemeinsam konsumieren.
+  Heute ist `Status.Connected` per Adapter ein transport-state-only
+  Signal (Session + ggf. Subscription); pro-Sample-Health läuft über
+  `DataQuality`. F-17 würde ein Domain-Primitive analog zur
+  `TimebaseDebounceState` aus RM-M4-03 §144 bauen, das Adapter-
+  übergreifend wiederverwendbar ist und mit dem RM-M4-05-/F-12-
+  RuntimeProfile-Layer zusammenspielt.
