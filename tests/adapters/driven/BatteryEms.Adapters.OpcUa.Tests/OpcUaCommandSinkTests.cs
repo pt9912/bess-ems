@@ -298,4 +298,86 @@ public sealed class OpcUaCommandSinkTests
         Assert.Contains("opcua-write-cadence-one_shot-not-supported",
             result.Reason, StringComparison.Ordinal);
     }
+
+    // Sub-Slice-C review-fix #1: ein Charge-Befehl (negativer
+    // ActivePower) auf einem fälschlich uint-gemappten Setpoint
+    // surfaced den Mapping-Bug als typisierten Fehler statt silent
+    // auf 0 zu klemmen.
+    [Theory]
+    [InlineData("uint16")]
+    [InlineData("uint32")]
+    [InlineData("uint64")]
+    public async Task Negative_active_power_into_uint_setpoint_is_fail_closed(string dataType)
+    {
+        var client = new FakeOpcUaClient();
+        await client.ConnectAsync(CancellationToken.None);
+        var sink = BuildSink(client, Mapping(
+            WriteNode("active_power_setpoint_kw", "ns=2;P", dataType: dataType)));
+
+        var result = await sink.WriteAsync(
+            Command(activeKw: -25), CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Contains("opcua-uint-cannot-encode-negative-value",
+            result.Reason, StringComparison.Ordinal);
+        Assert.Contains("active_power_setpoint_kw",
+            result.Reason, StringComparison.Ordinal);
+        // Pin: kein Write durchgegangen — Bug-State surfaced statt
+        // silent auf 0 zu schreiben.
+        Assert.Empty(client.Writes);
+    }
+
+    [Fact]
+    public async Task Negative_reactive_power_into_uint_setpoint_is_fail_closed()
+    {
+        var client = new FakeOpcUaClient();
+        await client.ConnectAsync(CancellationToken.None);
+        var sink = BuildSink(client, Mapping(
+            WriteNode("active_power_setpoint_kw", "ns=2;P", dataType: "float"),
+            WriteNode("reactive_power_setpoint_kvar", "ns=2;Q", dataType: "uint16")));
+
+        var result = await sink.WriteAsync(
+            Command(activeKw: 10, reactiveKvar: -3), CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Contains("opcua-uint-cannot-encode-negative-value",
+            result.Reason, StringComparison.Ordinal);
+        Assert.Contains("reactive_power_setpoint_kvar",
+            result.Reason, StringComparison.Ordinal);
+    }
+
+    // Sub-Slice-C review-fix #7: integer mappings truncate (don't
+    // round). The mapping-side mechanism für Sub-Integer-Präzision
+    // ist `scale_factor` — hier dokumentiert per Pin.
+    [Fact]
+    public async Task Integer_mapping_truncates_fractional_value_without_scale_factor()
+    {
+        var client = new FakeOpcUaClient();
+        await client.ConnectAsync(CancellationToken.None);
+        var sink = BuildSink(client, Mapping(
+            WriteNode("active_power_setpoint_kw", "ns=2;P", dataType: "int16")));
+
+        await sink.WriteAsync(Command(activeKw: 25.7), CancellationToken.None);
+
+        Assert.Single(client.Writes);
+        // 25.7 → (short)25.7 = 25; the 0.7 is lost. Operator uses
+        // scale_factor=0.1 with int16 to widen precision to tenths.
+        Assert.Equal((short)25, (short)client.Writes[0].Value);
+    }
+
+    [Fact]
+    public async Task Integer_mapping_with_scale_factor_widens_precision()
+    {
+        var client = new FakeOpcUaClient();
+        await client.ConnectAsync(CancellationToken.None);
+        var sink = BuildSink(client, Mapping(
+            WriteNode("active_power_setpoint_kw", "ns=2;P",
+                dataType: "int16", scaleFactor: 0.1)));
+
+        await sink.WriteAsync(Command(activeKw: 25.7), CancellationToken.None);
+
+        // 25.7 / 0.1 = 257 → (short)257 = 257; round-trip via
+        // source-multiply-by-0.1 = 25.7 again.
+        Assert.Equal((short)257, (short)client.Writes[0].Value);
+    }
 }

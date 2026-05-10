@@ -19,6 +19,11 @@ namespace BatteryEms.Adapters.OpcUa;
 // Plan-RM-M4-04 §1: M4-04 ist nicht produktiv freigegeben bevor
 // RM-M4-05 die Security-Härtung dranhängt. Der Stub-State unterstreicht
 // das auf der Implementation-Ebene.
+//
+// `[ExcludeFromCodeCoverage]` weil jede Methode `NotImplementedException`
+// wirft — Coverlet hätte sonst eine permanent-rote Linie auf Code, der
+// bewusst noch keinen produktiven Pfad hat.
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
 public sealed class OpcUaClient : IOpcUaClient
 {
     private readonly OpcUaAdapterOptions _options;

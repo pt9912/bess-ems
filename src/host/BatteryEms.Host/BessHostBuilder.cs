@@ -100,16 +100,12 @@ public static class BessHostBuilder
         // the loaded asset to DI so the adapter constructors resolve it.
         builder.Services.AddSingleton(runtimeConfig.Asset);
 
-        // I/O adapter triage. Plan-RM-M4-04 §4 Sub-Slice C macht die
-        // Mehrfach-Konfiguration explizit fail-closed: wenn der
-        // Operator gleichzeitig Modbus, MQTT und/oder OPC-UA
-        // konfiguriert hat (mehr als eine Familie mit MappingPath +
-        // Endpoint), wirft der Composition-Root einen Startup-Fehler
-        // `multiple-io-adapters-configured` mit der Liste der
-        // erkannten Konfigurationen — der Operator muss sich für
-        // genau eine Quelle entscheiden. Verhindert silent-override-
-        // Bugs durch wechselnde if/else-Reihenfolgen. Keine
-        // Konfiguration ⇒ NoOp-Pfad.
+        // I/O-Adapter-Triage. Detection-Logik in
+        // `IoAdapterTriage.SelectConfiguredFamily` (Application/IO),
+        // damit sie ohne WebApplicationFactory-Boot unit-getestet
+        // werden kann (review-fix #2 zu Sub-Slice C). Mehr als eine
+        // konfigurierte Familie wirft `multiple-io-adapters-configured`
+        // — der Operator muss sich für genau eine entscheiden.
         var modbusConfigured = runtimeConfig.ModbusMapping is not null
             && !string.IsNullOrWhiteSpace(hostOptions.ModbusHost)
             && hostOptions.ModbusPort > 0;
@@ -119,47 +115,38 @@ public static class BessHostBuilder
             && !string.IsNullOrWhiteSpace(hostOptions.MqttClientId);
         var opcUaConfigured = runtimeConfig.OpcUaMapping is not null
             && hostOptions.OpcUaEndpointUrl is not null;
-        var configured = new List<string>();
-        if (modbusConfigured) { configured.Add("modbus"); }
-        if (mqttConfigured) { configured.Add("mqtt"); }
-        if (opcUaConfigured) { configured.Add("opcua"); }
-        if (configured.Count > 1)
+        var family = IoAdapterTriage.SelectConfiguredFamily(
+            modbusConfigured, mqttConfigured, opcUaConfigured);
+        switch (family)
         {
-            throw new InvalidOperationException(
-                "multiple-io-adapters-configured: pick exactly one of "
-                + $"[{string.Join(", ", configured)}]. The composition root refuses "
-                + "to silently choose between simultaneously-configured I/O families.");
-        }
-        if (modbusConfigured)
-        {
-            builder.Services.AddBessModbus(
-                runtimeConfig.ModbusMapping!,
-                ModbusAdapterOptions.Defaults(hostOptions.ModbusHost!, hostOptions.ModbusPort, runtimeConfig.Asset.AssetId));
-        }
-        else if (mqttConfigured)
-        {
-            builder.Services.AddBessMqtt(
-                runtimeConfig.MqttMapping!,
-                MqttAdapterOptions.Defaults(hostOptions.MqttBrokerHost!, hostOptions.MqttBrokerPort, hostOptions.MqttClientId!, runtimeConfig.Asset.AssetId));
-        }
-        else if (opcUaConfigured)
-        {
-            builder.Services.AddBessOpcUa(
-                runtimeConfig.OpcUaMapping!,
-                new OpcUaAdapterOptions
-                {
-                    EndpointUrl = hostOptions.OpcUaEndpointUrl!,
-                    SessionName = string.IsNullOrWhiteSpace(hostOptions.OpcUaSessionName)
-                        ? "bess-ems"
-                        : hostOptions.OpcUaSessionName!,
-                    AllowUnsecured = hostOptions.OpcUaAllowUnsecured,
-                    AllowUnsecuredReason = hostOptions.OpcUaAllowUnsecuredReason,
-                });
-        }
-        else
-        {
-            builder.Services.AddSingleton<IBatteryTelemetrySource, NoOpBatteryTelemetrySource>();
-            builder.Services.AddSingleton<IBatteryCommandSink, NoOpBatteryCommandSink>();
+            case IoAdapterTriage.Family.Modbus:
+                builder.Services.AddBessModbus(
+                    runtimeConfig.ModbusMapping!,
+                    ModbusAdapterOptions.Defaults(hostOptions.ModbusHost!, hostOptions.ModbusPort, runtimeConfig.Asset.AssetId));
+                break;
+            case IoAdapterTriage.Family.Mqtt:
+                builder.Services.AddBessMqtt(
+                    runtimeConfig.MqttMapping!,
+                    MqttAdapterOptions.Defaults(hostOptions.MqttBrokerHost!, hostOptions.MqttBrokerPort, hostOptions.MqttClientId!, runtimeConfig.Asset.AssetId));
+                break;
+            case IoAdapterTriage.Family.OpcUa:
+                builder.Services.AddBessOpcUa(
+                    runtimeConfig.OpcUaMapping!,
+                    new OpcUaAdapterOptions
+                    {
+                        EndpointUrl = hostOptions.OpcUaEndpointUrl!,
+                        SessionName = string.IsNullOrWhiteSpace(hostOptions.OpcUaSessionName)
+                            ? "bess-ems"
+                            : hostOptions.OpcUaSessionName!,
+                        AllowUnsecured = hostOptions.OpcUaAllowUnsecured,
+                        AllowUnsecuredReason = hostOptions.OpcUaAllowUnsecuredReason,
+                    });
+                break;
+            case IoAdapterTriage.Family.None:
+            default:
+                builder.Services.AddSingleton<IBatteryTelemetrySource, NoOpBatteryTelemetrySource>();
+                builder.Services.AddSingleton<IBatteryCommandSink, NoOpBatteryCommandSink>();
+                break;
         }
 
         // Worker hosted-service.
