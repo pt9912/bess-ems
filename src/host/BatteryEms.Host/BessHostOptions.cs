@@ -51,6 +51,19 @@ public sealed class BessHostOptions
     public string? MqttBrokerHost { get; set; }
     public int MqttBrokerPort { get; set; }
     public string? MqttClientId { get; set; }
+
+    // RM-M4-04 (plan §4 Sub-Slice C): optional OPC-UA-Adapter wiring.
+    // OpcUaMappingPath + OpcUaEndpointUrl plus die Pre-M4-05-Security-
+    // Slots (OpcUaAllowUnsecured + OpcUaAllowUnsecuredReason) müssen
+    // gesetzt sein, damit `AddBessOpcUa` registriert. Per D-04
+    // failed der Host beim Boot, wenn OpcUaAllowUnsecured=false bei
+    // SecurityMode=None oder AllowUnsecured=true mit leerem Reason —
+    // siehe `OpcUaAdapterOptions.EnsureValid`.
+    public string? OpcUaMappingPath { get; set; }
+    public Uri? OpcUaEndpointUrl { get; set; }
+    public string? OpcUaSessionName { get; set; }
+    public bool OpcUaAllowUnsecured { get; set; }
+    public string? OpcUaAllowUnsecuredReason { get; set; }
 }
 
 public sealed class BessScheduleSolverOptions

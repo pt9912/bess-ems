@@ -1,6 +1,7 @@
 using BatteryEms.Adapters.Modbus;
 using BatteryEms.Adapters.Mqtt;
 using BatteryEms.Adapters.NativeInterop;
+using BatteryEms.Adapters.OpcUa;
 using BatteryEms.Adapters.Optimization;
 using BatteryEms.Adapters.Optimization.OrTools;
 using BatteryEms.Adapters.Persistence;
@@ -99,26 +100,61 @@ public static class BessHostBuilder
         // the loaded asset to DI so the adapter constructors resolve it.
         builder.Services.AddSingleton(runtimeConfig.Asset);
 
-        // Modbus / MQTT wiring is opt-in: when the host configuration
-        // provides the mapping path + endpoint, the real adapter is
-        // registered as IBatteryTelemetrySource / IBatteryCommandSink.
-        // Otherwise the NoOp pair keeps the regulation loop safe.
-        if (runtimeConfig.ModbusMapping is not null
+        // I/O adapter triage. Plan-RM-M4-04 §4 Sub-Slice C macht die
+        // Mehrfach-Konfiguration explizit fail-closed: wenn der
+        // Operator gleichzeitig Modbus, MQTT und/oder OPC-UA
+        // konfiguriert hat (mehr als eine Familie mit MappingPath +
+        // Endpoint), wirft der Composition-Root einen Startup-Fehler
+        // `multiple-io-adapters-configured` mit der Liste der
+        // erkannten Konfigurationen — der Operator muss sich für
+        // genau eine Quelle entscheiden. Verhindert silent-override-
+        // Bugs durch wechselnde if/else-Reihenfolgen. Keine
+        // Konfiguration ⇒ NoOp-Pfad.
+        var modbusConfigured = runtimeConfig.ModbusMapping is not null
             && !string.IsNullOrWhiteSpace(hostOptions.ModbusHost)
-            && hostOptions.ModbusPort > 0)
-        {
-            builder.Services.AddBessModbus(
-                runtimeConfig.ModbusMapping,
-                ModbusAdapterOptions.Defaults(hostOptions.ModbusHost!, hostOptions.ModbusPort, runtimeConfig.Asset.AssetId));
-        }
-        else if (runtimeConfig.MqttMapping is not null
+            && hostOptions.ModbusPort > 0;
+        var mqttConfigured = runtimeConfig.MqttMapping is not null
             && !string.IsNullOrWhiteSpace(hostOptions.MqttBrokerHost)
             && hostOptions.MqttBrokerPort > 0
-            && !string.IsNullOrWhiteSpace(hostOptions.MqttClientId))
+            && !string.IsNullOrWhiteSpace(hostOptions.MqttClientId);
+        var opcUaConfigured = runtimeConfig.OpcUaMapping is not null
+            && hostOptions.OpcUaEndpointUrl is not null;
+        var configured = new List<string>();
+        if (modbusConfigured) { configured.Add("modbus"); }
+        if (mqttConfigured) { configured.Add("mqtt"); }
+        if (opcUaConfigured) { configured.Add("opcua"); }
+        if (configured.Count > 1)
+        {
+            throw new InvalidOperationException(
+                "multiple-io-adapters-configured: pick exactly one of "
+                + $"[{string.Join(", ", configured)}]. The composition root refuses "
+                + "to silently choose between simultaneously-configured I/O families.");
+        }
+        if (modbusConfigured)
+        {
+            builder.Services.AddBessModbus(
+                runtimeConfig.ModbusMapping!,
+                ModbusAdapterOptions.Defaults(hostOptions.ModbusHost!, hostOptions.ModbusPort, runtimeConfig.Asset.AssetId));
+        }
+        else if (mqttConfigured)
         {
             builder.Services.AddBessMqtt(
-                runtimeConfig.MqttMapping,
+                runtimeConfig.MqttMapping!,
                 MqttAdapterOptions.Defaults(hostOptions.MqttBrokerHost!, hostOptions.MqttBrokerPort, hostOptions.MqttClientId!, runtimeConfig.Asset.AssetId));
+        }
+        else if (opcUaConfigured)
+        {
+            builder.Services.AddBessOpcUa(
+                runtimeConfig.OpcUaMapping!,
+                new OpcUaAdapterOptions
+                {
+                    EndpointUrl = hostOptions.OpcUaEndpointUrl!,
+                    SessionName = string.IsNullOrWhiteSpace(hostOptions.OpcUaSessionName)
+                        ? "bess-ems"
+                        : hostOptions.OpcUaSessionName!,
+                    AllowUnsecured = hostOptions.OpcUaAllowUnsecured,
+                    AllowUnsecuredReason = hostOptions.OpcUaAllowUnsecuredReason,
+                });
         }
         else
         {

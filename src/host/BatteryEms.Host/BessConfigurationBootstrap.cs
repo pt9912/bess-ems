@@ -51,7 +51,13 @@ internal static class BessConfigurationBootstrap
             mqtt = loader.LoadMqttMapping(options.MqttMappingPath);
         }
 
-        return new BessRuntimeConfiguration(asset, schedule, retention, modbus, mqtt);
+        OpcUaMappingConfiguration? opcua = null;
+        if (!string.IsNullOrWhiteSpace(options.OpcUaMappingPath))
+        {
+            opcua = loader.LoadOpcUaMapping(options.OpcUaMappingPath);
+        }
+
+        return new BessRuntimeConfiguration(asset, schedule, retention, modbus, mqtt, opcua);
     }
 
     public static void SeedAssetRegistry(IBatteryAssetRegistry registry, BatteryAsset asset)
@@ -107,4 +113,5 @@ internal sealed record BessRuntimeConfiguration(
     Schedule? Schedule,
     RetentionPolicy? Retention,
     ModbusMappingConfiguration? ModbusMapping,
-    MqttMappingConfiguration? MqttMapping);
+    MqttMappingConfiguration? MqttMapping,
+    OpcUaMappingConfiguration? OpcUaMapping);
