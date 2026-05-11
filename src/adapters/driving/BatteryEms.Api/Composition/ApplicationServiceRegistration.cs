@@ -63,6 +63,12 @@ public static class ApplicationServiceRegistration
         // Store-Folgelinie.
         services.AddSingleton<IOptimizationIdempotencyStore, InMemoryOptimizationIdempotencyStore>();
 
+        // RM-M5-01-C: Fallback-Plan-Validator. Default-Options aus
+        // plan-RM-M5 §Fallback-Plan-Gueltigkeit; Operator-Overrides
+        // pro ScheduleType kämen über IConfiguration (Folgearbeit).
+        services.AddSingleton(new FallbackPlanValidatorOptions());
+        services.AddSingleton<IFallbackPlanValidator, DefaultFallbackPlanValidator>();
+
         services.AddSingleton<InMemoryTimebaseHealthSource>();
         services.AddSingleton<ITimebaseHealthSource>(
             sp => sp.GetRequiredService<InMemoryTimebaseHealthSource>());
