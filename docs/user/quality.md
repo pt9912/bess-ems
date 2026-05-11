@@ -252,7 +252,7 @@ P-Sprungantwort: 25 kW Setpoint via `ModbusCommandSink` →
 Konvergenz-Read via `ModbusTelemetrySource` mit ±5 kW Toleranz
 (PCS-Dynamik braucht ~1 s).
 
-#### 2.2.2 OPC-UA-Roundtrip-Pfad (Mandatory, RM-M4-04 + RM-M4-08)
+#### 2.2.2 OPC-UA-Roundtrip-Pfad (Mandatory, RM-M4-04 + RM-M4-08 + RM-M4-05)
 
 ```bash
 make test-hil-opcua   # process-internal Embedded TestServer
@@ -267,7 +267,8 @@ läuft `OPCFoundation.NetStandard.Opc.Ua.Server`-basiert im selben
 Test-Prozess (`EmbeddedTestServerHost`, loopback-TCP-Port via
 Kernel-Allocate).
 
-**Pin-Inventory** (7 Pins gesamt):
+**Pin-Inventory** (13 Pins gesamt — 5 happy-path + 2 negativ/stress
++ 6 security):
 
 | Datei | Pin | Quelle |
 | ----- | --- | ------ |
@@ -278,6 +279,23 @@ Kernel-Allocate).
 | `OpcUaRoundtripTests.cs` | EndToEnd_Reconnect_after_server_restart_keeps_stream_alive | RM-M4-04-D |
 | `OpcUaNegativeTests.cs` | Multi_cycle_reconnect_keeps_stream_alive_and_does_not_leak_subscriptions | RM-M4-08-A |
 | `OpcUaNegativeTests.cs` | Concurrent_source_and_sink_survive_restart_under_contention | RM-M4-08-A |
+| `OpcUaSecurityTests.cs` | Secure_handshake_signandencrypt_succeeds_against_test_server | RM-M4-05-D |
+| `OpcUaSecurityTests.cs` | Secure_handshake_sign_mode_succeeds_against_test_server | RM-M4-05-D |
+| `OpcUaSecurityTests.cs` | Non_allowlisted_policy_throws_at_construction | RM-M4-05-D |
+| `OpcUaSecurityTests.cs` | Production_profile_with_unsecured_mode_throws_at_construction | RM-M4-05-D |
+| `OpcUaSecurityTests.cs` | Hil_simulator_profile_with_unsecured_mode_passes | RM-M4-05-D |
+| `OpcUaSecurityTests.cs` | Production_profile_without_trusted_server_certificate_fails | RM-M4-05-D |
+
+**Security-Default-Schwenk (RM-M4-05)**: pre-M4-05 fuhr der OPC-UA-
+Adapter mit `MessageSecurityMode.None` plus dem `AllowUnsecured`-
+Bool-Guard. Ab RM-M4-05 sind die Adapter-Defaults
+`RuntimeProfile=Production` + `SecurityMode=SignAndEncrypt` +
+`SecurityPolicy=Basic256Sha256`; ein Operator, der unsecured fahren
+muss (HIL, lokale Entwicklung), setzt `RuntimeProfile=HilSimulator`
+oder `Development` explizit. Der Production-Profile rejected
+SecurityMode=None **unabhängig** von `AllowUnsecured` — der
+AllowUnsecured-Bool ist im Production-Pfad bewusst nicht
+ausreichend (M4-05 D-02).
 
 **Konventions-Abgrenzung**:
 

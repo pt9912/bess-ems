@@ -433,6 +433,152 @@ source.md` mit eigenem Detail-Plan und Review-Pass-Pattern.
 
 ---
 
+## Item F-17: OPC-UA-Security-Policy-Allowlist-Erweiterung
+
+**Quelle:** RM-M4-05 §3 + D-04 (Allowlist-Erweiterung verlangt
+Plan-Änderung — kein Magic-Config-Knopf).
+
+Heute (Post-M4-05): `OpcUaSecurityPolicies.IsAllowed` ist eine
+statische Klasse mit einer hart codierten Allowlist. Die einzige
+heute zugelassene Policy ist `Basic256Sha256`. Jede zusätzliche
+Policy verlangt einen Plan-Slice, einen Code-Change am Adapter,
+neue Pins und Doku.
+
+**Trigger** (eines reicht):
+
+- TSO-/Vendor-Spec verlangt eine Policy außerhalb von
+  `Basic256Sha256` (z.B. `Aes128Sha256RsaOaep`,
+  `Aes256Sha256RsaPss` für modernere Vendor-Stacks).
+- Migration weg von `Basic256Sha256` weil die Policy aus Sicherheits-
+  Gründen retired wird.
+
+**Scope-Skizze** (wenn der Trigger zündet):
+
+- (a) Policy-Konstante in `OpcUaSecurityPolicies` ergänzen mit
+  full URI.
+- (b) `IsAllowed`-Pin um den neuen Policy-String erweitern;
+  `OpcUaAdapterOptions.EnsureValid`-Pin pro neuer Policy (Sign +
+  SignAndEncrypt jeweils).
+- (c) Embedded TestServer-Fixture um die Policy erweitern
+  (`AddPolicy(SecurityMode, Policy)` analog zur heutigen
+  `AddSignAndEncryptPolicies`-Linie).
+- (d) Quality-Doku §2.2.2 dokumentiert die erweiterte Allowlist.
+- (e) Ein neuer Integration-Pin in `OpcUaSecurityTests.cs`, der
+  einen sicheren Handshake mit der neuen Policy gegen den
+  Embedded TestServer fährt (Trust-Bridge gilt unverändert).
+
+**Aufwandsschätzung:** ~0.5-1 Tag pro Policy (Code + Tests +
+Doku). Skaliert linear mit der Anzahl der Policies.
+
+**Aktivierungs-Pfad:** entweder als kleinen Patch direkt am Adapter
+mit Carve-out-Plan-Eintrag in der jeweiligen Roadmap-Zeile, oder
+als eigenes `plan-RM-M4-FUP-opcua-policy-{name}.md` wenn mehrere
+Policies gleichzeitig anstehen.
+
+---
+
+## Item F-18: OPC-UA-Cert-Rotation/Renewal
+
+**Quelle:** RM-M4-05 §3 + §9 (Cert-Rotation/Renewal-Workflows
+explizit aus M4-05-Scope ausgeklammert — heute geht M4-05 davon
+aus, dass Certs statisch sind und der Operator manuell re-deployt).
+
+Heute: Der OpcUaClient lädt die App-Cert beim ersten
+`EnsureApplicationConfiguredAsync` und der Trusted-Peer-Store
+wird einmalig beim Start aufgelöst. Eine Cert-Lifecycle-Änderung
+(Operator kopiert eine neue Server-Cert in den Trusted-Pfad,
+Vendor rotiert sein Server-Cert) wird **nicht** erkannt; ein
+Re-Trust verlangt Process-Restart.
+
+**Trigger** (eines reicht):
+
+- Erstes Cert-Lifecycle-Event in der Operator-Praxis (Validity-
+  Period läuft ab; Operator-Team will Re-Trust ohne Restart).
+- Vendor rotiert Server-Cert proaktiv (Compliance-Anforderung);
+  Adapter muss reload-en, bevor der bestehende Trust expired.
+- Operator-Anforderung nach Hot-Reload des
+  `TrustedServerCertificatesPath`-Inhalts.
+
+**Scope-Skizze** (wenn der Trigger zündet):
+
+- (a) Cert-Watcher auf dem Trusted-Store-Path
+  (`FileSystemWatcher` oder Polling) mit Throttle (Multi-Event-
+  Bursts während Cert-Dateischreibens schlucken).
+- (b) `OpcUaClient.ReloadCertificatesAsync()`-Pfad ruft
+  `appConfig.CertificateValidator.UpdateAsync(...)` und löst
+  ein optionales Force-Reconnect aus, wenn die aktuell aktive
+  Session-Cert nicht mehr in der refreshten Trust-Liste ist.
+- (c) Pin-Test gegen Embedded TestServer mit Cert-Swap mid-stream:
+  Server bekommt ein neues Cert, alte Cert wird aus Client-Trust
+  entfernt → Client soll Re-Trust laden + Session erhalten/
+  re-establishen.
+- (d) Optional: Pre-Expiration-Warning-Log (EventId 4223?) wenn
+  die App-Cert oder eine getrustete Server-Cert in N Tagen
+  abläuft.
+
+**Aufwandsschätzung:** ~3-5 Tage inkl. Tests + Edge-Cases (Cert-
+File-mid-write, atomic-rename-vs-truncate-detect).
+
+**Aktivierungs-Pfad:** eigener `plan-RM-M4-FUP-opcua-cert-
+rotation.md` Slice-Plan.
+
+---
+
+## Item F-19: OPC-UA-User-Identity (UserName/Password / UserToken)
+
+**Quelle:** RM-M4-05 §3 + §9 (User/Token-Identity explizit out-of-
+scope: M4-05 fährt mit `UserIdentity=null` (Anonymous);
+Server-seitige Authentifizierung jenseits der Cert-basierten ist
+aus M4-05-Scope ausgeklammert).
+
+Heute: `OpcUaClient.ConnectAsync` ruft
+`DefaultSessionFactory.CreateAsync` mit `identity: null` —
+Anonymous-Auth gegen den OPC-UA-Server. Cert-basierter Trust ist
+in M4-05 bidirektional gepinnt, aber zusätzliche
+User-Authentifizierung (UserName/Password, UserToken,
+Kerberos/IssuedToken) ist nicht implementiert.
+
+**Trigger** (eines reicht):
+
+- TSO-/Vendor-Spec verlangt nicht-Anonymous-Authentication am
+  OPC-UA-Endpoint (UserName/Password als zweiten Faktor zur
+  Cert-Trust, oder Token-basierter Identity-Provider).
+- Compliance-Anforderung nach Audit-fähigem Per-User-Session-
+  Logging (Anonymous lässt sich nicht auf konkrete Operator-
+  Accounts mappen).
+
+**Scope-Skizze** (wenn der Trigger zündet):
+
+- (a) `OpcUaAdapterOptions.UserIdentity`-Slot als neuer
+  `OpcUaUserIdentityOptions`-Record (UserName + Password aus
+  Secret-Store-Reference, oder UserToken-Bytes, oder IssuedToken-
+  Endpoint). Default `null` ⇒ Anonymous (heutiges Verhalten).
+- (b) `OpcUaClient.ConnectAsync` materialisiert die Identity via
+  SDK-`UserIdentity`-Konstruktor und reicht sie an
+  `DefaultSessionFactory.CreateAsync(identity: ...)` durch.
+- (c) Secret-Resolver-Strategie: wir wollen keine Klartext-
+  Passwörter in der Config — `UserIdentity` referenziert einen
+  Secret-Identifier (z.B. `secret://op-tso-1`), und ein
+  `IOpcUaSecretResolver`-Driven-Port löst ihn beim Connect auf.
+  Default-Implementation z.B. Environment-Variable oder File-
+  basiert; Production-Impl via HashiCorp-Vault o.ä. ist eigene
+  Carve-out-Linie.
+- (d) Pin-Test gegen Embedded TestServer mit UserName-Token-
+  Policy: Server bekommt eine User-Token-Policy (Username/
+  Password); Client connectet mit korrektem Credential →
+  Session aktiv; Client mit falschem Credential → ServiceResult
+  „BadIdentityTokenRejected" wird in unsere kebab-case-Reason
+  gewrappt.
+
+**Aufwandsschätzung:** ~1 Woche inkl. Tests + Secret-Resolver-
+Driven-Port + Doku. Production-Secret-Resolver (Vault o.ä.) ist
+weitere ~1 Woche, eigene Linie.
+
+**Aktivierungs-Pfad:** eigener `plan-RM-M4-FUP-opcua-user-
+identity.md` Slice-Plan.
+
+---
+
 ## Trigger-Watch-Disziplin
 
 Diese Notiz wird **nicht aktiv abgearbeitet**. Sie wird gescannt:
