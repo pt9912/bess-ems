@@ -805,7 +805,7 @@ zu finden.
 | Kennung    | Frage                                                               | Status |
 | ---------- | ------------------------------------------------------------------- | ------ |
 | AR-OPEN-001 | Nach welchen Kriterien wird die API nach MVP als eigener Service ausgekoppelt? | Offen |
-| AR-OPEN-002 | gRPC vs. REST-only für externe Optimierungs-Sidecars in Phase 3?  | Offen  |
+| AR-OPEN-002 | gRPC vs. REST-only für externe Optimierungs-Sidecars in Phase 3?  | Geschlossen mit [ADR 0005](../docs/plan/adr/0005-optimization-core-sidecar-transport.md) — gRPC über HTTP/2 (UDS-Default für Loopback, mTLS für Cross-Host) ist der Sidecar-Transport für den `optimization-core`. |
 | AR-OPEN-003 | Persistenz-Stack: EF Core, Dapper oder Mischung?                  | Offen  |
 | AR-OPEN-004 | Fahrplanimport-Format (CSV, JSON, ENTSO-E, proprietär)?           | Offen  |
 | AR-OPEN-005 | Konkrete Topic-/Registerprofile für die ersten Hersteller?        | Offen, Bezug LH-OPEN-001 |
