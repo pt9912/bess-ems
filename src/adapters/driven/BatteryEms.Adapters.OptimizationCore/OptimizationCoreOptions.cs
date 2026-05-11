@@ -110,7 +110,29 @@ public sealed record OptimizationCoreOptions
         if (string.IsNullOrWhiteSpace(ExpectedContractVersion))
         {
             throw new InvalidOperationException(
-                "ExpectedContractVersion must be set (e.g. '1.0.0').");
+                "optimization-core-contract-incompatible: "
+                + "ExpectedContractVersion must be set (e.g. '1.0.0').");
+        }
+        // Plan-RM-M5-01 §6 Akzeptanzkriterium: EnsureValid wirft
+        // `optimization-core-contract-incompatible` wenn die
+        // Operator-Konfiguration der erwarteten Contract-Major-Version
+        // nicht semver-parsbar ist. Das ist die Boot-Zeit-Validierung;
+        // der Runtime-Check (Sidecar-reportet eine inkompatible Version)
+        // sitzt in `OptimizationCoreScheduleOptimizer.
+        // EnsureContractCompatibleAsync` und wirft dort eine separate
+        // ContractIncompatibleException mit demselben kebab-case-
+        // Reason. Beide Pfade landen via Status-Mapper auf demselben
+        // `FallbackReason.ContractIncompatible`.
+        if (!Version.TryParse(StripSemVerSuffix(ExpectedContractVersion), out _))
+        {
+            throw new InvalidOperationException(
+                $"optimization-core-contract-incompatible: "
+                + $"ExpectedContractVersion `{ExpectedContractVersion}` is "
+                + "not a parseable semver (expected e.g. '1.0.0'). The "
+                + "version is compared against the sidecar's reported "
+                + "[min_compatible_version, max_compatible_version] range "
+                + "at runtime — an unparseable value would deadlock the "
+                + "compatibility gate at first Optimize-call.");
         }
 
         // Plan-RM-M5-01 D-02: Production-Profile macht plaintext-TCP
@@ -145,6 +167,16 @@ public sealed record OptimizationCoreOptions
         }
 
         return this;
+    }
+
+    // SemVer-Pre-Release-Suffixe (z. B. `1.0.0-rc.1`) auf der Wire-
+    // Seite akzeptiert die Range-Logik nach `-`-Strip; EnsureValid
+    // schneidet hier analog ab damit Operator-Configs mit Pre-Release-
+    // Tags nicht stillschweigend rejected werden.
+    private static string StripSemVerSuffix(string s)
+    {
+        var dash = s.IndexOf('-', StringComparison.Ordinal);
+        return dash >= 0 ? s[..dash] : s;
     }
 }
 

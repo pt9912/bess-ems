@@ -59,7 +59,7 @@ help:
 	@echo "  make test-integration        Modbus roundtrip vs Go-Simulator via docker compose"
 	@echo "  make test-hil-modbus         Optional: HIL roundtrip vs bess-hil-simulator:local (RM-M2-HIL-08)"
 	@echo "  make test-hil-opcua          5 pinned OPC-UA-Roundtrips vs embedded TestServer (RM-M4-04 Sub-Slice D)"
-	@echo "  make test-hil-optimization-core   9 pins (5 roundtrip + 4 negative) vs In-Process gRPC-Sidecar (RM-M5-01-B)"
+	@echo "  make test-hil-optimization-core   25 pins (5 roundtrip + 4 negative + 4 mixed-version + 4 security + 3 idempotency + 5 fallback) vs In-Process gRPC-Sidecar (RM-M5-01)"
 	@echo "  make test-hil-closed-loop    Optional: Closed-loop optimize→dispatch→HIL smoke (Carve-out Demo-01)"
 	@echo ""
 	@echo "Welle M3 (active):"

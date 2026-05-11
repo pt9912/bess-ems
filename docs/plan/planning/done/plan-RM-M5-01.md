@@ -461,10 +461,16 @@ dokumentiert.
   `Grpc.Tools`-Codegen integriert.
 - **`OptimizationCoreScheduleOptimizer`** implementiert
   `IScheduleOptimizer` und ist composition-root-mäßig austauschbar.
-- **`OptimizationCoreOptions.EnsureValid`** wirft drei neue Reasons
-  (`optimization-core-not-hardened-in-production`, `optimization-
-  core-uds-permissions-not-locked`, `optimization-core-contract-
-  incompatible`).
+- **Adapter wirft drei neue Reasons** über die jeweils passende
+  Validierungs-Schicht:
+  `optimization-core-not-hardened-in-production` (EnsureValid, D-02)
+  und `optimization-core-contract-incompatible` (EnsureValid bei
+  nicht-semver-parsbarem `ExpectedContractVersion`; Runtime-Variante
+  derselbe Reason in `EnsureContractCompatibleAsync` wenn der Sidecar
+  einen inkompatiblen Range reportet) sowie
+  `optimization-core-uds-permissions-not-locked` (Runtime-Check in
+  `OptimizationCoreClient.ConnectAsync`, weil Filesystem-Mode-Bits
+  zur Options-Konstruktions-Zeit noch nicht verfügbar sind).
 - **Persistenter Idempotency-Store** mit Unique-Constraint auf
   `request_id`; atomare CAS-Operation; Restart-Replay-Pin grün.
 - **Sidecar-Status-Taxonomie-Mapping** als versioniertes Doku-
@@ -472,8 +478,14 @@ dokumentiert.
 - **Fallback-Matrix-Implementierung** für alle Fehlerklassen aus
   plan-RM-M5 §Fallback-Matrix; Plan-Gültigkeits-Check für alle
   Invalidations-Reasons.
-- **17 pinned Tests** im
-  `BatteryEms.OptimizationCore.IntegrationTests`-Projekt.
+- **25 pinned Tests** im
+  `BatteryEms.OptimizationCore.IntegrationTests`-Projekt (5 happy +
+  4 negativ + 4 mixed-version + 4 security + 3 adapter-side
+  idempotency + 5 local-fallback) plus 13 Persistence-Pins in
+  `BatteryEms.Persistence.IntegrationTests`. Die 5 local-fallback-
+  Pins + 3 adapter-side-idempotency-Pins kommen aus dem Sub-Slice-C-
+  Korrektur-Pass (§5.1); das vorab-gepinnte D-05-Pin-Tally (17)
+  bleibt im Slice-Plan als historischer Replacement-Text erhalten.
 - **`make test-hil-optimization-core` grün** in `make gates` und
   `make ci`.
 - **Quality-Doku** (`docs/user/quality.md` §2.6) listet die neuen

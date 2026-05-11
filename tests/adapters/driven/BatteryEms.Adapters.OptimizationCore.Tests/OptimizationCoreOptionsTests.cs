@@ -145,7 +145,7 @@ public sealed class OptimizationCoreOptionsTests
     }
 
     [Fact]
-    public void Empty_expected_contract_version_throws()
+    public void Empty_expected_contract_version_throws_with_contract_incompatible_reason()
     {
         var options = new OptimizationCoreOptions
         {
@@ -154,7 +154,58 @@ public sealed class OptimizationCoreOptionsTests
             ExpectedContractVersion = "",
         };
 
-        Assert.Throws<InvalidOperationException>(() => options.EnsureValid(Logger));
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => options.EnsureValid(Logger));
+        Assert.Contains(
+            "optimization-core-contract-incompatible",
+            ex.Message,
+            StringComparison.Ordinal);
+    }
+
+    // Plan-RM-M5-01 §6 Akzeptanzkriterium: EnsureValid wirft den
+    // `optimization-core-contract-incompatible`-Reason auch wenn der
+    // Operator einen nicht-parsbaren Versions-String setzt (z. B.
+    // Tippfehler `"v1"` statt `"1.0.0"`).
+    [Theory]
+    [InlineData("abc")]
+    [InlineData("1")]
+    [InlineData("v1.0.0")]
+    [InlineData("1.0.0.0.0")]
+    public void Non_semver_expected_contract_version_throws_with_contract_incompatible_reason(
+        string version)
+    {
+        var options = new OptimizationCoreOptions
+        {
+            SidecarEndpoint = new Uri("http://localhost:5001"),
+            RuntimeProfile = OptimizationCoreRuntimeProfile.HilSimulator,
+            ExpectedContractVersion = version,
+        };
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => options.EnsureValid(Logger));
+        Assert.Contains(
+            "optimization-core-contract-incompatible",
+            ex.Message,
+            StringComparison.Ordinal);
+    }
+
+    // SemVer-Pre-Release-Suffixe sind erlaubt (analog zur Wire-Side-
+    // Versions-Range-Check-Logik im OptimizationCoreScheduleOptimizer).
+    [Theory]
+    [InlineData("1.0.0-rc.1")]
+    [InlineData("1.2.3-alpha")]
+    [InlineData("2.0.0-beta.5")]
+    public void Semver_prerelease_expected_contract_version_passes(string version)
+    {
+        var options = new OptimizationCoreOptions
+        {
+            SidecarEndpoint = new Uri("http://localhost:5001"),
+            RuntimeProfile = OptimizationCoreRuntimeProfile.HilSimulator,
+            ExpectedContractVersion = version,
+        };
+
+        var validated = options.EnsureValid(Logger);
+        Assert.Equal(version, validated.ExpectedContractVersion);
     }
 
     [Fact]
