@@ -333,12 +333,13 @@ fährt im selben Test-Prozess als `Grpc.AspNetCore`-Application gegen
 einen Per-Test-UDS in `Path.GetTempPath()/BatteryEms/OptimizationCore/`;
 kein externes Asset und kein Container.
 
-**Pin-Inventory** (20 Pins gesamt — 5 happy-path + 4 negativ + 4
-mixed-version + 4 security + 3 adapter-side idempotency; die 4
-mixed-version- und 4 security-Pins decken die plan-RM-M5-01 §6
-Akzeptanzkriterien, die 3 adapter-side idempotency-Pins sind eine
-Sub-Slice-C-step-1-Erweiterung, die das Wire-Verhalten gegen den
-`IOptimizationIdempotencyStore`-Driven-Port pinned):
+**Pin-Inventory** (25 Pins gesamt — 5 happy-path + 4 negativ + 4
+mixed-version + 4 security + 3 adapter-side idempotency + 5
+local-fallback; die 4 mixed-version- und 4 security-Pins decken die
+plan-RM-M5-01 §6 Akzeptanzkriterien, die 3 adapter-side
+idempotency-Pins + 5 local-fallback-Pins kommen aus dem
+Sub-Slice-C-Korrektur-Pass (plan §5.1) als Wire-Verhalten gegen
+`IOptimizationIdempotencyStore` + Fallback-Matrix-Integration):
 
 | Datei | Pin | Quelle |
 | ----- | --- | ------ |
@@ -362,6 +363,11 @@ Sub-Slice-C-step-1-Erweiterung, die das Wire-Verhalten gegen den
 | `OptimizationCoreIdempotencyTests.cs` | First_optimize_creates_pending_then_finalizes_as_sidecar_committed | RM-M5-01-C |
 | `OptimizationCoreIdempotencyTests.cs` | Duplicate_optimize_with_same_inputs_skips_sidecar_call | RM-M5-01-C |
 | `OptimizationCoreIdempotencyTests.cs` | Different_request_inputs_get_different_request_id | RM-M5-01-C |
+| `OptimizationCoreFallbackTests.cs` | Transport_failure_with_fallback_returns_fallback_committed_schedule | RM-M5-01-C-fixup |
+| `OptimizationCoreFallbackTests.cs` | Transport_failure_without_fallback_returns_failed_no_activation | RM-M5-01-C-fixup |
+| `OptimizationCoreFallbackTests.cs` | Transport_failure_with_fallback_that_throws_falls_through_to_failed | RM-M5-01-C-fixup |
+| `OptimizationCoreFallbackTests.cs` | Sidecar_success_does_not_invoke_fallback | RM-M5-01-C-fixup |
+| `OptimizationCoreFallbackTests.cs` | Fallback_with_context_mismatch_is_rejected_by_validator | RM-M5-01-C-fixup |
 
 Plus 13 Persistence-Pins in `BatteryEms.Persistence.IntegrationTests`
 (`OptimizationIdempotencyStoreIntegrationTests.cs`) für den

@@ -185,6 +185,61 @@ Schwester-Repo-Init.
 
 ---
 
+## Item F-M5-05: „Letzter-bekannter-Plan"-Fallback aus IScheduleRepository
+
+**Quelle:** plan-RM-M5-01 §5.1 Korrektur-Pass-Scope-Cut. Heute (Post-
+Korrektur): wenn der Sidecar fehlschlägt UND der lokale OR-Tools-
+Fallback nicht konfiguriert ist ODER auch er fehlschlägt, geht der
+Adapter direkt auf `no_valid_plan` + Safe-Stop. Plan-RM-M5
+§Fallback-Matrix erwähnt aber zusätzlich:
+> Der Regelkreis nutzt nur einen frischen, kontextkompatiblen
+> Fahrplan; fehlt dieser, erzeugt der Control-Pfad Safe-Stop
+
+Das deutet auf einen sekundären Fallback-Pfad „letzter bekannter
+Plan aus der Persistenz", den der Plan-Validator dann gegen die
+4-Achsen-Regeln prüfen würde. Im Korrektur-Pass bewusst ausgeklammert,
+weil ein direkter `IScheduleRepository`-Zugriff vom Adapter aus
+Hexagonal-Verletzung wäre (Adapter zieht Domain-Repo statt Application-
+Use-Case zu konsultieren) und die Use-Case-Schicht heute keinen
+„Plan-from-Repo"-Lookup als Driven-Port exposed.
+
+**Trigger** (eines reicht):
+
+- Erste Operator-Anforderung nach Plan-Persistenz als Backup-Quelle,
+  wenn weder Sidecar noch lokaler Fallback verfügbar sind (z. B.
+  unkonfigurierter OR-Tools-Slot in einer minimalen Topologie).
+- RM-M5-02 (MPC-Kernel) braucht den Pfad als Default-Recovery-
+  Strategie wenn der State-Space-Solver-Lauf scheitert.
+- Telemetrie zeigt eine operativ relevante Rate von
+  no-valid-plan-Safe-Stops, die durch einen letzten gültigen Plan
+  vermeidbar wären.
+
+**Scope-Skizze** (wenn der Trigger zündet):
+
+- (a) Neuer Application-Driven-Port `ILastKnownScheduleProvider`
+  mit `Task<FallbackPlanCandidate?> GetLatestAsync(string assetId,
+  ScheduleType type, CancellationToken ct)` — kapselt den
+  `IScheduleRepository.GetByAssetAsync`-Aufruf plus
+  `IOptimizationRunRepository.GetLatestByScheduleAsync` für die
+  CreatedAt-Stamp-Auflösung.
+- (b) `OptimizationCoreScheduleOptimizer` bekommt einen weiteren
+  optionalen Slot; Pfad in `TryRunFallbackAsync` erweitert: wenn
+  primary-Fallback (OR-Tools) fehlt/scheitert, versuche
+  ILastKnownScheduleProvider → Plan-Validator-Check → bei pass
+  `FallbackCommitted` mit `local_plan_replayed`-source, bei fail
+  no-valid-plan.
+- (c) 3-4 zusätzliche Pins (last-known-plan-pass, last-known-plan-
+  rejected-by-validator, last-known-plan-not-found,
+  last-known-plan-priority-over-or-tools-or-vice-versa).
+
+**Aufwandsschätzung:** ~3-5 Tage inkl. Tests + Application-Schicht-
+Erweiterung.
+
+**Aktivierungs-Pfad:** eigener `plan-RM-M5-01-FUP-last-known-plan-
+fallback.md` Slice-Plan.
+
+---
+
 ## Item F-M5-04: Schedule-Stempel-Erweiterung für Plan-Gültigkeits-Check
 
 **Quelle:** plan-RM-M5-01 §7 Risiko-Punkt + §9. Heute (Post-M5-01):
