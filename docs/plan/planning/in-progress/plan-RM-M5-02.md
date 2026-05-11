@@ -276,7 +276,7 @@ einzelne ist im §9 Folgearbeiten-Block dokumentiert.
 | ⬜ | RM-M5-02-A | State-Space-Modell + Application-Schicht-Ports + Constraint-Property-Pins — **~700-1000 LOC** | Neuer `BatteryEms.Application.Mpc`-Namespace mit `MpcModel`, `MpcState`, `MpcTrajectory`, `MpcOptions`-Records. `IMpcDispatchOptimizer`-Driving-Port + `IMpcStateEstimator`-Driven-Port + `IMpcModelSolver`-Driven-Port. `DefaultMpcDispatchOrchestrator` als wireing-Klasse, die `IMpcStateEstimator.PredictUpdateAsync` + `IMpcModelSolver.SolveAsync` orchestriert. **In diesem Sub-Slice kein konkreter Solver-Adapter** — `IMpcModelSolver` wird als `NotImplementedException`-Stub registriert; das hält die Schicht-Wartbarkeit beim Cut sauber. Constraint-Property-Pins (5+): SOC-in-Bounds, Power-in-Bounds, Ramp-in-Bounds, Constraint-Violation-Reason-Pinning, Empty-Trajectory-Reject. State-Estimator-Stub `IdentityStateEstimator` (`State_new = State_old`, kein Filtering) für die Property-Pins. Tests in `BatteryEms.Application.Tests/Mpc/`. |
 | ⬜ | RM-M5-02-B | QP-Solver-Backend + erster Roundtrip-Pin — **~800-1200 LOC** | Konkreter `IMpcModelSolver`-Adapter gemäß D-02-Entscheidung. Bei Local-First (a): neuer `BatteryEms.Adapters.Optimization.Mpc.OrToolsMpcSolver` oder ein dedizierter `OsqpMpcSolver` (Solver-Wahl steckt in der ADR-Entscheidung). Bei Sidecar-First (b): `OptimizeMpc`-RPC im optimization-core-Adapter wird mit Body gefüllt; `OptimizationCoreMpcOptimizer` lebt **neben** dem bestehenden `OptimizationCoreScheduleOptimizer` und teilt sich Channel + Idempotency-Store. TestSidecar-Erweiterung mit `OptimalMpcStub` (Echo: liefert konstante SOC-Trajektorie) + `ScriptableMpcOutcomeStub` (Per-Test-Outcome-Queue, deckt Solver-Time-Limit/Infeasible/Stream-Crash). 8+ Roundtrip-Pins in neuer `OptimizationCoreMpcRoundtripTests` + `OptimizationCoreMpcNegativeTests`. Constraint-Property-Pins aus A werden gegen den echten Solver erneut gefahren — die Property-Tests laufen jetzt nicht nur gegen den Stub sondern auch gegen die Production-Linie. |
 | ⬜ | RM-M5-02-C | Kalman-Filter + Robustheits-Pfade + Fallback-Erweiterung + Monotonic-Clock — **~900-1100 LOC** | `DefaultLinearKalmanFilter`-Implementierung in `BatteryEms.Application.Mpc.Estimators`: Predict-Step (`x_pred = A * x_old + B * u`, `P_pred = A * P_old * A^T + Q`), Update-Step (`K = P_pred * C^T * (C * P_pred * C^T + R)^{-1}`, `x_new = x_pred + K * (y - C * x_pred)`, `P_new = (I - K * C) * P_pred`). Robustheits-Pfade: Missing-Measurement-Skip (counter persistent, nach `MaxConsecutiveMissingMeasurements` → `mpc-state-stale-too-long`), Unplausible-Werte-Validator (SOC im physischen Bereich, Temperatur in Asset-Bounds; sonst `mpc-state-non-physical`), Covariance-Divergence-Check (Determinant > threshold → `mpc-covariance-diverged`). Fallback-Erweiterung: `OptimizationCoreMpcOptimizer` erbt die `TryRunFallbackAsync`-Linie aus M5-01-Korrektur-Pass für den Sidecar-Failure-Pfad; lokaler Fallback bei MPC ist ein `IFallbackMpcOptimizer`-Driven-Port (neuer Marker, analog zu `IFallbackScheduleOptimizer`). **MonotonicAnchoredClock-Adapter** (D-09 Production-Pflicht): `BatteryEms.Adapters.Time.MonotonicAnchoredClock` mit Wall-Clock-Anchor + Stopwatch-Offset; periodischer Resync mit Toleranz-Check; DI-Registrierung als opt-in `IClock`-Override (Composition-Root entscheidet pre-Boot). 12+ Pins (Kalman-Convergence, Missing-Measurement-Recovery, Unplausible-State-Reject, Covariance-Divergence-Reject, Fallback-Wire-Integration, MonotonicClock-Backsprung-Resilience, MonotonicClock-Resync-Reject-Bei-Drift). |
-| ⬜ | RM-M5-02-D | Reproduzierbarkeitsvertrag + Replay-Hooks + Worker-Wiring + Retention + Production-Boot-Gates + Quality-Doku + Master-Plan-Closure — **~900-1100 LOC** | `MpcRun`-Domain-Typ + Migration `0004_mpc_runs.sql` mit D-09-Schema (acht Identity-Felder als reguläre Spalten + `mpc_request_id` PK + `numerik_stamp_json` + `p0_frobenius_display` + `deterministic_mode` + Terminal-/Trajektor-Felder + 3-Index-Set). Dapper-Repository `DapperMpcRunRepository` mit Restart-Replay-Pin + Retention-Compaction-Pin (D-09: Top-N + MaxAge). `MpcDispatchResult` exposed `IReadOnlyDictionary<string, string>`-Stempel für RM-M5-04-Replay. `FallbackPlanValidator` erweitert um MPC-Stempel-Achse (State-Estimator-Variante + `estimator_config_hash` vs. Kontext; Frobenius-Norm bleibt operator-sichtbar aber nicht identitätsbildend). **Cross-Run-Determinism-Pin** (D-04 Pflicht): zweimal selber MPC-Step → byte-für-byte identische Stempel-Hashes + Schedule-Points innerhalb der DeterministicMode-Toleranz. **Worker-Control-Cycle-Wiring-Pin** in `BatteryEms.Worker.Tests`: zählender Stub-`IMpcDispatchOptimizer` registriert, `ControlCycleHostedService` läuft ≥3 Ticks, Stub-CallCount ≥3 (D-01-Wiring-Beweis). **Identity-Tuple-Vollständigkeits-Pin-Serie** (D-09 Pflicht): 8 Pins, jeder ändert genau eine Verhaltens-Achse (asset_id / tick / sample_time / model_version / estimator_variant / solver_config / estimator_config / random_seed) und beweist dass eine neue `mpc_request_id` resultiert; plus 1 Negativ-Pin (identische Inputs → identischer Hash); plus 1 Default-Seed-Determinism-Pin (Default-`random_seed` aus den anderen sieben Feldern abgeleitet ⇒ Tuple-Hash unverändert) und 1 Operator-Seed-Override-Pin (expliziter Seed-Override ⇒ neue `mpc_request_id`). **Production-Fallback-Active-Pin** (D-07 Pflicht): Boot mit `MpcBackend=optimization_core` + ohne registrierten Fallback-Pfad + `RuntimeProfile=Production` ⇒ Startup-Fehler `mpc-production-without-fallback-pathway`. **Production-Monotonic-Clock-Pin** (D-09 Pflicht): Boot mit `MpcBackend=optimization_core` + `RuntimeProfile=Production` ohne `MonotonicAnchoredClock` ⇒ Startup-Fehler `mpc-production-without-monotonic-clock`. 12+ Persistence-Pins (Run-Roundtrip aller acht Identity-Spalten + Stempel-Achsen, Restart-Replay, CAS-Race, Late-Response-Ignored, Retention-Compaction-100k, forensische Per-SampleTime-Query). Quality-Doku §2.2.3-Erweiterung + neue §2.5 (`make test-mpc-property` Property-Gate). F-Folgearbeiten (§9) in `note-RM-M5-followups.md` ergänzen. Master-Plan-Zeile RM-M5-02 flippt auf ✅ mit D-05-Replacement-Text. Slice-Plan wird nach `done/plan-RM-M5-02.md` verschoben. |
+| ⬜ | RM-M5-02-D | Reproduzierbarkeitsvertrag + Replay-Hooks + Worker-Wiring + Retention + Production-Boot-Gates + Quality-Doku + Master-Plan-Closure — **~900-1100 LOC** | `MpcRun`-Domain-Typ + Migration `0004_mpc_runs.sql` mit D-09-Schema (acht Identity-Felder als reguläre Spalten + `mpc_request_id` PK + `numerik_stamp_json` + `p0_frobenius_display` + `deterministic_mode` + Terminal-/Trajektor-Felder + 3-Index-Set). Dapper-Repository `DapperMpcRunRepository` mit Restart-Replay-Pin + Retention-Compaction-Pin (D-09: Top-N + MaxAge). `MpcDispatchResult` exposed `IReadOnlyDictionary<string, string>`-Stempel für RM-M5-04-Replay. `FallbackPlanValidator` erweitert um MPC-Stempel-Achse (State-Estimator-Variante + `estimator_config_hash` vs. Kontext; Frobenius-Norm bleibt operator-sichtbar aber nicht identitätsbildend). **Cross-Run-Determinism-Pin** (D-04 Pflicht): zweimal selber MPC-Step → byte-für-byte identische Stempel-Hashes + Schedule-Points innerhalb der DeterministicMode-Toleranz. **Worker-Control-Cycle-Wiring-Pin** in `BatteryEms.Worker.Tests`: zählender Stub-`IMpcDispatchOptimizer` registriert, `ControlCycleHostedService` läuft ≥3 Ticks, Stub-CallCount ≥3 (D-01-Wiring-Beweis). **Identity-Tuple-Vollständigkeits-Pin-Serie** (D-09 Pflicht): 8 Pins, jeder ändert genau eine Verhaltens-Achse (asset_id / tick / sample_time / model_version / estimator_variant / solver_config / estimator_config / random_seed) und beweist dass eine neue `mpc_request_id` resultiert; plus 1 Negativ-Pin (identische Inputs → identischer Hash); plus 1 Default-Seed-Determinism-Pin (Default-`random_seed` aus den anderen sieben Feldern abgeleitet ⇒ Tuple-Hash unverändert) und 1 Operator-Seed-Override-Pin (expliziter Seed-Override ⇒ neue `mpc_request_id`). **Production-Fallback-Active-Pin** (D-07 Pflicht): Boot mit `MpcBackend != null` + ohne registrierten `IFallbackMpcOptimizer` + `RuntimeProfile=Production` ⇒ Startup-Fehler `mpc-production-without-fallback-pathway`. **Production-Monotonic-Clock-Pin** (D-09 Pflicht): Boot mit `MpcBackend != null` + `RuntimeProfile=Production` ohne `MonotonicAnchoredClock` ⇒ Startup-Fehler `mpc-production-without-monotonic-clock`. **MPC-Aktivierungs-Default-Pin** (D-02 Pflicht): Default-Bootstrap ohne `MpcBackend`-Wert ⇒ kein `IMpcDispatchOptimizer` im DI-Container; `ControlCycleHostedService` führt keinen MPC-Step aus. 12+ Persistence-Pins (Run-Roundtrip aller acht Identity-Spalten + Stempel-Achsen, Restart-Replay, CAS-Race, Late-Response-Ignored, Retention-Compaction-100k, forensische Per-SampleTime-Query). Quality-Doku §2.2.3-Erweiterung + neue §2.5 (`make test-mpc-property` Property-Gate). F-Folgearbeiten (§9) in `note-RM-M5-followups.md` ergänzen. Master-Plan-Zeile RM-M5-02 flippt auf ✅ mit D-05-Replacement-Text. Slice-Plan wird nach `done/plan-RM-M5-02.md` verschoben. |
 
 ---
 
@@ -296,25 +296,50 @@ Sub-Modus von `IScheduleOptimizer`": die Schnittstellen-Verbreiterung
 zwingt LP-Callers, MPC-spezifische State-/Estimator-Felder zu
 ignorieren — bricht das M2-Optimization-Modell.
 
-**D-02 Solver-Backend-Wahl (offen, ADR-Trigger).**
-Drei Varianten — Reviewer + ggf. ADR 0006 entscheiden vor RM-M5-02-B:
+**D-02 Solver-Backend-Wahl + Aktivierungs-Disziplin (offen,
+ADR-Trigger).**
 
-- **(a) Local-First**: QP-Solver lebt in-process (OR-Tools-QP /
-  OSQP / HiGHS). Sidecar opt-in. Spiegelt M5-01-Linie und hält
-  die Default-Topologie ohne externe Abhängigkeit.
-- **(b) Sidecar-First**: `OptimizeMpc`-RPC ist Default. Cross-
-  Language-Optimierungs-Backend (Python/Rust/C++) wird damit der
-  Default-Pfad; In-Process-Fallback nur bei `optimization_core`-
-  Backend nicht konfiguriert. Konsistenter mit ADR 0005 Vision.
-- **(c) Bi-Modal**: beide Backends gleichberechtigt; Operator
-  wählt per `BessHostOptions.MpcBackend`-Slot. Maximale Flexibilität,
-  höchster Test-/Doku-Aufwand.
+**MPC ist opt-in** — analog zur M5-01-Linie wo
+`ScheduleSolver.Backend = "optimization_core"` den Sidecar-Slot
+aktiviert: `BessHostOptions.MpcBackend` ist der **alleinige
+Aktivierungs-Slot**.
+
+- `MpcBackend == null` (Default) ⇒ kein MPC; `IMpcDispatchOptimizer`
+  wird nicht registriert; `ControlCycleHostedService` macht keinen
+  MPC-Step. Pre-RM-M5-02-Verhalten unverändert für Hosts ohne
+  MPC-Aktivierung.
+- `MpcBackend != null` ⇒ MPC aktiv. Die Produktions-Boot-Gates
+  (Fallback-Pflicht aus D-07, Monotonic-Clock aus D-09)
+  ankern auf diesen Aktivierungs-Slot, **nicht** auf ein
+  ungesetztes Feature-Flag-Default. Im Plan und in der Doku heißt
+  „MPC aktiviert" ausschließlich „`MpcBackend` ist auf einen
+  konkreten Wert gesetzt".
+
+Drei Backend-Werte — Reviewer + ggf. ADR 0006 entscheiden vor
+RM-M5-02-B:
+
+- **(a) Local-First** (`MpcBackend = "or_tools"`): QP-Solver
+  lebt in-process (OR-Tools-QP / OSQP / HiGHS — Solver-Auswahl
+  ist eigene D-02-Sub-Achse). Sidecar opt-in via eigenem Slot,
+  z. B. zusätzliches `MpcSidecarOptIn`-Flag bei Bi-Modal.
+- **(b) Sidecar-First** (`MpcBackend = "optimization_core"`):
+  `OptimizeMpc`-RPC ist primary; lokaler Fallback aus M5-01-
+  `IFallbackMpcOptimizer`-Linie.
+- **(c) Bi-Modal** (`MpcBackend = "bi_modal"`): beide Backends
+  gleichberechtigt; primary/fallback-Reihenfolge per
+  `MpcOptions.PreferredBackend`-Sub-Slot.
 
 Default-Vorschlag wenn kein ADR 0006: **(c) Bi-Modal mit
-Local-First-Default**. Begründung: ADR 0005 §7 Phase-4-Pivot-Linie
-deutet auf einen In-Process-Pivot bei harten Latenz-Bounds — eine
-Bi-Modal-Struktur macht den späteren Pivot reibungslos. Sub-Slice-B
-implementiert Local-First konkret; Sidecar-Pfad erbt sich von M5-01.
+Local-First-Default** für die Backend-Architektur, aber
+`MpcBackend = null` bleibt Default-Aktivierungs-Stand. Hosts die
+MPC nicht brauchen müssen den Slot explizit auf einen Wert setzen
+um MPC einzuschalten — Production-Hosts ohne den expliziten
+Aktivierungs-Slot laufen weiterhin M5-01-LP-only.
+
+Pin-Erwartung: Sub-Slice-D-DoD pin't den Default-Aktivierungs-
+Stand (`MpcBackend == null` ⇒ `IMpcDispatchOptimizer` ist nicht im
+DI-Container) damit die Aktivierungs-Disziplin nicht stillschweigend
+driftet.
 
 **D-03 Kalman-Variante: Linear-KF als Default.**
 LTI-Modell-Hülle aus Sub-Slice A passt zu einem Standard-Linear-KF.
@@ -336,18 +361,43 @@ Kombinationen, sondern unter einem expliziten Solver-/Threading-
 Disziplin-Vertrag:
 
 - **`Strict`-Modus** (Default): Solver-Adapter setzt Single-Thread
-  (`solver.SetNumThreads(1)` oder Solver-spezifisches Äquivalent —
-  OR-Tools-QP `SolverOptions.SetSolverSpecificParametersAsString`,
-  OSQP `solver.warm_start=false` + `solver.scaling=0`), aktiviert
-  Solver-Determinism-Flags wo verfügbar, persistiert den verwendeten
-  Random-Seed (Solver-eigener Seed plus optionaler MPC-Seed für
-  Tie-Breaking). Toleranz: **byte-für-byte identisch** für alle
-  int-/string-Stempel-Felder und ihre abgeleiteten SHA-256-Hashes
-  (Typ-Klasse (a) aus §3); **±1e-9 relativ** pro Float-Schedule-
-  Point (Typ-Klasse (b); akkomodiert die unvermeidliche FP-
-  Reihenfolge-Drift zwischen BLAS-Backends; ist empirisch im
-  Plan-Review-Pass zu kalibrieren — Reviewer wählt zwischen 1e-9
-  und 1e-12 nach Solver-Wahl).
+  und aktiviert Solver-Determinism-Flags pro Backend. Jede
+  konkrete Solver-Wahl aus D-02 materialisiert ihre Strict-
+  Disziplin im Sub-Slice-B-Adapter:
+  - **OR-Tools-QP**:
+    `SolverOptions.SetSolverSpecificParametersAsString("num_threads:1")`
+    plus deterministischer Random-Seed aus
+    `MpcOptions.RandomSeed`.
+  - **OSQP**: `solver.warm_start = false` + `solver.scaling = 0`;
+    OSQP ist im single-thread-Default deterministisch sobald
+    Scaling deaktiviert ist.
+  - **HiGHS**:
+    `Highs.SetOptionValue("parallel", "off")` +
+    `Highs.SetOptionValue("random_seed", MpcOptions.RandomSeed)`
+    + `Highs.SetOptionValue("presolve", "off")` (Presolve-
+    Heuristics sind nicht-deterministisch zwischen HiGHS-
+    Patch-Versionen; off ist die einzige reproduzierbare Default).
+    Sub-Slice-B-Adapter pin't die Flag-Kombination als Default
+    und exposed Operator-Overrides nur über expliziten Slot.
+  - **Sidecar (Sidecar-First / Bi-Modal)**: der Sidecar selbst
+    garantiert die Strict-Disziplin; der Worker übergibt
+    `MpcOptions.RandomSeed` und die DeterministicMode-Flag im
+    `OptimizeMpcRequest`-Proto und prüft im Sub-Slice-D Cross-
+    Run-Determinism-Pin dass derselbe Sidecar denselben Output
+    liefert.
+
+  Alle Strict-Adapter persistieren den verwendeten Random-Seed
+  als Identitäts-Feld im `MpcRun` (D-09).
+  Toleranz: **byte-für-byte identisch** für alle int-/string-
+  Stempel-Felder und ihre abgeleiteten SHA-256-Hashes (Typ-
+  Klasse (a) aus §3); **≤1e-9 relativ** pro Float-Schedule-Point
+  als **DoD-Maximum** (Typ-Klasse (b)). Sub-Slice-B-Pin
+  kalibriert die real-erreichte Toleranz im Bereich
+  [1e-12, 1e-9] empirisch pro Solver; der real-getestete Wert
+  wird im Sub-Slice-D Closure-Commit unter
+  `MpcStrictMode.RealToleranceLogged` dokumentiert. §6 schreibt
+  ≤1e-9 als verbindlichen Upper-Bound für die Closure; das Pin
+  darf strenger sein, nicht lockerer.
 - **`BestEffort`-Modus**: Solver fährt mit Multi-Thread-Default;
   Toleranz: 1e-6 relativ pro Float-Schedule-Point. Geeignet für
   Production-Topologien wo Latenz wichtiger als Replay-Determinism
@@ -477,12 +527,14 @@ LP-Linie). Für die MPC-Linie braucht es das Äquivalent:
   eingeführt (Marker analog zu `IFallbackScheduleOptimizer`).
   Konkrete Adapter (z. B. heuristischer last-known-trajectory-
   oder safe-stop-Trajektor) leben außerhalb des MPC-Kerns.
-- **Production-Boot-Gate**: wenn `BessHostOptions.MpcBackend`
-  gesetzt ist (also MPC aktiviert) UND `RuntimeProfile=Production`
-  UND kein `IFallbackMpcOptimizer` registriert ist, wirft der
-  Composition-Root einen `mpc-production-without-fallback-pathway`-
-  Startup-Fehler. HilSimulator/Development bleibt tolerant (lokale
-  Test-Topologien dürfen ohne Fallback laufen).
+- **Production-Boot-Gate**: wenn `BessHostOptions.MpcBackend !=
+  null` (MPC-Aktivierungs-Slot aus D-02) UND
+  `RuntimeProfile=Production` UND kein `IFallbackMpcOptimizer`
+  registriert ist, wirft der Composition-Root einen
+  `mpc-production-without-fallback-pathway`-Startup-Fehler.
+  HilSimulator/Development bleibt tolerant; `MpcBackend == null`
+  (MPC deaktiviert) umgeht das Gate vollständig — kein Fallback-
+  Slot wenn kein MPC.
 - Acceptance-Criterium-Pin in §6 + Sub-Slice-D-DoD erzwingt den
   Boot-Gate-Pfad: Production+kein-Fallback → Startup-Throw mit dem
   oben genannten kebab-case-Reason.
@@ -638,13 +690,15 @@ deshalb **nicht** für MPC. Drei orthogonale Entscheidungen:
      (Default 50 ms); größere Diffs werden geloggt und der
      Anchor bleibt unangetastet.
 
-   **Production-Boot-Gate**: wenn `BessHostOptions.MpcBackend`
-   gesetzt ist UND `RuntimeProfile=Production` UND der registrierte
-   `IClock`-Adapter NICHT `MonotonicAnchoredClock` ist, wirft die
+   **Production-Boot-Gate**: wenn `BessHostOptions.MpcBackend !=
+   null` (MPC-Aktivierungs-Slot aus D-02) UND
+   `RuntimeProfile=Production` UND der registrierte `IClock`-
+   Adapter NICHT `MonotonicAnchoredClock` ist, wirft die
    Composition-Root `mpc-production-without-monotonic-clock`.
    HilSimulator/Development bleibt tolerant gegenüber dem
-   Default-`SystemClock`. Acceptance-Pin in Sub-Slice D durchsetzt
-   den Boot-Gate.
+   Default-`SystemClock`; `MpcBackend == null` umgeht das Gate
+   vollständig. Acceptance-Pin in Sub-Slice D durchsetzt den
+   Boot-Gate.
 
    F-M5-11 bleibt als Folgearbeit für **erweiterte** Resync-
    Strategien (z. B. PTP-Anchor statt Wall-Clock, Per-Asset-Clock-
@@ -689,8 +743,14 @@ ist die saubere Trennung.
   vor Sub-Slice-B-Start; das Acceptance-Criterium gilt unabhängig
   davon, weil alle drei Varianten die `IMpcDispatchOptimizer`-DI-
   Schicht erfüllen.
+- **MPC-Aktivierungs-Disziplin** (D-02): MPC ist opt-in via
+  `BessHostOptions.MpcBackend` — `null` (Default) bedeutet kein
+  MPC, `IMpcDispatchOptimizer` ist nicht registriert,
+  `ControlCycleHostedService` macht keinen MPC-Step. Pin in
+  Sub-Slice D: Default-Bootstrap ohne `MpcBackend`-Wert ⇒
+  `GetService<IMpcDispatchOptimizer>()` returnt `null`.
 - **Production-Fallback-Pflicht** (D-07): Boot mit
-  `BessHostOptions.MpcBackend` gesetzt + `RuntimeProfile=Production`
+  `BessHostOptions.MpcBackend != null` + `RuntimeProfile=Production`
   ohne registrierten `IFallbackMpcOptimizer` ⇒ Startup-Fehler
   `mpc-production-without-fallback-pathway`. Pin in Sub-Slice D
   + Doku-Hinweis in Quality-Doku §2.2.3.
@@ -716,11 +776,17 @@ ist die saubere Trennung.
   Werten + identischem Random-Seed + identischen Solver-Threading-
   Flags produzieren (a) **byte-für-byte identische** Stempel-
   Hashes und int-/string-Felder und (b) Float-Trajektorien
-  innerhalb der in D-04 dokumentierten Toleranz (±1e-9 relativ pro
-  Schedule-Point — Pin in Sub-Slice-D bei Plan-Review kalibriert,
-  abhängig von der Solver-Wahl). `DeterministicMode=BestEffort`
-  lockert (b) auf 1e-6 relativ, (a) bleibt unverändert. `None`
-  markiert den Run explizit als Replay-untauglich.
+  innerhalb **≤1e-9 relativ** pro Schedule-Point. Diese Schwelle
+  ist der **verbindliche DoD-Upper-Bound** für die Closure; das
+  Sub-Slice-B-Pin kalibriert die real-erreichte Toleranz pro
+  Solver im Bereich [1e-12, 1e-9] und der real-getestete Wert
+  wird im Sub-Slice-D-Closure-Commit unter
+  `MpcStrictMode.RealToleranceLogged` dokumentiert. Strenger
+  als 1e-9 ist erlaubt (z. B. 1e-12 wenn der Solver es schafft);
+  lockerer als 1e-9 ist Closure-Blocker.
+  `DeterministicMode=BestEffort` lockert (b) auf 1e-6 relativ,
+  (a) bleibt unverändert. `None` markiert den Run explizit als
+  Replay-untauglich.
 - **`mpc_runs`-Migration** mit allen D-04-/D-09-Spalten; Dapper-
   Repository inkl. Restart-Replay-Pin, Late-Response-Ignored-Pin
   (CAS-Race-Pattern aus M5-01), Retention-Compaction-100k-Pin
