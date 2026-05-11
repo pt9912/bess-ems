@@ -319,6 +319,76 @@ Release, der dynamisches PCS/PQ-Verhalten gegen ein realistischeres
 Modell sanity-prüfen soll. Der Go-Simulator deckt deterministische
 Fixtures, der HIL-Simulator deckt PCS-Antwort und PQ-Capability.
 
+#### 2.2.3 Optimization-Core-Sidecar-Pfad (Mandatory, RM-M5-01)
+
+```bash
+make test-hil-optimization-core   # in-process gRPC TestSidecar
+```
+
+Filter: `Category=Integration` im
+`BatteryEms.OptimizationCore.IntegrationTests`-Projekt. **Pflicht-Gate**
+— verdrahtet sowohl in `make gates` als auch in `make ci`, analog
+zu `test-hil-opcua`. Der Test-Sidecar (`EmbeddedOptimizationCoreSidecar`)
+fährt im selben Test-Prozess als `Grpc.AspNetCore`-Application gegen
+einen Per-Test-UDS in `Path.GetTempPath()/BatteryEms/OptimizationCore/`;
+kein externes Asset und kein Container.
+
+**Pin-Inventory** (20 Pins gesamt — 5 happy-path + 4 negativ + 4
+mixed-version + 4 security + 3 adapter-side idempotency; die 4
+mixed-version- und 4 security-Pins decken die plan-RM-M5-01 §6
+Akzeptanzkriterien, die 3 adapter-side idempotency-Pins sind eine
+Sub-Slice-C-step-1-Erweiterung, die das Wire-Verhalten gegen den
+`IOptimizationIdempotencyStore`-Driven-Port pinned):
+
+| Datei | Pin | Quelle |
+| ----- | --- | ------ |
+| `OptimizationCoreRoundtripTests.cs` | Health_probe_succeeds_against_test_sidecar | RM-M5-01-B |
+| `OptimizationCoreRoundtripTests.cs` | Version_probe_compatibility_check_passes | RM-M5-01-B |
+| `OptimizationCoreRoundtripTests.cs` | Optimize_success_produces_optimal_run_with_schedule | RM-M5-01-B |
+| `OptimizationCoreRoundtripTests.cs` | Optimize_streaming_progress_does_not_block_final_result | RM-M5-01-B |
+| `OptimizationCoreRoundtripTests.cs` | Optimize_cancellation_mid_stream_returns_failed_run | RM-M5-01-B |
+| `OptimizationCoreNegativeTests.cs` | Deadline_exceeded_returns_failed_run_with_time_limit_status | RM-M5-01-B |
+| `OptimizationCoreNegativeTests.cs` | Sidecar_unavailable_returns_failed_run_with_failed_status | RM-M5-01-B |
+| `OptimizationCoreNegativeTests.cs` | Infeasible_sidecar_result_produces_no_schedule | RM-M5-01-B |
+| `OptimizationCoreNegativeTests.cs` | Invalid_trajectory_output_is_rejected_as_failed_run | RM-M5-01-B |
+| `OptimizationCoreMixedVersionTests.cs` | Worker_1_0_against_sidecar_1_0_optimizes_successfully | RM-M5-01-D |
+| `OptimizationCoreMixedVersionTests.cs` | Worker_1_0_against_sidecar_0_5_returns_contract_incompatible | RM-M5-01-D |
+| `OptimizationCoreMixedVersionTests.cs` | Worker_1_0_against_sidecar_2_0_min_returns_contract_incompatible | RM-M5-01-D |
+| `OptimizationCoreMixedVersionTests.cs` | Worker_required_feature_missing_returns_contract_incompatible | RM-M5-01-D |
+| `OptimizationCoreSecurityTests.cs` | Production_profile_with_plaintext_http_endpoint_throws_at_construction | RM-M5-01-C |
+| `OptimizationCoreSecurityTests.cs` | Production_profile_with_world_readable_uds_throws_at_connect | RM-M5-01-C |
+| `OptimizationCoreSecurityTests.cs` | Production_profile_with_locked_uds_passes_uds_mode_check | RM-M5-01-C |
+| `OptimizationCoreSecurityTests.cs` | Hil_simulator_profile_with_world_readable_uds_passes | RM-M5-01-C |
+| `OptimizationCoreIdempotencyTests.cs` | First_optimize_creates_pending_then_finalizes_as_sidecar_committed | RM-M5-01-C |
+| `OptimizationCoreIdempotencyTests.cs` | Duplicate_optimize_with_same_inputs_skips_sidecar_call | RM-M5-01-C |
+| `OptimizationCoreIdempotencyTests.cs` | Different_request_inputs_get_different_request_id | RM-M5-01-C |
+
+Plus 13 Persistence-Pins in `BatteryEms.Persistence.IntegrationTests`
+(`OptimizationIdempotencyStoreIntegrationTests.cs`) für den
+Dapper-backed `optimization_idempotency`-Store: CAS-Race,
+Restart-Replay, sechs Terminalzustände, Migration-Idempotenz. Diese
+laufen unter `make test-integration` (Postgres-Compose-Stack), nicht
+unter `make test-hil-optimization-core`.
+
+**Security-Profile-Schwenk (RM-M5-01-C)**: pre-M5-01 kannte die
+Composition-Root nur den M2-OR-Tools-Pfad. Ab RM-M5-01 ist der
+Sidecar-Adapter ein wählbarer `IScheduleOptimizer`-Slot; der
+Production-Profile lehnt plaintext-HTTP-Endpoints (Schema-Fehler
+`optimization-core-not-hardened-in-production`) und world-readable
+UDS-Sockets (`optimization-core-uds-permissions-not-locked`,
+Mode≠0600/0660) hart ab. HilSimulator/Development bleibt für lokale
+Test-Topologien plaintext-tolerant (analog zur OPC-UA-Linie).
+
+**Konventions-Abgrenzung**:
+
+- `make test-integration` → Modbus + MQTT + Postgres-Roundtrips
+  (inkl. `optimization_idempotency`-Persistence-Pins).
+- `make test-hil-opcua` → mandatory, in-process OPC-UA-TestServer.
+- `make test-hil-optimization-core` → mandatory, in-process
+  gRPC-TestSidecar; das einzige optimization-core-spezifische
+  End-to-End-Gate. Container-/Cross-Host-Topologie ist Folgearbeit
+  (RM-M5-06 Container-Orchestrierungs-Gate).
+
 ### 2.3 Sicherheitsfall-Tests
 
 Pflicht ab M1 (LH-TEST-006). Filter: `Category=Safety`. Werden zusätzlich
@@ -413,6 +483,7 @@ Fall mit Native Core das erfolgreiche Laden der `.so`-Bibliothek
 | Integration          | `make test-integration`          | `Category=Integration`     |
 | HIL (optional)       | `make test-hil-modbus`           | `Category=HIL`             |
 | OPC-UA-Roundtrip     | `make test-hil-opcua`            | `Category=Integration` im OPC-UA-IntegrationTests-Projekt |
+| Optimization-Core    | `make test-hil-optimization-core` | `Category=Integration` im OptimizationCore-IntegrationTests-Projekt |
 | Native Interop       | `make test-native-interop`       | `Category!=Parity` im NativeInterop-IntegrationTests-Projekt |
 | Native Parity        | `make test-native-parity`        | `Category=Parity` im NativeInterop-IntegrationTests-Projekt |
 | Replay               | `make test-replay`               | `Category=Replay`          |
@@ -739,6 +810,7 @@ make native-coverage-exclusions
 make test-native-interop
 make test-native-parity
 make test-hil-opcua
+make test-hil-optimization-core
 make test-integration
 make test-container
 make build                # erzeugt Runtime-Image

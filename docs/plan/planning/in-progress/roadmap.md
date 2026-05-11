@@ -180,7 +180,8 @@ unter `in-progress/`.
 > TestSidecar als Mocking-Pattern, Mixed-Version-Compat-Tests als
 > RM-M5-01-Pflicht. Erstes Arbeitspaket ist RM-M5-01 (gRPC-Sidecar
 > `optimization-core`) mit eigenem Detail-Slice-Plan
-> [`plan-RM-M5-01.md`](plan-RM-M5-01.md). Phase-4-Pivot-Trigger (harter
+> [`done/plan-RM-M5-01.md`](../done/plan-RM-M5-01.md) (abgeschlossen am
+> 2026-05-11). Phase-4-Pivot-Trigger (harter
 > Realtime-Bound, Multi-Asset-per-Sidecar, Edge-Controller-Pfad)
 > bleiben in ADR 0005 §7 als Trigger-Watch.
 >
@@ -237,7 +238,7 @@ unter `in-progress/`.
 | ✅     | M2          | Marktausbau und Optimierung        | 1 → 2 | Abgeschlossen ([Optimization-Slice](../done/plan-RM-M2-optimization.md), RM-M2-01..10, [Migrations-Tooling](../done/plan-RM-M2-migration.md), [HIL](../done/HIL-simulator.md)) |
 | ✅     | M3          | Native Control Core (Library)      | 2     | [`../done/plan-RM-M3.md`](../done/plan-RM-M3.md) — alle RM-M3-01..13 ✅ inkl. C-Pivot, doctest, vier Native-Quality-Gates, replay-basierter Parity, Doku-Sync und PID-Slice mit ABI-Minor-Bump 0.1→0.2; M3-D2 produktive Routing-Aktivierung ✅ ([`../done/plan-RM-M3-D2.md`](../done/plan-RM-M3-D2.md)); offene Follow-up-Slices (acht Items in zwei Blöcken) in [`../open/note-RM-M3-followups.md`](../open/note-RM-M3-followups.md) — Block A M3-Closure-Out-of-Scope, Block B M2-Folgewellen mit M3-Trigger; alle trigger-getrieben, kein aktiver Trigger heute |
 | ✅     | M4          | Regelleistung und OPC-UA           | 2     | [`../done/plan-RM-M4.md`](../done/plan-RM-M4.md) — alle 8 Pflicht-Slices grün: RM-M4-01 ✅, RM-M4-02 ✅, RM-M4-03 ✅, RM-M4-04 ✅, RM-M4-05 ✅, RM-M4-06 ✅, RM-M4-07 ✅, RM-M4-08 ✅. Folgearbeiten F-01..F-19 in `../open/note-RM-M4-followups.md` (F-04 TLS/Auth ist Pflicht-Slice vor Production-MQTT; F-09 OPC-UA-Activation-Source-Adapter trägt die Failover-Replay-via-Reconnect-Obligation; F-12 Cross-Adapter-RuntimeProfile bleibt Aktivierungs-Use-Case-Pflicht-Trigger; F-17/18/19 von M4-05 angelegt — Allowlist-Erweiterung, Cert-Rotation, User-Identity) |
-| 🟡     | M5          | MPC, Solver-Sidecar, Replay        | 3     | [`plan-RM-M5.md`](plan-RM-M5.md) — aktiviert 2026-05-11 nach M4-Closure und [ADR 0005](../../adr/0005-optimization-core-sidecar-transport.md) (schließt `AR-OPEN-002`). Erstes Arbeitspaket RM-M5-01 hat Detail-Slice [`plan-RM-M5-01.md`](plan-RM-M5-01.md). |
+| 🟡     | M5          | MPC, Solver-Sidecar, Replay        | 3     | [`plan-RM-M5.md`](plan-RM-M5.md) — aktiviert 2026-05-11 nach M4-Closure und [ADR 0005](../../adr/0005-optimization-core-sidecar-transport.md) (schließt `AR-OPEN-002`). RM-M5-01 (gRPC-Sidecar Contract-Slice) ✅ am 2026-05-11 abgeschlossen — Detail-Slice [`../done/plan-RM-M5-01.md`](../done/plan-RM-M5-01.md); RM-M5-02..06 offen. Folgearbeiten F-M5-01..04 in [`../open/note-RM-M5-followups.md`](../open/note-RM-M5-followups.md). |
 | ⬜     | M6          | Skalierung, UI, Edge / Multi-Asset | 4     | folgt mit Aktivierung |
 
 Phase bezieht sich auf [`architecture.md`](../../../../spec/architecture.md)
@@ -435,7 +436,7 @@ Solver-nahe Optimierung; ausgebaute Replay- und Vergleichsplattform.
 
 | Status | ID         | Inhalt                                                              | LH-Bezug                |
 | ------ | ---------- | ------------------------------------------------------------------- | ----------------------- |
-| 🟡     | RM-M5-01   | gRPC-Sidecar `optimization-core` (LP/MILP/MPC) — Detail-Slice [`plan-RM-M5-01.md`](plan-RM-M5-01.md); gRPC-Transport per [ADR 0005](../../adr/0005-optimization-core-sidecar-transport.md), UDS-Default + mTLS-Cross-Host, In-Process TestSidecar via Grpc.AspNetCore. | LH-OPT-002/003/006      |
+| ✅     | RM-M5-01   | gRPC-Sidecar `optimization-core` (LP/MILP/MPC) — Detail-Slice [`../done/plan-RM-M5-01.md`](../done/plan-RM-M5-01.md) (abgeschlossen 2026-05-11); gRPC-Transport per [ADR 0005](../../adr/0005-optimization-core-sidecar-transport.md), UDS-Default + mTLS-Cross-Host, In-Process TestSidecar via Grpc.AspNetCore. | LH-OPT-002/003/006      |
 | ⬜     | RM-M5-02   | MPC-Kernel (State-Space, Kalman, Vorhersagehorizont)                | LH-CTRL-005/006         |
 | ⬜     | RM-M5-03   | Hochfrequente Telemetrie-Filterung im Native Core (optional)        | LH-NATIVE-001           |
 | ⬜     | RM-M5-04   | Replay-Plattform mit Datensatz-Verwaltung und Sollwertvergleich     | LH-TEST-004             |
