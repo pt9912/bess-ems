@@ -4,6 +4,7 @@ using BatteryEms.Adapters.NativeInterop;
 using BatteryEms.Adapters.OpcUa;
 using BatteryEms.Adapters.Optimization;
 using BatteryEms.Adapters.Optimization.OrTools;
+using BatteryEms.Adapters.OptimizationCore;
 using BatteryEms.Adapters.Persistence;
 using BatteryEms.Adapters.Telemetry.OpenTelemetry;
 using BatteryEms.Adapters.Telemetry.Prometheus;
@@ -89,7 +90,7 @@ public static class BessHostBuilder
 
         // Driven adapters: optimisation + telemetry are always wired.
         builder.Services.AddBessOptimization();
-        ConfigureScheduleSolver(builder.Services, hostOptions.ScheduleSolver);
+        ConfigureScheduleSolver(builder.Services, hostOptions);
         builder.Services.AddBessTelemetry();
         // RM-M2-06: OTel tracing for the three Application-grenze flows.
         // Exporter is opt-in via OTEL_EXPORTER_OTLP_ENDPOINT; without it
@@ -187,11 +188,12 @@ public static class BessHostBuilder
 
     private static void ConfigureScheduleSolver(
         IServiceCollection services,
-        BessScheduleSolverOptions options)
+        BessHostOptions hostOptions)
     {
         ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(hostOptions);
 
+        var options = hostOptions.ScheduleSolver;
         var backend = string.IsNullOrWhiteSpace(options.Backend)
             ? "noop"
             : options.Backend.Trim();
@@ -199,22 +201,81 @@ public static class BessHostBuilder
         {
             return;
         }
-        if (!string.Equals(backend, "or_tools", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(backend, "ortools", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(backend, "or_tools", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(backend, "ortools", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException(
-                $"Unsupported Bess:ScheduleSolver:Backend '{options.Backend}'. Supported values: noop, or_tools.");
+            services.AddBessScheduleSolver(solver =>
+            {
+                if (options.TimeLimitSeconds is { } seconds)
+                {
+                    solver.TimeLimit = TimeSpan.FromSeconds(seconds);
+                }
+                solver.GapTolerance = options.GapTolerance;
+                solver.InitialSocPercent = options.InitialSocPercent;
+            });
+            return;
+        }
+        if (string.Equals(backend, "optimization_core", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(backend, "optimizationcore", StringComparison.OrdinalIgnoreCase))
+        {
+            // RM-M5-01-A (ADR 0005): gRPC-Sidecar-Adapter. SidecarEndpoint
+            // ist Pflicht; alle übrigen Slots übernehmen Adapter-Defaults
+            // wenn nicht gesetzt. EnsureValid läuft am ScheduleOptimizer-
+            // Konstruktor und failed bei Production+plaintext-Endpoint.
+            if (hostOptions.OptimizationCoreSidecarEndpoint is null)
+            {
+                throw new InvalidOperationException(
+                    "Bess:ScheduleSolver:Backend='optimization_core' requires "
+                    + "Bess:OptimizationCoreSidecarEndpoint to be set (e.g. "
+                    + "`unix:///var/run/bess-ems/optimization-core.sock` "
+                    + "for the Loopback-Default or `https://...` for the "
+                    + "Cross-Host-Production-Pfad gemäß ADR 0005 §4).");
+            }
+            services.AddBessOptimizationCore(BuildOptimizationCoreOptions(hostOptions));
+            return;
         }
 
-        services.AddBessScheduleSolver(solver =>
+        throw new InvalidOperationException(
+            $"Unsupported Bess:ScheduleSolver:Backend '{options.Backend}'. "
+            + "Supported values: noop, or_tools, optimization_core.");
+    }
+
+    // RM-M5-01-A Helper: baut `OptimizationCoreOptions` aus den
+    // BessHostOptions-Slots. Operator-Overrides — falls gesetzt —
+    // überschreiben Adapter-Defaults; sonst gilt
+    // Production+SignAndEncrypt-Equivalent für gRPC (RuntimeProfile=
+    // Production, ConnectTimeout=10s, RequestDeadline=60s,
+    // ExpectedContractVersion=1.0.0).
+    private static OptimizationCoreOptions BuildOptimizationCoreOptions(
+        BessHostOptions hostOptions)
+    {
+        var defaults = new OptimizationCoreOptions
         {
-            if (options.TimeLimitSeconds is { } seconds)
-            {
-                solver.TimeLimit = TimeSpan.FromSeconds(seconds);
-            }
-            solver.GapTolerance = options.GapTolerance;
-            solver.InitialSocPercent = options.InitialSocPercent;
-        });
+            SidecarEndpoint = hostOptions.OptimizationCoreSidecarEndpoint!,
+        };
+        return defaults with
+        {
+            RuntimeProfile = hostOptions.OptimizationCoreRuntimeProfile
+                ?? defaults.RuntimeProfile,
+            ExpectedContractVersion = string.IsNullOrWhiteSpace(
+                hostOptions.OptimizationCoreExpectedContractVersion)
+                    ? defaults.ExpectedContractVersion
+                    : hostOptions.OptimizationCoreExpectedContractVersion!,
+            ClientCertificatePath = string.IsNullOrWhiteSpace(
+                hostOptions.OptimizationCoreClientCertificatePath)
+                    ? defaults.ClientCertificatePath
+                    : hostOptions.OptimizationCoreClientCertificatePath!,
+            TrustedServerCertificatesPath = string.IsNullOrWhiteSpace(
+                hostOptions.OptimizationCoreTrustedServerCertificatesPath)
+                    ? defaults.TrustedServerCertificatesPath
+                    : hostOptions.OptimizationCoreTrustedServerCertificatesPath!,
+            BearerTokenPath = string.IsNullOrWhiteSpace(
+                hostOptions.OptimizationCoreBearerTokenPath)
+                    ? defaults.BearerTokenPath
+                    : hostOptions.OptimizationCoreBearerTokenPath!,
+            MaxFallbackScheduleAge = hostOptions.OptimizationCoreMaxFallbackScheduleAge
+                ?? defaults.MaxFallbackScheduleAge,
+        };
     }
 
     // M4-05: BessHostOptions kennt jetzt RuntimeProfile/SecurityMode/

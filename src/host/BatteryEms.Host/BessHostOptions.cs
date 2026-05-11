@@ -73,6 +73,29 @@ public sealed class BessHostOptions
     public string? OpcUaTrustedServerCertificatesPath { get; set; }
     public bool OpcUaAllowUnsecured { get; set; }
     public string? OpcUaAllowUnsecuredReason { get; set; }
+
+    // RM-M5-01-A (ADR 0005): optionales optimization-core-Sidecar-
+    // Adapter-Wiring. Wenn `ScheduleSolver.Backend = "optimization_core"`,
+    // baut der Host die `OptimizationCoreOptions` aus den folgenden
+    // Slots zusammen und registriert den gRPC-Sidecar-Adapter statt
+    // OR-Tools/NoOp. Production verlangt `unix://` oder `https://`
+    // Endpoint (D-02 — `optimization-core-not-hardened-in-production`
+    // bei plaintext-`http://` und `RuntimeProfile=Production`).
+    //
+    // **Sub-Slice-A-Vorbehalt**: die produktive Wire-Integration
+    // (Health-Probe + Version-Negotiation + Optimize-Streaming) lebt
+    // in RM-M5-01-B; ein Production-Boot mit Backend=optimization_core
+    // wird heute beim ersten `OptimizeAsync`-Aufruf
+    // `NotImplementedException` werfen. Der Slot ist bewusst opt-in
+    // damit niemand silent damit produktiv geht.
+    public Uri? OptimizationCoreSidecarEndpoint { get; set; }
+    public BatteryEms.Adapters.OptimizationCore.OptimizationCoreRuntimeProfile?
+        OptimizationCoreRuntimeProfile { get; set; }
+    public string? OptimizationCoreExpectedContractVersion { get; set; }
+    public string? OptimizationCoreClientCertificatePath { get; set; }
+    public string? OptimizationCoreTrustedServerCertificatesPath { get; set; }
+    public string? OptimizationCoreBearerTokenPath { get; set; }
+    public TimeSpan? OptimizationCoreMaxFallbackScheduleAge { get; set; }
 }
 
 public sealed class BessScheduleSolverOptions

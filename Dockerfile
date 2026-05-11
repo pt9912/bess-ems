@@ -30,6 +30,11 @@ COPY BatteryEms.sln ./
 COPY src/ src/
 COPY tests/ tests/
 COPY config/ config/
+# RM-M5-01-A (ADR 0005): proto/ trägt den gRPC-Vertrag für den
+# optimization-core-Sidecar. `Grpc.Tools` referenziert die .proto-Dateien
+# relativ aus dem Adapter-Projekt; ohne COPY proto/ fehlt das Source-
+# Material beim Codegen.
+COPY proto/ proto/
 RUN dotnet restore BatteryEms.sln --locked-mode
 
 # ---------------------------------------------------------------------------
@@ -84,6 +89,11 @@ RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.cs
     --no-restore \
     --logger "console;verbosity=normal" \
  && dotnet test tests/adapters/driven/BatteryEms.Adapters.OpcUa.Tests/BatteryEms.Adapters.OpcUa.Tests.csproj \
+    --configuration "${BUILD_CONFIGURATION}" \
+    --no-build \
+    --no-restore \
+    --logger "console;verbosity=normal" \
+ && dotnet test tests/adapters/driven/BatteryEms.Adapters.OptimizationCore.Tests/BatteryEms.Adapters.OptimizationCore.Tests.csproj \
     --configuration "${BUILD_CONFIGURATION}" \
     --no-build \
     --no-restore \

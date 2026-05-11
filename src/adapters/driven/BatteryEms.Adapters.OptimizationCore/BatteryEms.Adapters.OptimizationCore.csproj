@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>BatteryEms.Adapters.OptimizationCore</RootNamespace>
+    <AssemblyName>BatteryEms.Adapters.OptimizationCore</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" />
+    <PackageReference Include="Grpc.Net.Client" />
+    <!-- RM-M5-01 (ADR 0005): Grpc.Tools ist Build-Time-Source-Generator;
+         Assets nicht in das Adapter-Assembly verpacken. -->
+    <PackageReference Include="Grpc.Tools">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\hexagon\BatteryEms.Application\BatteryEms.Application.csproj" />
+    <ProjectReference Include="..\..\..\hexagon\BatteryEms.Domain\BatteryEms.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- RM-M5-01-A: gRPC-Codegen aus dem Top-Level proto/-Verzeichnis.
+         GrpcServices=Client (kein Server-Stub im Worker-Adapter). -->
+    <Protobuf Include="..\..\..\..\proto\optimization-core\v1\optimization_core.proto"
+              GrpcServices="Client"
+              ProtoRoot="..\..\..\..\proto" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="BatteryEms.Adapters.OptimizationCore.Tests" />
+    <InternalsVisibleTo Include="BatteryEms.OptimizationCore.IntegrationTests" />
+  </ItemGroup>
+
+</Project>

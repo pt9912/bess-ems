@@ -34,6 +34,7 @@
     <ProjectReference Include="..\..\adapters\driven\BatteryEms.Adapters.OpcUa\BatteryEms.Adapters.OpcUa.csproj" />
     <ProjectReference Include="..\..\adapters\driven\BatteryEms.Adapters.NativeInterop\BatteryEms.Adapters.NativeInterop.csproj" />
     <ProjectReference Include="..\..\adapters\driven\BatteryEms.Adapters.Optimization\BatteryEms.Adapters.Optimization.csproj" />
+    <ProjectReference Include="..\..\adapters\driven\BatteryEms.Adapters.OptimizationCore\BatteryEms.Adapters.OptimizationCore.csproj" />
     <ProjectReference Include="..\..\adapters\driven\BatteryEms.Adapters.Persistence\BatteryEms.Adapters.Persistence.csproj" />
     <ProjectReference Include="..\..\adapters\driven\BatteryEms.Adapters.Telemetry\BatteryEms.Adapters.Telemetry.csproj" />
   </ItemGroup>
