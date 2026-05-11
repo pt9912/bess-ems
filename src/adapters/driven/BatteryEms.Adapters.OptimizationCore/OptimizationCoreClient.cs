@@ -46,6 +46,14 @@ internal sealed class OptimizationCoreClient : IAsyncDisposable
         if (_channel is not null) { return Task.CompletedTask; }
 
         var endpoint = _options.SidecarEndpoint;
+        // Plan-RM-M5-01-C: UDS-Mode-Enforcement im Production-Profile.
+        // Operator stellt einen Per-Service-Socket mit Filesystem-Perms
+        // (Mode=0600, Owner=bess-Service) bereit (ADR 0005 §4 Default).
+        // Andere Perms → Boot-Fehler `optimization-core-uds-permissions-
+        // not-locked`, damit ein versehentlich world-readable Socket
+        // niemals produktiv gefahren wird.
+        EnsureUdsPermissionsLockedIfRequired(endpoint, _options.RuntimeProfile);
+
         var (channelAddress, handler) = BuildChannelTransport(endpoint);
         var channelOptions = new GrpcChannelOptions();
         if (handler is not null)
@@ -57,6 +65,51 @@ internal sealed class OptimizationCoreClient : IAsyncDisposable
         _channel = channel;
         _client = new Grpc.V1.OptimizationCore.OptimizationCoreClient(channel);
         return Task.CompletedTask;
+    }
+
+    private static void EnsureUdsPermissionsLockedIfRequired(
+        Uri endpoint, OptimizationCoreRuntimeProfile profile)
+    {
+        if (profile != OptimizationCoreRuntimeProfile.Production) { return; }
+        if (!string.Equals(endpoint.Scheme, "unix", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+        var path = endpoint.LocalPath;
+        if (!File.Exists(path))
+        {
+            // Socket noch nicht angelegt — Sidecar fährt eventuell
+            // parallel hoch. Wir lassen den Connect am gRPC-Layer
+            // fehlschlagen (Unavailable-Outcome via StatusMapper) statt
+            // hier einen eigenen Boot-Fehler zu werfen.
+            return;
+        }
+        if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
+        {
+            // Filesystem-Mode-Bits sind Unix-spezifisch; auf Windows
+            // ist die Production-Topologie ohnehin unrealistisch
+            // (Kestrel-UDS-Listener ist .NET-8+ Linux-Pfad).
+            return;
+        }
+        var mode = File.GetUnixFileMode(path);
+        const UnixFileMode UserRwOnly =
+            UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        const UnixFileMode UserGroupRw =
+            UserRwOnly | UnixFileMode.GroupRead | UnixFileMode.GroupWrite;
+        // Akzeptiert: Mode 0600 (Owner-Only) und Mode 0660 (Owner +
+        // Group-Member; brauchbar wenn der Sidecar als anderer User
+        // läuft und nur der bess-Gruppe Zugriff gewährt). Alles
+        // weitere fail-closed.
+        if (mode != UserRwOnly && mode != UserGroupRw)
+        {
+            var octal = Convert.ToString((int)mode, toBase: 8).PadLeft(3, '0');
+            throw new InvalidOperationException(
+                $"optimization-core-uds-permissions-not-locked: socket "
+                + $"`{path}` has mode 0{octal} but Production "
+                + "requires 0600 (Owner-Only) or 0660 (Owner+Group). "
+                + "Switch RuntimeProfile to HilSimulator/Development if "
+                + "you are testing locally without locked-down perms.");
+        }
     }
 
     // Plan-RM-M5-01-B: Endpoint-Scheme-spezifisches Transport-Setup.
