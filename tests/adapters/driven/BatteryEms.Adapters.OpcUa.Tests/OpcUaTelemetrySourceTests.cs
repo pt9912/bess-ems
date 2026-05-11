@@ -24,12 +24,19 @@ public sealed class OpcUaTelemetrySourceTests
         minOperatingTemperatureCelsius: -20,
         maxOperatingTemperatureCelsius: 55);
 
+    // M4-05-A: Test-Defaults bleiben im None+AllowUnsecured-Pfad mit
+    // RuntimeProfile=HilSimulator. SecurityMode=None überschreibt den
+    // neuen SignAndEncrypt-Default; ohne Cert-Material wäre die echte
+    // ConnectAsync ohnehin out-of-scope für diese Unit-Tests
+    // (FakeOpcUaClient).
     private static OpcUaAdapterOptions Options(
         TimeSpan? polling = null,
         int channelCapacity = 256)
         => new()
         {
             EndpointUrl = new Uri("opc.tcp://localhost:4840"),
+            RuntimeProfile = OpcUaRuntimeProfile.HilSimulator,
+            SecurityMode = OpcUaSecurityMode.None,
             PollingInterval = polling ?? TimeSpan.FromMilliseconds(10),
             SubscriptionChannelCapacity = channelCapacity,
             AllowUnsecured = true,
@@ -246,6 +253,11 @@ public sealed class OpcUaTelemetrySourceTests
 
     // Per-Knoten samplingIntervalMs erreicht AddMonitoredItem unverändert;
     // Knoten ohne Override fällt auf DefaultMonitoringIntervalMs zurück.
+    //
+    // M4-05-A inline-fix: Iterator wird in Task.Run getrieben, damit das
+    // synchrone Polling auf Subscriptions/Items im Main-Thread läuft.
+    // Direkter MoveNextAsync-Aufruf würde nie zurückkehren — die
+    // subscribe-only-Mapping yieldt keinen Sample ohne Push.
     [Fact]
     public async Task Per_node_sampling_interval_is_threaded_through_to_monitored_item()
     {
@@ -263,15 +275,20 @@ public sealed class OpcUaTelemetrySourceTests
             var enumerator = src.ReadAsync(cts.Token).GetAsyncEnumerator(cts.Token);
             await using (enumerator)
             {
-                // Allow the pump to register MonitoredItems.
+                var iteratorTask = Task.Run(async () =>
+                {
+                    try { await enumerator.MoveNextAsync(); }
+                    catch (OperationCanceledException) { /* expected on cts */ }
+                });
+
                 while (client.Subscriptions.Count == 0)
                 {
-                    await Task.Delay(10);
+                    await Task.Delay(10, cts.Token);
                 }
                 var items = client.Subscriptions[0].Items;
                 while (items.Count < 2)
                 {
-                    await Task.Delay(10);
+                    await Task.Delay(10, cts.Token);
                     items = client.Subscriptions[0].Items;
                 }
                 Assert.Equal(2, items.Count);
@@ -279,6 +296,9 @@ public sealed class OpcUaTelemetrySourceTests
                 var b = items.First(i => i.NodeId == "ns=2;B");
                 Assert.Equal(250, a.SamplingIntervalMs);
                 Assert.Equal(1000, b.SamplingIntervalMs);
+
+                await cts.CancelAsync();
+                await iteratorTask;
             }
         }
     }
@@ -362,21 +382,26 @@ public sealed class OpcUaTelemetrySourceTests
             var enumerator = src.ReadAsync(cts.Token).GetAsyncEnumerator(cts.Token);
             await using (enumerator)
             {
-                // Wait for the subscription to be alive.
-                while (client.Subscriptions.Count == 0)
+                // M4-05-A inline-fix: Async-Iterator-Body startet erst
+                // beim ersten MoveNextAsync — daher kann ein synchrones
+                // Polling auf `client.Subscriptions.Count > 0` VOR dem
+                // ersten Move nie aufgelöst werden (deadlock). Push
+                // über Task.Run nebenher, das Pattern aus
+                // `Subscribe_notification_lands_on_next_emitted_sample`.
+                var pushTask = Task.Run(async () =>
                 {
-                    await Task.Delay(10);
-                }
-                var sub = client.Subscriptions[0];
-                // Push more notifications than the channel can hold so
-                // the Drop-Oldest-Pfad zuschlägt + Overflow-Flag setzt.
-                for (var i = 0; i < 20; i++)
-                {
-                    sub.PushNotification(new OpcUaNotification(
-                        "ns=2;Soc", 50.0 + i, 0u, Now));
-                }
-                // Allow the pump to write into the channel.
-                await Task.Delay(50);
+                    while (client.Subscriptions.Count == 0)
+                    {
+                        await Task.Delay(10, cts.Token);
+                    }
+                    var sub = client.Subscriptions[0];
+                    for (var i = 0; i < 20; i++)
+                    {
+                        sub.PushNotification(new OpcUaNotification(
+                            "ns=2;Soc", 50.0 + i, 0u, Now));
+                    }
+                });
+
                 BatteryTelemetry? overflowed = null;
                 while (await enumerator.MoveNextAsync())
                 {
@@ -386,6 +411,7 @@ public sealed class OpcUaTelemetrySourceTests
                         break;
                     }
                 }
+                await pushTask;
                 Assert.NotNull(overflowed);
                 Assert.Equal("opcua-subscription-overflow", overflowed!.DataQuality.Reason);
             }
@@ -414,22 +440,30 @@ public sealed class OpcUaTelemetrySourceTests
             new OpcUaTelemetrySource(client, mapping, options, Asset, clock, null!));
     }
 
-    // D-04 Konstruktor-Pin: ein Source mit Default-Security-Options
-    // failed beim Bau (EnsureValid wirft opcua-security-not-hardened),
-    // bevor ReadAsync überhaupt aufgerufen wird.
+    // M4-05-A Konstruktor-Pin: ein Source mit Production+None-
+    // Konfiguration failed beim Bau, auch wenn AllowUnsecured=true
+    // gesetzt ist (D-02). Pre-M4-05-Variante prüfte die heute-Default-
+    // Options (None+AllowUnsecured=false); seit M4-05 sind die
+    // Defaults sicher, also pinnen wir den explizit-unsicheren Pfad.
     [Fact]
-    public void Constructor_with_unsafe_default_options_throws_security_guard()
+    public void Constructor_with_production_none_throws_security_guard()
     {
         var unsafeOptions = new OpcUaAdapterOptions
         {
             EndpointUrl = new Uri("opc.tcp://localhost:4840"),
-            // AllowUnsecured=false default
+            RuntimeProfile = OpcUaRuntimeProfile.Production,
+            SecurityMode = OpcUaSecurityMode.None,
+            AllowUnsecured = true,
+            AllowUnsecuredReason = "operator-tried-to-bypass",
         };
         var ex = Assert.Throws<InvalidOperationException>(() =>
             BuildSource(new FakeOpcUaClient(),
                 Mapping(Node("soc_percent", "ns=2;A", "read")),
                 unsafeOptions));
-        Assert.Contains("opcua-security-not-hardened", ex.Message, StringComparison.Ordinal);
+        Assert.Contains(
+            "opcua-security-not-hardened-in-production",
+            ex.Message,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -499,6 +533,15 @@ public sealed class OpcUaTelemetrySourceTests
     // Sub-Slice-B review-fix #4: post-drain flag-clear pin (plan §148).
     // After an overflow burst forces the channel into Stale, a clean
     // drain (no further pushes) takes the next sample back to Valid.
+    //
+    // M4-05-A inline-fix: Test war pre-broken — Subscription-Polling
+    // VOR erstem MoveNextAsync deadlockt (Iterator hat noch nicht
+    // gelaufen, also gibt es keine Subscription). Push läuft jetzt
+    // nebenher in Task.Run, der äußere `cts`-Token schützt vor
+    // dem Hang. Plus: `deadline` wird jetzt als Tokens-Quelle für
+    // MoveNextAsync verwendet (nicht nur per-iter geprüft), damit
+    // der Test auch fail-closed terminiert, wenn das Overflow-Flag
+    // wider Erwarten nicht clear-t.
     [Fact]
     public async Task Subscription_overflow_clears_after_drain_and_subsequent_sample_is_valid_again()
     {
@@ -510,23 +553,24 @@ public sealed class OpcUaTelemetrySourceTests
             options);
         await using (src)
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             var enumerator = src.ReadAsync(cts.Token).GetAsyncEnumerator(cts.Token);
             await using (enumerator)
             {
-                while (client.Subscriptions.Count == 0)
+                var pushTask = Task.Run(async () =>
                 {
-                    await Task.Delay(10);
-                }
-                var sub = client.Subscriptions[0];
-
-                // Burst far past capacity to force a definitive drop.
-                for (var i = 0; i < 30; i++)
-                {
-                    sub.PushNotification(new OpcUaNotification(
-                        "ns=2;Soc", 50.0 + i, 0u, Now));
-                }
-                await Task.Delay(50);
+                    while (client.Subscriptions.Count == 0)
+                    {
+                        await Task.Delay(10, cts.Token);
+                    }
+                    var sub = client.Subscriptions[0];
+                    // Burst far past capacity to force a definitive drop.
+                    for (var i = 0; i < 30; i++)
+                    {
+                        sub.PushNotification(new OpcUaNotification(
+                            "ns=2;Soc", 50.0 + i, 0u, Now));
+                    }
+                });
 
                 // Confirm we hit the overflow path.
                 var sawStale = false;
@@ -539,6 +583,7 @@ public sealed class OpcUaTelemetrySourceTests
                         break;
                     }
                 }
+                await pushTask;
                 Assert.True(sawStale,
                     "expected at least one Stale sample with opcua-subscription-overflow reason.");
 
@@ -546,7 +591,6 @@ public sealed class OpcUaTelemetrySourceTests
                 // the next tick. With the bugfix the next sample must
                 // come back to DataQuality.Valid.
                 var sawValidAfter = false;
-                using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(2));
                 while (await enumerator.MoveNextAsync())
                 {
                     if (enumerator.Current.DataQuality.Flag == DataQualityState.Valid)
@@ -554,7 +598,6 @@ public sealed class OpcUaTelemetrySourceTests
                         sawValidAfter = true;
                         break;
                     }
-                    if (deadline.IsCancellationRequested) { break; }
                 }
                 Assert.True(sawValidAfter,
                     "expected the overflow flag to clear after a clean drain so "

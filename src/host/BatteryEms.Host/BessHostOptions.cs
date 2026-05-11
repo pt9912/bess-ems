@@ -52,16 +52,25 @@ public sealed class BessHostOptions
     public int MqttBrokerPort { get; set; }
     public string? MqttClientId { get; set; }
 
-    // RM-M4-04 (plan §4 Sub-Slice C): optional OPC-UA-Adapter wiring.
-    // OpcUaMappingPath + OpcUaEndpointUrl plus die Pre-M4-05-Security-
-    // Slots (OpcUaAllowUnsecured + OpcUaAllowUnsecuredReason) müssen
-    // gesetzt sein, damit `AddBessOpcUa` registriert. Per D-04
-    // failed der Host beim Boot, wenn OpcUaAllowUnsecured=false bei
-    // SecurityMode=None oder AllowUnsecured=true mit leerem Reason —
-    // siehe `OpcUaAdapterOptions.EnsureValid`.
+    // RM-M4-04 (plan §4 Sub-Slice C) + RM-M4-05: optionales OPC-UA-
+    // Adapter-Wiring. OpcUaMappingPath + OpcUaEndpointUrl müssen
+    // gesetzt sein, damit `AddBessOpcUa` registriert. M4-05 ergänzt
+    // RuntimeProfile + SecurityMode + SecurityPolicy als optionale
+    // Override-Slots (Default `null` ⇒ Adapter-Defaults aus
+    // `OpcUaAdapterOptions`: RuntimeProfile=Production,
+    // SecurityMode=SignAndEncrypt, SecurityPolicy=Basic256Sha256).
+    // Production verlangt `SecurityMode=Sign|SignAndEncrypt`; ein
+    // unsecured Override (`SecurityMode=None` + `AllowUnsecured=true`
+    // + Reason) ist nur in `RuntimeProfile=HilSimulator|Development`
+    // gültig — siehe `OpcUaAdapterOptions.EnsureValid` (M4-05 D-02).
     public string? OpcUaMappingPath { get; set; }
     public Uri? OpcUaEndpointUrl { get; set; }
     public string? OpcUaSessionName { get; set; }
+    public BatteryEms.Adapters.OpcUa.OpcUaRuntimeProfile? OpcUaRuntimeProfile { get; set; }
+    public BatteryEms.Adapters.OpcUa.OpcUaSecurityMode? OpcUaSecurityMode { get; set; }
+    public string? OpcUaSecurityPolicy { get; set; }
+    public string? OpcUaApplicationCertificateSubject { get; set; }
+    public string? OpcUaTrustedServerCertificatesPath { get; set; }
     public bool OpcUaAllowUnsecured { get; set; }
     public string? OpcUaAllowUnsecuredReason { get; set; }
 }

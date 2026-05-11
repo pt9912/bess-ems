@@ -132,15 +132,7 @@ public static class BessHostBuilder
             case IoAdapterTriage.Family.OpcUa:
                 builder.Services.AddBessOpcUa(
                     runtimeConfig.OpcUaMapping!,
-                    new OpcUaAdapterOptions
-                    {
-                        EndpointUrl = hostOptions.OpcUaEndpointUrl!,
-                        SessionName = string.IsNullOrWhiteSpace(hostOptions.OpcUaSessionName)
-                            ? "bess-ems"
-                            : hostOptions.OpcUaSessionName!,
-                        AllowUnsecured = hostOptions.OpcUaAllowUnsecured,
-                        AllowUnsecuredReason = hostOptions.OpcUaAllowUnsecuredReason,
-                    });
+                    BuildOpcUaAdapterOptions(hostOptions));
                 break;
             case IoAdapterTriage.Family.None:
             default:
@@ -223,5 +215,41 @@ public static class BessHostBuilder
             solver.GapTolerance = options.GapTolerance;
             solver.InitialSocPercent = options.InitialSocPercent;
         });
+    }
+
+    // M4-05: BessHostOptions kennt jetzt RuntimeProfile/SecurityMode/
+    // SecurityPolicy + Cert-Subject/TrustedStore-Slots. Helper baut die
+    // Adapter-Options, indem die Operator-Overrides — falls gesetzt —
+    // die Adapter-Defaults überschreiben. Null lässt den Default-Wert
+    // aus `OpcUaAdapterOptions` greifen (Production + SignAndEncrypt +
+    // Basic256Sha256). Die finale `EnsureValid`-Validierung läuft auf
+    // der Source/Sink-Konstruktor-Linie (D-04 + M4-05 D-02).
+    private static OpcUaAdapterOptions BuildOpcUaAdapterOptions(BessHostOptions hostOptions)
+    {
+        var defaults = new OpcUaAdapterOptions
+        {
+            EndpointUrl = hostOptions.OpcUaEndpointUrl!,
+        };
+        return defaults with
+        {
+            SessionName = string.IsNullOrWhiteSpace(hostOptions.OpcUaSessionName)
+                ? defaults.SessionName
+                : hostOptions.OpcUaSessionName!,
+            RuntimeProfile = hostOptions.OpcUaRuntimeProfile ?? defaults.RuntimeProfile,
+            SecurityMode = hostOptions.OpcUaSecurityMode ?? defaults.SecurityMode,
+            SecurityPolicy = string.IsNullOrWhiteSpace(hostOptions.OpcUaSecurityPolicy)
+                ? defaults.SecurityPolicy
+                : hostOptions.OpcUaSecurityPolicy!,
+            ApplicationCertificateSubject = string.IsNullOrWhiteSpace(
+                hostOptions.OpcUaApplicationCertificateSubject)
+                    ? defaults.ApplicationCertificateSubject
+                    : hostOptions.OpcUaApplicationCertificateSubject!,
+            TrustedServerCertificatesPath = string.IsNullOrWhiteSpace(
+                hostOptions.OpcUaTrustedServerCertificatesPath)
+                    ? defaults.TrustedServerCertificatesPath
+                    : hostOptions.OpcUaTrustedServerCertificatesPath!,
+            AllowUnsecured = hostOptions.OpcUaAllowUnsecured,
+            AllowUnsecuredReason = hostOptions.OpcUaAllowUnsecuredReason,
+        };
     }
 }

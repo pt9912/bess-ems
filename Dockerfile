@@ -83,6 +83,11 @@ RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.cs
     --no-build \
     --no-restore \
     --logger "console;verbosity=normal" \
+ && dotnet test tests/adapters/driven/BatteryEms.Adapters.OpcUa.Tests/BatteryEms.Adapters.OpcUa.Tests.csproj \
+    --configuration "${BUILD_CONFIGURATION}" \
+    --no-build \
+    --no-restore \
+    --logger "console;verbosity=normal" \
  && dotnet test tests/adapters/driven/BatteryEms.Adapters.Telemetry.Tests/BatteryEms.Adapters.Telemetry.Tests.csproj \
     --configuration "${BUILD_CONFIGURATION}" \
     --no-build \

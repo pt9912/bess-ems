@@ -24,9 +24,16 @@ public sealed class OpcUaCommandSinkTests
         minOperatingTemperatureCelsius: -20,
         maxOperatingTemperatureCelsius: 55);
 
+    // M4-05-A: Test-Defaults bleiben im None+AllowUnsecured-Pfad, aber
+    // jetzt mit RuntimeProfile=HilSimulator (Production-Default würde
+    // mit SecurityMode=None werfen — siehe D-02). Override-Linie:
+    // SecurityMode=None überschreibt den neuen SignAndEncrypt-Default,
+    // damit kein Cert-Material in den Adapter-Unit-Tests gebraucht wird.
     private static OpcUaAdapterOptions Options() => new()
     {
         EndpointUrl = new Uri("opc.tcp://localhost:4840"),
+        RuntimeProfile = OpcUaRuntimeProfile.HilSimulator,
+        SecurityMode = OpcUaSecurityMode.None,
         AllowUnsecured = true,
         AllowUnsecuredReason = "command-sink-tests",
         ReadTimeout = TimeSpan.FromSeconds(2),
@@ -215,15 +222,22 @@ public sealed class OpcUaCommandSinkTests
         Assert.Equal(4f, (float)qWrite.Value);
     }
 
-    // D-04 Konstruktor-Pin: ein Sink mit Default-Security-Options
-    // failed beim Bau (EnsureValid wirft opcua-security-not-hardened).
+    // M4-05-A Konstruktor-Pin: ein Sink mit Production+None-
+    // Konfiguration failed beim Bau, auch wenn AllowUnsecured=true
+    // gesetzt ist (D-02 — der Bool-Override ist im Production-Profile
+    // nicht ausreichend). Pre-M4-05-Variante prüfte die heute-Default-
+    // Options (None+AllowUnsecured=false); seit M4-05 sind die
+    // Defaults sicher, also pinnen wir den explizit-unsicheren Pfad.
     [Fact]
-    public void Constructor_with_unsafe_default_options_throws_security_guard()
+    public void Constructor_with_production_none_throws_security_guard()
     {
         var unsafeOptions = new OpcUaAdapterOptions
         {
             EndpointUrl = new Uri("opc.tcp://localhost:4840"),
-            // AllowUnsecured=false default
+            RuntimeProfile = OpcUaRuntimeProfile.Production,
+            SecurityMode = OpcUaSecurityMode.None,
+            AllowUnsecured = true,
+            AllowUnsecuredReason = "operator-tried-to-bypass",
         };
         var client = new FakeOpcUaClient();
         var ex = Assert.Throws<InvalidOperationException>(() =>
@@ -231,7 +245,10 @@ public sealed class OpcUaCommandSinkTests
                 WriteNode("active_power_setpoint_kw", "ns=2;P")),
                 Asset, unsafeOptions, new FakeClock(),
                 NullLogger<OpcUaCommandSink>.Instance));
-        Assert.Contains("opcua-security-not-hardened", ex.Message, StringComparison.Ordinal);
+        Assert.Contains(
+            "opcua-security-not-hardened-in-production",
+            ex.Message,
+            StringComparison.Ordinal);
     }
 
     [Fact]

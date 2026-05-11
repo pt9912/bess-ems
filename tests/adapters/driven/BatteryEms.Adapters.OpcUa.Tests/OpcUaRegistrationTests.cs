@@ -22,9 +22,13 @@ public sealed class OpcUaRegistrationTests
         minOperatingTemperatureCelsius: -20,
         maxOperatingTemperatureCelsius: 55);
 
+    // M4-05-A: Test-Defaults bleiben im None+AllowUnsecured-Pfad mit
+    // RuntimeProfile=HilSimulator (siehe OpcUaAdapterOptions D-02).
     private static OpcUaAdapterOptions Options() => new()
     {
         EndpointUrl = new Uri("opc.tcp://localhost:4840"),
+        RuntimeProfile = OpcUaRuntimeProfile.HilSimulator,
+        SecurityMode = OpcUaSecurityMode.None,
         AllowUnsecured = true,
         AllowUnsecuredReason = "registration-tests",
     };
@@ -85,22 +89,27 @@ public sealed class OpcUaRegistrationTests
         Assert.NotNull(sp.GetRequiredService<OpcUaAdapterOptions>());
     }
 
+    // M4-05-A inline-fix: `await using` statt `using` — die resolved
+    // Singletons (OpcUaTelemetrySource/Sink/Client) implementieren nur
+    // IAsyncDisposable. ServiceProvider.Dispose() (sync) wirft
+    // InvalidOperationException für IAsyncDisposable-only-Typen;
+    // `DisposeAsync` ist der korrekte Pfad.
     [Fact]
-    public void Resolves_telemetry_source_as_opcua_telemetry_source()
+    public async Task Resolves_telemetry_source_as_opcua_telemetry_source()
     {
         // Inject the FakeOpcUaClient so the source's ctor works
         // (production stub doesn't fail at ctor either, but a fake
         // keeps the service-provider state usable in the assertion).
-        using var sp = (ServiceProvider)BuildProvider(new FakeOpcUaClient());
+        await using var sp = (ServiceProvider)BuildProvider(new FakeOpcUaClient());
 
         var resolved = sp.GetRequiredService<IBatteryTelemetrySource>();
         Assert.IsType<OpcUaTelemetrySource>(resolved);
     }
 
     [Fact]
-    public void Resolves_command_sink_as_opcua_command_sink()
+    public async Task Resolves_command_sink_as_opcua_command_sink()
     {
-        using var sp = (ServiceProvider)BuildProvider(new FakeOpcUaClient());
+        await using var sp = (ServiceProvider)BuildProvider(new FakeOpcUaClient());
 
         var resolved = sp.GetRequiredService<IBatteryCommandSink>();
         Assert.IsType<OpcUaCommandSink>(resolved);
@@ -112,7 +121,7 @@ public sealed class OpcUaRegistrationTests
     // beim ersten gescheiterten Telemetrie-Tick mit "where does this
     // NotImplementedException come from".
     [Fact]
-    public void Resolving_production_client_emits_stub_warning()
+    public async Task Resolving_production_client_emits_stub_warning()
     {
         var spyProvider = new SpyLoggerProvider();
         var services = new ServiceCollection();
@@ -121,7 +130,7 @@ public sealed class OpcUaRegistrationTests
         services.AddSingleton(Asset);
         services.AddBessOpcUa(Mapping(), Options());
 
-        using var sp = services.BuildServiceProvider();
+        await using var sp = services.BuildServiceProvider();
         // Trigger the IOpcUaClient factory.
         _ = sp.GetRequiredService<IOpcUaClient>();
 

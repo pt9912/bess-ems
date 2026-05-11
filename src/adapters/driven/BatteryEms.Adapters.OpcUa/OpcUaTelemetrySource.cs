@@ -340,6 +340,16 @@ public sealed class OpcUaTelemetrySource : IBatteryTelemetrySource, IAsyncDispos
     {
         try
         {
+            // Capture overflow BEFORE drain. DrainSubscribeNotifications
+            // clears the flag unconditionally (plan §148); if we read
+            // HasOverflow after the drain, every backlog tick would
+            // emit Valid samples and the Stale floor would never reach
+            // the consumer. Reading pre-drain pins the floor to the
+            // backlog state that produced this tick's samples.
+            var floor = _notifications.HasOverflow
+                ? DataQuality.Stale("opcua-subscription-overflow")
+                : null;
+
             // Drain any pending subscribe notifications first so per-
             // tick read values overlay them.
             DrainSubscribeNotifications();
@@ -359,9 +369,6 @@ public sealed class OpcUaTelemetrySource : IBatteryTelemetrySource, IAsyncDispos
             }
             var now = _clock.UtcNow;
             UpdateStatusOnSuccess(now);
-            var floor = _notifications.HasOverflow
-                ? DataQuality.Stale("opcua-subscription-overflow")
-                : null;
             return _assembler.Build(now, floor);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

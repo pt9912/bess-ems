@@ -3,13 +3,21 @@ using Microsoft.Extensions.Logging;
 namespace BatteryEms.Adapters.OpcUa;
 
 // Operator-tunable + Security-slot-bearing options for the OPC-UA
-// adapter (plan-RM-M4-04 §4 Sub-Slice A + D-04). EnsureValid runs the
-// Security-Startup-Guard from D-04: SecurityMode=None requires an
-// explicit AllowUnsecured=true plus a non-empty AllowUnsecuredReason,
-// otherwise the host throws opcua-security-not-hardened at boot. The
-// SecurityMode/SecurityPolicy slots exist today so M4-05 can layer the
-// production-grade RuntimeProfile-aware Härtung on without an
-// Options-Schema-Bruch.
+// adapter (plan-RM-M4-04 §4 Sub-Slice A + D-04; M4-05-A erweitert um
+// RuntimeProfile-Awareness und schwenkt die Production-Defaults auf
+// `SignAndEncrypt` + `Basic256Sha256`). `EnsureValid` macht den
+// Production-Pfad fail-closed:
+//
+// * `RuntimeProfile=Production` + `SecurityMode=None` ⇒ harter
+//   Startup-Fehler `opcua-security-not-hardened-in-production`,
+//   unabhängig von `AllowUnsecured` (M4-05 D-02).
+// * `SecurityMode!=None` + `SecurityPolicy` nicht in der Allowlist ⇒
+//   `opcua-security-policy-not-allowlisted` (D-04).
+// * `SecurityMode!=None` + `AllowUnsecured=true` ⇒
+//   `opcua-allow-unsecured-with-secure-mode-inconsistent`.
+// * `RuntimeProfile=HilSimulator|Development` + `SecurityMode=None`
+//   geht weiterhin durch den AllowUnsecured-Bool-Guard (Pre-M4-05-
+//   Verhalten für Test-Profile).
 public sealed record OpcUaAdapterOptions
 {
     // System.Uri statt string per CA1056 — die OPC-UA-Endpoint-URL
@@ -48,20 +56,40 @@ public sealed record OpcUaAdapterOptions
     // Overflow-Flag in der Telemetry-Source gesetzt.
     public int SubscriptionChannelCapacity { get; init; } = 256;
 
-    // Pre-M4-05 Security-Slots. Heute sitzt der Adapter auf `None` mit
-    // dem AllowUnsecured-Startup-Guard (D-04); M4-05 ändert die Defaults
-    // nicht, aber EnsureValid bekommt einen RuntimeProfile-Parameter.
-    public OpcUaSecurityMode SecurityMode { get; init; } = OpcUaSecurityMode.None;
-    public string SecurityPolicy { get; init; } = string.Empty;
+    // Plan-RM-M4-05 §3: adapter-lokales RuntimeProfile-Field. Default
+    // `Production` macht den Production-Code-Pfad fail-closed gegen
+    // Konfigurations-Drift; Test-Profile setzen das explizit auf
+    // `HilSimulator` (siehe IntegrationTests/Defaults.cs).
+    public OpcUaRuntimeProfile RuntimeProfile { get; init; } = OpcUaRuntimeProfile.Production;
+
+    // M4-05 Default-Schwenk: SignAndEncrypt statt None, Basic256Sha256
+    // statt leer. Eine Operator-Konfiguration ohne explizite Profile-/
+    // Mode-Wahl bekommt damit den sicheren Default (Master-DoD-D-03).
+    public OpcUaSecurityMode SecurityMode { get; init; } = OpcUaSecurityMode.SignAndEncrypt;
+    public string SecurityPolicy { get; init; } = OpcUaSecurityPolicies.Basic256Sha256;
     public bool AllowUnsecured { get; init; }
     public string? AllowUnsecuredReason { get; init; }
 
-    // Run the Startup-Guard (D-04). Returns the same instance on
-    // success so callers can chain (`new OpcUaAdapterOptions { ... }
-    // .EnsureValid(logger)`). On the AllowUnsecured-success path, a
-    // structured Warning is logged via LogUnsecuredOpcUaConnection
-    // (EventId 4200) so the operator sees the reason in stdout before
-    // the adapter starts wiring against an unsecured endpoint.
+    // Optionaler Operator-Override für das App-Cert-Subject. Wenn leer,
+    // leitet der OpcUaClient es aus SessionName ab (heute hard-coded
+    // `CN={SessionName}, O=BatteryEms, DC=localhost`). Operator kann
+    // ein Vendor-konformes Subject vorgeben (M4-05-B).
+    public string? ApplicationCertificateSubject { get; init; }
+
+    // Optionaler Operator-Override für den Trusted-Server-Cert-Store-
+    // Pfad. Default leer ⇒ Adapter legt einen Store unter dem
+    // per-Instanz-PKI-Root an (Production verlangt dann eine Trust-
+    // Provisioning-Bridge, sonst schlägt der Connect mit
+    // `opcua-server-certificate-not-trusted` fehl). Operator-Pfad
+    // ermöglicht Pre-Deployment-Cert-Provisioning.
+    public string? TrustedServerCertificatesPath { get; init; }
+
+    // Run the Startup-Guard. Returns the same instance on success so
+    // callers can chain. EventId 4200 (existing) markiert den
+    // AllowUnsecured-Override; 4221 markiert den Production-Sicher-
+    // Pfad; 4222 bestätigt die Allowlist-Auswahl. Reihenfolge der
+    // Validations: Argument-Checks → numerische Slots → Profile/
+    // Security-Achse.
     public OpcUaAdapterOptions EnsureValid(ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(logger);
@@ -110,9 +138,55 @@ public sealed record OpcUaAdapterOptions
                 $"SubscriptionChannelCapacity must be positive (got {SubscriptionChannelCapacity}).");
         }
 
-        // D-04 Startup-Guard. The bool-axis blocks unsecured operation
-        // until the operator opts in twice (AllowUnsecured + non-empty
-        // Reason). M4-05 layers RuntimeProfile-awareness on top.
+        // M4-05 D-02: Production + None ist ein harter Startup-Fehler,
+        // unabhängig von AllowUnsecured. Der Bool-Guard ist im
+        // Production-Profile bewusst nicht ausreichend; wer trotzdem
+        // unsecured fahren muss, setzt RuntimeProfile auf HilSimulator
+        // oder Development (bewusst-sichtbar in der Deploy-Konfig).
+        if (RuntimeProfile == OpcUaRuntimeProfile.Production
+            && SecurityMode == OpcUaSecurityMode.None)
+        {
+            throw new InvalidOperationException(
+                "opcua-security-not-hardened-in-production: "
+                + "RuntimeProfile=Production requires SecurityMode=Sign or "
+                + "SignAndEncrypt. AllowUnsecured is not a valid override in "
+                + "Production — switch RuntimeProfile to Development or "
+                + "HilSimulator if you must run against an unsecured endpoint "
+                + "(e.g. a legacy server without cert support).");
+        }
+
+        // M4-05 (c): Sign|SignAndEncrypt darf nicht mit AllowUnsecured=true
+        // kombiniert sein — das ist eine Konfigurations-Inkonsistenz, kein
+        // operativ valider Pfad.
+        if (SecurityMode != OpcUaSecurityMode.None && AllowUnsecured)
+        {
+            throw new InvalidOperationException(
+                "opcua-allow-unsecured-with-secure-mode-inconsistent: "
+                + $"SecurityMode={SecurityMode} cannot be combined with "
+                + "AllowUnsecured=true. Pick exactly one: a secure mode "
+                + "(Sign or SignAndEncrypt) or an unsecured opt-in via "
+                + "SecurityMode=None plus AllowUnsecured=true plus a "
+                + "non-empty AllowUnsecuredReason.");
+        }
+
+        // M4-05 D-04: jede Sign|SignAndEncrypt-Konfiguration muss eine
+        // allowlistete Policy nennen. `Basic256Sha256` ist der heutige
+        // M4-Start-Eintrag; jede Erweiterung verlangt einen Plan-Slice
+        // (F-17) und einen Code-Change in `OpcUaSecurityPolicies`.
+        if (SecurityMode != OpcUaSecurityMode.None
+            && !OpcUaSecurityPolicies.IsAllowed(SecurityPolicy))
+        {
+            throw new InvalidOperationException(
+                $"opcua-security-policy-not-allowlisted: SecurityPolicy="
+                + $"'{SecurityPolicy}' is not in the M4-05 allowlist. "
+                + "Allowlisted: Basic256Sha256. Adding a policy requires "
+                + "an F-17 plan-slice plus an OpcUaSecurityPolicies code "
+                + "change — see note-RM-M4-followups.md.");
+        }
+
+        // D-04 (existing) Startup-Guard für den None-Pfad. Nach den
+        // Production-Checks: Test-Profile dürfen mit None+AllowUnsecured
+        // weiterfahren (Pre-M4-05-Verhalten erhalten).
         if (SecurityMode == OpcUaSecurityMode.None)
         {
             if (!AllowUnsecured)
@@ -133,6 +207,16 @@ public sealed record OpcUaAdapterOptions
             OpcUaAdapterOptionsLog.LogUnsecuredOpcUaConnection(
                 logger, EndpointUrl, AllowUnsecuredReason!);
         }
+        else
+        {
+            // Secure-Pfad: structured Information-Markers, damit der
+            // Operator im stdout-Log sieht, mit welchem Profile und
+            // welcher Policy der Adapter hochfährt.
+            OpcUaAdapterOptionsLog.LogSecureProfileEstablished(
+                logger, RuntimeProfile, SecurityMode, EndpointUrl);
+            OpcUaAdapterOptionsLog.LogAllowlistedPolicyAccepted(
+                logger, SecurityPolicy);
+        }
 
         return this;
     }
@@ -146,4 +230,18 @@ internal static partial class OpcUaAdapterOptionsLog
         ILogger logger,
         Uri endpointUrl,
         string reason);
+
+    [LoggerMessage(EventId = 4221, Level = LogLevel.Information,
+        Message = "opcua adapter starting with secure profile {RuntimeProfile} mode={SecurityMode} against {EndpointUrl}")]
+    public static partial void LogSecureProfileEstablished(
+        ILogger logger,
+        OpcUaRuntimeProfile runtimeProfile,
+        OpcUaSecurityMode securityMode,
+        Uri endpointUrl);
+
+    [LoggerMessage(EventId = 4222, Level = LogLevel.Information,
+        Message = "opcua adapter accepted allowlisted security policy {SecurityPolicy}")]
+    public static partial void LogAllowlistedPolicyAccepted(
+        ILogger logger,
+        string securityPolicy);
 }

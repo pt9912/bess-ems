@@ -2,14 +2,18 @@ using BatteryEms.Adapters.OpcUa;
 
 namespace BatteryEms.OpcUa.IntegrationTests;
 
-// Test-Fixture-Helper aus plan-RM-M4-04 §4 Sub-Slice D: produziert eine
-// `OpcUaAdapterOptions`-Instanz, die schon `AllowUnsecured=true` plus
-// einen nicht-leeren `AllowUnsecuredReason` trägt. Ohne diese
-// Vorbelegung würde `EnsureValid()` mit `opcua-security-not-hardened`
-// werfen, bevor irgendein Pin zünden kann (D-04 Konsequenz).
+// Test-Fixture-Helper aus plan-RM-M4-04 §4 Sub-Slice D + plan-RM-M4-05-A:
+// produziert eine `OpcUaAdapterOptions`-Instanz für den HilSimulator-
+// None-Pfad. M4-05 schwenkt die Adapter-Defaults auf
+// Production+SignAndEncrypt+Basic256Sha256 — Test-Defaults müssen daher
+// explizit `RuntimeProfile=HilSimulator` plus `SecurityMode=None` plus
+// `AllowUnsecured=true` plus einen nicht-leeren Reason setzen, damit
+// `EnsureValid()` durchläuft (D-02 + D-03).
 //
 // Tests können die Defaults überschreiben — dies ist nur der
-// Zero-Boilerplate-Pfad gegen den embedded Simulator.
+// Zero-Boilerplate-Pfad gegen den embedded Simulator. Der Production-
+// Secure-Pfad bekommt einen eigenen Builder (`ForProductionSecure`)
+// mit M4-05-C.
 //
 // Hinweis (Review-Fix L7): die Timing-Werte hier sind **bewusst**
 // agressiver als die Production-Defaults aus `OpcUaAdapterOptions`
@@ -27,6 +31,10 @@ internal static class Defaults
         {
             EndpointUrl = endpointUrl,
             SessionName = "bess-ems-test",
+            // M4-05-A D-03: explizit HilSimulator-Profile + None-Mode.
+            // Production-Default würde mit SecurityMode=None werfen.
+            RuntimeProfile = OpcUaRuntimeProfile.HilSimulator,
+            SecurityMode = OpcUaSecurityMode.None,
             AllowUnsecured = true,
             AllowUnsecuredReason = ForHilSimulatorReason,
             ConnectTimeout = TimeSpan.FromSeconds(10),
