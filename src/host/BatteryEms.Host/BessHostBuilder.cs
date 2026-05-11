@@ -231,6 +231,13 @@ public static class BessHostBuilder
                     + "for the Loopback-Default or `https://...` for the "
                     + "Cross-Host-Production-Pfad gemäß ADR 0005 §4).");
             }
+            // RM-M5-01-C Korrektur-Pass (plan-RM-M5 §Fallback-Matrix):
+            // wenn der Operator einen lokalen Fallback-Optimizer setzt,
+            // registrieren wir den entsprechenden Adapter als
+            // `IFallbackScheduleOptimizer` BEFORE `AddBessOptimizationCore`,
+            // damit die Factory im OptimizationCoreScheduleOptimizer ihn
+            // via `GetService<IFallbackScheduleOptimizer>()` auflöst.
+            ConfigureOptimizationCoreFallback(services, hostOptions, options);
             services.AddBessOptimizationCore(BuildOptimizationCoreOptions(hostOptions));
             return;
         }
@@ -238,6 +245,43 @@ public static class BessHostBuilder
         throw new InvalidOperationException(
             $"Unsupported Bess:ScheduleSolver:Backend '{options.Backend}'. "
             + "Supported values: noop, or_tools, optimization_core.");
+    }
+
+    // RM-M5-01-C Korrektur-Pass: registriert den lokalen Fallback-
+    // Optimizer (plan-RM-M5 §Fallback-Matrix) wenn der Operator
+    // `OptimizationCoreFallbackBackend` setzt. Aktuell unterstützt:
+    // `or_tools` ⇒ AddBessScheduleSolverAsFallback. `null` oder leer
+    // ⇒ kein Fallback (no_valid_plan + Safe-Stop bei Sidecar-Failure).
+    private static void ConfigureOptimizationCoreFallback(
+        IServiceCollection services,
+        BessHostOptions hostOptions,
+        BessScheduleSolverOptions solverOptions)
+    {
+        var fallbackBackend = hostOptions.OptimizationCoreFallbackBackend;
+        if (string.IsNullOrWhiteSpace(fallbackBackend))
+        {
+            return;
+        }
+        var trimmed = fallbackBackend.Trim();
+        if (string.Equals(trimmed, "or_tools", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(trimmed, "ortools", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddBessScheduleSolverAsFallback(solver =>
+            {
+                if (solverOptions.TimeLimitSeconds is { } seconds)
+                {
+                    solver.TimeLimit = TimeSpan.FromSeconds(seconds);
+                }
+                solver.GapTolerance = solverOptions.GapTolerance;
+                solver.InitialSocPercent = solverOptions.InitialSocPercent;
+            });
+            return;
+        }
+        throw new InvalidOperationException(
+            $"Unsupported Bess:OptimizationCoreFallbackBackend '{fallbackBackend}'. "
+            + "Supported values: or_tools (or empty for no fallback ⇒ "
+            + "no_valid_plan + Safe-Stop on Sidecar-Failure per plan-RM-M5 "
+            + "§Fallback-Matrix).");
     }
 
     // RM-M5-01-A Helper: baut `OptimizationCoreOptions` aus den

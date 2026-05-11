@@ -74,20 +74,20 @@ public sealed class BessHostOptions
     public bool OpcUaAllowUnsecured { get; set; }
     public string? OpcUaAllowUnsecuredReason { get; set; }
 
-    // RM-M5-01-A (ADR 0005): optionales optimization-core-Sidecar-
-    // Adapter-Wiring. Wenn `ScheduleSolver.Backend = "optimization_core"`,
-    // baut der Host die `OptimizationCoreOptions` aus den folgenden
-    // Slots zusammen und registriert den gRPC-Sidecar-Adapter statt
-    // OR-Tools/NoOp. Production verlangt `unix://` oder `https://`
-    // Endpoint (D-02 — `optimization-core-not-hardened-in-production`
-    // bei plaintext-`http://` und `RuntimeProfile=Production`).
+    // RM-M5-01 (ADR 0005): optimization-core-Sidecar-Adapter-Wiring.
+    // Wenn `ScheduleSolver.Backend = "optimization_core"`, baut der
+    // Host die `OptimizationCoreOptions` aus den folgenden Slots
+    // zusammen und registriert den gRPC-Sidecar-Adapter hinter dem
+    // M2-`IScheduleOptimizer`-Port (RM-M5-01-A). Production verlangt
+    // `unix://` oder `https://` als Endpoint (D-02 —
+    // `optimization-core-not-hardened-in-production` bei plaintext-
+    // `http://` und `RuntimeProfile=Production`).
     //
-    // **Sub-Slice-A-Vorbehalt**: die produktive Wire-Integration
-    // (Health-Probe + Version-Negotiation + Optimize-Streaming) lebt
-    // in RM-M5-01-B; ein Production-Boot mit Backend=optimization_core
-    // wird heute beim ersten `OptimizeAsync`-Aufruf
-    // `NotImplementedException` werfen. Der Slot ist bewusst opt-in
-    // damit niemand silent damit produktiv geht.
+    // Wire-Integration ist seit RM-M5-01-B live (Health/Version-Probe
+    // + Optimize-Streaming + Status-Mapping); RM-M5-01-C ergänzt
+    // worker-owned Idempotency, Security-Pins und (Korrektur-Pass)
+    // den lokalen `or_tools`-Fallback via
+    // `OptimizationCoreFallbackBackend`.
     public Uri? OptimizationCoreSidecarEndpoint { get; set; }
     public BatteryEms.Adapters.OptimizationCore.OptimizationCoreRuntimeProfile?
         OptimizationCoreRuntimeProfile { get; set; }
@@ -96,6 +96,17 @@ public sealed class BessHostOptions
     public string? OptimizationCoreTrustedServerCertificatesPath { get; set; }
     public string? OptimizationCoreBearerTokenPath { get; set; }
     public TimeSpan? OptimizationCoreMaxFallbackScheduleAge { get; set; }
+
+    // RM-M5-01-C Korrektur-Pass (plan-RM-M5 §Fallback-Matrix): wenn
+    // Backend=optimization_core, kann hier ein **lokaler Fallback-
+    // Optimizer** konfiguriert werden, der bei Sidecar-Failure
+    // (Deadline/Unavailable/Stream-Crash) eine frische Optimierung
+    // liefert. Default `null` ⇒ kein Fallback ⇒ Transport-Failure
+    // führt direkt auf no_valid_plan + Safe-Stop. Heute unterstützter
+    // Wert: `"or_tools"` (M2-OR-Tools-Adapter als
+    // `IFallbackScheduleOptimizer`). Andere Backends sind explizit
+    // Fehler.
+    public string? OptimizationCoreFallbackBackend { get; set; }
 }
 
 public sealed class BessScheduleSolverOptions

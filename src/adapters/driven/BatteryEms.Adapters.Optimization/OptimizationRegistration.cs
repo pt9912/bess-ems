@@ -1,6 +1,7 @@
 using BatteryEms.Adapters.Optimization.OrTools;
 using BatteryEms.Application.Optimization;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace BatteryEms.Adapters.Optimization;
 
@@ -47,4 +48,60 @@ public static class OptimizationRegistration
         services.AddSingleton<IScheduleOptimizer, OrToolsScheduleOptimizer>();
         return services;
     }
+
+    // RM-M5-01-C Korrektur-Pass (plan-RM-M5 §Fallback-Matrix Zeile
+    // „Timeout/Deadline oder Unavailable vor Ergebnis"): registriert
+    // den OR-Tools-Optimizer als `IFallbackScheduleOptimizer`. Wird
+    // vom `BessHostBuilder` gerufen, wenn das primäre Backend
+    // `optimization_core` und der Fallback-Slot `or_tools` ist.
+    //
+    // Verwendet einen Per-Service-`ScheduleSolverOptions`-Container
+    // (kein `AddSingleton(options)` auf den primären Slot), damit eine
+    // parallele primäre `AddBessScheduleSolver`-Registrierung keinen
+    // Konfigurations-Konflikt erzeugt. Praktisch ist das heute
+    // unmöglich (BessHostBuilder.AddBessScheduleSolver wählt zwischen
+    // backends exklusiv), aber der Schutz hält die Linie robust gegen
+    // spätere Multi-Optimizer-Topologien.
+    public static IServiceCollection AddBessScheduleSolverAsFallback(
+        this IServiceCollection services,
+        Action<ScheduleSolverOptionsBuilder>? configure = null)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        var builder = new ScheduleSolverOptionsBuilder();
+        configure?.Invoke(builder);
+        var options = builder.Build().EnsureValid();
+
+        services.AddSingleton<IFallbackScheduleOptimizer>(sp =>
+        {
+            var inner = new OrToolsScheduleOptimizer(
+                options,
+                sp.GetRequiredService<BatteryEms.Application.Time.IClock>(),
+                sp.GetRequiredService<ILogger<OrToolsScheduleOptimizer>>());
+            return new OrToolsFallbackScheduleOptimizer(inner);
+        });
+        return services;
+    }
+}
+
+// Wrapper, der den OR-Tools-`IScheduleOptimizer` unter
+// `IFallbackScheduleOptimizer` exposed. Vertrag delegiert 1:1 — der
+// Marker existiert ausschließlich für die DI-Disambiguierung im
+// `OptimizationCoreScheduleOptimizer`-Konstruktor.
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812",
+    Justification = "Instantiated by AddBessScheduleSolverAsFallback factory.")]
+internal sealed class OrToolsFallbackScheduleOptimizer : IFallbackScheduleOptimizer
+{
+    private readonly OrToolsScheduleOptimizer _inner;
+
+    public OrToolsFallbackScheduleOptimizer(OrToolsScheduleOptimizer inner)
+    {
+        ArgumentNullException.ThrowIfNull(inner);
+        _inner = inner;
+    }
+
+    public Task<ScheduleOptimizationResult> OptimizeAsync(
+        ScheduleOptimizationRequest request,
+        CancellationToken cancellationToken)
+        => _inner.OptimizeAsync(request, cancellationToken);
 }

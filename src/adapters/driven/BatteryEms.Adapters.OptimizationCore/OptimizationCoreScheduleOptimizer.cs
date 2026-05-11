@@ -35,6 +35,16 @@ namespace BatteryEms.Adapters.OptimizationCore;
 // Gültigkeits-Check (Zeitindex / MaxFallbackScheduleAge / Kontext-
 // Stempel / Telemetrie-Drift), Local-Optimizer-Fallback bei
 // `or_tools`-Backend → alles RM-M5-01-C.
+// CA1506-Schwelle (96) ist überschritten weil dieser Adapter der
+// hexagonale Wire-Endpunkt für den optimization-core-Sidecar ist:
+// gRPC-Generated-Types + Domain-Model + Application-Driven-Ports
+// (IOptimizationIdempotencyStore, IFallbackScheduleOptimizer,
+// IFallbackPlanValidator) + Mapper. Das Coupling ist Pattern-immanent;
+// alle Inputs sind bewusste Driven-Port-Kopplungen aus plan-RM-M5
+// §Komponenten.
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Maintainability", "CA1506",
+    Justification = "Sidecar-Adapter-Top-Level: koppelt M2-Domain, gRPC-Wire-Typen, Idempotency-Store, Fallback-Optimizer und Plan-Validator — Pattern-immanent.")]
 internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, IDisposable
 {
     private const string SolverName = "optimization-core";
@@ -44,6 +54,13 @@ internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, ID
     private readonly IOptimizationIdempotencyStore _idempotencyStore;
     private readonly IClock _clock;
     private readonly ILogger<OptimizationCoreScheduleOptimizer> _logger;
+    // RM-M5-01-C Korrektur-Pass: optionaler lokaler Fallback-Optimizer
+    // (z. B. OR-Tools) + Plan-Validator gemäß plan-RM-M5 §Fallback-Matrix
+    // Zeile „Timeout/Deadline oder Unavailable vor Ergebnis". Beide
+    // sind via DI optional — fehlt der Fallback, gilt no_valid_plan +
+    // Safe-Stop.
+    private readonly IFallbackScheduleOptimizer? _fallbackOptimizer;
+    private readonly IFallbackPlanValidator? _planValidator;
     private readonly SemaphoreSlim _versionProbeGate = new(1, 1);
     private bool _versionProbeDone;
     private bool _disposed;
@@ -53,7 +70,9 @@ internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, ID
         OptimizationCoreOptions options,
         IOptimizationIdempotencyStore idempotencyStore,
         IClock clock,
-        ILogger<OptimizationCoreScheduleOptimizer> logger)
+        ILogger<OptimizationCoreScheduleOptimizer> logger,
+        IFallbackScheduleOptimizer? fallbackOptimizer = null,
+        IFallbackPlanValidator? planValidator = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(options);
@@ -61,12 +80,26 @@ internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, ID
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(logger);
         options.EnsureValid(logger);
+        // Plan-Validator muss vorhanden sein wenn ein Fallback konfiguriert
+        // ist — sonst ginge der validator-check stillschweigend baden,
+        // was gegen plan-RM-M5 §Fallback-Plan-Gueltigkeit verstößt.
+        if (fallbackOptimizer is not null && planValidator is null)
+        {
+            throw new InvalidOperationException(
+                "optimization-core-fallback-without-validator: an "
+                + "IFallbackScheduleOptimizer was registered but no "
+                + "IFallbackPlanValidator. The validator is mandatory "
+                + "when a local fallback is active (plan-RM-M5 "
+                + "§Fallback-Plan-Gueltigkeit).");
+        }
 
         _client = client;
         _options = options;
         _idempotencyStore = idempotencyStore;
         _clock = clock;
         _logger = logger;
+        _fallbackOptimizer = fallbackOptimizer;
+        _planValidator = planValidator;
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
@@ -120,6 +153,19 @@ internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, ID
         }
         catch (RpcException ex)
         {
+            // Plan-RM-M5 §Fallback-Matrix: Sidecar-Connect-/Health-/
+            // Version-Pfad scheitert ⇒ Lokaler Optimierer-Fallback wenn
+            // konfiguriert; sonst no_valid_plan + Safe-Stop.
+            var fallbackOutcome = await TryRunFallbackAsync(
+                request, horizonStartUtc, cancellationToken).ConfigureAwait(false);
+            if (fallbackOutcome is not null)
+            {
+                return await FinalizeAndReturnAsync(
+                    requestId, fallbackOutcome,
+                    OptimizationTerminalState.FallbackCommitted,
+                    "local-optimizer-fallback-committed", cancellationToken)
+                    .ConfigureAwait(false);
+            }
             var outcome = OptimizationCoreStatusMapper.ClassifyTransport(ex.StatusCode);
             var transportFailed = BuildFailedResult(
                 request,
@@ -165,6 +211,19 @@ internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, ID
 
             if (final is null)
             {
+                // Stream-Crash mid-Optimize ⇒ Fallback-Versuch wenn
+                // verfügbar (plan-RM-M5 §Fallback-Matrix „Timeout/
+                // Deadline oder Unavailable vor Ergebnis").
+                var fallbackOutcome = await TryRunFallbackAsync(
+                    request, horizonStartUtc, cancellationToken).ConfigureAwait(false);
+                if (fallbackOutcome is not null)
+                {
+                    return await FinalizeAndReturnAsync(
+                        requestId, fallbackOutcome,
+                        OptimizationTerminalState.FallbackCommitted,
+                        "local-optimizer-fallback-committed", cancellationToken)
+                        .ConfigureAwait(false);
+                }
                 var streamFailed = BuildFailedResult(
                     request,
                     horizonStartUtc,
@@ -198,6 +257,20 @@ internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, ID
         }
         catch (RpcException ex)
         {
+            // Sidecar-RpcException während des Optimize-Streams ⇒
+            // Fallback-Versuch wenn verfügbar (plan-RM-M5 §Fallback-
+            // Matrix). Status-Mapper-Outcome wird nur verwendet wenn
+            // kein Fallback registriert oder Fallback fehlschlägt.
+            var fallbackOutcome = await TryRunFallbackAsync(
+                request, horizonStartUtc, cancellationToken).ConfigureAwait(false);
+            if (fallbackOutcome is not null)
+            {
+                return await FinalizeAndReturnAsync(
+                    requestId, fallbackOutcome,
+                    OptimizationTerminalState.FallbackCommitted,
+                    "local-optimizer-fallback-committed", cancellationToken)
+                    .ConfigureAwait(false);
+            }
             var outcome = OptimizationCoreStatusMapper.ClassifyTransport(ex.StatusCode);
             var rpcFailed = BuildFailedResult(
                 request,
@@ -235,6 +308,90 @@ internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, ID
                 "transport-cancelled", cancellationToken)
                 .ConfigureAwait(false);
         }
+    }
+
+    // Plan-RM-M5 §Fallback-Matrix Zeile „Timeout/Deadline oder
+    // Unavailable vor Ergebnis": versuche den lokalen Optimierer-
+    // Fallback (falls registriert), validiere den produzierten Plan
+    // gegen den 4-Achsen-Check und liefere ein `FallbackCommitted`-
+    // taugliches `ScheduleOptimizationResult` zurück. Liefert `null`
+    // wenn kein Fallback verfügbar ist, der Fallback selbst scheitert,
+    // kein Schedule produziert oder die Validation fehlschlägt — der
+    // Caller geht dann auf den `no_valid_plan`-Pfad.
+    //
+    // Wichtig: `OperationCanceledException` propagieren wir bewusst
+    // weiter; der Caller hat einen eigenen Cancelled-Pfad mit
+    // korrekter Idempotency-Finalisierung. Alle anderen Fallback-
+    // Exceptions werden geloggt und zu `null` reduziert (fail-closed).
+    private async Task<ScheduleOptimizationResult?> TryRunFallbackAsync(
+        ScheduleOptimizationRequest request,
+        DateTimeOffset horizonStartUtc,
+        CancellationToken cancellationToken)
+    {
+        if (_fallbackOptimizer is null || _planValidator is null)
+        {
+            return null;
+        }
+
+        OptimizationCoreLog.LogFallbackAttempt(_logger, request.AssetId);
+        ScheduleOptimizationResult fallbackResult;
+        try
+        {
+            fallbackResult = await _fallbackOptimizer.OptimizeAsync(
+                request, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+#pragma warning disable CA1031 // Fail-closed: jeder andere Fallback-Fehler ⇒ no-valid-plan
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            OptimizationCoreLog.LogFallbackFailed(_logger, request.AssetId, ex);
+            return null;
+        }
+
+        if (fallbackResult.ProducedSchedule is null)
+        {
+            // Fallback-Optimizer hat selbst keinen brauchbaren Plan
+            // produziert (Infeasible/Failed). Kein Schedule → kein
+            // Validator-Aufruf nötig.
+            OptimizationCoreLog.LogFallbackProducedNoSchedule(
+                _logger, request.AssetId, fallbackResult.Run.TerminationCode);
+            return null;
+        }
+
+        // Plan-RM-M5 §Fallback-Plan-Gueltigkeit: Kontext-Stempel +
+        // Horizon-Alignment + MaxAge + Telemetrie-Drift. Adapter hat
+        // keinen Telemetrie-Snapshot im Scope — Drift-Achse wird
+        // dadurch im Validator skip'd (siehe DefaultFallbackPlanValidator
+        // §CheckTelemetryDrift). Die 3 anderen Achsen laufen aktiv.
+        var candidate = new FallbackPlanCandidate(
+            Schedule: fallbackResult.ProducedSchedule,
+            CreatedAtUtc: _clock.UtcNow);
+        var context = new FallbackPlanContext(
+            AssetId: request.AssetId,
+            ScheduleType: request.ScheduleType,
+            CurrentTickUtc: _clock.UtcNow,
+            HorizonStart: horizonStartUtc,
+            HorizonEnd: request.HorizonEnd.ToUniversalTime(),
+            TimeStep: request.TimeStep,
+            MarketBidArea: request.MarketBidArea,
+            Asset: request.Asset,
+            CurrentTelemetry: null);
+        var validation = _planValidator.Validate(candidate, context);
+        if (!validation.IsValid)
+        {
+            OptimizationCoreLog.LogFallbackRejected(
+                _logger, request.AssetId,
+                validation.Reason, validation.Detail ?? string.Empty);
+            return null;
+        }
+
+        OptimizationCoreLog.LogFallbackCommitted(
+            _logger, request.AssetId, fallbackResult.Run.SolverName);
+        return fallbackResult;
     }
 
     // Plan-RM-M5 §Fallback-Taxonomie: kebab-case-Reason aus dem
@@ -766,4 +923,31 @@ internal static partial class OptimizationCoreLog
         Message = "optimization-core duplicate request asset_id={AssetId} request_id={RequestId}")]
     public static partial void LogDuplicateRequest(
         ILogger logger, string assetId, string requestId);
+
+    [LoggerMessage(EventId = 5115, Level = LogLevel.Information,
+        Message = "optimization-core fallback attempt asset_id={AssetId}")]
+    public static partial void LogFallbackAttempt(ILogger logger, string assetId);
+
+    [LoggerMessage(EventId = 5116, Level = LogLevel.Warning,
+        Message = "optimization-core fallback failed asset_id={AssetId}; fall through to no-valid-plan")]
+    public static partial void LogFallbackFailed(
+        ILogger logger, string assetId, Exception ex);
+
+    [LoggerMessage(EventId = 5117, Level = LogLevel.Warning,
+        Message = "optimization-core fallback produced no schedule asset_id={AssetId} termination={TerminationCode}")]
+    public static partial void LogFallbackProducedNoSchedule(
+        ILogger logger, string assetId, string terminationCode);
+
+    [LoggerMessage(EventId = 5118, Level = LogLevel.Warning,
+        Message = "optimization-core fallback rejected by plan-validator asset_id={AssetId} reason={Reason} detail={Detail}")]
+    public static partial void LogFallbackRejected(
+        ILogger logger,
+        string assetId,
+        BatteryEms.Application.Optimization.FallbackReason reason,
+        string detail);
+
+    [LoggerMessage(EventId = 5119, Level = LogLevel.Information,
+        Message = "optimization-core fallback committed asset_id={AssetId} solver={SolverName}")]
+    public static partial void LogFallbackCommitted(
+        ILogger logger, string assetId, string solverName);
 }
