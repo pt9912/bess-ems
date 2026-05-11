@@ -157,6 +157,7 @@ public sealed class ControlCycleTracingTests
             repo,
             metrics,
             new FakeClock(),
+            new BatteryEms.Application.Markets.InMemoryTimebaseHealthSource(),
             NullLogger<ControlCycleHostedService>.Instance,
             // 1-hour interval: PeriodicTimer fires the first tick
             // immediately, then waits an hour for the next — by that

@@ -74,6 +74,7 @@ public sealed class ControlCycleHostedServiceTests
             repo,
             metrics,
             new FakeClock(),
+            new BatteryEms.Application.Markets.InMemoryTimebaseHealthSource(),
             NullLogger<ControlCycleHostedService>.Instance,
             Options.Create(new WorkerOptions { CycleInterval = TimeSpan.FromMilliseconds(20) }));
         return (service, harness);

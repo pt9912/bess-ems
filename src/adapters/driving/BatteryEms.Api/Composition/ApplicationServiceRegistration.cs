@@ -51,7 +51,16 @@ public static class ApplicationServiceRegistration
         // last-activation state holder (audit + /health surface), the
         // production-gate provider (fail-closed on security-profile
         // until F-12), and the activation use-case itself.
-        services.AddSingleton<ITimebaseHealthSource, InMemoryTimebaseHealthSource>();
+        // M4-03 Finding-2 fix: ein einziger InMemoryTimebaseHealthSource-
+        // Singleton bedient beide Driven Ports — `ITimebaseHealthSource`
+        // (Reader-Pfad für Use-Case/PreconditionProvider/Health-Endpoint)
+        // und `ITimebaseHealthObserver` (Writer-Pfad für den ControlCycle-
+        // HostedService, der pro Tick `Observe(bool)` ruft).
+        services.AddSingleton<InMemoryTimebaseHealthSource>();
+        services.AddSingleton<ITimebaseHealthSource>(
+            sp => sp.GetRequiredService<InMemoryTimebaseHealthSource>());
+        services.AddSingleton<ITimebaseHealthObserver>(
+            sp => sp.GetRequiredService<InMemoryTimebaseHealthSource>());
         services.AddSingleton<IActivationDispatchSource, InMemoryActivationDispatchSource>();
         services.AddSingleton<IRegelleistungActivationStateStore, InMemoryRegelleistungActivationStateStore>();
         services.AddSingleton<IProductionPreconditionProvider, DefaultProductionPreconditionProvider>();

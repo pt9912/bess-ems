@@ -14,4 +14,8 @@
     <ProjectReference Include="..\..\..\hexagon\BatteryEms.Domain\BatteryEms.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="BatteryEms.Worker.Tests" />
+  </ItemGroup>
+
 </Project>

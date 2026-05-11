@@ -45,6 +45,8 @@ public sealed class WorkerRegistrationTests
         services.AddSingleton<IControlCycleMetrics>(NoOpControlCycleMetrics.Instance);
         services.AddSingleton<IBatteryTelemetrySource, NoOpBatteryTelemetrySource>();
         services.AddSingleton<IBatteryCommandSink, NoOpBatteryCommandSink>();
+        services.AddSingleton<BatteryEms.Application.Markets.ITimebaseHealthObserver,
+            BatteryEms.Application.Markets.InMemoryTimebaseHealthSource>();
 
         services.AddBessWorker(configuration);
 

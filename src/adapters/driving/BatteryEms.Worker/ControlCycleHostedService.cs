@@ -2,6 +2,7 @@ using System.Diagnostics;
 using BatteryEms.Application.Assets;
 using BatteryEms.Application.Control;
 using BatteryEms.Application.IO;
+using BatteryEms.Application.Markets;
 using BatteryEms.Application.Observability;
 using BatteryEms.Application.Persistence;
 using BatteryEms.Application.Time;
@@ -27,8 +28,19 @@ public sealed partial class ControlCycleHostedService : BackgroundService
     private readonly ICommandRepository _commandRepository;
     private readonly IControlCycleMetrics _metrics;
     private readonly IClock _clock;
+    private readonly ITimebaseHealthObserver _timebaseObserver;
     private readonly ILogger<ControlCycleHostedService> _logger;
     private readonly WorkerOptions _options;
+
+    // Plan-RM-M4-03 §144 Finding-2-Wiring: tick-level Clock-Anomaly-
+    // Detection füttert die `ITimebaseHealthObserver`-Maschine. Wir
+    // halten den Timestamp des vorherigen Ticks, vergleichen pro Tick
+    // gegen den erwarteten `CycleInterval`, und melden Anomalien als
+    // Violation. Der State wird per `lock` geschützt damit ein
+    // potentieller späterer Concurrent-Cycle (Multi-Asset-Future) keine
+    // Race-Beobachtung produziert.
+    private readonly object _timebaseGate = new();
+    private DateTimeOffset? _previousTickTimestamp;
 
     public ControlCycleHostedService(
         IControlCycleUseCase cycle,
@@ -37,6 +49,7 @@ public sealed partial class ControlCycleHostedService : BackgroundService
         ICommandRepository commandRepository,
         IControlCycleMetrics metrics,
         IClock clock,
+        ITimebaseHealthObserver timebaseObserver,
         ILogger<ControlCycleHostedService> logger,
         IOptions<WorkerOptions> options)
     {
@@ -46,6 +59,7 @@ public sealed partial class ControlCycleHostedService : BackgroundService
         ArgumentNullException.ThrowIfNull(commandRepository);
         ArgumentNullException.ThrowIfNull(metrics);
         ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(timebaseObserver);
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(options);
 
@@ -55,6 +69,7 @@ public sealed partial class ControlCycleHostedService : BackgroundService
         _commandRepository = commandRepository;
         _metrics = metrics;
         _clock = clock;
+        _timebaseObserver = timebaseObserver;
         _logger = logger;
         _options = options.Value;
     }
@@ -82,6 +97,8 @@ public sealed partial class ControlCycleHostedService : BackgroundService
 
     private async Task TickAsync(CancellationToken cancellationToken)
     {
+        ObserveTimebaseClock();
+
         foreach (var asset in _assets.GetAll())
         {
             if (cancellationToken.IsCancellationRequested)
@@ -91,6 +108,49 @@ public sealed partial class ControlCycleHostedService : BackgroundService
 
             await ExecuteForAssetAsync(asset.AssetId, cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    // Plan-RM-M4-03 §144 Finding-2-Wiring: pro Tick Clock-Anomalien
+    // erkennen und an die `ITimebaseHealthObserver`-Maschine melden.
+    // Klassifikation in `ComputeTimebaseViolation`; hier nur State-
+    // Übergang + Observer-Call. State per `lock` damit eine spätere
+    // Multi-Asset-Concurrent-Cycle-Variante keine Race-Beobachtung
+    // produziert.
+    private void ObserveTimebaseClock()
+    {
+        var now = _clock.UtcNow;
+        bool violation;
+        lock (_timebaseGate)
+        {
+            violation = ComputeTimebaseViolation(
+                _previousTickTimestamp, now, _options.CycleInterval);
+            _previousTickTimestamp = now;
+        }
+        _timebaseObserver.Observe(violation);
+    }
+
+    // Pure: klassifiziert ein Tick-zu-Tick-Delta als Violation oder
+    // stable. Eine Violation ist eines von:
+    //   (a) Delta < 0  → Clock-Rückspring (NTP-Step rückwärts oder Host-
+    //       Suspend mit fehlerhafter Resync).
+    //   (b) Delta > 2 × CycleInterval → ausgelassener Tick (Host stalled,
+    //       PeriodicTimer hat überrollt, Clock sprang vorwärts).
+    // Drift im Bereich [0, 2×Interval] gilt als stable; das toleriert
+    // normalen Scheduling-Jitter (PeriodicTimer kann unter Last leicht
+    // verspätet feuern). Erster Tick nach Boot hat keinen Vergleichs-
+    // Anker → wird als stable gemeldet, der Zustand bleibt im Initial-
+    // Healthy.
+    internal static bool ComputeTimebaseViolation(
+        DateTimeOffset? previousTickTimestamp,
+        DateTimeOffset currentTickTimestamp,
+        TimeSpan cycleInterval)
+    {
+        if (previousTickTimestamp is not { } previous)
+        {
+            return false;
+        }
+        var delta = currentTickTimestamp - previous;
+        return delta < TimeSpan.Zero || delta > cycleInterval * 2;
     }
 
     private async Task ExecuteForAssetAsync(string assetId, CancellationToken cancellationToken)
