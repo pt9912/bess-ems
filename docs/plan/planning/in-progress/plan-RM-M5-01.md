@@ -1,19 +1,19 @@
 # Plan RM-M5-01 — gRPC-Sidecar `optimization-core` (Contract-Slice)
 
 **Dokumenttyp:** Slice-Plan (Detail-Plan zum Master-Arbeitspaket RM-M5-01)
-**Status:** ✅ Abgeschlossen am 2026-05-11 — alle 4 Sub-Slices RM-M5-01-A..D grün
+**Status:** 🟡 In Arbeit — A/B/D grün, C 🟡 (Korrektur-Pass nach externem Review am 2026-05-11)
 **Bezug:**
-[`../in-progress/plan-RM-M5.md`](../in-progress/plan-RM-M5.md) (Master-Plan, RM-M5-01-Zeile mit
+[`plan-RM-M5.md`](plan-RM-M5.md) (Master-Plan, RM-M5-01-Zeile mit
 DoD plus Sidecar-Status-Taxonomie, Fallback-Matrix, Idempotenz-Vertrag,
 Contract-Versions-Vertrag),
 [`../../adr/0005-optimization-core-sidecar-transport.md`](../../adr/0005-optimization-core-sidecar-transport.md)
 (gRPC-Transport-Adoption: §2 Entscheidungs-Tabelle, §3 verworfene
 Alternativen, §4 Security-Modell, §5 Contract-Versionierung, §6
 Mocking-Strategie, §9 Sequenz Schritt 3 = dieser Slice),
-[`plan-RM-M4-05.md`](plan-RM-M4-05.md) (Sub-Slice-
+[`../done/plan-RM-M4-05.md`](../done/plan-RM-M4-05.md) (Sub-Slice-
 Cut-Pattern A/B/C/D, Embedded-TestServer-Fixture-Pattern,
 Cert-Trust-Bridge — wird hier auf gRPC-mTLS adaptiert),
-[`plan-RM-M2-optimization.md`](plan-RM-M2-optimization.md)
+[`../done/plan-RM-M2-optimization.md`](../done/plan-RM-M2-optimization.md)
 (M2-OptimizationRun-Modell, IScheduleOptimizer-Driven-Port, der vom
 Sidecar-Adapter hinter den bestehenden Optimierungsports bedient wird),
 [`../../../../spec/lastenheft.md`](../../../../spec/lastenheft.md)
@@ -264,8 +264,8 @@ auf der die anderen aufbauen.
 | ------ | -- | ----- | --- |
 | ✅ | RM-M5-01-A | Proto-Vertrag + .NET-Adapter-Skelett + Transport-Mapping-Artefakt — **~600-900 LOC** | Neues Top-Level-Verzeichnis `proto/optimization-core/v1/` mit `optimization_core.proto`: Package `bess.optimization_core.v1`, Service `OptimizationCore`, RPCs `Health` (returns `HealthResponse`), `Version` (returns `VersionResponse { contract_version, min_compatible_version, max_compatible_version, repeated string features }`), `Optimize` (streams `OptimizeProgress`, terminal `OptimizeResult`), `OptimizeMpc` (Vertrag-only, RM-M5-02 implementiert Backend), `Cancel` (returns `Empty`). Message-Schema deckt `OptimizationRequest` (asset_id, schedule_type, horizon_start, horizon_end, time_step, constraints, request_id, idempotency_key, deadline), `OptimizationResponse` (solver_status, has_usable_solution, solution_quality, schedule_points, objective_value, run_id, termination_reason). Field-Numbers fix, Backward-Compat-Disziplin im Proto-Header dokumentiert. Neues Adapter-Projekt `src/adapters/driven/BatteryEms.Adapters.OptimizationCore/` mit `OptimizationCoreOptions`-Record, `OptimizationCoreClient`-Wrapper über `Grpc.Net.Client.GrpcChannel`, `OptimizationCoreScheduleOptimizer : IScheduleOptimizer`-Implementierung (Health+Version-Probe vor erstem Optimize, Transport-Mapping-Lookup, M2-`OptimizationRun`-Output). `AddBessOptimizationCore`-Extension. `BessHostOptions`-Slots durchgereicht. `OptimizationCoreOptions.EnsureValid` mit Profile-Awareness (Production+plaintext → throws). Sidecar-Status-Taxonomie-Mapping in `OptimizationCoreStatusMapper`-static-class plus versionierte Doku-Tabelle in `proto/optimization-core/v1/transport-mapping-v1.md`. Tests (`BatteryEms.Adapters.OptimizationCore.Tests`): 10+ Pins (Options-EnsureValid-Matrix, Status-Mapper-Tabelle, Defaults-Pin, BessHostOptions-Wiring). `Grpc.Tools`-NuGet im Adapter-`.csproj` für Source-Generator. Keine Wire-Roundtrip-Tests in diesem Sub-Slice (das ist B). |
 | ✅ | RM-M5-01-B | In-Process TestSidecar + Mocking-Pattern + erster Roundtrip-Pin — **~500-700 LOC** | Neues Test-Projekt `tests/integration/BatteryEms.OptimizationCore.IntegrationTests/`. `EmbeddedOptimizationCoreSidecar : IAsyncDisposable`-Fixture startet `Grpc.AspNetCore`-WebApplicationFactory mit `OptimizationCoreBase`-Stub auf einem Per-Test-UDS in `Path.GetTempPath()`. Zwei Stub-Klassen: `OptimalAlwaysSucceedsStub` (echo-Stub mit `optimal`-Status) + `ScriptableOutcomeStub` (Per-Test-Queue `Action<OptimizeRequest, IServerStreamWriter<OptimizeProgress>>`). Test-Klassen `OptimizationCoreRoundtripTests` mit 5 Pins (Health-Probe, Version-Probe-Match, Optimize-Success-Optimal, Optimize-Streaming-Progress, Cancellation-mid-Stream). `OptimizationCoreNegativeTests` mit 4 Pins (Deadline-Exceeded → `solver_time_limit`, Unavailable-Crash-mid-Request → `sidecar_unavailable`-Fallback, Infeasible-Sidecar-Result → keine neue Schedule-Version, Invalid-Trajectory-Output → verwirft-Result). Dockerfile-Stage `test-hil-optimization-core` (neu); Makefile-Target gleichnamig (neu); CI-Verdrahtung in `make gates` und `make ci` analog zur `test-hil-opcua`-Linie. Quality-Doku §2.6 wird in C/D synchronisiert. |
-| ✅ | RM-M5-01-C | Idempotency-Store + Fallback-Matrix + Plan-Gültigkeits-Check + Security-Pins — **~700-1000 LOC** | Neue Migration `migrations/0003_optimization_idempotency.sql` (Tabelle `optimization_idempotency` mit Unique-Constraint auf `request_id`, plus `terminal_state`/`terminal_reason`/`run_id`/`produced_version`/`created_at`/`committed_at`). `IIdempotencyStore`-Driven-Port (Application) + `DapperIdempotencyStore`-Adapter (Persistence). Atomare CAS-Operation `TryFinalizeAsync(requestId, state, reason, runId, version)`. `OptimizationCoreScheduleOptimizer` legt pre-Sidecar einen `pending`-Eintrag an (oder liest existierenden Terminalzustand für Duplicate-Detection); post-Sidecar CAS auf `sidecar_committed` oder `fallback_committed` oder `failed_no_activation`. Late-Response-Handler erkennt bereits-finalisierte `request_id` und gibt `late_response_ignored` ohne zweite Aktivierung zurück. Plan-Gültigkeits-Check `IsFallbackCandidateValidAsync` prüft Zeitindex / MaxFallbackScheduleAge (Default `min(Schedule.TimeStep, 2 * ControlCycleInterval)`) / Kontext-Stempel / Telemetrie-Drift; jede Invalidation liefert maschinenlesbaren Reason aus der Fallback-Taxonomie. Fallback-Matrix-Implementierung: Deadline/Unavailable/Crash → wenn `or_tools`-Backend konfiguriert, lokaler Optimierer-Fallback mit `fallback_source=local_optimizer`; sonst `no_valid_plan` + Safe-Stop. Infeasible/Invalid-Trajectory → keine neue Schedule-Version. Invalid-Snapshot pre-Sidecar → kein Sidecar-Request, Precheck-Failure. Security-Pins: UDS-Mode-0644 → Startup-Fehler `optimization-core-uds-permissions-not-locked`; mTLS-Client-Cert-Mismatch → `unauthorized_client`; HTTPS-Client gegen plaintext-Sidecar → `sidecar_unavailable`; Production+plaintext → Startup-Fehler `optimization-core-not-hardened-in-production`. Tests (10+ neue Pins in `OptimizationCoreNegativeTests` und neuer `OptimizationCoreSecurityTests`, plus 12+ Persistence-Pins in `BatteryEms.Adapters.Persistence.Tests` für die Idempotency-Tabelle inkl. CAS-Race und Restart-Replay). |
-| ✅ | RM-M5-01-D | Mixed-Version-Compat-Tests + Quality-Doku + Master-Plan-Cleanup — **~300-500 LOC** | Vier Mixed-Version-Pins in `OptimizationCoreNegativeTests`: (i) Worker `contract_version=1.0`, Sidecar `1.0` → ✅ Optimize-Success; (ii) Worker `1.0`, Sidecar `0.5` (incompatible) → `contract_incompatible`-Fallback + kein Optimize-Request; (iii) Worker `1.0`, Sidecar `2.0` mit `min_compatible_version=2.0` → `contract_incompatible`-Fallback; (iv) Worker erwartet Feature `has-usable-solution`, Sidecar meldet leeres `features`-Array → `contract_incompatible` + Fallback. `ScriptableOutcomeStub` bekommt zwei zusätzliche Per-Test-Slots `OverrideVersionResponse` und `OverrideFeatures`. Quality-Doku §2.6 wird erweitert um `make test-hil-optimization-core` als Mandatory Gate plus Pin-Inventory-Tabelle (5 happy + 4 negativ + 4 mixed-version + 4 security = 17 Pins). Plan-RM-M5 Master-DoD für RM-M5-01: bei Closure flippt die Zeile auf ✅ mit dem in §5 D-05 vorab gepinnten Replacement-Text. F-Folgearbeiten (siehe §9) in `note-RM-M5-followups.md` (neu) anlegen. **Slice-Plan** wird nach `done/plan-RM-M5-01.md` verschoben. |
+| 🟡 | RM-M5-01-C | Idempotency-Store + Fallback-Matrix + Plan-Gültigkeits-Check + Security-Pins — **~700-1000 LOC** + Korrektur-Pass +~350-450 LOC | Neue Migration `migrations/0003_optimization_idempotency.sql` (Tabelle `optimization_idempotency` mit Unique-Constraint auf `request_id`, plus `terminal_state`/`terminal_reason`/`run_id`/`produced_version`/`created_at`/`committed_at`). `IIdempotencyStore`-Driven-Port (Application) + `DapperIdempotencyStore`-Adapter (Persistence). Atomare CAS-Operation `TryFinalizeAsync(requestId, state, reason, runId, version)`. `OptimizationCoreScheduleOptimizer` legt pre-Sidecar einen `pending`-Eintrag an (oder liest existierenden Terminalzustand für Duplicate-Detection); post-Sidecar CAS auf `sidecar_committed` oder `fallback_committed` oder `failed_no_activation`. Late-Response-Handler erkennt bereits-finalisierte `request_id` und gibt `late_response_ignored` ohne zweite Aktivierung zurück. Plan-Gültigkeits-Check `IsFallbackCandidateValidAsync` prüft Zeitindex / MaxFallbackScheduleAge (Default `min(Schedule.TimeStep, 2 * ControlCycleInterval)`) / Kontext-Stempel / Telemetrie-Drift; jede Invalidation liefert maschinenlesbaren Reason aus der Fallback-Taxonomie. Fallback-Matrix-Implementierung: Deadline/Unavailable/Crash → wenn `or_tools`-Backend konfiguriert, lokaler Optimierer-Fallback mit `fallback_source=local_optimizer`; sonst `no_valid_plan` + Safe-Stop. Infeasible/Invalid-Trajectory → keine neue Schedule-Version. Invalid-Snapshot pre-Sidecar → kein Sidecar-Request, Precheck-Failure. Security-Pins: UDS-Mode-0644 → Startup-Fehler `optimization-core-uds-permissions-not-locked`; mTLS-Client-Cert-Mismatch → `unauthorized_client`; HTTPS-Client gegen plaintext-Sidecar → `sidecar_unavailable`; Production+plaintext → Startup-Fehler `optimization-core-not-hardened-in-production`. Tests (10+ neue Pins in `OptimizationCoreNegativeTests` und neuer `OptimizationCoreSecurityTests`, plus 12+ Persistence-Pins in `BatteryEms.Adapters.Persistence.Tests` für die Idempotency-Tabelle inkl. CAS-Race und Restart-Replay). |
+| 🟡 | RM-M5-01-D | Mixed-Version-Compat-Tests + Quality-Doku + Master-Plan-Cleanup — **~300-500 LOC** (Mixed-Version-Pins ✅, Doku/Closure 🟡 bis Sub-Slice-C-Korrektur abgeschlossen) | Vier Mixed-Version-Pins in `OptimizationCoreNegativeTests`: (i) Worker `contract_version=1.0`, Sidecar `1.0` → ✅ Optimize-Success; (ii) Worker `1.0`, Sidecar `0.5` (incompatible) → `contract_incompatible`-Fallback + kein Optimize-Request; (iii) Worker `1.0`, Sidecar `2.0` mit `min_compatible_version=2.0` → `contract_incompatible`-Fallback; (iv) Worker erwartet Feature `has-usable-solution`, Sidecar meldet leeres `features`-Array → `contract_incompatible` + Fallback. `ScriptableOutcomeStub` bekommt zwei zusätzliche Per-Test-Slots `OverrideVersionResponse` und `OverrideFeatures`. Quality-Doku §2.6 wird erweitert um `make test-hil-optimization-core` als Mandatory Gate plus Pin-Inventory-Tabelle (5 happy + 4 negativ + 4 mixed-version + 4 security = 17 Pins). Plan-RM-M5 Master-DoD für RM-M5-01: bei Closure flippt die Zeile auf ✅ mit dem in §5 D-05 vorab gepinnten Replacement-Text. F-Folgearbeiten (siehe §9) in `note-RM-M5-followups.md` (neu) anlegen. **Slice-Plan** wird nach `done/plan-RM-M5-01.md` verschoben. |
 
 ---
 
@@ -374,23 +374,50 @@ RPC-Slot im Vertrag verhindert späteren breaking-change.
 
 ---
 
-## 5.1 Closure-Notiz (Sub-Slice D)
+## 5.1 Korrektur-Notiz Sub-Slice C (Review-Pass 2026-05-11)
 
-Pin-Count-Delta: das vorab-gepinnte D-05-Master-Plan-Replacement-Wort
-sprach von „17 Pins (5 happy + 4 negativ + 4 mixed-version + 4
-security)". Bei der RM-M5-01-D-Closure ist die Realität 20 Pins —
-das zusätzliche Trio sind die drei adapter-side Idempotency-Pins in
-`OptimizationCoreIdempotencyTests.cs`, die in RM-M5-01-C-step-1 als
-zusätzliche Wire-Pins gegen den `IOptimizationIdempotencyStore`-
-Driven-Port angelegt wurden (jenseits der 4 Negative-Pins die §4
-RM-M5-01-C explizit gefordert hat). Plus 13 Persistence-Pins in
-`BatteryEms.Persistence.IntegrationTests` für den Dapper-backed
-Idempotency-Store (Plan §4 RM-M5-01-C hatte „12+" angesetzt).
+Externer Review-Pass nach der ersten RM-M5-01-D-Closure hat drei
+Gaps gegen Sub-Slice-C-DoD aufgedeckt. Die Closure wurde
+zurückgenommen (Slice-Plan zurück nach `in-progress/`, Master-Plan
+RM-M5-01-Zeile auf 🟡), bis der Korrektur-Pass landet:
 
-Der Master-Plan-Eintrag in `plan-RM-M5.md` reflektiert die Realität
-(20 + 13); das vorab-gepinnte D-05-Wortlaut-Asset bleibt im Slice-
-Plan als historischer Replacement-Text erhalten. Diese Inkonsistenz
-ist die einzige bewusste Abweichung vom vorab-gepinnten Text.
+- **Finding 1 — Lokaler `or_tools`-Fallback nicht im
+  `OptimizationCoreScheduleOptimizer.OptimizeAsync`-Flow wirksam.**
+  Plan §3 + §4 Sub-Slice-C-DoD verlangt: „Deadline/Unavailable/Crash
+  → wenn `or_tools`-Backend konfiguriert, lokaler Optimierer-
+  Fallback mit `fallback_source=local_optimizer`; sonst
+  `no_valid_plan` + Safe-Stop". Heute landen alle Transport-Failure-
+  Branches in `FailedNoActivation` ohne Fallback-Versuch.
+- **Finding 2 — `IFallbackPlanValidator` gebaut + 14 Pins grün, aber
+  nicht in den Laufzeit-Flow integriert.** Plan §3 verlangt
+  `OptimizationCoreScheduleOptimizer.IsFallbackCandidateValidAsync`
+  prüft Zeitindex / MaxFallbackScheduleAge / Kontext-Stempel /
+  Telemetrie-Drift; die Hooks existieren in Application + DI, der
+  Aufruf-Pfad im Adapter fehlt.
+- **Finding 3 — `BessHostOptions.cs:89` stale Kommentar zu
+  `NotImplementedException` aus Sub-Slice-A-Stand; Wire-Integration
+  ist seit Sub-Slice-B live.**
+
+**Korrektur-Pass-Scope:** neuer Driven-Port
+`IFallbackScheduleOptimizer : IScheduleOptimizer` (Marker-Interface),
+optionale Injection in `OptimizationCoreScheduleOptimizer`,
+Validator-Aufruf gegen den Fallback-Optimizer-Output (Kontext-
+Stempel + Telemetrie-Drift; Telemetrie-Drift bleibt skip-bar wenn
+Adapter keinen Snapshot hat), `BessHostBuilder` registriert OR-
+Tools-Adapter als `IFallbackScheduleOptimizer` wenn
+`BessHostOptions.OptimizationCoreFallbackBackend = "or_tools"`,
+plus 5 neue Pins (fallback-success, fallback-fails, no-fallback,
+sidecar-success-no-fallback-called, validator-rejects). Bewusst
+**out of scope für den Korrektur-Pass**: Lookup eines „letzter
+bekannter Plan" via `IScheduleRepository` als sekundäre Fallback-
+Quelle (Adapter-Seitige Domain-Repo-Querys wären Hexagonal-
+Verletzung) — diese Variante landet als F-M5-05 in
+`note-RM-M5-followups.md` mit Trigger „erste Use-Case-Schicht-
+Anforderung nach Plan-Persistenz als Backup-Quelle".
+
+Pin-Count-Buchhaltung wird im D-05-Replacement-Text bei Re-Closure
+aktualisiert (heute Stand: 20 OptimizationCore-Pins + 13
+Persistence-Pins; nach Korrektur-Pass voraussichtlich 25 + 13).
 
 ---
 
