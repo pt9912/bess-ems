@@ -89,6 +89,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BatteryEms.Adapters.Optimiz
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BatteryEms.Adapters.OptimizationCore.Tests", "tests\adapters\driven\BatteryEms.Adapters.OptimizationCore.Tests\BatteryEms.Adapters.OptimizationCore.Tests.csproj", "{FFE0C01D-10F1-4625-BE7A-CB0AAC2490C6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BatteryEms.OptimizationCore.IntegrationTests", "tests\integration\BatteryEms.OptimizationCore.IntegrationTests\BatteryEms.OptimizationCore.IntegrationTests.csproj", "{6443B095-DC59-4935-AF20-D8D53BD81AD7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -507,6 +509,18 @@ Global
 		{FFE0C01D-10F1-4625-BE7A-CB0AAC2490C6}.Release|x64.Build.0 = Release|Any CPU
 		{FFE0C01D-10F1-4625-BE7A-CB0AAC2490C6}.Release|x86.ActiveCfg = Release|Any CPU
 		{FFE0C01D-10F1-4625-BE7A-CB0AAC2490C6}.Release|x86.Build.0 = Release|Any CPU
+		{6443B095-DC59-4935-AF20-D8D53BD81AD7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6443B095-DC59-4935-AF20-D8D53BD81AD7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6443B095-DC59-4935-AF20-D8D53BD81AD7}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{6443B095-DC59-4935-AF20-D8D53BD81AD7}.Debug|x64.Build.0 = Debug|Any CPU
+		{6443B095-DC59-4935-AF20-D8D53BD81AD7}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{6443B095-DC59-4935-AF20-D8D53BD81AD7}.Debug|x86.Build.0 = Debug|Any CPU
+		{6443B095-DC59-4935-AF20-D8D53BD81AD7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6443B095-DC59-4935-AF20-D8D53BD81AD7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6443B095-DC59-4935-AF20-D8D53BD81AD7}.Release|x64.ActiveCfg = Release|Any CPU
+		{6443B095-DC59-4935-AF20-D8D53BD81AD7}.Release|x64.Build.0 = Release|Any CPU
+		{6443B095-DC59-4935-AF20-D8D53BD81AD7}.Release|x86.ActiveCfg = Release|Any CPU
+		{6443B095-DC59-4935-AF20-D8D53BD81AD7}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -526,5 +540,6 @@ Global
 		{7B3F5A9C-1E4D-4A8B-9C2D-3F5A6B7C8D9E} = {28A6993C-471E-82FE-7D9E-AD3B1EC22BD9}
 		{613BF777-8191-4DDD-87E8-04B80DAB4B5F} = {881E85BE-B0D8-0019-8553-D45727D918BB}
 		{FFE0C01D-10F1-4625-BE7A-CB0AAC2490C6} = {2AFA06A5-8AB8-F604-80F0-87C7E6262215}
+		{6443B095-DC59-4935-AF20-D8D53BD81AD7} = {28A6993C-471E-82FE-7D9E-AD3B1EC22BD9}
 	EndGlobalSection
 EndGlobal

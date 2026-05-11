@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>BatteryEms.OptimizationCore.IntegrationTests</RootNamespace>
+    <AssemblyName>BatteryEms.OptimizationCore.IntegrationTests</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Grpc.AspNetCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\hexagon\BatteryEms.Domain\BatteryEms.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\hexagon\BatteryEms.Application\BatteryEms.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\adapters\driven\BatteryEms.Adapters.OptimizationCore\BatteryEms.Adapters.OptimizationCore.csproj" />
+  </ItemGroup>
+
+</Project>

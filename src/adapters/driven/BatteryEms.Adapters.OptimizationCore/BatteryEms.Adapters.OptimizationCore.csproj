@@ -25,9 +25,11 @@
 
   <ItemGroup>
     <!-- RM-M5-01-A: gRPC-Codegen aus dem Top-Level proto/-Verzeichnis.
-         GrpcServices=Client (kein Server-Stub im Worker-Adapter). -->
+         GrpcServices=Both: Client für den Worker-Adapter; Server für
+         den Embedded TestSidecar im Integration-Test-Projekt
+         (sub-class von OptimizationCoreBase + InternalsVisibleTo). -->
     <Protobuf Include="..\..\..\..\proto\optimization-core\v1\optimization_core.proto"
-              GrpcServices="Client"
+              GrpcServices="Both"
               ProtoRoot="..\..\..\..\proto" />
   </ItemGroup>
 

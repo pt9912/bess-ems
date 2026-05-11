@@ -20,6 +20,7 @@ public sealed class OptimizationCoreRegistrationTests
     {
         var services = new ServiceCollection();
         services.AddLogging(b => b.AddProvider(NullLoggerProvider.Instance));
+        services.AddSingleton<BatteryEms.Application.Time.IClock, TestClock>();
         services.AddBessOptimizationCore(Options());
 
         await using var sp = services.BuildServiceProvider();
@@ -61,6 +62,7 @@ public sealed class OptimizationCoreRegistrationTests
         // OptimizationCoreScheduleOptimizer-Konstruktor (EnsureValid).
         var services = new ServiceCollection();
         services.AddLogging(b => b.AddProvider(NullLoggerProvider.Instance));
+        services.AddSingleton<BatteryEms.Application.Time.IClock, TestClock>();
         services.AddBessOptimizationCore(new OptimizationCoreOptions
         {
             SidecarEndpoint = new Uri("http://localhost:5001"),
@@ -75,5 +77,13 @@ public sealed class OptimizationCoreRegistrationTests
             "optimization-core-not-hardened-in-production",
             ex.Message,
             StringComparison.Ordinal);
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812",
+        Justification = "Instantiated by the DI container.")]
+    private sealed class TestClock : BatteryEms.Application.Time.IClock
+    {
+        public DateTimeOffset UtcNow { get; } =
+            new(2026, 5, 11, 12, 0, 0, TimeSpan.Zero);
     }
 }

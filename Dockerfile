@@ -397,6 +397,20 @@ RUN dotnet test tests/integration/BatteryEms.OpcUa.IntegrationTests/BatteryEms.O
     --logger "console;verbosity=normal"
 
 # ---------------------------------------------------------------------------
+# test-hil-optimization-core (RM-M5-01-B): 9 pinned Roundtrip+Negative-
+# Tests gegen einen In-Process gRPC-Sidecar (Grpc.AspNetCore + Kestrel-
+# UDS-Listener im selben Test-Prozess). Pendant zum test-hil-opcua-Stage
+# für die OPC-UA-Linie.
+# ---------------------------------------------------------------------------
+FROM lint AS test-hil-optimization-core
+ARG BUILD_CONFIGURATION
+RUN dotnet test tests/integration/BatteryEms.OptimizationCore.IntegrationTests/BatteryEms.OptimizationCore.IntegrationTests.csproj \
+    --configuration "${BUILD_CONFIGURATION}" \
+    --no-build \
+    --no-restore \
+    --logger "console;verbosity=normal"
+
+# ---------------------------------------------------------------------------
 # native-lint (RM-M3-09): clang-tidy against the native control core
 # using the project's `.clang-tidy` config. CMAKE_EXPORT_COMPILE_COMMANDS
 # emits the compile_commands.json clang-tidy needs to see the same

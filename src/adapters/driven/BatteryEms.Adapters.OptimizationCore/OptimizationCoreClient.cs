@@ -1,3 +1,4 @@
+using System.Net.Sockets;
 using Grpc.Net.Client;
 
 namespace BatteryEms.Adapters.OptimizationCore;
@@ -10,19 +11,17 @@ namespace BatteryEms.Adapters.OptimizationCore;
 // generierten Service-Stubs an den `OptimizationCoreScheduleOptimizer`.
 // `DisposeAsync` ruft `GrpcChannel.ShutdownAsync` + Dispose.
 //
-// **Sub-Slice-A-Skelett:** Channel-Konstruktion + Lifecycle sind in A
-// gelegt; die konkrete Channel-Konfiguration (UDS via
-// `SocketsHttpHandler.ConnectCallback`, mTLS-Cert-Bindings, Bearer-
-// Token-`CallCredentials`-Interceptor) landet in **RM-M5-01-C**
-// (Security-Pfad). Heute baut `Connect` einen Default-Channel, der
-// für plaintext-Endpoints (`http://`) und UDS (`unix://`) funktioniert;
-// `https://` ohne mTLS-Materials läuft auf den .NET-Default-Trust-
-// Chain — Production-Härtung folgt mit Sub-Slice C.
+// **Sub-Slice-B Wire-Foundation:** UDS-Support via
+// `SocketsHttpHandler.ConnectCallback` (Loopback-Default aus ADR
+// 0005 §4); plaintext-`http://`-Endpoints für Test-Profile;
+// `https://` ist heute Default-TLS-Chain. **Sub-Slice C** layert
+// mTLS-Cert-Material + Bearer-Token-`CallCredentials` drauf.
 internal sealed class OptimizationCoreClient : IAsyncDisposable
 {
     private readonly OptimizationCoreOptions _options;
     private GrpcChannel? _channel;
     private Grpc.V1.OptimizationCore.OptimizationCoreClient? _client;
+    private SocketsHttpHandler? _httpHandler;
     private bool _disposed;
 
     public OptimizationCoreClient(OptimizationCoreOptions options)
@@ -40,21 +39,65 @@ internal sealed class OptimizationCoreClient : IAsyncDisposable
 
     internal bool IsConnected => _channel is not null && !_disposed;
 
-    // Sub-Slice-A-Skelett: konkrete Channel-Konstruktion + Health-Probe
-    // landet in RM-M5-01-B/C. Today returns a minimal default channel
-    // that works for the TestSidecar-Plaintext-Pfad in Sub-Slice B's
-    // In-Process-Fixture-Tests. Production-mTLS-Konfiguration wird in
-    // Sub-Slice C ergänzt.
     public Task ConnectAsync(CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         cancellationToken.ThrowIfCancellationRequested();
         if (_channel is not null) { return Task.CompletedTask; }
 
-        var channel = GrpcChannel.ForAddress(_options.SidecarEndpoint);
+        var endpoint = _options.SidecarEndpoint;
+        var (channelAddress, handler) = BuildChannelTransport(endpoint);
+        var channelOptions = new GrpcChannelOptions();
+        if (handler is not null)
+        {
+            channelOptions.HttpHandler = handler;
+            _httpHandler = handler;
+        }
+        var channel = GrpcChannel.ForAddress(channelAddress, channelOptions);
         _channel = channel;
         _client = new Grpc.V1.OptimizationCore.OptimizationCoreClient(channel);
         return Task.CompletedTask;
+    }
+
+    // Plan-RM-M5-01-B: Endpoint-Scheme-spezifisches Transport-Setup.
+    // - `unix://` → `SocketsHttpHandler.ConnectCallback` bindet ein
+    //   `AF_UNIX`-Socket; gRPC läuft über HTTP/2-cleartext (h2c) auf
+    //   der lokalen Pipe.
+    // - `http://` → direkter `GrpcChannel.ForAddress`; nur in
+    //   Test-Profile (EnsureValid rejected das in Production).
+    // - `https://` → Default-TLS-Chain. mTLS-Cert-Material wird in
+    //   Sub-Slice C über zusätzliche Handler-Konfiguration ergänzt.
+    private static (string Address, SocketsHttpHandler? Handler) BuildChannelTransport(
+        Uri endpoint)
+    {
+        if (string.Equals(endpoint.Scheme, "unix", StringComparison.OrdinalIgnoreCase))
+        {
+            var udsPath = endpoint.LocalPath;
+            var handler = new SocketsHttpHandler
+            {
+                ConnectCallback = async (context, ct) =>
+                {
+                    var socket = new Socket(
+                        AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+                    try
+                    {
+                        await socket.ConnectAsync(
+                            new UnixDomainSocketEndPoint(udsPath), ct).ConfigureAwait(false);
+                        return new NetworkStream(socket, ownsSocket: true);
+                    }
+                    catch
+                    {
+                        socket.Dispose();
+                        throw;
+                    }
+                },
+            };
+            // GrpcChannel.ForAddress braucht eine http://-Adresse als
+            // "Authority"-Marker; der ConnectCallback unterläuft den
+            // DNS-Lookup und bindet auf den UDS-Socket.
+            return ("http://uds-localhost", handler);
+        }
+        return (endpoint.ToString(), null);
     }
 
     public async ValueTask DisposeAsync()
@@ -71,5 +114,7 @@ internal sealed class OptimizationCoreClient : IAsyncDisposable
             _channel = null;
             _client = null;
         }
+        _httpHandler?.Dispose();
+        _httpHandler = null;
     }
 }

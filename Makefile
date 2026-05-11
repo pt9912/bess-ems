@@ -20,7 +20,7 @@ DOCKER_BUILD = $(DOCKER) build $(BUILD_CONTEXT) \
 
 .PHONY: help \
 	lint arch-check gates \
-	test test-safety test-integration test-hil-modbus test-hil-opcua test-hil-closed-loop test-container coverage-gate \
+	test test-safety test-integration test-hil-modbus test-hil-opcua test-hil-optimization-core test-hil-closed-loop test-container coverage-gate \
 	native-build test-native-interop test-native-parity \
 	native-lint native-sanitizer native-coverage-report native-coverage-gate native-coverage-exclusions \
 	simulator-test simulator-race simulator-lint simulator-coverage-gate \
@@ -59,6 +59,7 @@ help:
 	@echo "  make test-integration        Modbus roundtrip vs Go-Simulator via docker compose"
 	@echo "  make test-hil-modbus         Optional: HIL roundtrip vs bess-hil-simulator:local (RM-M2-HIL-08)"
 	@echo "  make test-hil-opcua          5 pinned OPC-UA-Roundtrips vs embedded TestServer (RM-M4-04 Sub-Slice D)"
+	@echo "  make test-hil-optimization-core   9 pins (5 roundtrip + 4 negative) vs In-Process gRPC-Sidecar (RM-M5-01-B)"
 	@echo "  make test-hil-closed-loop    Optional: Closed-loop optimize→dispatch→HIL smoke (Carve-out Demo-01)"
 	@echo ""
 	@echo "Welle M3 (active):"
@@ -168,8 +169,8 @@ gates: lint arch-check test test-safety coverage-gate \
 	native-build native-lint native-sanitizer \
 	native-coverage-gate native-coverage-exclusions \
 	test-native-interop test-native-parity \
-	test-hil-opcua
-	@echo "[gates] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, simulator-{lint,test,race,coverage-gate}) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua)"
+	test-hil-opcua test-hil-optimization-core
+	@echo "[gates] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, simulator-{lint,test,race,coverage-gate}) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + M5 (test-hil-optimization-core)"
 
 # --- Welle 3 (partially active) --------------------------------------------
 
@@ -201,6 +202,12 @@ test-integration:
 # (siehe Dockerfile `test-hil-opcua`).
 test-hil-opcua:
 	$(DOCKER_BUILD) --target test-hil-opcua -t $(IMAGE_PREFIX)-test-hil-opcua:latest
+
+# RM-M5-01-B: 9 pinned Tests (5 Roundtrip + 4 Negative) gegen den
+# In-Process gRPC-Sidecar (Grpc.AspNetCore + Kestrel-UDS-Listener im
+# selben Test-Prozess). Process-internal — kein Compose-Asset.
+test-hil-optimization-core:
+	$(DOCKER_BUILD) --target test-hil-optimization-core -t $(IMAGE_PREFIX)-test-hil-optimization-core:latest
 
 # RM-M2-HIL-08: optionales HIL-Gate. Bringt den externen
 # `bess-hil-simulator:local`-Container hoch (siehe HIL-OPEN-01:
@@ -360,9 +367,9 @@ ci: lint arch-check test test-safety coverage-gate \
     native-build native-lint native-sanitizer \
     native-coverage-gate native-coverage-exclusions \
     test-native-interop test-native-parity \
-    test-hil-opcua \
+    test-hil-opcua test-hil-optimization-core \
     test-integration
-	@echo "[ci] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, simulator-*) + M2 schema (validate, drift-check) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + test-integration"
+	@echo "[ci] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, simulator-*) + M2 schema (validate, drift-check) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + M5 (test-hil-optimization-core) + test-integration"
 
 # Fresh-clone-naher Komplettlauf: alle CI-Gates plus Runtime-Image und
 # Compose-Smoke. Letzte Stufe vor einem M1-Tag (RM-M1-20).
