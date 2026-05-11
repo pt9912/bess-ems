@@ -4,9 +4,9 @@
 **Status:** Abgeschlossen am 2026-05-11 — alle Sub-Slices RM-M4-05-A..D ✅; Closure-Commit `9197a99` (RM-M4-05-D + M4 closure). Slice-Doku in `done/`; F-17/F-18/F-19 in `../open/note-RM-M4-followups.md` als Trigger-Watch angelegt.
 **Bezug:**
 [`plan-RM-M4.md`](plan-RM-M4.md) (Master-Plan, RM-M4-05-Zeile mit DoD und LH-Bezug),
-[`../done/plan-RM-M4-04.md`](../done/plan-RM-M4-04.md) (RM-M4-04-D-04 hat die Security-Slots `SecurityMode/SecurityPolicy/AllowUnsecured/AllowUnsecuredReason` in `OpcUaAdapterOptions` und den Bool-Achsen-Startup-Guard bereits gelegt; M4-05 layert die Profile-Awareness und das echte SDK-Binding für `SignAndEncrypt` drauf),
-[`../done/plan-RM-M4-08.md`](../done/plan-RM-M4-08.md) (RM-M4-08-A liefert das Embedded TestServer-Fixture-Pattern; M4-05 erweitert die Fixture für SignAndEncrypt + Cert-Trust-Bridge),
-[`../done/plan-RM-M4-03.md`](../done/plan-RM-M4-03.md) (F-12 Cross-Adapter-RuntimeProfile-Source ist getrackt; M4-05 implementiert ein **OPC-UA-lokales** RuntimeProfile-Field auf der Adapter-Schicht und überlässt F-12 die globale Quelle — siehe D-01),
+[`plan-RM-M4-04.md`](plan-RM-M4-04.md) (RM-M4-04-D-04 hat die Security-Slots `SecurityMode/SecurityPolicy/AllowUnsecured/AllowUnsecuredReason` in `OpcUaAdapterOptions` und den Bool-Achsen-Startup-Guard bereits gelegt; M4-05 layert die Profile-Awareness und das echte SDK-Binding für `SignAndEncrypt` drauf),
+[`plan-RM-M4-08.md`](plan-RM-M4-08.md) (RM-M4-08-A liefert das Embedded TestServer-Fixture-Pattern; M4-05 erweitert die Fixture für SignAndEncrypt + Cert-Trust-Bridge),
+[`plan-RM-M4-03.md`](plan-RM-M4-03.md) (F-12 Cross-Adapter-RuntimeProfile-Source ist getrackt; M4-05 implementiert ein **OPC-UA-lokales** RuntimeProfile-Field auf der Adapter-Schicht und überlässt F-12 die globale Quelle — siehe D-01),
 [`../open/note-RM-M4-followups.md`](../open/note-RM-M4-followups.md) (F-09 OPC-UA-Activation-Source-Adapter; F-13 Multi-Server; F-14 Method-Calls; F-15 Type-System; M4-05 fügt **F-17 Allowlist-Erweiterung** und **F-18 Cert-Rotation/Renewal** hinzu — siehe §9),
 [`../../../../spec/lastenheft.md`](../../../../spec/lastenheft.md) (LH-OPCUA-005 Security)
 
@@ -316,7 +316,7 @@ Bei Closure wird RM-M4-05-Zeile in `plan-RM-M4.md` umformuliert.
 Verbindlicher Replacement-Text:
 
 > Slice-Plan:
-> [`done/plan-RM-M4-05.md`](../done/plan-RM-M4-05.md). `OpcUaRuntime-
+> [`plan-RM-M4-05.md`](plan-RM-M4-05.md). `OpcUaRuntime-
 > Profile`-Field (`Development`/`HilSimulator`/`Production`,
 > Default `Production`) plus `SecurityPolicy`-Allowlist
 > (M4-Start: `Basic256Sha256`; Erweiterung verlangt Planänderung

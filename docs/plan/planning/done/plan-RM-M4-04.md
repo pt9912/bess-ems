@@ -3,7 +3,7 @@
 **Dokumenttyp:** Slice-Plan (Detail-Plan zum Master-Arbeitspaket RM-M4-04)
 **Status:** Erledigt — RM-M4-04-A..D abgeschlossen; Slice-DoD und LH-OPCUA-001..004 grün, LH-OPCUA-005 separater Slice RM-M4-05
 **Bezug:**
-[`../in-progress/plan-RM-M4.md`](../in-progress/plan-RM-M4.md) (Master-Plan, RM-M4-04-Zeile mit DoD und LH-Bezug),
+[`plan-RM-M4.md`](plan-RM-M4.md) (Master-Plan, RM-M4-04-Zeile mit DoD und LH-Bezug),
 [`./plan-RM-M4-03.md`](./plan-RM-M4-03.md) (RM-M4-03 D-06 + F-09: Driving-Port-Form für Aktivierungs-Source — OPC-UA-Activation-Subscription bleibt Folgearbeit, nicht in M4-04),
 [`../open/note-RM-M4-followups.md`](../open/note-RM-M4-followups.md) (F-07 OPC-UA-Mapping-Migration v1→v2 als Template-Slice; F-09 alle Source-Wire-Adapter inkl. eines OPC-UA-Activation-Source-Adapters — M4-04 lehnt das F-09-Carve-out ab und lässt es bei F-09),
 [`../../../../spec/lastenheft.md`](../../../../spec/lastenheft.md) (LH-OPCUA-001 Lesen, LH-OPCUA-002 Schreiben, LH-OPCUA-003 Subscriptions, LH-OPCUA-004 StatusCode, LH-OPCUA-005 Security — letzteres separater Slice RM-M4-05)

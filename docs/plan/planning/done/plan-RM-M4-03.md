@@ -3,8 +3,8 @@
 **Dokumenttyp:** Slice-Plan (Detail-Plan zum Master-Arbeitspaket RM-M4-03)
 **Status:** Abgeschlossen — alle Sub-Slices RM-M4-03-A..E ✅ (siehe §10 Auslieferung)
 **Bezug:**
-[`plan-RM-M4.md`](../in-progress/plan-RM-M4.md) (Master-Plan, RM-M4-03-Zeile mit DoD und LH-Bezug),
-[`plan-RM-M4.md` §138 ff.](../in-progress/plan-RM-M4.md) (`ControlPriorityClass`-Vertrag — Rang 3 für `RegelleistungsActivation`),
+[`plan-RM-M4.md`](plan-RM-M4.md) (Master-Plan, RM-M4-03-Zeile mit DoD und LH-Bezug),
+[`plan-RM-M4.md` §138 ff.](plan-RM-M4.md) (`ControlPriorityClass`-Vertrag — Rang 3 für `RegelleistungsActivation`),
 [`../open/note-RM-M4-followups.md`](../open/note-RM-M4-followups.md) (F-08/F-09 als Folgearbeiten dieses Slices),
 [`plan-RM-M2-migration.md`](plan-RM-M2-migration.md) (Migrations-Pipeline mit DbUp + d-migrate; RM-M3-FUP-01 wurde durch Sub-Slice B als erster realer Konsument abgeschlossen — siehe `../open/note-RM-M3-followups.md` Item 5),
 [`../../../../spec/lastenheft.md`](../../../../spec/lastenheft.md) (LH-MKT-005/006 Aktivierung im Regelkreis, LH-MON-003 Trace-Sichtbarkeit, LH-OPS-001 Profil-Validation)

@@ -3,7 +3,7 @@
 **Dokumenttyp:** Slice-Plan (Detail-Plan zum Master-Arbeitspaket RM-M4-08)
 **Status:** Erledigt — RM-M4-08-A abgeschlossen; 7 Pins in `make test-hil-opcua` grün, in `make gates` und `make ci` verdrahtet; F-09 in `note-RM-M4-followups.md` als eigenständiges Item angelegt; Master-Plan-Wortlaut korrigiert
 **Bezug:**
-[`../in-progress/plan-RM-M4.md`](../in-progress/plan-RM-M4.md) (Master-Plan, RM-M4-08-Zeile mit DoD und LH-Bezug),
+[`plan-RM-M4.md`](plan-RM-M4.md) (Master-Plan, RM-M4-08-Zeile mit DoD und LH-Bezug),
 [`./plan-RM-M4-04.md`](./plan-RM-M4-04.md) (RM-M4-04-D liefert die 5 OPC-UA-Adapter-Happy-Path-Pins gegen den Embedded TestServer; M4-08-A ergänzt **zwei** Pins die echtes Adapter-Verhalten testen statt bestehende Tests zu duplizieren — siehe Review-Pass §H1),
 [`./plan-RM-M4-03.md`](./plan-RM-M4-03.md) (RM-M4-03 deckt Race/Tiebreak/Duplikat-Replay/**Restart**-Replay/TimebaseDegraded-Pins **bewusst auf der Use-Case-Schicht** ab — M4-08 dupliziert diese Pins **nicht** via OPC-UA-Wire; **Failover-Replay-via-OPC-UA-Reconnect** bleibt aber strukturell ungeklärt und erbt nach F-09 — siehe D-01 + D-03),
 [`../open/note-RM-M4-followups.md`](../open/note-RM-M4-followups.md) (M4-08-A's Closure ergänzt dort das **F-09-Item** mit dem expliziten Sub-Bullet „Failover-Replay-Pin via OPC-UA-Reconnect" — siehe §3 In-Scope und D-03),
