@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using BatteryEms.Application.Optimization;
 using BatteryEms.Application.Time;
 using BatteryEms.Domain;
@@ -39,6 +41,7 @@ internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, ID
 
     private readonly OptimizationCoreClient _client;
     private readonly OptimizationCoreOptions _options;
+    private readonly IOptimizationIdempotencyStore _idempotencyStore;
     private readonly IClock _clock;
     private readonly ILogger<OptimizationCoreScheduleOptimizer> _logger;
     private readonly SemaphoreSlim _versionProbeGate = new(1, 1);
@@ -48,21 +51,27 @@ internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, ID
     public OptimizationCoreScheduleOptimizer(
         OptimizationCoreClient client,
         OptimizationCoreOptions options,
+        IOptimizationIdempotencyStore idempotencyStore,
         IClock clock,
         ILogger<OptimizationCoreScheduleOptimizer> logger)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(idempotencyStore);
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(logger);
         options.EnsureValid(logger);
 
         _client = client;
         _options = options;
+        _idempotencyStore = idempotencyStore;
         _clock = clock;
         _logger = logger;
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Maintainability", "CA1506",
+        Justification = "Sidecar-Adapter-Top-Level: koppelt M2-Domain-Modell, gRPC-Wire-Typen und Idempotency-Store — die Kopplung ist intrinsisch dem Adapter-Pattern.")]
     public async Task<ScheduleOptimizationResult> OptimizeAsync(
         ScheduleOptimizationRequest request,
         CancellationToken cancellationToken)
@@ -72,6 +81,23 @@ internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, ID
 
         var horizonStartUtc = request.HorizonStart.ToUniversalTime();
         var startedAt = _clock.UtcNow;
+
+        // Plan-RM-M5 §Request-Idempotenz: deterministische `request_id`
+        // aus den fachlichen Identitäts-Feldern; TryBegin atomar pre-
+        // Sidecar. Existiert ein finaler Eintrag mit dieser ID, wird
+        // der Sidecar-Call übersprungen und ein `late_response_ignored`-
+        // Failed-Run zurückgegeben (Worker liest den ursprünglichen
+        // OptimizationRun via IOptimizationRunRepository für den
+        // echten Verlauf).
+        var requestId = ComputeRequestId(request);
+        var beginResult = await _idempotencyStore.TryBeginAsync(
+            requestId, startedAt, cancellationToken).ConfigureAwait(false);
+        if (!beginResult.IsNewlyCreated)
+        {
+            return HandleExistingIdempotencyEntry(
+                request, horizonStartUtc, beginResult.Entry, startedAt);
+        }
+
         try
         {
             await _client.ConnectAsync(cancellationToken).ConfigureAwait(false);
@@ -80,24 +106,33 @@ internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, ID
         catch (ContractIncompatibleException ex)
         {
             OptimizationCoreLog.LogContractIncompatible(_logger, ex.Detail);
-            return BuildFailedResult(
+            var contractFailed = BuildFailedResult(
                 request,
                 horizonStartUtc,
                 OptimizationCoreStatusMapper.ClassifyContractIncompatible(),
                 terminationCode: "contract-incompatible",
                 terminationDetail: ex.Detail,
                 elapsed: _clock.UtcNow - startedAt);
+            return await FinalizeAndReturnAsync(
+                requestId, contractFailed,
+                OptimizationTerminalState.FailedNoActivation,
+                "contract-incompatible", cancellationToken).ConfigureAwait(false);
         }
         catch (RpcException ex)
         {
             var outcome = OptimizationCoreStatusMapper.ClassifyTransport(ex.StatusCode);
-            return BuildFailedResult(
+            var transportFailed = BuildFailedResult(
                 request,
                 horizonStartUtc,
                 outcome,
                 terminationCode: ex.StatusCode.ToString(),
                 terminationDetail: NormalizeTerminationDetail(ex.Status.Detail),
                 elapsed: _clock.UtcNow - startedAt);
+            return await FinalizeAndReturnAsync(
+                requestId, transportFailed,
+                OptimizationTerminalState.FailedNoActivation,
+                MapTerminalReason(outcome.FallbackReason), cancellationToken)
+                .ConfigureAwait(false);
         }
 
         var protoRequest = BuildProtoRequest(request);
@@ -130,9 +165,7 @@ internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, ID
 
             if (final is null)
             {
-                // Stream geschlossen ohne Result — Worker behandelt das
-                // als TransportInternalError; kein silenter Success.
-                return BuildFailedResult(
+                var streamFailed = BuildFailedResult(
                     request,
                     horizonStartUtc,
                     new OptimizationCoreOutcome(
@@ -143,25 +176,93 @@ internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, ID
                     terminationCode: "stream-closed-without-result",
                     terminationDetail: null,
                     elapsed: _clock.UtcNow - startedAt);
+                return await FinalizeAndReturnAsync(
+                    requestId, streamFailed,
+                    OptimizationTerminalState.FailedNoActivation,
+                    "transport-internal-error", cancellationToken).ConfigureAwait(false);
             }
 
-            var outcome = OptimizationCoreStatusMapper.ClassifyResult(
+            var resultOutcome = OptimizationCoreStatusMapper.ClassifyResult(
                 final.SolverStatus, final.HasUsableSolution);
-            return BuildResult(request, horizonStartUtc, final, outcome,
+            var built = BuildResult(request, horizonStartUtc, final, resultOutcome,
                 elapsed: _clock.UtcNow - startedAt);
+            // Wenn das Schedule persistiert wird (sidecar-result) →
+            // SidecarCommitted; sonst (Infeasible/Unbounded/Invalid-
+            // Trajectory) → FailedNoActivation.
+            var (state, reason) = built.ProducedSchedule is not null
+                ? (OptimizationTerminalState.SidecarCommitted, "sidecar-committed")
+                : (OptimizationTerminalState.FailedNoActivation,
+                   MapTerminalReason(resultOutcome.FallbackReason));
+            return await FinalizeAndReturnAsync(
+                requestId, built, state, reason, cancellationToken).ConfigureAwait(false);
         }
         catch (RpcException ex)
         {
             var outcome = OptimizationCoreStatusMapper.ClassifyTransport(ex.StatusCode);
-            return BuildFailedResult(
+            var rpcFailed = BuildFailedResult(
                 request,
                 horizonStartUtc,
                 outcome,
                 terminationCode: ex.StatusCode.ToString(),
                 terminationDetail: NormalizeTerminationDetail(ex.Status.Detail),
                 elapsed: _clock.UtcNow - startedAt);
+            return await FinalizeAndReturnAsync(
+                requestId, rpcFailed,
+                OptimizationTerminalState.FailedNoActivation,
+                MapTerminalReason(outcome.FallbackReason), cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Caller-initiated Cancel mid-stream. Idempotency-Eintrag
+            // wird als Cancelled finalisiert (plan-RM-M5 §Atomare
+            // Finalisierung: einer der vier Terminalzustände), damit
+            // ein späterer Retry mit derselben request_id den Status
+            // sieht statt einen zweiten Sidecar-Call zu schicken.
+            var cancelledOutcome = new OptimizationCoreOutcome(
+                Status: OptimizationSolverStatus.Failed,
+                FallbackSource: FallbackSource.FromMatrix,
+                FallbackReason: FallbackReason.TransportCancelled,
+                PersistSchedule: false);
+            var cancelled = BuildFailedResult(
+                request, horizonStartUtc, cancelledOutcome,
+                terminationCode: "Cancelled",
+                terminationDetail: "caller-cancelled-mid-optimize",
+                elapsed: _clock.UtcNow - startedAt);
+            return await FinalizeAndReturnAsync(
+                requestId, cancelled,
+                OptimizationTerminalState.Cancelled,
+                "transport-cancelled", cancellationToken)
+                .ConfigureAwait(false);
         }
     }
+
+    // Plan-RM-M5 §Fallback-Taxonomie: kebab-case-Reason aus dem
+    // Mapper-Enum für die Persistenz im Idempotency-Store.
+    private static string MapTerminalReason(FallbackReason reason) => reason switch
+    {
+        FallbackReason.None => "none",
+        FallbackReason.DeadlineExceeded => "deadline-exceeded",
+        FallbackReason.SidecarUnavailable => "sidecar-unavailable",
+        FallbackReason.TransportCancelled => "transport-cancelled",
+        FallbackReason.TransportInternalError => "transport-internal-error",
+        FallbackReason.InvalidRequest => "invalid-request",
+        FallbackReason.SolverInfeasible => "solver-infeasible",
+        FallbackReason.SolverUnbounded => "solver-unbounded",
+        FallbackReason.SolverTimeLimit => "solver-time-limit",
+        FallbackReason.SolverIterationLimit => "solver-iteration-limit",
+        FallbackReason.NoValidPlan => "no-valid-plan",
+        FallbackReason.FallbackPlanExpired => "fallback-plan-expired",
+        FallbackReason.FallbackContextMismatch => "fallback-context-mismatch",
+        FallbackReason.FallbackTelemetryDrift => "fallback-telemetry-drift",
+        FallbackReason.InvalidSnapshot => "invalid-snapshot",
+        FallbackReason.InvalidMpcState => "invalid-mpc-state",
+        FallbackReason.ContractIncompatible => "contract-incompatible",
+        FallbackReason.UnauthorizedClient => "unauthorized-client",
+        FallbackReason.DuplicateRequest => "duplicate-request",
+        FallbackReason.LateResponseIgnored => "late-response-ignored",
+        _ => "transport-internal-error",
+    };
 
     // Lazy: Health + Version-Probe einmal pro Adapter-Lifetime
     // ausführen. Bei inkompatibler Version → ContractIncompatibleException
@@ -520,6 +621,97 @@ internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, ID
     private static string NormalizeSolverName(string? name) =>
         string.IsNullOrWhiteSpace(name) ? SolverName : name!;
 
+    // Plan-RM-M5 §Request-Idempotenz: deterministischer Idempotency-
+    // Key aus dem fachlichen Identitäts-Tupel. SHA-256-Hash auf einer
+    // canonical-form-String-Repräsentation, formatiert als UUIDv5-
+    // style GUID-String für DB/Wire-Kompatibilität.
+    private static string ComputeRequestId(ScheduleOptimizationRequest request)
+    {
+        var canonical = string.Join('|',
+            request.AssetId,
+            request.ScheduleType.ToString(),
+            request.HorizonStart.ToUniversalTime().ToString("O"),
+            request.HorizonEnd.ToUniversalTime().ToString("O"),
+            request.TimeStep.ToString("c"),
+            request.BaseScheduleVersion.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            request.MarketBidArea);
+        var bytes = Encoding.UTF8.GetBytes(canonical);
+        var hash = SHA256.HashData(bytes);
+        // Erste 16 Bytes als GUID; deterministisch + idempotent über
+        // identische Eingaben.
+        return new Guid(hash.AsSpan(0, 16).ToArray()).ToString("D");
+    }
+
+    // Plan-RM-M5 §Atomare Finalisierung: pro request_id genau ein
+    // atomarer Terminalzustand. Worker-side CAS via
+    // IOptimizationIdempotencyStore.TryFinalizeAsync.
+    private async Task<ScheduleOptimizationResult> FinalizeAndReturnAsync(
+        string requestId,
+        ScheduleOptimizationResult result,
+        OptimizationTerminalState terminalState,
+        string terminalReason,
+        CancellationToken cancellationToken)
+    {
+        // Plan-RM-M5 §Atomare Finalisierung: der Idempotency-Eintrag
+        // MUSS in einem Terminalzustand landen, selbst wenn der Caller
+        // mid-call canceled hat (sonst leakt der Pending-Eintrag und
+        // ein späterer Retry sieht „duplicate-pending"). CancellationToken
+        // wird absichtlich NICHT durchgereicht — wir verlinken nur
+        // ConfigureAwait und akzeptieren einen short blocking-Tail
+        // im Cancel-Pfad für State-Integrität.
+        _ = cancellationToken; // bewusst nicht weitergereicht
+        var producedVersion = result.ProducedSchedule?.Version;
+        await _idempotencyStore.TryFinalizeAsync(
+            requestId,
+            terminalState,
+            terminalReason,
+            runId: result.Run.RunId,
+            producedVersion: producedVersion,
+            committedAt: _clock.UtcNow,
+            cancellationToken: CancellationToken.None).ConfigureAwait(false);
+        return result;
+    }
+
+    // Frühe-Exit-Pfad wenn TryBegin einen existierenden Eintrag
+    // findet. Existing-Final → late_response_ignored; Existing-Pending
+    // → duplicate-request (Worker-Side-Concurrent-Call). Beide ergeben
+    // Failed-Runs ohne ProducedSchedule.
+    private ScheduleOptimizationResult HandleExistingIdempotencyEntry(
+        ScheduleOptimizationRequest request,
+        DateTimeOffset horizonStartUtc,
+        OptimizationIdempotencyEntry entry,
+        DateTimeOffset startedAt)
+    {
+        var elapsed = _clock.UtcNow - startedAt;
+        if (entry.IsFinal)
+        {
+            OptimizationCoreLog.LogLateResponseIgnored(
+                _logger, request.AssetId, entry.TerminalState);
+            return BuildFailedResult(
+                request, horizonStartUtc,
+                new OptimizationCoreOutcome(
+                    Status: OptimizationSolverStatus.Failed,
+                    FallbackSource: FallbackSource.NoActivation,
+                    FallbackReason: FallbackReason.LateResponseIgnored,
+                    PersistSchedule: false),
+                terminationCode: "late-response-ignored",
+                terminationDetail: $"existing-terminal-state={entry.TerminalState}",
+                elapsed: elapsed);
+        }
+        // Existing pending → Concurrent-Caller. Fail-closed.
+        OptimizationCoreLog.LogDuplicateRequest(_logger, request.AssetId, entry.RequestId);
+        return BuildFailedResult(
+            request, horizonStartUtc,
+            new OptimizationCoreOutcome(
+                Status: OptimizationSolverStatus.Failed,
+                FallbackSource: FallbackSource.NoActivation,
+                FallbackReason: FallbackReason.DuplicateRequest,
+                PersistSchedule: false),
+            terminationCode: "duplicate-request",
+            terminationDetail: $"concurrent-pending-request-id={entry.RequestId}",
+            elapsed: elapsed);
+    }
+
     public void Dispose()
     {
         if (_disposed) { return; }
@@ -562,4 +754,16 @@ internal static partial class OptimizationCoreLog
     [LoggerMessage(EventId = 5112, Level = LogLevel.Warning,
         Message = "optimization-core rejected sidecar result (invalid trajectory): {Detail}")]
     public static partial void LogInvalidTrajectory(ILogger logger, string detail);
+
+    [LoggerMessage(EventId = 5113, Level = LogLevel.Information,
+        Message = "optimization-core late response ignored asset_id={AssetId} prior_terminal_state={PriorTerminalState}")]
+    public static partial void LogLateResponseIgnored(
+        ILogger logger,
+        string assetId,
+        BatteryEms.Application.Optimization.OptimizationTerminalState priorTerminalState);
+
+    [LoggerMessage(EventId = 5114, Level = LogLevel.Warning,
+        Message = "optimization-core duplicate request asset_id={AssetId} request_id={RequestId}")]
+    public static partial void LogDuplicateRequest(
+        ILogger logger, string assetId, string requestId);
 }

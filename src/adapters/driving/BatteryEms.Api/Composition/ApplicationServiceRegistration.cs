@@ -56,6 +56,13 @@ public static class ApplicationServiceRegistration
         // (Reader-Pfad für Use-Case/PreconditionProvider/Health-Endpoint)
         // und `ITimebaseHealthObserver` (Writer-Pfad für den ControlCycle-
         // HostedService, der pro Tick `Observe(bool)` ruft).
+        // RM-M5-01-C: Idempotency-Store als InMemory-Default (Dapper-
+        // backed Persistence kommt in Sub-Slice-C Persistenz-Schicht).
+        // Worker-owned, registriert pro Asset-Lifetime; Process-Restart
+        // verliert In-Memory-Tracker — siehe DapperOptimizationIdempotency-
+        // Store-Folgelinie.
+        services.AddSingleton<IOptimizationIdempotencyStore, InMemoryOptimizationIdempotencyStore>();
+
         services.AddSingleton<InMemoryTimebaseHealthSource>();
         services.AddSingleton<ITimebaseHealthSource>(
             sp => sp.GetRequiredService<InMemoryTimebaseHealthSource>());

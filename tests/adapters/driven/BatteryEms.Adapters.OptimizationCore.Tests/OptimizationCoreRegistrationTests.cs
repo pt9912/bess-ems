@@ -21,6 +21,9 @@ public sealed class OptimizationCoreRegistrationTests
         var services = new ServiceCollection();
         services.AddLogging(b => b.AddProvider(NullLoggerProvider.Instance));
         services.AddSingleton<BatteryEms.Application.Time.IClock, TestClock>();
+        services.AddSingleton<
+            BatteryEms.Application.Optimization.IOptimizationIdempotencyStore,
+            BatteryEms.Application.Optimization.InMemoryOptimizationIdempotencyStore>();
         services.AddBessOptimizationCore(Options());
 
         await using var sp = services.BuildServiceProvider();
@@ -63,6 +66,9 @@ public sealed class OptimizationCoreRegistrationTests
         var services = new ServiceCollection();
         services.AddLogging(b => b.AddProvider(NullLoggerProvider.Instance));
         services.AddSingleton<BatteryEms.Application.Time.IClock, TestClock>();
+        services.AddSingleton<
+            BatteryEms.Application.Optimization.IOptimizationIdempotencyStore,
+            BatteryEms.Application.Optimization.InMemoryOptimizationIdempotencyStore>();
         services.AddBessOptimizationCore(new OptimizationCoreOptions
         {
             SidecarEndpoint = new Uri("http://localhost:5001"),

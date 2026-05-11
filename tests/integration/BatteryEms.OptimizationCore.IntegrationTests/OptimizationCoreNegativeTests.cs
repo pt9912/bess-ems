@@ -160,6 +160,7 @@ public sealed class OptimizationCoreNegativeTests
         return new OptimizationCoreScheduleOptimizer(
             client,
             options,
+            new BatteryEms.Application.Optimization.InMemoryOptimizationIdempotencyStore(),
             new Defaults.FixedClock(),
             NullLogger<OptimizationCoreScheduleOptimizer>.Instance);
     }
