@@ -26,6 +26,33 @@ internal static class Defaults
 {
     public const string ForHilSimulatorReason = "hil-simulator-pre-m4-05";
 
+    // Plan-RM-M4-05-C: Production-Secure-Builder. Triggert den
+    // SignAndEncrypt-Pfad im OpcUaClient (AutoAccept=false, Trust-Store
+    // backed). Der `TrustedServerCertificatesPath` bleibt null hier —
+    // die `OpcUaTestServerFixture.EstablishSecureTrustAsync`-Bridge
+    // schreibt die Server-Cert in den vom OpcUaClient angelegten
+    // PKI-trusted-Store (Default unter `Path.GetTempPath()/BatteryEms/
+    // OpcUa/pki/{Guid}/trusted/certs`). Eine Operator-Override-Variante
+    // wird in Unit-Tests separat gepinnt (OpcUaClientTests).
+    public static OpcUaAdapterOptions ForProductionSecure(Uri endpointUrl) =>
+        new()
+        {
+            EndpointUrl = endpointUrl,
+            SessionName = "bess-ems-test-secure",
+            RuntimeProfile = OpcUaRuntimeProfile.Production,
+            SecurityMode = OpcUaSecurityMode.SignAndEncrypt,
+            SecurityPolicy = OpcUaSecurityPolicies.Basic256Sha256,
+            AllowUnsecured = false,
+            ConnectTimeout = TimeSpan.FromSeconds(10),
+            ReadTimeout = TimeSpan.FromSeconds(5),
+            PollingInterval = TimeSpan.FromMilliseconds(100),
+            DefaultMonitoringIntervalMs = 200,
+            KeepAliveInterval = TimeSpan.FromSeconds(2),
+            ReconnectBackoffStart = TimeSpan.FromMilliseconds(200),
+            ReconnectBackoffMax = TimeSpan.FromSeconds(2),
+            SubscriptionChannelCapacity = 64,
+        };
+
     public static OpcUaAdapterOptions ForHilSimulator(Uri endpointUrl) =>
         new()
         {

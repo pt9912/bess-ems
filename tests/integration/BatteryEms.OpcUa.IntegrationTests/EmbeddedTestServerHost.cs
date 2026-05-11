@@ -47,6 +47,13 @@ internal sealed class EmbeddedTestServerHost : IAsyncDisposable
         ?? throw new InvalidOperationException(
             "TestServer not started yet — call StartAsync first.");
 
+    // M4-05-C: nach `StartAsync` ist die ApplicationConfiguration des
+    // Test-Servers verfügbar — der `CertificateTrustBridge`-Helper braucht
+    // sie, um die Server-App-Cert in den Client-Trust-Store zu kopieren
+    // und umgekehrt.
+    internal ApplicationConfiguration ApplicationConfiguration =>
+        _application.ApplicationConfiguration;
+
     public static async Task<EmbeddedTestServerHost> StartAsync(
         CancellationToken cancellationToken = default)
     {
@@ -80,6 +87,13 @@ internal sealed class EmbeddedTestServerHost : IAsyncDisposable
                 productUri: "urn:bess-ems:test-server")
             .AsServer([endpointUrl.ToString()])
             .AddUnsecurePolicyNone()
+            // M4-05-C: Sign + SignAndEncrypt-Policies in der Embedded-
+            // Fixture, damit der Client (per Defaults.ForProductionSecure)
+            // einen sicheren Endpoint vom Server picken kann. Der Test-
+            // Server akzeptiert weiterhin den unsicheren None-Pfad —
+            // die bestehenden 7 HilSimulator-Pins bleiben unverändert.
+            .AddSignPolicies(true)
+            .AddSignAndEncryptPolicies(true)
             .AddUserTokenPolicy(UserTokenType.Anonymous)
             .AddSecurityConfiguration(certs, pkiRoot)
             .SetAutoAcceptUntrustedCertificates(true)

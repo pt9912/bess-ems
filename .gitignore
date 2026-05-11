@@ -38,3 +38,6 @@ Thumbs.db
 # generation timestamps, so they are regenerated on every
 # `make schema-generate` and never tracked.
 src/adapters/driven/BatteryEms.Adapters.Persistence/Migrations/**/*.report.yaml
+
+# Claude Code harness state (per-session lock files, transcripts, etc.).
+.claude/

@@ -1,3 +1,4 @@
+using BatteryEms.Adapters.OpcUa;
 using Xunit;
 
 namespace BatteryEms.OpcUa.IntegrationTests;
@@ -36,6 +37,18 @@ public sealed class OpcUaTestServerFixture : IAsyncLifetime
             _host = null;
         }
     }
+
+    // Plan-RM-M4-05-C: Trust-Bridge-Hook. Ruft `CertificateTrustBridge.
+    // EstablishMutualTrustAsync` mit dem Fixture-Host und dem übergebenen
+    // Client. Tests im Production-Secure-Pfad (`Defaults.ForProductionSecure`)
+    // rufen das vor dem ersten `ConnectAsync` auf, damit der Trust greift.
+    // Der Hook ist idempotent — mehrfacher Aufruf ist OK (Helper deduppt
+    // über Thumbprint im Store).
+    internal Task EstablishSecureTrustAsync(
+        OpcUaClient client,
+        CancellationToken cancellationToken = default)
+        => CertificateTrustBridge.EstablishMutualTrustAsync(
+            Host, client, cancellationToken);
 
     // Setzt alle Test-Knoten auf eine bekannte Baseline (Plan-RM-M4-08
     // M2/M7-Konsequenz). Beide Test-Klassen rufen das in ihrem
