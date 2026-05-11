@@ -85,29 +85,43 @@ public sealed class OpcUaClient : IOpcUaClient
 
             await EnsureApplicationConfiguredAsync(token).ConfigureAwait(false);
 
-            var endpointDescription = await CoreClientUtils
-                .SelectEndpointAsync(
-                    _appConfig!,
-                    _options.EndpointUrl.ToString(),
-                    useSecurity: false,
-                    _telemetry!,
-                    token)
-                .ConfigureAwait(false);
+            // M4-05-B: useSecurity wird jetzt aus dem SecurityMode
+            // abgeleitet. Production+Sign/SignAndEncrypt verlangt einen
+            // sicheren Endpoint vom Server; HilSimulator/Development mit
+            // SecurityMode=None bleibt auf dem unsicheren Endpoint-Pfad.
+            var useSecurity = _options.SecurityMode != OpcUaSecurityMode.None;
+            EndpointDescription endpointDescription = await SelectEndpointWithTrustWrapAsync(
+                useSecurity, token).ConfigureAwait(false);
             var endpointConfiguration = EndpointConfiguration.Create(_appConfig!);
             var endpoint = new ConfiguredEndpoint(null, endpointDescription, endpointConfiguration);
 
             var sessionFactory = new DefaultSessionFactory(_telemetry!);
-            var session = (Session)await sessionFactory
-                .CreateAsync(
-                    _appConfig!,
-                    endpoint,
-                    updateBeforeConnect: false,
-                    _options.SessionName,
-                    sessionTimeout: 60_000,
-                    identity: null,
-                    preferredLocales: default,
-                    token)
-                .ConfigureAwait(false);
+            Session session;
+            try
+            {
+                session = (Session)await sessionFactory
+                    .CreateAsync(
+                        _appConfig!,
+                        endpoint,
+                        updateBeforeConnect: false,
+                        _options.SessionName,
+                        sessionTimeout: 60_000,
+                        identity: null,
+                        preferredLocales: default,
+                        token)
+                    .ConfigureAwait(false);
+            }
+            catch (Opc.Ua.ServiceResultException ex)
+                when (useSecurity
+                    && IsCertificateTrustError(ex.StatusCode))
+            {
+                throw new InvalidOperationException(
+                    $"opcua-server-certificate-not-trusted: server certificate at "
+                    + $"{_options.EndpointUrl} was rejected during session "
+                    + $"handshake. Operator must pre-provision the server "
+                    + $"certificate under the configured trust path (see "
+                    + $"OpcUaAdapterOptions.TrustedServerCertificatesPath).", ex);
+            }
 
             // Review-Fix L3: das SDK unterstützt diesen Setter nach
             // `CreateAsync`-Return; es restartet den Keepalive-Timer mit
@@ -331,7 +345,7 @@ public sealed class OpcUaClient : IOpcUaClient
         return session;
     }
 
-    private async Task EnsureApplicationConfiguredAsync(CancellationToken cancellationToken)
+    internal async Task EnsureApplicationConfiguredAsync(CancellationToken cancellationToken)
     {
         if (_appConfig is not null) { return; }
         // Review-Fix M1/M2: partial-failure-Cleanup. Bauen in lokale
@@ -348,7 +362,11 @@ public sealed class OpcUaClient : IOpcUaClient
             telemetryDisposable = defaultTelemetry as IDisposable;
         }
 
-        var subject = $"CN={_options.SessionName}, O=BatteryEms, DC=localhost";
+        // M4-05-B: App-Cert-Subject aus Options, mit SessionName-
+        // Fallback. Operator kann ein Vendor-konformes Subject vorgeben.
+        var subject = string.IsNullOrWhiteSpace(_options.ApplicationCertificateSubject)
+            ? $"CN={_options.SessionName}, O=BatteryEms, DC=localhost"
+            : _options.ApplicationCertificateSubject!;
         Directory.CreateDirectory(_pkiRoot);
         var certs = ApplicationConfigurationBuilder.CreateDefaultApplicationCertificates(
             subject, CertificateStoreType.Directory, _pkiRoot);
@@ -359,6 +377,15 @@ public sealed class OpcUaClient : IOpcUaClient
             ApplicationType = ApplicationType.Client,
         };
 
+        // M4-05-B Profile-Gate: Production + Sign|SignAndEncrypt fährt
+        // mit AutoAccept=false; HilSimulator|Development bleibt mit
+        // AutoAccept=true (Pre-M4-05-Verhalten für Test-Linien).
+        // SecurityMode=None wird in EnsureValid für Production
+        // bereits abgefangen — hier ist also Production ⇒ secure.
+        var isProductionSecure = _options.RuntimeProfile == OpcUaRuntimeProfile.Production
+            && _options.SecurityMode != OpcUaSecurityMode.None;
+        var autoAccept = !isProductionSecure;
+
         try
         {
             await application
@@ -367,7 +394,7 @@ public sealed class OpcUaClient : IOpcUaClient
                     productUri: "urn:bess-ems:opcua-client")
                 .AsClient()
                 .AddSecurityConfiguration(certs, _pkiRoot)
-                .SetAutoAcceptUntrustedCertificates(true)
+                .SetAutoAcceptUntrustedCertificates(autoAccept)
                 .CreateAsync(cancellationToken)
                 .ConfigureAwait(false);
 
@@ -391,11 +418,39 @@ public sealed class OpcUaClient : IOpcUaClient
         }
 
         var appConfig = application.ApplicationConfiguration;
-        // Named handler statt Lambda, damit Dispose -= denselben
-        // Handler-Slot trifft (Review-Fix L6 + M1).
-        var handler = new CertificateValidationEventHandler(
-            (sender, e) => e.Accept = true);
-        appConfig.CertificateValidator.CertificateValidation += handler;
+
+        // M4-05-B: Operator-Override des Trusted-Server-Cert-Store-Pfads.
+        // Default leer ⇒ Adapter erbt den Pfad aus der `_pkiRoot`-
+        // Konvention (durch `AddSecurityConfiguration` gesetzt). Wenn
+        // der Operator einen expliziten Pfad konfiguriert hat, schwenken
+        // wir die TrustedPeerCertificates-Liste darauf um — das erlaubt
+        // Pre-Deployment-Cert-Provisioning unter einem wohlbekannten
+        // Pfad (Plan-RM-M4-05 D-06).
+        if (!string.IsNullOrWhiteSpace(_options.TrustedServerCertificatesPath))
+        {
+            appConfig.SecurityConfiguration.TrustedPeerCertificates.StoreType =
+                CertificateStoreType.Directory;
+            appConfig.SecurityConfiguration.TrustedPeerCertificates.StorePath =
+                _options.TrustedServerCertificatesPath!;
+            await appConfig.CertificateValidator
+                .UpdateAsync(appConfig, ct: cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        // M4-05-B: Cert-Validator-Hook NUR im HilSimulator|Development-
+        // Pfad. Production verlangt echten Cert-Trust — der SDK-
+        // Validator rejected untrusted certs ohne Handler, und unser
+        // ConnectAsync wrappt die SDK-`ServiceResultException` in
+        // `opcua-server-certificate-not-trusted`.
+        CertificateValidationEventHandler? autoAcceptHandler = null;
+        if (autoAccept)
+        {
+            // Named handler statt Lambda, damit Dispose -= denselben
+            // Handler-Slot trifft (Review-Fix L6 + M1).
+            autoAcceptHandler = new CertificateValidationEventHandler(
+                (sender, e) => e.Accept = true);
+            appConfig.CertificateValidator.CertificateValidation += autoAcceptHandler;
+        }
 
         // Atomic commit: nur jetzt, nach allen await-Punkten ohne
         // Throw, übernehmen wir die lokalen Werte in die Felder.
@@ -403,8 +458,59 @@ public sealed class OpcUaClient : IOpcUaClient
         _telemetryDisposable = telemetryDisposable;
         _application = application;
         _appConfig = appConfig;
-        _certificateAutoAcceptHandler = handler;
+        _certificateAutoAcceptHandler = autoAcceptHandler;
     }
+
+    // Plan-RM-M4-05-B: bestimmte UA-Status-Codes signalisieren einen
+    // Cert-Trust-Fehler. Wir wrappen sie in unserer kebab-case-Reason
+    // damit der Operator die Diagnose direkt sieht.
+    private static bool IsCertificateTrustError(uint statusCode)
+    {
+        return statusCode == Opc.Ua.StatusCodes.BadCertificateUntrusted
+            || statusCode == Opc.Ua.StatusCodes.BadCertificateChainIncomplete
+            || statusCode == Opc.Ua.StatusCodes.BadCertificateInvalid
+            || statusCode == Opc.Ua.StatusCodes.BadSecurityChecksFailed;
+    }
+
+    private async Task<EndpointDescription> SelectEndpointWithTrustWrapAsync(
+        bool useSecurity, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var description = await CoreClientUtils
+                .SelectEndpointAsync(
+                    _appConfig!,
+                    _options.EndpointUrl.ToString(),
+                    useSecurity: useSecurity,
+                    _telemetry!,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (description is null)
+            {
+                throw new InvalidOperationException(
+                    $"opcua-no-endpoint-available: SelectEndpointAsync returned "
+                    + $"no endpoint for {_options.EndpointUrl} (useSecurity={useSecurity}).");
+            }
+            return description;
+        }
+        catch (Opc.Ua.ServiceResultException ex)
+            when (useSecurity && IsCertificateTrustError(ex.StatusCode))
+        {
+            throw new InvalidOperationException(
+                $"opcua-server-certificate-not-trusted: server certificate at "
+                + $"{_options.EndpointUrl} is not in the client trusted-peer "
+                + $"store. Operator must pre-provision the server certificate "
+                + $"under the configured trust path (see "
+                + $"OpcUaAdapterOptions.TrustedServerCertificatesPath; default "
+                + $"is derived from the PKI root).", ex);
+        }
+    }
+
+    // M4-05-B-Test-Hook: erlaubt strukturelle Pins gegen die nach
+    // EnsureApplicationConfiguredAsync sichtbare ApplicationConfiguration
+    // ohne den echten Network-Connect zu starten. Wire-Tests laufen
+    // gegen den Embedded TestServer in Sub-Slice D.
+    internal ApplicationConfiguration? ApplicationConfigurationForTest => _appConfig;
 
     // Review-Fix H2: typsicheres Variant-Build. Sink boxed bereits per
     // `OpcUaCommandSink.TryBoxForDataType` auf den passenden CLR-Typ;
