@@ -526,9 +526,62 @@ Kubernetes-Deployment, Edge-Anbindung. Inhalte mit hohem Diskussionsbedarf
   2. Den zugehörigen `plan-RM-Mn.md` nach `docs/plan/planning/done/`
      verschieben und in der „Übersicht"-Tabelle in der
      Detailplan-Spalte verlinken.
-  3. „Aktueller Stand" auf den nächsten Meilenstein umstellen.
+  3. Alle eigenen Slice-Pläne (`plan-RM-Mn-XX.md`) ebenfalls in
+     `done/` haben — Sub-Slice-Status-Tabellen + Status-Header
+     synchronisiert (siehe Slice-Plan-Konvention unten).
+  4. Cross-Reference-Sweep: alle Pfad-Verweise auf den verschobenen
+     Master-Plan + Slice-Pläne anpassen (Sibling-Pläne im selben
+     Folder ⇒ Datei-Name ohne `../`-Präfix; Cross-Folder-Verweise
+     bleiben wie sie sind).
+  5. „Aktueller Stand" auf den nächsten Meilenstein umstellen.
 - „Aktueller Stand" wird nach jedem signifikanten Fortschritt neu
   geschrieben, nicht inkrementell — die Liste bleibt kurz.
 - Bei Inkonsistenz zwischen Lastenheft (`LH-*`) und Roadmap-Eintrag
   gewinnt das Lastenheft. Die Roadmap wird angepasst; ein Lastenheft-Patch
   erfolgt nur, wenn die normative Anforderung selbst falsch oder veraltet ist.
+
+### Slice-Plan-Konvention
+
+Innerhalb eines Meilensteins sind die einzelnen Arbeitspakete
+(`RM-Mn-XX`) **nicht symmetrisch** dokumentiert. Manche leben mit voller
+DoD inline in der Master-Plan-Liefergegenstands-Tabelle, andere bekommen
+einen eigenen Detail-Slice-Plan unter `docs/plan/planning/{open,in-progress,done}/plan-RM-Mn-XX.md`.
+Die Asymmetrie ist absichtlich, skaliert mit dem Umfang des einzelnen
+Slices — nicht jedes Arbeitspaket trägt die Kosten eines eigenen
+Slice-Plan-Files.
+
+**Eigener Slice-Plan** wenn mindestens einer dieser Auslöser zutrifft:
+
+- Das Arbeitspaket bricht sich natürlich in mehrere Sub-Slices
+  (`RM-Mn-XX-A..n`) auf, jeder mit eigenem Closure-Commit.
+- Geschätzter Aufwand ≥ ~1 Woche zusammenhängender Arbeit.
+- Fünf oder mehr Design-Entscheidungen (D-01..D-NN), die jeweils eine
+  Alternative + Begründung tragen.
+- Externer Review-Pass (ein oder mehrere Iterationen) ist eingeplant —
+  das Slice-Doc ist der Lese-Anker.
+- Querverweise auf andere Slice-Pläne, ADRs, Plan-Notes als
+  Trigger-Watches oder Cross-Cutting-Entscheidungen sind so dicht, dass
+  eine eigene Bezug-Sektion sich lohnt.
+
+**Inline-DoD in der Master-Plan-Tabelle** ist die Default-Form für alles
+andere. Die DoD-Zelle trägt selbst die volle Substanz:
+
+- Implementierungs-Skizze, Test-Inventory, Persistenz-/Migrations-
+  Berührungspunkte.
+- Design-Entscheidungen `D-01..D-04` inline (selten mehr; wenn doch:
+  Wechsel auf eigenen Slice-Plan).
+- Trigger-getriebene Folgearbeiten als „**Bewusst draußen** mit
+  konkretem Trigger" Aufzählung — entweder inline oder mit Verweis auf
+  `note-RM-Mn-followups.md`.
+
+**Folge für Lesende:** die Master-Plan-Tabelle ist die normative
+DoD-Quelle. Wenn eine DoD-Zelle `Slice-Plan: [plan-RM-Mn-XX.md](...)`
+nennt, lebt die volle Tiefe im verlinkten Slice-Doc; sonst ist die
+Zelle selbst die Quelle.
+
+**Beispielzuordnung in M4** (zur Kalibrierung künftiger Slices):
+
+| Arbeitspaket | Form | Begründung |
+| ------------ | ---- | ---------- |
+| RM-M4-01/02/06/07 | Inline-DoD | Single-Shot-Arbeit, 4 Design-Entscheidungen, kein Sub-Slice-Breakdown |
+| RM-M4-03/04/05/08 | Eigener Slice-Plan | Sub-Slice-A..n + Multi-Wochen-Aufwand + Review-Pass-Iterationen |
