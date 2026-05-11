@@ -1,0 +1,349 @@
+// Optimization-Core Sidecar-Vertrag v1 (plan-RM-M5-01-A).
+//
+// Schließt AR-OPEN-002 via ADR 0005 (gRPC über HTTP/2 als Transport
+// für Phase-3-Sidecars). Major-Version im Paket-Namespace
+// (`bess.optimization_core.v1`); Breaking Changes erzwingen ein
+// `v2/`-Schwester-Verzeichnis.
+//
+// Backward-Compat-Disziplin: Field-Numbers werden nie wiederverwendet;
+// neue optionale Felder OK; required-Felder (es gibt in proto3 keine
+// "required" mehr, aber semantisch erwartete Felder) nur in
+// Major-Bumps. Buf-Lint im CI (RM-M5-06-Carve-out).
+//
+// Transport-Mapping (gRPC-StatusCode → normierte Outcomes der
+// plan-RM-M5 §Sidecar-Status-Taxonomie) ist als versioniertes
+// Artefakt in `transport-mapping-v1.md` dokumentiert (D-04 aus
+// plan-RM-M5-01).
+
+syntax = "proto3";
+
+package bess.optimization_core.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+option csharp_namespace = "BatteryEms.Adapters.OptimizationCore.Grpc.V1";
+
+// =============================================================================
+// Service
+// =============================================================================
+
+service OptimizationCore {
+    // Health-Probe (analog `grpc.health.v1.Health.Check`). Worker
+    // ruft das pre-Optimize-Call zur Konnektivitäts-Prüfung; Container-
+    // Orchestrierungs-Probes (k8s grpc-probe, grpc_health_probe) nutzen
+    // dasselbe RPC.
+    rpc Health(HealthRequest) returns (HealthResponse);
+
+    // Version + Feature-Negotiation. Beide Seiten melden
+    // contract_version + min/max_compatible_version + Feature-Flags;
+    // Worker prüft Mutual-Range pre-erstem-Optimize. Inkompatible
+    // Version blockiert Sidecar-Aktivierung mit `contract_incompatible`-
+    // Fallback (plan-RM-M5 §Contract-Versionen Und Rollout).
+    rpc Version(VersionRequest) returns (VersionResponse);
+
+    // Horizon-Optimierung (LP/MILP-Surface). Server-Streaming für
+    // progressive Updates während eines mehrsekundigen Solver-Laufs;
+    // der finale `OptimizeResult` ist der letzte Stream-Wert.
+    // `CallOptions.Deadline` wird vom Client gesetzt und vom Sidecar
+    // im Solver-Time-Limit gespiegelt.
+    rpc Optimize(OptimizeRequest) returns (stream OptimizeUpdate);
+
+    // MPC-Vertrag-only-Slot (plan-RM-M5-01 D-08). RM-M5-02 liefert das
+    // State-Space-Backend; in RM-M5-01-A existiert nur die Vertragsform.
+    // Felder können additiv ergänzt werden bevor RM-M5-02 backend-seitig
+    // implementiert (Field-Number-Reservierungen unten verhindern
+    // Reuse-Konflikte).
+    rpc OptimizeMpc(OptimizeMpcRequest) returns (OptimizeMpcResponse);
+}
+
+// =============================================================================
+// Health
+// =============================================================================
+
+message HealthRequest {}
+
+message HealthResponse {
+    enum Status {
+        STATUS_UNSPECIFIED = 0;
+        SERVING = 1;
+        NOT_SERVING = 2;
+    }
+    Status status = 1;
+}
+
+// =============================================================================
+// Version + Feature-Flags
+// =============================================================================
+
+message VersionRequest {}
+
+message VersionResponse {
+    // SemVer-String der vom Sidecar implementierten Contract-Version
+    // (z.B. "1.0.0").
+    string contract_version = 1;
+
+    // Niedrigste vom Sidecar verstandene Worker-Contract-Version. Ein
+    // Worker mit niedrigerer Version → Sidecar lehnt mit
+    // `INVALID_ARGUMENT` ab → Worker mappt zu `contract_incompatible`.
+    string min_compatible_version = 2;
+
+    // Höchste vom Sidecar verstandene Worker-Contract-Version. Ein
+    // Worker mit höherer Major-Version → Worker erkennt das pre-Optimize
+    // und fällt auf `contract_incompatible`-Fallback.
+    string max_compatible_version = 3;
+
+    // Kebab-Case-Feature-Flags. Worker prüft pre-Optimize-Call ob alle
+    // für den Request nötigen Features vom Sidecar gemeldet werden
+    // (z.B. "has-usable-solution", "deterministic-seed",
+    // "auth-bearer-token", "streaming-progress"). Fehlt ein Pflicht-
+    // Feature → kein Sidecar-Request, lokaler Fallback gemäß
+    // plan-RM-M5 §Fallback-Matrix.
+    repeated string features = 4;
+}
+
+// =============================================================================
+// Optimize (LP/MILP)
+// =============================================================================
+
+message OptimizeRequest {
+    // UUID. Plan-RM-M5 §Request-Idempotenz: pro request_id gibt es
+    // genau einen atomaren Terminalzustand im worker-owned Idempotency-
+    // Store. Wiederholte Requests mit gleicher request_id dürfen
+    // höchstens einen OptimizationRun und höchstens eine Schedule-
+    // Version erzeugen.
+    string request_id = 1;
+
+    // Asset-Identifier (LH-DOM-001). Optimization läuft pro Asset.
+    string asset_id = 2;
+
+    // Schedule-Typ (DayAhead / Intraday / RegelLeistungReserve).
+    ScheduleType schedule_type = 3;
+
+    // Horizon-Anfang (UTC). Halb-offenes Fenster `[horizon_start,
+    // horizon_end)` per LH-MKT-007.
+    google.protobuf.Timestamp horizon_start = 4;
+    google.protobuf.Timestamp horizon_end = 5;
+
+    // Time-Step pro Schedule-Window (z.B. 1h für DayAhead, 15min für
+    // Intraday/Regelleistung).
+    google.protobuf.Duration time_step = 6;
+
+    // Preise pro Step (Spot- oder Intraday-Preise; Länge =
+    // (horizon_end - horizon_start) / time_step). Leer ⇒
+    // energy_cost-Komponente trägt 0 zur Objective bei.
+    repeated double prices_per_step = 7;
+
+    // Preis-Einheit (z.B. "EUR/MWh"). Sidecar muss die Einheit
+    // verstehen oder mit `INVALID_ARGUMENT` ablehnen.
+    string price_unit = 8;
+
+    // Markt-Gebietszone (LH-MKT-007 #6). Wird mit dem Schedule
+    // persistiert für Audit-Trail; Sidecar nutzt sie typischerweise
+    // nur zur Preis-Disambiguierung.
+    string market_bid_area = 9;
+
+    // Schedule-Version, auf der diese Optimierung aufsetzt (M2-Modell:
+    // Producer-Version = base + 1). 0 ⇒ Cold-Start, keine prior
+    // Schedule.
+    int32 base_schedule_version = 10;
+
+    // Asset-Fähigkeiten (Capacity, Power-Bounds, SOC-Bounds,
+    // Efficiencies, Ramp). Sidecar konstruiert daraus die LP-/MILP-
+    // Constraint-Matrix.
+    AssetCapabilities asset = 11;
+
+    // Reservierungs-Bänder die der Solver pro Step honoriert
+    // (LH-MKT-004). Leer ⇒ keine Reserve-Deduction (M2-Pfad).
+    repeated ReserveBand reserves = 12;
+
+    // Solver-Deadline (zusätzlich zum gRPC-`CallOptions.Deadline`).
+    // Redundant — der Sidecar darf entweder Wert nutzen, sollte aber
+    // beim ersten erreichten Limit terminieren. Leer ⇒ kein Solver-
+    // Time-Limit gesetzt.
+    google.protobuf.Duration deadline = 13;
+}
+
+// Schedule-Typ als enum (gespiegelt aus `BatteryEms.Domain.ScheduleType`).
+enum ScheduleType {
+    SCHEDULE_TYPE_UNSPECIFIED = 0;
+    DAY_AHEAD = 1;
+    INTRADAY = 2;
+    REGELLEISTUNG_RESERVE = 3;
+}
+
+message AssetCapabilities {
+    string asset_id = 1;
+    double capacity_kwh = 2;
+    double max_charge_power_kw = 3;
+    double max_discharge_power_kw = 4;
+    double min_soc_percent = 5;
+    double max_soc_percent = 6;
+    double charge_efficiency = 7;
+    double discharge_efficiency = 8;
+    double max_ramp_kw_per_second = 9;
+    double min_operating_temperature_celsius = 10;
+    double max_operating_temperature_celsius = 11;
+}
+
+message ReserveBand {
+    enum Product {
+        PRODUCT_UNSPECIFIED = 0;
+        FCR = 1;
+        AFRR = 2;
+        MFRR = 3;
+    }
+
+    enum Direction {
+        DIRECTION_UNSPECIFIED = 0;
+        SYMMETRIC = 1;
+        UP = 2;
+        DOWN = 3;
+    }
+
+    Product product = 1;
+    Direction direction = 2;
+
+    // Halb-offenes Fenster `[window_start, window_end)`.
+    google.protobuf.Timestamp window_start = 3;
+    google.protobuf.Timestamp window_end = 4;
+
+    // Magnitude in kW (≥ 0). Direction definiert das Vorzeichen
+    // bei der Cap-Deduction (Symmetric ⇒ beidseitig, Up ⇒ nur
+    // Discharge-Cap, Down ⇒ nur Charge-Cap).
+    double power_kw = 5;
+}
+
+// Stream-Vertrag: jeder OptimizeUpdate ist entweder ein
+// progressives Update (Progress) oder die finale Antwort (Result).
+// Der Sidecar sendet beliebig viele Progress-Updates plus genau
+// einen Result als letzten Wert vor Stream-Schließen.
+message OptimizeUpdate {
+    oneof update {
+        OptimizeProgress progress = 1;
+        OptimizeResult result = 2;
+    }
+}
+
+message OptimizeProgress {
+    // Stand des laufenden Solvers — z.B. nach n Iterationen.
+    int32 step_index = 1;
+
+    // Aktueller Objective-Wert (kann sich noch ändern).
+    double objective_so_far = 2;
+
+    // Bisherige Solver-Laufzeit (Cumulative).
+    google.protobuf.Duration runtime_so_far = 3;
+}
+
+message OptimizeResult {
+    // Solver-Status (gespiegelt aus
+    // `BatteryEms.Domain.OptimizationSolverStatus`). Worker mappt das
+    // gemäß `transport-mapping-v1.md`-Tabelle auf
+    // `OptimizationRun.Status` + Fallback-Tags.
+    enum SolverStatus {
+        SOLVER_STATUS_UNSPECIFIED = 0;
+        OPTIMAL = 1;
+        FEASIBLE = 2;
+        INFEASIBLE = 3;
+        UNBOUNDED = 4;
+        TIME_LIMIT = 5;
+        ITERATION_LIMIT = 6;
+        FAILED = 7;
+    }
+    SolverStatus solver_status = 1;
+
+    // plan-RM-M5 §Sidecar-Status-Taxonomie: explizites Usable-Signal.
+    // Notwendig weil `TIME_LIMIT` / `ITERATION_LIMIT` sowohl mit als
+    // auch ohne nutzbare Zwischenlösung enden können. Worker liest
+    // diesen Bool BEVOR er ein ProducedSchedule persistiert.
+    bool has_usable_solution = 2;
+
+    // Solution-Quality-Tag (kebab-case, z.B. "optimal" / "feasible" /
+    // "none"). Redundant zu solver_status + has_usable_solution,
+    // dient als observability-friendly Label für Metric-Tags und
+    // Run-Audit.
+    string solution_quality = 3;
+
+    // Erzeugte Schedule-Windows. Leer wenn has_usable_solution=false.
+    // Länge = (horizon_end - horizon_start) / time_step bei
+    // OPTIMAL/FEASIBLE; bei resource-limit-Cases mit nutzbarer
+    // Zwischenlösung ggf. kürzer.
+    repeated SchedulePoint schedule_points = 4;
+
+    // Gesamter Zielfunktionswert (M2-`OptimizationRun.ObjectiveValue`).
+    double objective_value = 5;
+
+    // Komponenten-Aufschlüsselung. Erlaubt Operator-seitige Analyse
+    // welche Kostenfaktoren dominant waren (energy_cost vs
+    // degradation_cost vs soc_target_penalty).
+    ObjectiveBreakdown objective_breakdown = 6;
+
+    // Verletzte oder weiche Constraints (kebab-case, z.B.
+    // "soc-bound-violation" / "ramp-rate-exceeded"). Leer bei
+    // OPTIMAL; nicht-leer bei FEASIBLE oder Solver-internem Soft-
+    // Constraint-Slack.
+    repeated string constraint_violations = 7;
+
+    // Nicht-fatale Warnungen (z.B. "time-limit-reached-with-feasible-
+    // solution"). Persistiert in `OptimizationRun.Warnings`.
+    repeated string warnings = 8;
+
+    // Gesamte Solver-Laufzeit (nicht: gRPC-Roundtrip-Zeit).
+    google.protobuf.Duration solver_runtime = 9;
+
+    // Solver-spezifischer Terminations-Code (z.B. "OPTIMAL",
+    // "TIME_LIMIT_FEASIBLE", "INFEASIBLE_PROVED"). Wird in
+    // `OptimizationRun.TerminationCode` persistiert.
+    string termination_code = 10;
+
+    // Optionaler human-readable Detail-String (z.B. Solver-Log-
+    // Exzerpt bei FAILED). Wird in `OptimizationRun.TerminationDetail`
+    // persistiert.
+    string termination_detail = 11;
+
+    // Solver-Name (z.B. "HiGHS", "ortools-glop", "cvxpy-eclm").
+    // Persistiert in `OptimizationRun.SolverName` für Audit-Trail.
+    string solver_name = 12;
+}
+
+message SchedulePoint {
+    google.protobuf.Timestamp window_start = 1;
+    google.protobuf.Timestamp window_end = 2;
+
+    // Target-Setpoint im Window. Vorzeichenkonvention per LH §4.1:
+    // positiv = Discharge (Asset gibt Energie ans Netz ab); negativ
+    // = Charge.
+    double target_power_kw = 3;
+}
+
+message ObjectiveBreakdown {
+    double energy_cost = 1;
+    double degradation_cost = 2;
+    double soc_target_penalty = 3;
+    // Reserve-Penalty (RM-M2-04-OPT-RESERVE-Folge, F-Carve-out) wird
+    // hier additiv ergänzt wenn der LP-Slice landet; field 4
+    // reserviert.
+    reserved 4;
+    reserved "reserve_penalty";
+}
+
+// =============================================================================
+// OptimizeMpc (Vertrag-only — RM-M5-02 liefert Backend)
+// =============================================================================
+
+message OptimizeMpcRequest {
+    string request_id = 1;
+    string asset_id = 2;
+
+    // Felder werden in RM-M5-02 additiv ergänzt (State-Space-Modell,
+    // Vorhersagehorizont, Kalman-State, …). Field-Numbers 3-50
+    // reserviert für RM-M5-02-Erweiterung.
+    reserved 3 to 50;
+}
+
+message OptimizeMpcResponse {
+    // Felder werden in RM-M5-02 additiv ergänzt. Field-Numbers 1-50
+    // reserviert.
+    reserved 1 to 50;
+}
