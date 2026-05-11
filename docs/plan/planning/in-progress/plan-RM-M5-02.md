@@ -67,8 +67,8 @@ Sidecar. RM-M5-01 hat den Wire-Vertrag plus die LP-Surface
 Modell plus Kalman-Filter plus Constraints-Einhaltung — kein
 Multi-Asset, kein piecewise-Modell, kein Stochastic-MPC, keine
 adaptive Modell-Identifikation. Diese Erweiterungen sind eigene
-Folge-Slices (RM-M5-02-FUP-*); der Trigger für jede einzelne ist im
-§9 Folgearbeiten-Block dokumentiert.
+Folge-Slices (F-M5-06..11 — siehe §9); der Trigger für jede
+einzelne ist im §9 Folgearbeiten-Block dokumentiert.
 
 ---
 
@@ -160,25 +160,37 @@ Folge-Slices (RM-M5-02-FUP-*); der Trigger für jede einzelne ist im
   horizon_end, time_step, base_schedule_version, market_bid_area)` —
   passt aber nicht für den MPC-Sub-Sekunden-Tick. Pro Tick
   produziert MPC eine eigene `mpc_request_id` aus dem
-  **vollständigen Verhaltens-Tuple**:
+  **vollständigen 8-Feld-Verhaltens-Tuple**:
   `(asset_id, control_cycle_tick_utc_ms_truncated, sample_time_ms,
   mpc_model_version, state_estimator_variant, solver_config_hash,
-  estimator_p0_hash)`. `sample_time_ms` ist explizit Teil der
-  Identität (Finding-2-Schutz vor SampleTime-Wechsel der dieselbe
-  Truncate-Boundary trifft); `solver_config_hash` deckt
-  Horizon/TimeLimit/Threading/`DeterministicMode` (Finding-1-Schutz
-  vor Operator-Tuning-Updates die das Tick-Verhalten ändern, aber
-  unter dem alten Identity-Hash dedupliziert würden);
-  `estimator_p0_hash` deckt Estimator-Initial-Bedingungen die das
-  MPC-Verhalten beeinflussen.
-  Plan-Validator-Linie aus M5-01 bleibt orthogonal — Idempotency
-  detektiert Retry/Duplicate (selber Tick + selbe Konfiguration
-  zweimal abgefeuert), Validator detektiert State-Drift.
-  Persistenz lebt in einer **eigenen Tabelle** `mpc_runs` (nicht
-  im LP-`optimization_idempotency`-Store), weil MPC-Schreib-Rate
-  (4 Hz pro Asset) eine andere Retention-/Compaction-Linie verlangt
-  — Migration `0004_mpc_runs.sql` deklariert eine TTL-/Top-N-
-  Compaction-Policy (D-09).
+  estimator_config_hash, random_seed)`. Alle acht Felder werden
+  **zusätzlich als reguläre Spalten** in `mpc_runs` persistiert —
+  nicht nur als Hash-Input — damit forensische Queries (z. B.
+  „alle Runs mit SampleTime=250 ms zwischen 14:00 und 15:00")
+  ohne Re-Computation auf die Spalten zugreifen können. `random_seed`
+  ist im Default-Pfad deterministisch aus den anderen sieben
+  Feldern abgeleitet (Operator-Override produziert eigenen Hash;
+  siehe D-09). `estimator_config_hash` deckt `P_0` + `Q` + `R` +
+  Estimator-Variante-spezifische Parameter; `solver_config_hash`
+  bleibt QP-Solver-spezifisch (Threading, DeterministicMode,
+  Horizon, TimeLimit). Plan-Validator-Linie aus M5-01 bleibt
+  orthogonal — Idempotency detektiert Retry/Duplicate (selber
+  Tick + selbe Konfiguration zweimal abgefeuert), Validator
+  detektiert State-Drift. Persistenz lebt in einer **eigenen
+  Tabelle** `mpc_runs` (nicht im LP-`optimization_idempotency`-
+  Store), weil MPC-Schreib-Rate (4 Hz pro Asset) eine andere
+  Retention-/Compaction-Linie verlangt — Migration
+  `0004_mpc_runs.sql` deklariert eine TTL-/Top-N-Compaction-Policy
+  (D-09).
+- **Wall-Clock-Disziplin** (D-09 + §7 Risiko-Block): Production-
+  Pfade mit aktivem MPC verlangen einen `MonotonicAnchoredClock`-
+  `IClock`-Adapter (im Sub-Slice-C-Scope). Default-`SystemClock`
+  (wall-clock-following) ist in `RuntimeProfile=Production` mit
+  MPC-Backend explizit abgelehnt — Composition-Root wirft
+  `mpc-production-without-monotonic-clock` bei Fehler. NTP-
+  Backsprünge / Wall-Clock-Restarts werden vom Anchor-Clock
+  geglättet und schlagen sich nicht in `control_cycle_tick_utc_ms_
+  truncated` nieder.
 - **Terminal-Reason `mpc-committed`** analog zu
   `sidecar-committed` aus M5-01; Late-Response-Ignored-Pfad erbt
   sich vom Idempotency-Pattern aus M5-01-C.
@@ -231,14 +243,14 @@ Folge-Slices (RM-M5-02-FUP-*); der Trigger für jede einzelne ist im
 **Out of Scope (separate Slices / Folgearbeiten):**
 
 - **Multi-Asset-MPC** (gemeinsame Optimierung über mehrere Batterien
-  / Netz-Knotenpunkte) → RM-M5-02-FUP-multi-asset. Trigger: erster
+  / Netz-Knotenpunkte) → F-M5-06 (siehe §9). Trigger: erster
   Operator-Workflow mit 2+ Batterien im selben Netz-Knoten.
 - **Piecewise-/Nichtlineare-Modell-Erweiterung** (z. B. SOC-
   abhängige Effizienz-Kurve, Temperatur-abhängige Power-Bounds) →
-  RM-M5-02-FUP-nonlinear. Trigger: erste Replay-Differenz, die
+  F-M5-07 (siehe §9). Trigger: erste Replay-Differenz, die
   bei LTI-Annahme nicht erklärbar ist.
 - **Stochastic-MPC / Robust-MPC** (Unsicherheits-Sets statt Mean-
-  State) → RM-M5-02-FUP-stochastic. Trigger: erste Operator-
+  State) → F-M5-08 (siehe §9). Trigger: erste Operator-
   Anforderung nach Forecast-Unsicherheits-Handling jenseits der
   Kalman-Covariance.
 - **Adaptive Modell-Identifikation** (Online-Re-Fitting der
@@ -251,7 +263,7 @@ Folge-Slices (RM-M5-02-FUP-*); der Trigger für jede einzelne ist im
   → eigene Folge-Slice; initial nur eine globale `MpcOptions.
   SampleTime`.
 - **Time-Varying-Reference-Tracking** (Trajektorien-Following
-  jenseits der Marktpreis-Linie) → RM-M5-FUP-trajectory-tracking.
+  jenseits der Marktpreis-Linie) → F-M5-10 (siehe §9).
   Trigger: erste TSO-/Operator-Anforderung nach Reference-Profil-
   Following.
 
@@ -263,8 +275,8 @@ Folge-Slices (RM-M5-02-FUP-*); der Trigger für jede einzelne ist im
 | ------ | -- | ----- | --- |
 | ⬜ | RM-M5-02-A | State-Space-Modell + Application-Schicht-Ports + Constraint-Property-Pins — **~700-1000 LOC** | Neuer `BatteryEms.Application.Mpc`-Namespace mit `MpcModel`, `MpcState`, `MpcTrajectory`, `MpcOptions`-Records. `IMpcDispatchOptimizer`-Driving-Port + `IMpcStateEstimator`-Driven-Port + `IMpcModelSolver`-Driven-Port. `DefaultMpcDispatchOrchestrator` als wireing-Klasse, die `IMpcStateEstimator.PredictUpdateAsync` + `IMpcModelSolver.SolveAsync` orchestriert. **In diesem Sub-Slice kein konkreter Solver-Adapter** — `IMpcModelSolver` wird als `NotImplementedException`-Stub registriert; das hält die Schicht-Wartbarkeit beim Cut sauber. Constraint-Property-Pins (5+): SOC-in-Bounds, Power-in-Bounds, Ramp-in-Bounds, Constraint-Violation-Reason-Pinning, Empty-Trajectory-Reject. State-Estimator-Stub `IdentityStateEstimator` (`State_new = State_old`, kein Filtering) für die Property-Pins. Tests in `BatteryEms.Application.Tests/Mpc/`. |
 | ⬜ | RM-M5-02-B | QP-Solver-Backend + erster Roundtrip-Pin — **~800-1200 LOC** | Konkreter `IMpcModelSolver`-Adapter gemäß D-02-Entscheidung. Bei Local-First (a): neuer `BatteryEms.Adapters.Optimization.Mpc.OrToolsMpcSolver` oder ein dedizierter `OsqpMpcSolver` (Solver-Wahl steckt in der ADR-Entscheidung). Bei Sidecar-First (b): `OptimizeMpc`-RPC im optimization-core-Adapter wird mit Body gefüllt; `OptimizationCoreMpcOptimizer` lebt **neben** dem bestehenden `OptimizationCoreScheduleOptimizer` und teilt sich Channel + Idempotency-Store. TestSidecar-Erweiterung mit `OptimalMpcStub` (Echo: liefert konstante SOC-Trajektorie) + `ScriptableMpcOutcomeStub` (Per-Test-Outcome-Queue, deckt Solver-Time-Limit/Infeasible/Stream-Crash). 8+ Roundtrip-Pins in neuer `OptimizationCoreMpcRoundtripTests` + `OptimizationCoreMpcNegativeTests`. Constraint-Property-Pins aus A werden gegen den echten Solver erneut gefahren — die Property-Tests laufen jetzt nicht nur gegen den Stub sondern auch gegen die Production-Linie. |
-| ⬜ | RM-M5-02-C | Kalman-Filter + Robustheits-Pfade + Fallback-Erweiterung — **~700-900 LOC** | `DefaultLinearKalmanFilter`-Implementierung in `BatteryEms.Application.Mpc.Estimators`: Predict-Step (`x_pred = A * x_old + B * u`, `P_pred = A * P_old * A^T + Q`), Update-Step (`K = P_pred * C^T * (C * P_pred * C^T + R)^{-1}`, `x_new = x_pred + K * (y - C * x_pred)`, `P_new = (I - K * C) * P_pred`). Robustheits-Pfade: Missing-Measurement-Skip (counter persistent, nach `MaxConsecutiveMissingMeasurements` → `mpc-state-stale-too-long`), Unplausible-Werte-Validator (SOC im physischen Bereich, Temperatur in Asset-Bounds; sonst `mpc-state-non-physical`), Covariance-Divergence-Check (Determinant > threshold → `mpc-covariance-diverged`). Fallback-Erweiterung: `OptimizationCoreMpcOptimizer` erbt die `TryRunFallbackAsync`-Linie aus M5-01-Korrektur-Pass für den Sidecar-Failure-Pfad; lokaler Fallback bei MPC ist ein `IFallbackMpcOptimizer`-Driven-Port (neuer Marker, analog zu `IFallbackScheduleOptimizer`). 10+ Pins (Kalman-Convergence, Missing-Measurement-Recovery, Unplausible-State-Reject, Covariance-Divergence-Reject, Fallback-Wire-Integration). |
-| ⬜ | RM-M5-02-D | Reproduzierbarkeitsvertrag + Replay-Hooks + Worker-Wiring + Retention + Quality-Doku + Master-Plan-Closure — **~800-1000 LOC** | `MpcRun`-Domain-Typ + Migration `0004_mpc_runs.sql` mit D-09-Schema (incl. `mpc_request_id` PK, `control_cycle_tick_utc_ms_truncated`, `sample_time_ms`, `solver_config_hash`, `estimator_p0_hash`, `random_seed`, `deterministic_mode`, alle drei D-04-Stempel-Achsen). Dapper-Repository `DapperMpcRunRepository` mit Restart-Replay-Pin + Retention-Compaction-Pin (D-09: Top-N + MaxAge). `MpcDispatchResult` exposed `IReadOnlyDictionary<string, string>`-Stempel für RM-M5-04-Replay. `FallbackPlanValidator` erweitert um MPC-Stempel-Achse (State-Estimator-Variante + Canonical-`P_0`-Hash vs. Kontext; Frobenius-Norm bleibt operator-sichtbar aber nicht identitätsbildend). **Cross-Run-Determinism-Pin** (D-04 Pflicht): zweimal selber MPC-Step → identische Stempel-Hashes + Schedule-Points innerhalb der DeterministicMode-Toleranz. **Worker-Control-Cycle-Wiring-Pin** in `BatteryEms.Worker.Tests`: zählender Stub-`IMpcDispatchOptimizer` registriert, `ControlCycleHostedService` läuft ≥3 Ticks, Stub-CallCount ≥3 (D-01-Wiring-Beweis). **Identity-Tuple-Vollständigkeits-Pin-Serie** (D-09 Pflicht): 7 Pins, jeder ändert genau eine Verhaltens-Achse (asset_id / tick / sample_time / model_version / estimator_variant / solver_config / estimator_p0) und beweist dass eine neue `mpc_request_id` resultiert; plus 1 Negativ-Pin (identische Inputs → identischer Hash). **Production-Fallback-Active-Pin** (D-07 Pflicht): Boot mit `MpcBackend=optimization_core` + ohne registrierten Fallback-Pfad + `RuntimeProfile=Production` ⇒ Startup-Fehler `mpc-production-without-fallback-pathway`. 12+ Persistence-Pins (Run-Roundtrip, alle Stempel-Achsen vollständig, Restart-Replay, CAS-Race, Late-Response-Ignored, Retention-Compaction-100k). Quality-Doku §2.2.3-Erweiterung + neue §2.5 (`make test-mpc-property` Property-Gate). F-Folgearbeiten (§9) in `note-RM-M5-followups.md` ergänzen. Master-Plan-Zeile RM-M5-02 flippt auf ✅ mit D-05-Replacement-Text. Slice-Plan wird nach `done/plan-RM-M5-02.md` verschoben. |
+| ⬜ | RM-M5-02-C | Kalman-Filter + Robustheits-Pfade + Fallback-Erweiterung + Monotonic-Clock — **~900-1100 LOC** | `DefaultLinearKalmanFilter`-Implementierung in `BatteryEms.Application.Mpc.Estimators`: Predict-Step (`x_pred = A * x_old + B * u`, `P_pred = A * P_old * A^T + Q`), Update-Step (`K = P_pred * C^T * (C * P_pred * C^T + R)^{-1}`, `x_new = x_pred + K * (y - C * x_pred)`, `P_new = (I - K * C) * P_pred`). Robustheits-Pfade: Missing-Measurement-Skip (counter persistent, nach `MaxConsecutiveMissingMeasurements` → `mpc-state-stale-too-long`), Unplausible-Werte-Validator (SOC im physischen Bereich, Temperatur in Asset-Bounds; sonst `mpc-state-non-physical`), Covariance-Divergence-Check (Determinant > threshold → `mpc-covariance-diverged`). Fallback-Erweiterung: `OptimizationCoreMpcOptimizer` erbt die `TryRunFallbackAsync`-Linie aus M5-01-Korrektur-Pass für den Sidecar-Failure-Pfad; lokaler Fallback bei MPC ist ein `IFallbackMpcOptimizer`-Driven-Port (neuer Marker, analog zu `IFallbackScheduleOptimizer`). **MonotonicAnchoredClock-Adapter** (D-09 Production-Pflicht): `BatteryEms.Adapters.Time.MonotonicAnchoredClock` mit Wall-Clock-Anchor + Stopwatch-Offset; periodischer Resync mit Toleranz-Check; DI-Registrierung als opt-in `IClock`-Override (Composition-Root entscheidet pre-Boot). 12+ Pins (Kalman-Convergence, Missing-Measurement-Recovery, Unplausible-State-Reject, Covariance-Divergence-Reject, Fallback-Wire-Integration, MonotonicClock-Backsprung-Resilience, MonotonicClock-Resync-Reject-Bei-Drift). |
+| ⬜ | RM-M5-02-D | Reproduzierbarkeitsvertrag + Replay-Hooks + Worker-Wiring + Retention + Production-Boot-Gates + Quality-Doku + Master-Plan-Closure — **~900-1100 LOC** | `MpcRun`-Domain-Typ + Migration `0004_mpc_runs.sql` mit D-09-Schema (acht Identity-Felder als reguläre Spalten + `mpc_request_id` PK + `numerik_stamp_json` + `p0_frobenius_display` + `deterministic_mode` + Terminal-/Trajektor-Felder + 3-Index-Set). Dapper-Repository `DapperMpcRunRepository` mit Restart-Replay-Pin + Retention-Compaction-Pin (D-09: Top-N + MaxAge). `MpcDispatchResult` exposed `IReadOnlyDictionary<string, string>`-Stempel für RM-M5-04-Replay. `FallbackPlanValidator` erweitert um MPC-Stempel-Achse (State-Estimator-Variante + `estimator_config_hash` vs. Kontext; Frobenius-Norm bleibt operator-sichtbar aber nicht identitätsbildend). **Cross-Run-Determinism-Pin** (D-04 Pflicht): zweimal selber MPC-Step → byte-für-byte identische Stempel-Hashes + Schedule-Points innerhalb der DeterministicMode-Toleranz. **Worker-Control-Cycle-Wiring-Pin** in `BatteryEms.Worker.Tests`: zählender Stub-`IMpcDispatchOptimizer` registriert, `ControlCycleHostedService` läuft ≥3 Ticks, Stub-CallCount ≥3 (D-01-Wiring-Beweis). **Identity-Tuple-Vollständigkeits-Pin-Serie** (D-09 Pflicht): 8 Pins, jeder ändert genau eine Verhaltens-Achse (asset_id / tick / sample_time / model_version / estimator_variant / solver_config / estimator_config / random_seed) und beweist dass eine neue `mpc_request_id` resultiert; plus 1 Negativ-Pin (identische Inputs → identischer Hash); plus 1 Default-Seed-Determinism-Pin (Default-`random_seed` aus den anderen sieben Feldern abgeleitet ⇒ Tuple-Hash unverändert) und 1 Operator-Seed-Override-Pin (expliziter Seed-Override ⇒ neue `mpc_request_id`). **Production-Fallback-Active-Pin** (D-07 Pflicht): Boot mit `MpcBackend=optimization_core` + ohne registrierten Fallback-Pfad + `RuntimeProfile=Production` ⇒ Startup-Fehler `mpc-production-without-fallback-pathway`. **Production-Monotonic-Clock-Pin** (D-09 Pflicht): Boot mit `MpcBackend=optimization_core` + `RuntimeProfile=Production` ohne `MonotonicAnchoredClock` ⇒ Startup-Fehler `mpc-production-without-monotonic-clock`. 12+ Persistence-Pins (Run-Roundtrip aller acht Identity-Spalten + Stempel-Achsen, Restart-Replay, CAS-Race, Late-Response-Ignored, Retention-Compaction-100k, forensische Per-SampleTime-Query). Quality-Doku §2.2.3-Erweiterung + neue §2.5 (`make test-mpc-property` Property-Gate). F-Folgearbeiten (§9) in `note-RM-M5-followups.md` ergänzen. Master-Plan-Zeile RM-M5-02 flippt auf ✅ mit D-05-Replacement-Text. Slice-Plan wird nach `done/plan-RM-M5-02.md` verschoben. |
 
 ---
 
@@ -410,20 +422,23 @@ Verbindlicher Replacement-Text:
 > als Identitätskriterium, Frobenius-Norm nur als operator-sichtbares
 > Display). `MpcRun`-Domain-Typ + Migration `0004_mpc_runs.sql` +
 > Dapper-Repository persistieren Seed/Solver-Konfig-Hash/Numerik-
-> Versionen/Estimator-Canonical-Hash für RM-M5-04-Replay (D-04 +
+> Versionen/Estimator-Config-Hash für RM-M5-04-Replay (D-04 +
 > D-09); MPC-Idempotency-Schlüssel als deterministischer SHA-256
-> über das 7-Feld-Verhaltens-Tuple `(asset_id, control_cycle_tick_
+> über das 8-Feld-Verhaltens-Tuple `(asset_id, control_cycle_tick_
 > utc_ms_truncated, sample_time_ms, mpc_model_version,
-> state_estimator_variant, solver_config_hash, estimator_p0_hash)`
-> — jede Achse pinned in einer Identity-Tuple-Vollständigkeits-
-> Pin-Serie. Plus Top-N + MaxAge-Retention-Policy für den 4-Hz-
-> Schreib-Pfad (D-09). `FallbackPlanValidator`
+> state_estimator_variant, solver_config_hash, estimator_config_hash,
+> random_seed)` — jede Achse pinned in einer Identity-Tuple-
+> Vollständigkeits-Pin-Serie. `MonotonicAnchoredClock`-Adapter als
+> Production-`IClock`-Pflicht (Boot-Gate
+> `mpc-production-without-monotonic-clock` bei Fehler). Plus
+> Top-N + MaxAge-Retention-Policy für den 4-Hz-Schreib-Pfad (D-09). `FallbackPlanValidator`
 > erweitert um MPC-Stempel-Achse. NN Pins gesamt (Pin-Count bei
 > Closure mit real-gelieferter Zahl ersetzt — Lehre aus M5-01-D
 > Pin-Count-Drift) plus neue `make test-mpc-property` Mandatory in
 > `make gates` und `make ci` und Cross-Run-Determinism-Pin als
-> Pflicht-Gate. RM-M5-03 (Native-Embed-Pivot), RM-M5-FUP-multi-
-> asset, RM-M5-FUP-nonlinear, RM-M5-FUP-stochastic siehe
+> Pflicht-Gate. RM-M5-03 (Native-Embed-Pivot) bleibt eigenes Slice;
+> F-M5-06..11 (Multi-Asset / Nichtlinear / Stochastic / Adaptive /
+> Trajectory-Tracking / Erweiterte Clock-Resync) siehe
 > `note-RM-M5-followups.md`.
 
 Pin-Count `NN` wird bei Closure mit der real-gelieferten Zahl ersetzt;
@@ -504,68 +519,96 @@ dimensioniert (Schedule-Reopt pro Stunde / pro Asset) und passt
 deshalb **nicht** für MPC. Drei orthogonale Entscheidungen:
 
 1. **Eigene Tabelle `mpc_runs`** (nicht die LP-`optimization_idempotency`-
-   Tabelle ko-nutzen). Spalten:
-   `mpc_request_id TEXT PK, asset_id TEXT NOT NULL,
+   Tabelle ko-nutzen). **Alle acht Identity-Tuple-Felder werden
+   als reguläre Spalten** persistiert (nicht nur als
+   Hash-Eingang), damit forensische Queries direkt auf die Spalten
+   zugreifen können statt den Hash zu invertieren:
+
+   ```
+   mpc_request_id            TEXT PK,
+   asset_id                  TEXT NOT NULL,
    control_cycle_tick_utc_ms BIGINT NOT NULL,
-   mpc_model_version TEXT NOT NULL,
-   state_estimator_variant TEXT NOT NULL,
-   solver_config_hash TEXT NOT NULL,
-   numerik_stamp_json TEXT NOT NULL,
-   estimator_p0_hash TEXT NOT NULL,
-   estimator_p0_frobenius_display DOUBLE PRECISION NOT NULL,
-   random_seed BIGINT NOT NULL,
-   deterministic_mode TEXT NOT NULL,
-   terminal_state TEXT NOT NULL,
-   terminal_reason TEXT NOT NULL,
-   produced_trajectory_json TEXT,
-   solver_runtime_ms DOUBLE PRECISION NOT NULL,
-   created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-   committed_at TIMESTAMP WITH TIME ZONE`.
-   Indizes auf `(asset_id, control_cycle_tick_utc_ms)`
-   (Replay-Lookup) und `(asset_id, created_at DESC)` (Operator-
-   Retention-Query).
+   sample_time_ms            INTEGER NOT NULL,
+   mpc_model_version         TEXT NOT NULL,
+   state_estimator_variant   TEXT NOT NULL,
+   solver_config_hash        TEXT NOT NULL,
+   estimator_config_hash     TEXT NOT NULL,
+   random_seed               BIGINT NOT NULL,
+   numerik_stamp_json        TEXT NOT NULL,
+   p0_frobenius_display      DOUBLE PRECISION NOT NULL,
+   deterministic_mode        TEXT NOT NULL,
+   terminal_state            TEXT NOT NULL,
+   terminal_reason           TEXT NOT NULL,
+   produced_trajectory_json  TEXT,
+   solver_runtime_ms         DOUBLE PRECISION NOT NULL,
+   created_at                TIMESTAMP WITH TIME ZONE NOT NULL,
+   committed_at              TIMESTAMP WITH TIME ZONE
+   ```
+
+   Indizes:
+   - `(asset_id, control_cycle_tick_utc_ms)` — Replay-Lookup.
+   - `(asset_id, sample_time_ms, control_cycle_tick_utc_ms)` —
+     forensische Per-SampleTime-Queries (z. B. „alle 250-ms-Runs
+     in einem Operator-Fenster").
+   - `(asset_id, created_at DESC)` — Operator-Retention-Query.
 
 2. **`mpc_request_id`-Schema** als deterministischer SHA-256-Hash
    über die canonical-form-Serialisierung des **vollständigen
    Verhaltens-Tupels**:
    `(asset_id, control_cycle_tick_utc_ms_truncated, sample_time_ms,
    mpc_model_version, state_estimator_variant, solver_config_hash,
-   estimator_p0_hash)`.
-   Sieben Felder pro Tick — jedes ist eine Verhaltens-Achse, die
+   estimator_config_hash, random_seed)`.
+   Acht Felder pro Tick — jedes ist eine Verhaltens-Achse, die
    bei Änderung einen funktional-neuen Lauf erzwingt (keine
    Idempotency-Kollision auf einen veralteten Run):
 
    - `asset_id`: trivial.
    - `control_cycle_tick_utc_ms_truncated`: zur konfigurierten
-     `MpcOptions.SampleTime`-Boundary getruncte UTC-Millisekunde
-     (z. B. bei 250 ms-Sample-Time: `tick_utc_ms / 250 * 250`).
-     Verhindert dass ein Worker mit Sub-Millisekunden-Clock-Skew
-     dieselbe logische Tick als zwei verschiedene Identitäten
-     sieht.
+     `MpcOptions.SampleTime`-Boundary getruncte
+     **Monotonic-Anchored**-UTC-Millisekunde aus dem im
+     Production-Pfad zwingenden `MonotonicAnchoredClock` (siehe
+     §3 Wall-Clock-Disziplin). Ein NTP-Backsprung schlägt sich
+     **nicht** in der Tick-ID nieder; der Anchor-Clock liefert
+     monotonen Fortschritt. Truncate-Logik: bei 250 ms-Sample-
+     Time: `tick_utc_ms / 250 * 250`.
    - `sample_time_ms`: explizit als eigenes Identitätsfeld (nicht
      nur als Truncate-Divisor). Verhindert dass eine Operator-
      Änderung der SampleTime (z. B. 250 ms → 500 ms) für einen
-     Wall-Clock-Moment, der zufällig auf beiden Boundaries liegt,
-     einen falsch-positiven Identitäts-Hit produziert.
+     Moment, der zufällig auf beiden Boundaries liegt, einen
+     falsch-positiven Identitäts-Hit produziert.
    - `mpc_model_version`: State-Space-Modell-Stand (Constraint-
      Bounds, A/B/C/D-Matrizen-Hash).
    - `state_estimator_variant`: `linear-kf` / `extended-kf` /
      `unscented-kf` — wechselnder Estimator gibt ohne Hash-
      Erweiterung sonst dieselbe `mpc_request_id`.
-   - `solver_config_hash`: SHA-256 über (`MpcOptions` voller
-     Konfigurations-Snapshot — Horizon, TimeLimit, Gap,
-     max-Iters, Threading-Flags, `DeterministicMode`, sonstige
-     solver-spezifische Flags). Verhindert dass eine
-     Konfigurations-Änderung zur Laufzeit (z. B. Operator dreht
-     `HorizonSteps` von 10 auf 20) für denselben Tick auf einen
-     veralteten Run dedupliziert wird. Dieselbe Hash-Eingabe wie
-     der D-04-Solver-Konfigurations-Hash — bewusst geteilt, damit
-     Identity-Tuple und Replay-Stempel auf denselben Konfig-
-     Snapshot verweisen.
-   - `estimator_p0_hash`: SHA-256 über `P_0`-Canonical aus D-04
-     §3. Verhindert dass eine geänderte Estimator-Initial-
-     Bedingung ohne Hash-Erweiterung sonst dieselbe Identität
-     bekommt.
+   - `solver_config_hash`: SHA-256 über (`MpcOptions` **QP-
+     Solver-Slot** — Horizon, TimeLimit, Gap, max-Iters,
+     Threading-Flags, `DeterministicMode`, sonstige solver-
+     spezifische Flags). **Estimator-Parameter sind bewusst
+     ausgeschlossen** und leben in `estimator_config_hash`.
+     Dieselbe Hash-Eingabe wie der D-04-Solver-Konfigurations-
+     Hash — bewusst geteilt, damit Identity-Tuple und Replay-
+     Stempel auf denselben Konfig-Snapshot verweisen.
+   - `estimator_config_hash`: SHA-256 über den canonical-form-
+     Estimator-Parameter-Block: (a) `P_0`-Matrix (row-major-
+     Bytes nach Truncation auf 1e-12 Float-Präzision); (b)
+     Process-Noise-Covariance `Q`; (c) Measurement-Noise-
+     Covariance `R`; (d) etwaige Estimator-Variante-spezifische
+     Parameter (z. B. UKF-Sigma-Point-Skalierung). Decken alle
+     drei Kalman-Parameter aus `MpcOptions` plus die Initial-
+     Covariance ab. Heißt im Plan vorher `estimator_p0_hash` —
+     der Name war zu eng; bei Implementierung in Sub-Slice D
+     wird die Spalte direkt `estimator_config_hash` heißen.
+   - `random_seed`: explizit als Identitätsfeld weil ein
+     Operator-konfigurierbarer Seed ein Verhaltens-Eingang ist.
+     **Default-Verhalten**: deterministisch aus den anderen
+     sieben Feldern abgeleitet (erste 8 Bytes vom Pre-Seed-Hash
+     der anderen Felder als `int64`), sodass im Standard-Pfad
+     der Seed redundant zum Tuple ist und keinen Identitäts-
+     Drift produziert. **Operator-Override**: explizit gesetzter
+     Seed (z. B. für Tie-Breaking-Strategien oder
+     Reproduzierbarkeits-Forensik) wird ins Tuple gespiegelt und
+     produziert eigene `mpc_request_id`.
 
    Im stabilen 4-Hz-Cycle liefert dasselbe Tupel pro Tick exakt
    eine `mpc_request_id`; ein Worker-Restart der innerhalb
@@ -573,16 +616,40 @@ deshalb **nicht** für MPC. Drei orthogonale Entscheidungen:
    `ON CONFLICT (mpc_request_id) DO NOTHING` analog zur M5-01-
    Linie.
 
-   **Wall-Clock-Skew-Disziplin (Operator-Pflicht):** das Truncate
-   auf SampleTime-Boundary schützt gegen Sub-ms-Skew aber **nicht**
-   gegen NTP-Backsprünge die mehrere SampleTime-Boundaries
-   überspringen oder rückwärts laufen. Operator-Konfiguration
-   muss eine monotonic-clock-basierte `IClock`-Implementation
-   verwenden (RM-M1-19-Linie aus dem M1-Worker hat den
-   `IClock`-Driven-Port; `SystemClock` als Default ist bewusst
-   `DateTimeOffset.UtcNow`, der NTP folgt). Operator-Override
-   für NTP-instabile Topologien siehe F-Folgearbeit (geht in
-   `note-RM-M5-followups.md`).
+   **Monotonic-Anchored-Clock als Production-Pflicht (D-09
+   Sub-Slice-C-Scope):** das Truncate auf SampleTime-Boundary
+   schützt gegen Sub-ms-Skew aber **nicht** gegen NTP-Backsprünge
+   die mehrere SampleTime-Boundaries überspringen oder rückwärts
+   laufen — ohne stabilen Clock-Pfad bricht die ganze D-09-
+   Identitäts-Disziplin. Deshalb wird im Sub-Slice C ein neuer
+   `MonotonicAnchoredClock`-Adapter (`BatteryEms.Adapters.Time/
+   MonotonicAnchoredClock.cs` oder analoger Pfad) als
+   `IClock`-Implementation eingeführt:
+
+   - Bei `IClock`-Konstruktion: Snapshot der aktuellen Wall-Clock
+     (`DateTimeOffset.UtcNow`) als Anchor + `Stopwatch.GetTimestamp()`
+     als monotonic-Offset-Quelle.
+   - `UtcNow`-Read: `Anchor + Stopwatch.GetElapsedTime()`.
+     Monoton steigend, NTP-unabhängig.
+   - Periodische Anchor-Resync (Default alle 24 h) gegen die
+     Wall-Clock um Long-Uptime-Drift zu begrenzen, ohne der
+     monotonic-Garantie zu schaden — Resync wird nur akzeptiert
+     wenn `|wall_now - monotonic_now| < ResyncToleranzMs`
+     (Default 50 ms); größere Diffs werden geloggt und der
+     Anchor bleibt unangetastet.
+
+   **Production-Boot-Gate**: wenn `BessHostOptions.MpcBackend`
+   gesetzt ist UND `RuntimeProfile=Production` UND der registrierte
+   `IClock`-Adapter NICHT `MonotonicAnchoredClock` ist, wirft die
+   Composition-Root `mpc-production-without-monotonic-clock`.
+   HilSimulator/Development bleibt tolerant gegenüber dem
+   Default-`SystemClock`. Acceptance-Pin in Sub-Slice D durchsetzt
+   den Boot-Gate.
+
+   F-M5-11 bleibt als Folgearbeit für **erweiterte** Resync-
+   Strategien (z. B. PTP-Anchor statt Wall-Clock, Per-Asset-Clock-
+   Domains für Multi-Asset-Topologien); der Kern-Slice deckt die
+   Standard-Linie mit Wall-Clock-Anchor + Stopwatch.
 
 3. **Retention-/Compaction-Policy** (eigene Migration-Job-Linie
    oder in-store-Compaction analog zum
@@ -659,20 +726,31 @@ ist die saubere Trennung.
   (CAS-Race-Pattern aus M5-01), Retention-Compaction-100k-Pin
   (Top-N + MaxAge gemäß D-09).
 - **MPC-Idempotency-Schlüssel** (D-09): deterministischer SHA-256
-  über das 7-Feld-Tuple `(asset_id, control_cycle_tick_utc_ms_
+  über das **8-Feld-Tuple** `(asset_id, control_cycle_tick_utc_ms_
   truncated, sample_time_ms, mpc_model_version, state_estimator_
-  variant, solver_config_hash, estimator_p0_hash)`. Jede Achse ist
-  ein Verhaltens-Identitäts-Slot — Operator-Tuning-Updates (z. B.
-  SampleTime-Wechsel, Solver-Config-Change, Estimator-Variante-
-  Pivot) erzwingen einen neuen `mpc_request_id` statt einer
-  falschen Dedupe-Kollision auf einen veralteten Run. Worker-
-  Restart-mid-Tick detektiert echten Replay zuverlässig (kein
-  Wall-Clock-Now-Input).
+  variant, solver_config_hash, estimator_config_hash, random_seed)`.
+  Jede Achse ist ein Verhaltens-Identitäts-Slot — Operator-Tuning-
+  Updates (z. B. SampleTime-Wechsel, Solver-Config-Change,
+  Estimator-Q/R-Anpassung, Estimator-Variante-Pivot, Seed-Override)
+  erzwingen einen neuen `mpc_request_id` statt einer falschen
+  Dedupe-Kollision auf einen veralteten Run. `random_seed` ist
+  Default-deterministisch aus den anderen sieben Feldern abgeleitet;
+  Operator-Override produziert eigenen Hash. Alle acht Felder
+  werden zusätzlich als reguläre Spalten in `mpc_runs` persistiert
+  (forensische Queries).
+- **Production-Monotonic-Clock-Pflicht** (D-09): Boot mit
+  `MpcBackend=optimization_core` + `RuntimeProfile=Production`
+  ohne `MonotonicAnchoredClock`-Adapter ⇒ Startup-Fehler
+  `mpc-production-without-monotonic-clock`. Default-`SystemClock`
+  (wall-clock-following) ist im Production-Pfad mit aktivem MPC
+  explizit abgelehnt. HilSimulator/Development bleibt tolerant.
 - **Identity-Tuple-Vollständigkeits-Pin** in Sub-Slice D: pro
   Verhaltens-Achse ein Pin der eine Achse ändert und beweist
-  dass eine neue `mpc_request_id` resultiert (7 Pins gegen
-  7 Achsen). Plus ein Negativ-Pin der dieselben Werte zweimal
-  hasht und Identitäts-Match beweist.
+  dass eine neue `mpc_request_id` resultiert (8 Pins gegen 8
+  Achsen). Plus ein Negativ-Pin der dieselben Werte zweimal
+  hasht und Identitäts-Match beweist. Plus zwei Seed-spezifische
+  Pins (Default-deterministisch ⇒ Hash unverändert; expliziter
+  Override ⇒ neuer Hash).
 - **Cross-Run-Determinism-Pin** (D-04): zweimal selber MPC-Step
   mit `DeterministicMode=Strict` ⇒ identische Stempel-Hashes
   (Solver-Konfig + `P_0`-Canonical) + Schedule-Points innerhalb der
@@ -754,15 +832,16 @@ ist die saubere Trennung.
 - **Wall-Clock-Skew vs. Identity-Truncate.** D-09 truncated den
   Wall-Clock-Tick auf SampleTime-Boundary für den Identity-Hash;
   NTP-Backsprünge die mehrere SampleTime-Boundaries überspringen
-  oder die Wall-Clock rückwärts laufen lassen brechen die
-  Identitäts-Disziplin (Worker sieht zweimal denselben truncated-
-  Wert für physisch unterschiedliche Ticks). Mitigation: Operator-
-  Pflicht ist eine `IClock`-Implementation die NTP-Skews glättet
-  (monotonic-Clock + UTC-Anker); Default-`SystemClock` reicht für
-  NTP-stabile Topologien. F-Folgearbeit (geht in
-  `note-RM-M5-followups.md`): dedizierter `IMonotonicClock`-
-  Driven-Port + Adapter wenn die Operator-Praxis NTP-instabile
-  Topologien zeigt.
+  oder die Wall-Clock rückwärts laufen lassen würden ohne stabile
+  Clock-Quelle die Identitäts-Disziplin brechen. Mitigation:
+  `MonotonicAnchoredClock`-Adapter im Sub-Slice-C-Scope ist
+  **Production-Pflicht** (Boot-Gate
+  `mpc-production-without-monotonic-clock`); Wall-Clock-Anchor +
+  `Stopwatch.GetTimestamp()`-Offset liefert NTP-unabhängigen
+  monotonen Fortschritt; periodische Resync gegen Wall-Clock mit
+  Toleranz-Check. F-M5-11 deckt **erweiterte** Resync-Strategien
+  (PTP, Per-Asset-Clock-Domains) — keine Production-Voraussetzung
+  mehr, sondern Trigger-getriebene Folgearbeit.
 
 ---
 
@@ -832,16 +911,15 @@ führte).
 - **F-M5-10 Time-Varying-Reference-Tracking.** Trigger: erste
   TSO-/Operator-Anforderung nach Trajektorien-Following jenseits
   der reinen Schedule-Linie.
-- **F-M5-11 Monotonic-Clock-Driven-Port für NTP-instabile
-  Topologien.** Trigger: erste Operator-Praxis-Beobachtung in der
-  die Default-`SystemClock` (wall-clock, NTP-folgt) MPC-Identity-
-  Kollisionen oder Replay-Drift produziert (z. B. weil eine VM
-  reboots und die Wall-Clock einen NTP-Backsprung macht). Scope:
-  dedizierter `IMonotonicClock`-Driven-Port + Adapter der
-  `Stopwatch.GetTimestamp()` oder eine plattform-spezifische
-  monotonic-Clock-API verwendet, plus Anchor-Pattern gegen die
-  Wall-Clock bei Start. Pin-Test gegen einen Test-Clock der
-  Backsprünge simuliert.
+- **F-M5-11 Erweiterte Clock-Resync-Strategien.** Trigger: erste
+  Operator-Anforderung jenseits der Wall-Clock-Anchor-Default-
+  Linie aus dem Sub-Slice-C-`MonotonicAnchoredClock` (z. B.
+  PTP-Anchor statt Wall-Clock für sub-ms-Synchronisation, Per-
+  Asset-Clock-Domains für Multi-Asset-Topologien mit
+  unterschiedlichen Asset-Clocks, oder GPS-Disciplined-Clock-
+  Pattern für netzweite Determinism-Anforderungen). Scope:
+  Adapter-Erweiterung neben dem bestehenden
+  `MonotonicAnchoredClock` mit Per-Asset/Per-Domain-Konfiguration.
 
 **Bestehend, unverändert (aus RM-M5-01-Linie):**
 
