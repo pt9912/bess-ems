@@ -193,6 +193,45 @@ tables:
       columns:
       - asset_id
       - created_at
+  optimization_idempotency:
+    # RM-M5-01-C step 4 + plan-RM-M5 §Request-Idempotenz Und Retry:
+    # worker-owned Idempotency-Store für Sidecar-Aufrufe. Eindeutiges
+    # `request_id` plus atomarer Terminalzustand (Pending /
+    # SidecarCommitted / FallbackCommitted / Cancelled /
+    # FailedNoActivation / LateResponseIgnored).
+    columns:
+      request_id:
+        type: text
+        required: true
+      terminal_state:
+        type: text
+        required: true
+      terminal_reason:
+        type: text
+        required: true
+      run_id:
+        type: uuid
+        required: false
+      produced_version:
+        type: integer
+        required: false
+      created_at:
+        type: datetime
+        timezone: true
+        required: true
+      committed_at:
+        type: datetime
+        timezone: true
+        required: false
+    primary_key:
+    - request_id
+    indices:
+    - name: idx_optimization_idempotency_terminal_state
+      columns:
+      - terminal_state
+    - name: idx_optimization_idempotency_created_at
+      columns:
+      - created_at
   regelleistung_activations:
     columns:
       activation_id:

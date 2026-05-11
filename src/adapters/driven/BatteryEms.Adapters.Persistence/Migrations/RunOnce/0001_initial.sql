@@ -50,6 +50,17 @@ CREATE TABLE "optimization_runs" (
     PRIMARY KEY ("run_id")
 );
 
+CREATE TABLE "optimization_idempotency" (
+    "request_id" TEXT NOT NULL,
+    "terminal_state" TEXT NOT NULL,
+    "terminal_reason" TEXT NOT NULL,
+    "run_id" UUID,
+    "produced_version" INTEGER,
+    "created_at" TIMESTAMP WITH TIME ZONE NOT NULL,
+    "committed_at" TIMESTAMP WITH TIME ZONE,
+    PRIMARY KEY ("request_id")
+);
+
 CREATE TABLE "regelleistung_activations" (
     "activation_id" TEXT NOT NULL,
     "payload_hash" TEXT NOT NULL,
@@ -112,6 +123,10 @@ CREATE INDEX "idx_audit_recorded_at" ON "audit_events" ("recorded_at" DESC);
 CREATE INDEX "idx_commands_asset_issued_at" ON "commands" ("asset_id", "issued_at" DESC);
 
 CREATE INDEX "idx_optimization_runs_asset_created_at" ON "optimization_runs" ("asset_id", "created_at");
+
+CREATE INDEX "idx_optimization_idempotency_terminal_state" ON "optimization_idempotency" ("terminal_state");
+
+CREATE INDEX "idx_optimization_idempotency_created_at" ON "optimization_idempotency" ("created_at");
 
 CREATE INDEX "idx_regelleistung_activations_source_chosen_at" ON "regelleistung_activations" ("source_id", "winner_chosen_at");
 

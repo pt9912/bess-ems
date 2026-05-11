@@ -1,5 +1,6 @@
 using BatteryEms.Application.Api;
 using BatteryEms.Application.Markets;
+using BatteryEms.Application.Optimization;
 using BatteryEms.Application.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -38,6 +39,11 @@ public static class PersistenceRegistration
         services.AddSingleton<IOperatorAuditLog, DapperOperatorAuditLog>();
         services.AddSingleton<IRetentionRepository, DapperRetentionRepository>();
         services.AddSingleton<IOptimizationRunRepository, DapperOptimizationRunRepository>();
+        // RM-M5-01-C step 4: ersetzt das InMemoryOptimizationIdempotency-
+        // Store-Binding aus AddBessApplicationInMemoryStores durch die
+        // Postgres-backed Variante (CAS via INSERT...ON CONFLICT +
+        // UPDATE WHERE Pending). Restart-Replay-fest pro request_id.
+        services.AddSingleton<IOptimizationIdempotencyStore, DapperOptimizationIdempotencyStore>();
         // RM-M1-19c: replace the default "ok"-only IHealthQuery with the
         // Postgres-aware probe so /health returns 503 when the database
         // is unreachable. Order matters: AddBessApplicationInMemoryStores

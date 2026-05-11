@@ -40,7 +40,13 @@ public sealed partial class DapperActivationDedupeStore : IActivationDedupeStore
     // — the (a) sub-case fires when the DB has a newer migration
     // than the running app, which would mean we cannot safely read
     // the dedupe table.
-    private const int LatestKnownMigrationNumber = 2;
+    //
+    // 3 ⇐ RM-M5-01-C step 4: 0003_optimization_idempotency.sql adds
+    // the worker-owned Idempotency-Tracker-Tabelle. Migration berührt
+    // regelleistung_activations nicht; das Bumpen verhindert nur
+    // false-positive incompatible-checkpoint-fail-closed-Treffer wenn
+    // beide Migrations bereits angewendet sind.
+    private const int LatestKnownMigrationNumber = 3;
 
     private const string InsertSql = """
         INSERT INTO regelleistung_activations
