@@ -576,31 +576,41 @@ deshalb **nicht** für MPC. Drei orthogonale Entscheidungen:
    Hash-Eingang), damit forensische Queries direkt auf die Spalten
    zugreifen können statt den Hash zu invertieren:
 
+   Persistiert wird **der getruncte Tick-Wert** (auf `sample_time_ms`-
+   Boundary, siehe §2 unten) — derselbe Wert, der in die
+   `mpc_request_id`-Hash-Eingabe geht. Das Spaltennamens-Suffix
+   `_truncated` macht das im Schema explizit; eine separate Spalte
+   für den rohen Wall-Clock-Tick gibt es bewusst **nicht** (würde
+   die Identitäts-Linie nur verwirren — forensische Wall-Clock-
+   Recherche läuft über `created_at`/`committed_at`, nicht über
+   den Identitäts-Tick).
+
    ```
-   mpc_request_id            TEXT PK,
-   asset_id                  TEXT NOT NULL,
-   control_cycle_tick_utc_ms BIGINT NOT NULL,
-   sample_time_ms            INTEGER NOT NULL,
-   mpc_model_version         TEXT NOT NULL,
-   state_estimator_variant   TEXT NOT NULL,
-   solver_config_hash        TEXT NOT NULL,
-   estimator_config_hash     TEXT NOT NULL,
-   random_seed               BIGINT NOT NULL,
-   numerik_stamp_json        TEXT NOT NULL,
-   p0_frobenius_display      DOUBLE PRECISION NOT NULL,
-   deterministic_mode        TEXT NOT NULL,
-   terminal_state            TEXT NOT NULL,
-   terminal_reason           TEXT NOT NULL,
-   produced_trajectory_json  TEXT,
-   solver_runtime_ms         DOUBLE PRECISION NOT NULL,
-   created_at                TIMESTAMP WITH TIME ZONE NOT NULL,
-   committed_at              TIMESTAMP WITH TIME ZONE
+   mpc_request_id                      TEXT PK,
+   asset_id                            TEXT NOT NULL,
+   control_cycle_tick_utc_ms_truncated BIGINT NOT NULL,
+   sample_time_ms                      INTEGER NOT NULL,
+   mpc_model_version                   TEXT NOT NULL,
+   state_estimator_variant             TEXT NOT NULL,
+   solver_config_hash                  TEXT NOT NULL,
+   estimator_config_hash               TEXT NOT NULL,
+   random_seed                         BIGINT NOT NULL,
+   numerik_stamp_json                  TEXT NOT NULL,
+   p0_frobenius_display                DOUBLE PRECISION NOT NULL,
+   deterministic_mode                  TEXT NOT NULL,
+   terminal_state                      TEXT NOT NULL,
+   terminal_reason                     TEXT NOT NULL,
+   produced_trajectory_json            TEXT,
+   solver_runtime_ms                   DOUBLE PRECISION NOT NULL,
+   created_at                          TIMESTAMP WITH TIME ZONE NOT NULL,
+   committed_at                        TIMESTAMP WITH TIME ZONE
    ```
 
    Indizes:
-   - `(asset_id, control_cycle_tick_utc_ms)` — Replay-Lookup.
-   - `(asset_id, sample_time_ms, control_cycle_tick_utc_ms)` —
-     forensische Per-SampleTime-Queries (z. B. „alle 250-ms-Runs
+   - `(asset_id, control_cycle_tick_utc_ms_truncated)` —
+     Replay-Lookup.
+   - `(asset_id, sample_time_ms, control_cycle_tick_utc_ms_truncated)`
+     — forensische Per-SampleTime-Queries (z. B. „alle 250-ms-Runs
      in einem Operator-Fenster").
    - `(asset_id, created_at DESC)` — Operator-Retention-Query.
 
@@ -805,11 +815,17 @@ ist die saubere Trennung.
   werden zusätzlich als reguläre Spalten in `mpc_runs` persistiert
   (forensische Queries).
 - **Production-Monotonic-Clock-Pflicht** (D-09): Boot mit
-  `MpcBackend=optimization_core` + `RuntimeProfile=Production`
-  ohne `MonotonicAnchoredClock`-Adapter ⇒ Startup-Fehler
-  `mpc-production-without-monotonic-clock`. Default-`SystemClock`
-  (wall-clock-following) ist im Production-Pfad mit aktivem MPC
-  explizit abgelehnt. HilSimulator/Development bleibt tolerant.
+  `BessHostOptions.MpcBackend != null` (jeder Aktivierungs-Wert —
+  `or_tools`, `optimization_core`, `bi_modal`; siehe D-02
+  Aktivierungs-Disziplin) + `RuntimeProfile=Production` ohne
+  `MonotonicAnchoredClock`-Adapter ⇒ Startup-Fehler
+  `mpc-production-without-monotonic-clock`. Die D-09-Identitäts-
+  Logik (Tick-Truncate auf SampleTime-Boundary) ist für alle drei
+  Backend-Varianten gleich abhängig vom monotonen Uhrverhalten,
+  deshalb gilt das Gate unabhängig von der konkreten Backend-Wahl.
+  Default-`SystemClock` (wall-clock-following) ist im Production-
+  Pfad mit aktivem MPC explizit abgelehnt. HilSimulator/Development
+  bleibt tolerant.
 - **Identity-Tuple-Vollständigkeits-Pin** in Sub-Slice D: pro
   Verhaltens-Achse ein Pin der eine Achse ändert und beweist
   dass eine neue `mpc_request_id` resultiert (8 Pins gegen 8
