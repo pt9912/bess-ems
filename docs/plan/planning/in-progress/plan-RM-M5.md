@@ -1,10 +1,13 @@
 # Plan RM-M5 MPC, Solver-Sidecar, Replay-Plattform
 
-**Dokumenttyp:** Detailplan / M5 (offen)
-**Status:** Offen - abgeleitet aus Roadmap-Milestone M5, noch nicht
-aktiviert.
+**Dokumenttyp:** Detailplan / M5 (aktiv)
+**Status:** In Arbeit - aktiviert am 2026-05-11 nach Abschluss von M4
+und ADR 0005 (gRPC-Adoption schließt AR-OPEN-002). Erstes Arbeitspaket
+RM-M5-01 hat eigenen Slice-Plan [`plan-RM-M5-01.md`](plan-RM-M5-01.md).
 **Bezug:**
-[`../in-progress/roadmap.md`](../in-progress/roadmap.md) (M5),
+[`roadmap.md`](roadmap.md) (M5),
+[`../../adr/0005-optimization-core-sidecar-transport.md`](../../adr/0005-optimization-core-sidecar-transport.md)
+(gRPC-Transport-Adoption, schließt AR-OPEN-002),
 [`../../adr/0003-native-kernel-language.md`](../../adr/0003-native-kernel-language.md)
 (Phase-3-MPC als Re-Evaluierungsanker),
 [`../../adr/0004-native-kernel-process-isolation.md`](../../adr/0004-native-kernel-process-isolation.md)
@@ -90,23 +93,19 @@ Multi-Asset-Bedienung.
 
 ## Aktivierungsbedingungen
 
-M5 kann starten, wenn M4 geschlossen ist oder bewusst entschieden wurde,
-dass der erste Sidecar-/Replay-Slice fachlich unabhaengig von offenen
-M4-Teilen ist. Vor dem ersten produktionsnahen Sidecar-PR muessen die
-M2/M3-Basisgates auf `main` gruen sein und ADR 0004 fuer den konkreten
-M5-Sidecar-Schnitt entweder bestaetigt oder ergaenzt werden. Das
-Architektur-Open-Item `AR-OPEN-002` ist fuer M5 blockierend: Ein
-konkreter Transport darf erst implementiert werden, wenn ADR 0004 oder
-`spec/architecture.md` die finale Transportentscheidung fuer externe
-Optimierungs-Sidecars festhaelt.
+M5 ist seit 2026-05-11 aktiviert: M4 ist abgeschlossen (alle 8 Pflicht-
+Slices ✅) und ADR 0005 schliesst `AR-OPEN-002` mit gRPC-Adoption,
+Security-Achse (UDS-Default + mTLS-Cross-Host) und Mocking-/CI-
+Konsequenzen. M2/M3-Basisgates auf `main` sind gruen. Damit ist der
+formale Transport-Blocker geloest und RM-M5-01 darf Code beginnen.
 
 | Check | Erwartung |
 | ----- | --------- |
 | M2-Optimierung | `IScheduleOptimizer`, `OptimizationRun`, Solverstatus und Persistenz sind stabil; Sidecar-Integration ersetzt keinen Domain-Vertrag. |
 | M3-Native | In-Process Native bleibt fuer kleine Control-Kerne verfuegbar; M5 fuehrt Sidecar nur fuer MPC/Solver-grosse Kerne ein. |
 | M4-Schnitt | Falls Regelleistungs-Reserve-Constraints Teil des MPC-/MILP-Modells werden, muss das M4-Reservemodell abgeschlossen oder als explizite Planannahme dokumentiert sein. |
-| ADR-Status | ADR 0004 wird fuer Sidecar-Transport, Supervisor-/Health-Verhalten, Fallback-Policy und Container-Topologie revalidiert. |
-| Transportentscheidung | `AR-OPEN-002` ist geschlossen; ADR 0004 oder Architektur §13 nennt den finalen Transport (`gRPC` oder Alternative), Security-/Mocking-/CI-Konsequenzen und den Link zur Entscheidung. |
+| ADR-Status | ✅ ADR 0005 fixiert gRPC-Transport, Security-Achse (UDS-Default / mTLS-Cross-Host), Contract-Versionierung, Mocking-Strategie und Phase-4-Pivot-Trigger. ADR 0004 bleibt fuer den In-Process-Pfad des `battery_control_core` unveraendert (orthogonale Linie). |
+| Transportentscheidung | ✅ `AR-OPEN-002` geschlossen mit ADR 0005; `spec/architecture.md` §18 referenziert die Closure-Zeile. |
 | Transport-Mapping | Vor RM-M5-01-Freeze existiert ein versioniertes Transport-Mapping-Dokument, das konkrete Transportcodes auf die normierten Outcomes der Sidecar-Status-Taxonomie mappt und Retry-, Cancellation-, Deadline- und Unavailable-Regeln festlegt. |
 | Contract-Version | Worker und Sidecar melden `contract_version`, `min_compatible_version`, `max_compatible_version` und Feature-Flags im Health/Version-Check. Inkompatible Versionen blockieren Sidecar-Aktivierung hart und fallen vor Request-Start auf lokalen Fallback/Safe-Stop. |
 | Security-Freeze | Vor produktionsnahem RM-M5-01-Freeze ist der Sidecar-Security-Vertrag abgeschlossen: AuthN/AuthZ, verschluesselter Transport oder geschuetzter lokaler Socket, Secret-Handling und Negativtests fuer unautorisierte Clients sind dokumentiert und gate-faehig. |
@@ -319,9 +318,9 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
 
 ## Sequenz
 
-1. `AR-OPEN-002` schliessen: ADR 0004 oder Architektur §13 muss die
-   finale Transportentscheidung inklusive Security-, Mocking- und
-   CI-Konsequenzen enthalten.
+1. ✅ `AR-OPEN-002` geschlossen via ADR 0005 (2026-05-11). gRPC ueber
+   HTTP/2 ist der Sidecar-Transport, UDS-Default fuer Loopback, mTLS
+   fuer Cross-Host, Mocking via In-Process Grpc.AspNetCore-TestSidecar.
 2. Security-Freeze fuer RM-M5-01 abschliessen: AuthN/AuthZ,
    Transportverschluesselung oder geschuetzter lokaler Socket,
    Secret-Handling und Negativtests fuer unautorisierte Clients sind
@@ -386,12 +385,15 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
 
 ## Risiken und Entscheidungen
 
-- **Transportvertrag vs. Architektur-Drift.** Architektur §13 und ADR
-  0004 nennen gRPC als Phase-3-Kandidat, aber `AR-OPEN-002` in
-  `spec/architecture.md` fuehrt gRPC vs. REST-only fuer externe
-  Optimierungs-Sidecars noch als offen. Bis zur Entscheidung bleibt der
-  Plan transportneutral; M5 muss die Architekturfrage vor produktivem Code
-  per ADR-Update oder Architektur-Sync schliessen.
+- **Transportvertrag vs. Architektur-Drift.** ✅ Geloest durch ADR 0005
+  (2026-05-11): gRPC ueber HTTP/2 ist der adoptierte Transport, UDS fuer
+  Loopback / mTLS fuer Cross-Host. `spec/architecture.md` §18
+  AR-OPEN-002 traegt die Closure-Zeile. Der Plan bleibt **trotzdem**
+  transportneutral in den normierten Status-Bezeichnern
+  (`success` / `deadline_exceeded` / `unavailable` etc.); das konkrete
+  Transport-Mapping ist ein eigenes versioniertes Artefakt aus
+  RM-M5-01-A. Phase-4-Pivot-Trigger (z.B. harter Realtime-Bound) sind in
+  ADR 0005 §7 benannt.
 - **Fallback-Semantik.** Ein Sidecar-Fallback kann Optimierungsqualitaet
   verlieren. Die Fallback-Matrix ist der verbindliche Default; jede
   Abweichung braucht Plan-/ADR-Update, weil NoOp, bestehender LP-Adapter,

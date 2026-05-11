@@ -1,7 +1,9 @@
 # Plan RM-M4 Regelleistung und OPC-UA
 
-**Dokumenttyp:** Detailplan / M4 (offen)
-**Status:** Offen — abgeleitet aus Roadmap-Milestone M4, noch nicht aktiviert.
+**Dokumenttyp:** Detailplan / M4 (abgeschlossen)
+**Status:** Abgeschlossen am 2026-05-11 — alle 8 Pflicht-Slices ✅ (RM-M4-01..08).
+Closure-Commit `9197a99` (RM-M4-05-D + M4 closure). Folgearbeiten F-01..F-19
+sind als Trigger-Watches in [`../open/note-RM-M4-followups.md`](../open/note-RM-M4-followups.md).
 **Bezug:**
 [`../in-progress/roadmap.md`](../in-progress/roadmap.md) (M4),
 [`../../../../spec/lastenheft.md`](../../../../spec/lastenheft.md)

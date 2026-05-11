@@ -3,7 +3,7 @@
 **Dokumenttyp:** Vorabklärung / Trigger-Watch
 **Status:** Offen — Folgearbeiten zu aktiven M4-Slices, ohne Plan-Heimat im Master-Plan
 **Bezug:**
-[`../in-progress/plan-RM-M4.md`](../in-progress/plan-RM-M4.md) (Master-Slice-Plan, in Arbeit — RM-M4-01 ✅, RM-M4-02 ✅, RM-M4-06 in Vorbereitung),
+[`../done/plan-RM-M4.md`](../done/plan-RM-M4.md) (Master-Slice-Plan, abgeschlossen am 2026-05-11 — alle 8 Pflicht-Slices ✅),
 [`../in-progress/roadmap.md`](../in-progress/roadmap.md)
 
 ---
