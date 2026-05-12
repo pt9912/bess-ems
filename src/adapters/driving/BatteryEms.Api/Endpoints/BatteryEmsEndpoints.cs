@@ -225,8 +225,7 @@ public static class BatteryEmsEndpoints
                 CancellationToken ct) =>
             {
                 if (body is null
-                    || body.TimeStepSeconds <= 0
-                    || !double.IsFinite(body.TimeStepSeconds)
+                    || !TryCreateTimeStep(body.TimeStepSeconds, out var timeStep)
                     || body.HorizonStart >= body.HorizonEnd)
                 {
                     return Results.BadRequest(new { error = "missing-or-invalid-field" });
@@ -243,7 +242,7 @@ public static class BatteryEmsEndpoints
                         source: body.Source,
                         horizonStart: body.HorizonStart,
                         horizonEnd: body.HorizonEnd,
-                        timeStep: TimeSpan.FromSeconds(body.TimeStepSeconds),
+                        timeStep: timeStep,
                         values: body.Values);
                 }
                 catch (ArgumentException ex)
@@ -284,8 +283,7 @@ public static class BatteryEmsEndpoints
             {
                 if (body is null
                     || string.IsNullOrWhiteSpace(body.AssetId)
-                    || body.TimeStepSeconds <= 0
-                    || !double.IsFinite(body.TimeStepSeconds)
+                    || !TryCreateTimeStep(body.TimeStepSeconds, out var timeStep)
                     || body.HorizonStart >= body.HorizonEnd)
                 {
                     return Results.BadRequest(new { error = "missing-or-invalid-field" });
@@ -309,7 +307,7 @@ public static class BatteryEmsEndpoints
                     body.PriceSeries,
                     body.HorizonStart,
                     body.HorizonEnd,
-                    TimeSpan.FromSeconds(body.TimeStepSeconds),
+                    timeStep,
                     priceSeriesSource,
                     ct).ConfigureAwait(false);
                 if (resolvedPriceInput.Result is not null)
@@ -326,7 +324,7 @@ public static class BatteryEmsEndpoints
                         asset: asset,
                         horizonStart: body.HorizonStart,
                         horizonEnd: body.HorizonEnd,
-                        timeStep: TimeSpan.FromSeconds(body.TimeStepSeconds),
+                        timeStep: timeStep,
                         pricesPerStep: resolvedPriceInput.PricesPerStep,
                         priceUnit: resolvedPriceInput.PriceUnit);
                 }
@@ -365,8 +363,7 @@ public static class BatteryEmsEndpoints
             {
                 if (body is null
                     || string.IsNullOrWhiteSpace(body.AssetId)
-                    || body.TimeStepSeconds <= 0
-                    || !double.IsFinite(body.TimeStepSeconds)
+                    || !TryCreateTimeStep(body.TimeStepSeconds, out var timeStep)
                     || body.ResidualStart >= body.HorizonEnd)
                 {
                     return Results.BadRequest(new { error = "missing-or-invalid-field" });
@@ -384,7 +381,7 @@ public static class BatteryEmsEndpoints
                     body.PriceSeries,
                     body.ResidualStart,
                     body.HorizonEnd,
-                    TimeSpan.FromSeconds(body.TimeStepSeconds),
+                    timeStep,
                     priceSeriesSource,
                     ct).ConfigureAwait(false);
                 if (resolvedPriceInput.Result is not null)
@@ -400,7 +397,7 @@ public static class BatteryEmsEndpoints
                         asset: asset,
                         residualStart: body.ResidualStart,
                         horizonEnd: body.HorizonEnd,
-                        timeStep: TimeSpan.FromSeconds(body.TimeStepSeconds),
+                        timeStep: timeStep,
                         pricesPerStep: resolvedPriceInput.PricesPerStep,
                         priceUnit: resolvedPriceInput.PriceUnit);
                 }
@@ -446,6 +443,26 @@ public static class BatteryEmsEndpoints
         "regel_leistung_reserve" => ScheduleType.RegelLeistungReserve,
         _ => null,
     };
+
+    private static bool TryCreateTimeStep(double timeStepSeconds, out TimeSpan timeStep)
+    {
+        timeStep = default;
+        if (timeStepSeconds <= 0 || !double.IsFinite(timeStepSeconds))
+        {
+            return false;
+        }
+
+        try
+        {
+            timeStep = TimeSpan.FromSeconds(timeStepSeconds);
+        }
+        catch (OverflowException)
+        {
+            return false;
+        }
+
+        return timeStep > TimeSpan.Zero;
+    }
 
     private static async Task<ResolvedPriceInput> ResolvePriceInputAsync(
         IReadOnlyList<double>? inlinePrices,

@@ -16,6 +16,7 @@ public sealed class PriceSeriesEndpointTests : IClassFixture<BatteryEmsApiFactor
 {
     private static readonly DateTimeOffset HorizonStart =
         new(2026, 5, 12, 0, 0, 0, TimeSpan.Zero);
+    private static readonly double[] OneImportedPrice = [42.5];
 
     private readonly BatteryEmsApiFactory _factory;
 
@@ -120,6 +121,58 @@ public sealed class PriceSeriesEndpointTests : IClassFixture<BatteryEmsApiFactor
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Import_returns_400_for_time_step_outside_timespan_range()
+    {
+        using var client = AuthenticatedClient(_factory);
+
+        var response = await client.PostAsJsonAsync(
+            "/markets/price-series/import",
+            ValidImportBody(timeStepSeconds: double.MaxValue),
+            TestJson.Options);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Day_ahead_returns_400_for_time_step_outside_timespan_range()
+    {
+        using var client = AuthenticatedClient(_factory);
+
+        var response = await client.PostAsJsonAsync(
+            "/markets/day-ahead/optimize",
+            new
+            {
+                asset_id = "asset-price-overflow",
+                schedule_type = "day_ahead",
+                horizon_start = HorizonStart,
+                horizon_end = HorizonStart + TimeSpan.FromHours(1),
+                time_step_seconds = double.MaxValue,
+            },
+            TestJson.Options);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Intraday_returns_400_for_time_step_outside_timespan_range()
+    {
+        using var client = AuthenticatedClient(_factory);
+
+        var response = await client.PostAsJsonAsync(
+            "/markets/intraday/reoptimize",
+            new
+            {
+                asset_id = "asset-price-overflow",
+                residual_start = HorizonStart,
+                horizon_end = HorizonStart + TimeSpan.FromHours(1),
+                time_step_seconds = double.MaxValue,
+            },
+            TestJson.Options);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     private static HttpClient AuthenticatedClient(WebApplicationFactory<Program> factory)
     {
         var client = factory.CreateClient();
@@ -151,7 +204,7 @@ public sealed class PriceSeriesEndpointTests : IClassFixture<BatteryEmsApiFactor
             maxOperatingTemperatureCelsius: 55));
     }
 
-    private static object ValidImportBody() => new
+    private static object ValidImportBody(double timeStepSeconds = 3600) => new
     {
         market_bid_area = "DE-LU",
         product = "day_ahead",
@@ -160,8 +213,8 @@ public sealed class PriceSeriesEndpointTests : IClassFixture<BatteryEmsApiFactor
         source = "synthetic-test",
         horizon_start = HorizonStart,
         horizon_end = HorizonStart + TimeSpan.FromHours(1),
-        time_step_seconds = 3600,
-        values = new[] { 42.5 },
+        time_step_seconds = timeStepSeconds,
+        values = OneImportedPrice,
     };
 
     private sealed record PriceSeriesImportDto(

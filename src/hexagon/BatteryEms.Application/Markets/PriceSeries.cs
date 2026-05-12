@@ -72,7 +72,7 @@ public sealed class PriceSeries
         HorizonStart = horizonStart;
         HorizonEnd = horizonEnd;
         TimeStep = timeStep;
-        Values = values.ToArray();
+        Values = Array.AsReadOnly(values.ToArray());
     }
 
     public int StepCount => Values.Count;

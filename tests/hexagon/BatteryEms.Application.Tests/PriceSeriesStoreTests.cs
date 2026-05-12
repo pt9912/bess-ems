@@ -70,6 +70,18 @@ public sealed class PriceSeriesStoreTests
     }
 
     [Fact]
+    public void Price_series_values_are_defensively_copied_and_read_only()
+    {
+        var mutablePrice = new[] { 42.0 };
+
+        var series = ValidSeries(source: "synthetic-a", values: mutablePrice);
+        mutablePrice[0] = 100.0;
+
+        Assert.Equal(42.0, series.Values.Single());
+        Assert.False(series.Values is double[]);
+    }
+
+    [Fact]
     public async Task In_memory_store_rejects_unknown_source()
     {
         var store = new InMemoryPriceSeriesStore();
