@@ -29,6 +29,11 @@ public static class ApplicationServiceRegistration
         services.AddSingleton<IScheduleRepository>(_ => new InMemoryScheduleRepository());
         services.AddSingleton<IScheduleTracker, DefaultScheduleTracker>();
         services.AddSingleton<IReserveRepository>(_ => new InMemoryReserveRepository());
+        services.AddSingleton<InMemoryPriceSeriesStore>();
+        services.AddSingleton<IPriceSeriesSource>(
+            sp => sp.GetRequiredService<InMemoryPriceSeriesStore>());
+        services.AddSingleton<IPriceSeriesImportSink>(
+            sp => sp.GetRequiredService<InMemoryPriceSeriesStore>());
 
         // RM-M4-03-B: Regelleistung activation dedupe tracker. Default
         // bindings are in-memory; AddBessPersistence replaces the store

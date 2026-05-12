@@ -3,6 +3,7 @@ using BatteryEms.Api.Auth;
 using BatteryEms.Api.Contracts;
 using BatteryEms.Application.Api;
 using BatteryEms.Application.Assets;
+using BatteryEms.Application.Markets;
 using BatteryEms.Application.Optimization;
 using BatteryEms.Application.Persistence;
 using BatteryEms.Application.Time;
@@ -23,6 +24,7 @@ public static class BatteryEmsEndpoints
         MapBatteryStatus(routes);
         MapCurrentCommand(routes);
         MapCurrentSchedules(routes);
+        MapPriceSeriesImport(routes);
         MapOperatorStop(routes);
         MapDayAheadOptimize(routes);
         MapIntradayReoptimize(routes);
@@ -215,6 +217,57 @@ public static class BatteryEmsEndpoints
             .WithSummary("Operator-driven safe stop for an asset (LH-API-006/007).");
     }
 
+    private static void MapPriceSeriesImport(IEndpointRouteBuilder routes)
+    {
+        routes.MapPost("/markets/price-series/import", async (
+                PriceSeriesImportRequestBody body,
+                IPriceSeriesImportSink importSink,
+                CancellationToken ct) =>
+            {
+                if (body is null
+                    || body.TimeStepSeconds <= 0
+                    || !double.IsFinite(body.TimeStepSeconds)
+                    || body.HorizonStart >= body.HorizonEnd)
+                {
+                    return Results.BadRequest(new { error = "missing-or-invalid-field" });
+                }
+
+                PriceSeries series;
+                try
+                {
+                    series = new PriceSeries(
+                        marketBidArea: body.MarketBidArea,
+                        product: body.Product,
+                        priceKind: body.PriceKind,
+                        unit: body.Unit,
+                        source: body.Source,
+                        horizonStart: body.HorizonStart,
+                        horizonEnd: body.HorizonEnd,
+                        timeStep: TimeSpan.FromSeconds(body.TimeStepSeconds),
+                        values: body.Values);
+                }
+                catch (ArgumentException ex)
+                {
+                    return Results.BadRequest(new { error = "invalid-price-series", detail = ex.Message });
+                }
+
+                await importSink.ImportAsync(series, ct).ConfigureAwait(false);
+                return Results.Ok(new PriceSeriesImportResponse(
+                    MarketBidArea: series.MarketBidArea,
+                    Product: series.Product,
+                    PriceKind: series.PriceKind,
+                    Unit: series.Unit,
+                    Source: series.Source,
+                    HorizonStart: series.HorizonStart,
+                    HorizonEnd: series.HorizonEnd,
+                    TimeStepSeconds: series.TimeStep.TotalSeconds,
+                    Count: series.StepCount));
+            })
+            .RequireAuthorization(AuthConstants.OperatorPolicy)
+            .WithName("PriceSeriesImport")
+            .WithSummary("Import a source-labelled, provider-neutral price series (RM-M5-07).");
+    }
+
     private static void MapDayAheadOptimize(IEndpointRouteBuilder routes)
     {
         // LH-API-005: triggers a day-ahead schedule optimisation. The use
@@ -225,12 +278,14 @@ public static class BatteryEmsEndpoints
         routes.MapPost("/markets/day-ahead/optimize", async (
                 OptimizationRequestBody body,
                 IBatteryAssetRegistry assets,
+                IPriceSeriesSource priceSeriesSource,
                 IScheduleOptimizationUseCase useCase,
                 CancellationToken ct) =>
             {
                 if (body is null
                     || string.IsNullOrWhiteSpace(body.AssetId)
                     || body.TimeStepSeconds <= 0
+                    || !double.IsFinite(body.TimeStepSeconds)
                     || body.HorizonStart >= body.HorizonEnd)
                 {
                     return Results.BadRequest(new { error = "missing-or-invalid-field" });
@@ -248,6 +303,20 @@ public static class BatteryEmsEndpoints
                     return Results.BadRequest(new { error = "unknown-schedule-type", value = body.ScheduleType });
                 }
 
+                var resolvedPriceInput = await ResolvePriceInputAsync(
+                    body.PricesPerStep,
+                    body.PriceUnit,
+                    body.PriceSeries,
+                    body.HorizonStart,
+                    body.HorizonEnd,
+                    TimeSpan.FromSeconds(body.TimeStepSeconds),
+                    priceSeriesSource,
+                    ct).ConfigureAwait(false);
+                if (resolvedPriceInput.Result is not null)
+                {
+                    return resolvedPriceInput.Result;
+                }
+
                 ScheduleOptimizationCommand command;
                 try
                 {
@@ -258,8 +327,8 @@ public static class BatteryEmsEndpoints
                         horizonStart: body.HorizonStart,
                         horizonEnd: body.HorizonEnd,
                         timeStep: TimeSpan.FromSeconds(body.TimeStepSeconds),
-                        pricesPerStep: body.PricesPerStep,
-                        priceUnit: body.PriceUnit);
+                        pricesPerStep: resolvedPriceInput.PricesPerStep,
+                        priceUnit: resolvedPriceInput.PriceUnit);
                 }
                 catch (ArgumentException ex)
                 {
@@ -290,12 +359,14 @@ public static class BatteryEmsEndpoints
         routes.MapPost("/markets/intraday/reoptimize", async (
                 IntradayReoptimizationRequestBody body,
                 IBatteryAssetRegistry assets,
+                IPriceSeriesSource priceSeriesSource,
                 IIntradayReoptimizationUseCase useCase,
                 CancellationToken ct) =>
             {
                 if (body is null
                     || string.IsNullOrWhiteSpace(body.AssetId)
                     || body.TimeStepSeconds <= 0
+                    || !double.IsFinite(body.TimeStepSeconds)
                     || body.ResidualStart >= body.HorizonEnd)
                 {
                     return Results.BadRequest(new { error = "missing-or-invalid-field" });
@@ -307,6 +378,20 @@ public static class BatteryEmsEndpoints
                     return Results.NotFound(new { error = "asset-not-registered", asset_id = body.AssetId });
                 }
 
+                var resolvedPriceInput = await ResolvePriceInputAsync(
+                    body.PricesPerStep,
+                    body.PriceUnit,
+                    body.PriceSeries,
+                    body.ResidualStart,
+                    body.HorizonEnd,
+                    TimeSpan.FromSeconds(body.TimeStepSeconds),
+                    priceSeriesSource,
+                    ct).ConfigureAwait(false);
+                if (resolvedPriceInput.Result is not null)
+                {
+                    return resolvedPriceInput.Result;
+                }
+
                 IntradayReoptimizationCommand command;
                 try
                 {
@@ -316,8 +401,8 @@ public static class BatteryEmsEndpoints
                         residualStart: body.ResidualStart,
                         horizonEnd: body.HorizonEnd,
                         timeStep: TimeSpan.FromSeconds(body.TimeStepSeconds),
-                        pricesPerStep: body.PricesPerStep,
-                        priceUnit: body.PriceUnit);
+                        pricesPerStep: resolvedPriceInput.PricesPerStep,
+                        priceUnit: resolvedPriceInput.PriceUnit);
                 }
                 catch (ArgumentException ex)
                 {
@@ -361,4 +446,56 @@ public static class BatteryEmsEndpoints
         "regel_leistung_reserve" => ScheduleType.RegelLeistungReserve,
         _ => null,
     };
+
+    private static async Task<ResolvedPriceInput> ResolvePriceInputAsync(
+        IReadOnlyList<double>? inlinePrices,
+        string? inlineUnit,
+        PriceSeriesReferenceBody? reference,
+        DateTimeOffset horizonStart,
+        DateTimeOffset horizonEnd,
+        TimeSpan timeStep,
+        IPriceSeriesSource priceSeriesSource,
+        CancellationToken ct)
+    {
+        if (inlinePrices is not null && reference is not null)
+        {
+            return ResolvedPriceInput.BadRequest(new { error = "ambiguous-price-input" });
+        }
+        if (reference is null)
+        {
+            return new ResolvedPriceInput(inlinePrices, inlineUnit, Result: null);
+        }
+
+        try
+        {
+            var series = await priceSeriesSource.LoadAsync(
+                new PriceSeriesRequest(
+                    reference.MarketBidArea,
+                    reference.Product,
+                    reference.PriceKind,
+                    reference.Source,
+                    horizonStart,
+                    horizonEnd,
+                    timeStep),
+                ct).ConfigureAwait(false);
+            return new ResolvedPriceInput(series.Values, series.Unit, Result: null);
+        }
+        catch (PriceSeriesNotFoundException)
+        {
+            return new ResolvedPriceInput(null, null, Results.NotFound(new { error = "price-series-not-found" }));
+        }
+        catch (ArgumentException ex)
+        {
+            return ResolvedPriceInput.BadRequest(new { error = "invalid-price-series-reference", detail = ex.Message });
+        }
+    }
+
+    private sealed record ResolvedPriceInput(
+        IReadOnlyList<double>? PricesPerStep,
+        string? PriceUnit,
+        IResult? Result)
+    {
+        public static ResolvedPriceInput BadRequest(object body) =>
+            new(null, null, Results.BadRequest(body));
+    }
 }

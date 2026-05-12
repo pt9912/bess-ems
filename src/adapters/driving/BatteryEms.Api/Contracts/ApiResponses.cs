@@ -151,7 +151,8 @@ public sealed record OptimizationRequestBody(
     DateTimeOffset HorizonEnd,
     double TimeStepSeconds,
     IReadOnlyList<double>? PricesPerStep = null,
-    string? PriceUnit = null);
+    string? PriceUnit = null,
+    PriceSeriesReferenceBody? PriceSeries = null);
 
 // Body for POST /markets/intraday/reoptimize (RM-M4-01). ResidualStart
 // is the moment from which the residual horizon is reoptimised; it
@@ -166,7 +167,39 @@ public sealed record IntradayReoptimizationRequestBody(
     DateTimeOffset HorizonEnd,
     double TimeStepSeconds,
     IReadOnlyList<double>? PricesPerStep = null,
-    string? PriceUnit = null);
+    string? PriceUnit = null,
+    PriceSeriesReferenceBody? PriceSeries = null);
+
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+public sealed record PriceSeriesReferenceBody(
+    string MarketBidArea,
+    string Product,
+    string PriceKind,
+    string Source);
+
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+public sealed record PriceSeriesImportRequestBody(
+    string MarketBidArea,
+    string Product,
+    string PriceKind,
+    string Unit,
+    string Source,
+    DateTimeOffset HorizonStart,
+    DateTimeOffset HorizonEnd,
+    double TimeStepSeconds,
+    IReadOnlyList<double> Values);
+
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+public sealed record PriceSeriesImportResponse(
+    string MarketBidArea,
+    string Product,
+    string PriceKind,
+    string Unit,
+    string Source,
+    DateTimeOffset HorizonStart,
+    DateTimeOffset HorizonEnd,
+    double TimeStepSeconds,
+    int Count);
 
 [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
 public sealed record OptimizationResponse(
