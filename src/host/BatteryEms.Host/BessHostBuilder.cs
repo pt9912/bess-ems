@@ -91,6 +91,7 @@ public static class BessHostBuilder
         // Driven adapters: optimisation + telemetry are always wired.
         builder.Services.AddBessOptimization();
         ConfigureScheduleSolver(builder.Services, hostOptions);
+        ConfigureMpcBackend(builder.Services, hostOptions);
         builder.Services.AddBessTelemetry();
         // RM-M2-06: OTel tracing for the three Application-grenze flows.
         // Exporter is opt-in via OTEL_EXPORTER_OTLP_ENDPOINT; without it
@@ -245,6 +246,35 @@ public static class BessHostBuilder
         throw new InvalidOperationException(
             $"Unsupported Bess:ScheduleSolver:Backend '{options.Backend}'. "
             + "Supported values: noop, or_tools, optimization_core.");
+    }
+
+    private static void ConfigureMpcBackend(
+        IServiceCollection services,
+        BessHostOptions hostOptions)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(hostOptions);
+
+        if (string.IsNullOrWhiteSpace(hostOptions.MpcBackend))
+        {
+            return;
+        }
+
+        var backend = hostOptions.MpcBackend.Trim();
+        if (string.Equals(backend, "local_osqp", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddBessLocalOsqpMpcSolver();
+            return;
+        }
+        if (string.Equals(backend, "optimization_core", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(backend, "bi_modal", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"mpc-backend-not-implemented: Bess:MpcBackend='{hostOptions.MpcBackend}' is reserved for F-M5-12.");
+        }
+
+        throw new InvalidOperationException(
+            $"Unsupported Bess:MpcBackend '{hostOptions.MpcBackend}'. Supported values: local_osqp.");
     }
 
     // RM-M5-01-C Korrektur-Pass: registriert den lokalen Fallback-

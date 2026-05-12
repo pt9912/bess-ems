@@ -241,7 +241,8 @@
         "dependencies": {
           "BatteryEms.Application": "[1.0.0, )",
           "BatteryEms.Domain": "[1.0.0, )",
-          "Google.OrTools": "[9.15.6755, )"
+          "Google.OrTools": "[9.15.6755, )",
+          "osqp-net": "[1.0.0.2, )"
         }
       },
       "batteryems.adapters.optimizationcore": {
@@ -460,6 +461,12 @@
         "dependencies": {
           "OpenTelemetry.Api.ProviderBuilderExtensions": "[1.15.3, 2.0.0)"
         }
+      },
+      "osqp-net": {
+        "type": "CentralTransitive",
+        "requested": "[1.0.0.2, )",
+        "resolved": "1.0.0.2",
+        "contentHash": "CbNHJEODcJmOMm+awVpAT1bnqo1NPn7Lvte7DsdgbTlmS8TN3KYnZjid1vJ7G/gx++N3L3eAC8jT0kielMQZSg=="
       }
     }
   }

@@ -1,6 +1,9 @@
 using BatteryEms.Adapters.Optimization.OrTools;
+using BatteryEms.Adapters.Optimization.Mpc.Local;
+using BatteryEms.Application.Mpc;
 using BatteryEms.Application.Optimization;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 
 namespace BatteryEms.Adapters.Optimization;
@@ -80,6 +83,16 @@ public static class OptimizationRegistration
                 sp.GetRequiredService<ILogger<OrToolsScheduleOptimizer>>());
             return new OrToolsFallbackScheduleOptimizer(inner);
         });
+        return services;
+    }
+
+    public static IServiceCollection AddBessLocalOsqpMpcSolver(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddSingleton<IMpcStateEstimator, IdentityStateEstimator>();
+        services.AddSingleton<IMpcModelSolver, LocalOsqpMpcSolver>();
+        services.AddSingleton<IMpcDispatchOptimizer, DefaultMpcDispatchOrchestrator>();
         return services;
     }
 }

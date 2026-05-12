@@ -107,6 +107,13 @@ public sealed class BessHostOptions
     // `IFallbackScheduleOptimizer`). Andere Backends sind explizit
     // Fehler.
     public string? OptimizationCoreFallbackBackend { get; set; }
+
+    // RM-M5-02-B: optional MPC backend wiring. Default null keeps MPC
+    // completely disabled: no IMpcDispatchOptimizer is registered and
+    // the worker keeps the pre-MPC control path. Supported today:
+    // "local_osqp". Reserved for F-M5-12 and rejected in this slice:
+    // "optimization_core", "bi_modal".
+    public string? MpcBackend { get; set; }
 }
 
 public sealed class BessScheduleSolverOptions

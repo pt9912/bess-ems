@@ -20,6 +20,7 @@
     <PackageVersion Include="dbup-postgresql" Version="7.0.1" />
     <PackageVersion Include="FluentModbus" Version="5.3.2" />
     <PackageVersion Include="Google.OrTools" Version="9.15.6755" />
+    <PackageVersion Include="osqp-net" Version="1.0.0.2" />
     <!-- RM-M5-01 (ADR 0005): gRPC-Sidecar-Transport für den
          optimization-core. Grpc.Tools ist Build-Time-Source-Generator
          für proto/*.proto-Codegen; Grpc.Net.Client ist der Client-
