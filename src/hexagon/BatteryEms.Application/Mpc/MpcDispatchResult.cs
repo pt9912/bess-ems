@@ -42,7 +42,7 @@ public sealed class MpcDispatchResult
         MpcTrajectory trajectory,
         MpcState posteriorState,
         IReadOnlyDictionary<string, string> stamps,
-        string reason = "ok")
+        string reason = MpcConstraintReasons.Committed)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(requestId);
         ArgumentNullException.ThrowIfNull(trajectory);

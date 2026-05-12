@@ -12,6 +12,11 @@ namespace BatteryEms.Application.Mpc;
 // 1:1 to the Sub-Slice-A DoD property pins.
 public static class MpcConstraintReasons
 {
+    // Terminal-Reason for a usable MPC dispatch — mirrors the M5-01
+    // `sidecar-committed` line so Sub-Slice-D `mpc_runs.reason` indexes
+    // the same kebab-case vocabulary across LP and MPC.
+    public const string Committed = "mpc-committed";
+
     public const string Ok = "mpc-trajectory-ok";
     public const string Empty = "mpc-trajectory-empty";
     public const string SocOutOfBounds = "mpc-trajectory-soc-out-of-bounds";
@@ -56,7 +61,7 @@ public static class MpcConstraintValidator
         ArgumentNullException.ThrowIfNull(model);
         ArgumentNullException.ThrowIfNull(options);
 
-        if (trajectory is null || trajectory.Length == 0)
+        if (trajectory is null)
         {
             return MpcConstraintCheckResult.Invalid(MpcConstraintReasons.Empty);
         }
@@ -73,8 +78,8 @@ public static class MpcConstraintValidator
         {
             var point = trajectory.Points[i];
 
-            if (point.PredictedSocPercent < constraints.MinSocPercent - constraints.SocToleranceFraction
-                || point.PredictedSocPercent > constraints.MaxSocPercent + constraints.SocToleranceFraction)
+            if (point.PredictedSocPercent < constraints.MinSocPercent - constraints.SocTolerancePercent
+                || point.PredictedSocPercent > constraints.MaxSocPercent + constraints.SocTolerancePercent)
             {
                 return MpcConstraintCheckResult.Invalid(
                     MpcConstraintReasons.SocOutOfBounds, offendingPointIndex: i);

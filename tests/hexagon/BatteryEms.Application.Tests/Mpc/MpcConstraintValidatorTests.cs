@@ -151,6 +151,7 @@ public sealed class MpcConstraintValidatorTests
     // layers index by; this pin asserts the canonical spellings so
     // a rename surfaces here before it ripples downstream.
     [Theory]
+    [InlineData(nameof(MpcConstraintReasons.Committed), "mpc-committed")]
     [InlineData(nameof(MpcConstraintReasons.Ok), "mpc-trajectory-ok")]
     [InlineData(nameof(MpcConstraintReasons.Empty), "mpc-trajectory-empty")]
     [InlineData(nameof(MpcConstraintReasons.SocOutOfBounds), "mpc-trajectory-soc-out-of-bounds")]

@@ -13,6 +13,13 @@ namespace BatteryEms.Application.Mpc;
 // `mpc-trajectory-ramp-out-of-bounds`. Carry the bounds in the model so
 // the Sub-Slice-D `MpcRun` stamp can hash them as part of the solver-
 // config identity tuple without reaching back to BatteryAsset.
+//
+// SocTolerancePercent is an absolute percentage-point band around the
+// SOC floor/ceiling (e.g. 1e-9 ⇒ ±1e-9 percentage points), *not* a
+// fraction of the bound range. The slot was renamed from
+// `SocToleranceFraction` to `*Percent` in the RM-M5-02-A review pass so
+// per-asset tolerance configuration cannot mistake it for a proportional
+// band.
 public sealed record MpcConstraints
 {
     public double MinSocPercent { get; }
@@ -20,7 +27,7 @@ public sealed record MpcConstraints
     public double MinActivePowerKw { get; }
     public double MaxActivePowerKw { get; }
     public double MaxRampKwPerSecond { get; }
-    public double SocToleranceFraction { get; }
+    public double SocTolerancePercent { get; }
     public double PowerToleranceKw { get; }
     public double RampToleranceKwPerSecond { get; }
 
@@ -30,7 +37,7 @@ public sealed record MpcConstraints
         double minActivePowerKw,
         double maxActivePowerKw,
         double maxRampKwPerSecond,
-        double socToleranceFraction = 1e-9,
+        double socTolerancePercent = 1e-9,
         double powerToleranceKw = 1e-6,
         double rampToleranceKwPerSecond = 1e-6)
     {
@@ -39,7 +46,7 @@ public sealed record MpcConstraints
         ThrowIfNotFinite(minActivePowerKw, nameof(minActivePowerKw));
         ThrowIfNotFinite(maxActivePowerKw, nameof(maxActivePowerKw));
         ThrowIfNotFinite(maxRampKwPerSecond, nameof(maxRampKwPerSecond));
-        ThrowIfNotFinite(socToleranceFraction, nameof(socToleranceFraction));
+        ThrowIfNotFinite(socTolerancePercent, nameof(socTolerancePercent));
         ThrowIfNotFinite(powerToleranceKw, nameof(powerToleranceKw));
         ThrowIfNotFinite(rampToleranceKwPerSecond, nameof(rampToleranceKwPerSecond));
 
@@ -51,15 +58,15 @@ public sealed record MpcConstraints
             throw new ArgumentOutOfRangeException(nameof(minActivePowerKw), "MinActivePowerKw must be <= MaxActivePowerKw.");
         if (maxRampKwPerSecond < 0)
             throw new ArgumentOutOfRangeException(nameof(maxRampKwPerSecond), "MaxRampKwPerSecond must be non-negative.");
-        if (socToleranceFraction < 0 || powerToleranceKw < 0 || rampToleranceKwPerSecond < 0)
-            throw new ArgumentOutOfRangeException(nameof(socToleranceFraction), "Constraint tolerances must be non-negative.");
+        if (socTolerancePercent < 0 || powerToleranceKw < 0 || rampToleranceKwPerSecond < 0)
+            throw new ArgumentOutOfRangeException(nameof(socTolerancePercent), "Constraint tolerances must be non-negative.");
 
         MinSocPercent = minSocPercent;
         MaxSocPercent = maxSocPercent;
         MinActivePowerKw = minActivePowerKw;
         MaxActivePowerKw = maxActivePowerKw;
         MaxRampKwPerSecond = maxRampKwPerSecond;
-        SocToleranceFraction = socToleranceFraction;
+        SocTolerancePercent = socTolerancePercent;
         PowerToleranceKw = powerToleranceKw;
         RampToleranceKwPerSecond = rampToleranceKwPerSecond;
     }

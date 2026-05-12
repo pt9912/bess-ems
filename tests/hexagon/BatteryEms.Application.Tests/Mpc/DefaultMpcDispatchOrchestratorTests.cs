@@ -83,7 +83,7 @@ public sealed class DefaultMpcDispatchOrchestratorTests
         var result = await orchestrator.NextStepAsync(request, CancellationToken.None);
 
         Assert.True(result.IsUsable);
-        Assert.Equal("ok", result.Reason);
+        Assert.Equal(MpcConstraintReasons.Committed, result.Reason);
         Assert.Same(trajectory, result.Trajectory);
         Assert.NotNull(result.PosteriorState);
         Assert.Equal("lti-soc-v1", result.Stamps["mpc_model_version"]);
@@ -157,7 +157,7 @@ public sealed class DefaultMpcDispatchOrchestratorTests
             return Task.FromResult(new MpcStateUpdate(
                 new MpcState(DateTimeOffset.UnixEpoch, [0.0], MpcMatrix.Identity(1)),
                 IsHealthy: true,
-                Reason: "ok"));
+                Reason: "mpc-state-passthrough"));
         }
     }
 

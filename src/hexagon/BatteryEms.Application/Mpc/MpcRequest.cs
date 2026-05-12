@@ -3,11 +3,18 @@ using BatteryEms.Domain;
 
 namespace BatteryEms.Application.Mpc;
 
-// Per-control-cycle input. `Asset` carries the operational bounds the
-// validator cross-checks against the model's constraint hull;
-// `LatestMeasurement` is the sensor read the estimator predicts and
-// updates against; `CommandTick` is the truncated UTC instant that
-// feeds the Sub-Slice-D `mpc_request_id` identity tuple (D-09 field
+// Per-control-cycle input. `Asset` is the operational reference the
+// Sub-Slice-C `DefaultLinearKalmanFilter` consults for its non-physical-
+// value validator (SOC inside `[MinSocPercent, MaxSocPercent]`,
+// temperature inside `[MinOperatingTemperatureCelsius,
+// MaxOperatingTemperatureCelsius]` → `mpc-state-non-physical` reason);
+// Sub-Slice A only enforces asset-id consistency at construction and
+// otherwise carries the record through unread (the validator works off
+// `model.Constraints`, not off `Asset` — the model carries the bounds
+// that participate in the solver-config hash). `LatestMeasurement` is
+// the sensor read the estimator predicts and updates against;
+// `CommandTick` is the truncated UTC instant that feeds the Sub-Slice-D
+// `mpc_request_id` identity tuple (D-09 field
 // `control_cycle_tick_utc_ms_truncated`). The truncation rule itself
 // lives with the orchestrator; Sub-Slice A only requires that the
 // caller supplies a tick the orchestrator can hash deterministically.
