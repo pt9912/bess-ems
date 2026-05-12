@@ -18,7 +18,7 @@ RM-M5-01 hat eigenen Slice-Plan [`done/plan-RM-M5-01.md`](../done/plan-RM-M5-01.
 (§8.2 Optimierungs-Interface, §13 Native Core / Sidecars),
 [`../../../../spec/lastenheft.md`](../../../../spec/lastenheft.md)
 (LH-OPT-002/003/006, LH-CTRL-005/006, LH-NATIVE-001, LH-TEST-004,
-LH-MON-002, LH-TEST-007)
+LH-MON-002, LH-TEST-007, LH-OPEN-003, LH-MKT-008)
 
 ---
 
@@ -59,6 +59,9 @@ Multi-Asset-Bedienung.
   erlaubt.
 - LP/MILP/MPC-faehige Request-/Response-Modelle, ohne Application oder
   Domain an einen konkreten Solver zu koppeln.
+- Quellenneutraler Preisreihen-Port (`IPriceSeriesSource`) plus
+  Import/API-Pfad fuer Optimierungs-Preise. Der M5-Default bindet keine
+  externen Marktpreis-Anbieter direkt an.
 - MPC-Kernel mit State-Space-Modell, Schaetzer-/Kalman-Pfad,
   Vorhersagehorizont und Constraint-Ausgabe, soweit fuer LH-CTRL-005/006
   notwendig.
@@ -86,6 +89,9 @@ Multi-Asset-Bedienung.
 - Regelleistungsprodukt- oder Praequalifikationslogik; M4/M6.
 - Freie Solver-Experimentierflaeche ohne Port-, Replay- und
   Observability-Vertrag.
+- Externe Marktpreis-Anbieteradapter (z. B. ENTSO-E, EPEX, Tibber,
+  aWATTar oder Aggregatoren). Solche Adapter brauchen eine eigene
+  Quellenentscheidung mit Lizenz-, Auth-, Rate-Limit- und Caching-Pruefung.
 - Harte Echtzeitgarantien. M5 muss Deadlines und Fallback testen, aber
   keine zertifizierte Echtzeitplattform behaupten.
 
@@ -297,6 +303,7 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
 | Native/Kernel | `state_space_core` oder Sidecar-interner MPC-Kernel mit State-Space/Kalman/Horizon | LH-CTRL-005/006 |
 | Native optional | Hochfrequente Telemetrie-Filterung im nativen Pfad | LH-NATIVE-001 |
 | Application | Fallback- und Deadline-Policy fuer Optimierungs- und Dispatch-nahe Sidecar-Aufrufe | LH-NF-002, LH-OPT-006 |
+| Application | `IPriceSeriesSource`, `PriceSeries`/`PriceSeriesRequest` und quellenneutraler Import/API-Pfad | LH-OPEN-003, LH-MKT-008 |
 | Replay | Datensatzmanifest, Fixture-Loader, Golden-/Diff-Format und Vergleichsrunner | LH-TEST-004 |
 | Observability | Sidecar-/Solver-/MPC-Metriken und Command-Latenz | LH-MON-002 |
 | Deploy/Test | Compose-/Container-Gate fuer Worker + Sidecar | LH-TEST-007 |
@@ -313,6 +320,7 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
 | ⬜ | RM-M5-04 | Replay-Plattform mit Datensatz-Verwaltung und Sollwertvergleich | Versioniertes Manifest fuer Datensaetze; Loader fuer externe JSON-Fixtures validieren reject-by-default gegen bekannte Schema-Versionen und melden Inkompatibilitaet pro Fixture; Manifest-Schema klassifiziert Felder als required/optional/deprecated/tolerated_legacy; bestehende M2/M3-Fixtures bleiben ueber explizit versionierte Kompatibilitaets-Loader lauffaehig, bis 100 % der Pflichtfallliste in kleinen Folge-PRs mit Golden-Diff-Nachweis migriert sind; Manifest enthaelt Seed, Determinismusmodus, Runtime-/Numerik-Versionen, Solver-Optionen, `request_id`-Regel und Toleranzen; Runner vergleicht Commands/Sollwerte gegen Golden-Dateien und mehrere Engines; Diff-Report trennt erlaubte numerische Toleranz von fachlicher Drift. |
 | ⬜ | RM-M5-05 | Erweiterte Metriken / Solverstatus / Command-Latenz | Prometheus-Metriken decken Solverstatus, Laufzeit, Deadline/Timeout, `fallback_source`, `fallback_reason`, Terminalzustand, Sidecar-Health und Command-Latenz ab; Tests scrapen erfolgreiche und fehlerhafte Pfade. |
 | ⬜ | RM-M5-06 | Container-Orchestrierungstests (Worker + Sidecar) | Compose-/CI-Gate startet Worker und Sidecar, prueft Health, erfolgreichen Optimierungslauf, Sidecar-Crash, Restart und Fallback; Container-Logs enthalten korrelierbare RunId/RequestId. |
+| ⬜ | RM-M5-07 | Preisreihen-Port und quellenneutraler Import/API-Pfad | `IPriceSeriesSource` als source-agnostic Driven-Port; normalisierte `PriceSeries` mit Zone/Marktgebiet, Produkt/Preisart, Einheit, Zeitraster und expliziter Quelle; API-/Importpfad nimmt Preisreihen ohne Anbieterbindung entgegen und reicht sie an Optimierungsrequests weiter; Tests nutzen synthetische oder eindeutig frei nutzbare Daten. Externe Anbieteradapter sind out-of-scope und duerfen erst nach dokumentierter Lizenz-/Nutzungs-, Auth-, Rate-Limit- und Caching-Pruefung entstehen. |
 
 ---
 
@@ -333,15 +341,18 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
    observierbar gemacht werden muessen.
 5. RM-M5-06 frueh als Container-Gate schneiden, sobald Worker und
    Test-Sidecar zusammenspielen.
-6. RM-M5-04 danach ausbauen und bestehende M2/M3-Replay-Fixtures
+6. RM-M5-07 parallel zur Optimierungs-/Replay-Basis schneiden, bevor
+   MPC-Faelle echte Preisinputs brauchen. Der Slice liefert nur Port,
+   Modell und Import/API-Default, keine externen Anbieteradapter.
+7. RM-M5-04 danach ausbauen und bestehende M2/M3-Replay-Fixtures
    ueber Kompatibilitaets-Loader lauffaehig halten. Migrationen duerfen
    in kleinen Folge-PRs laufen; der alte Pfad wird erst entfernt, wenn
    Golden-Diff-Nachweise und ein ueberlappender CI-Lauf vorliegen. Neue
    MPC-Faelle bekommen eigene Manifestversion.
-7. RM-M5-02 erst auf stabilem Contract-/Replay-Fundament aktivieren,
+8. RM-M5-02 erst auf stabilem Contract-/Replay-Fundament aktivieren,
    damit numerische Drift und Constraint-Verletzungen reproduzierbar
    diskutiert werden koennen.
-8. RM-M5-03 nur ziehen, wenn RM-M5-02 eine echte hochfrequente
+9. RM-M5-03 nur ziehen, wenn RM-M5-02 eine echte hochfrequente
    Filteranforderung ausweist.
 
 ---
@@ -378,6 +389,10 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
 - Metriken fuer Solverstatus, Laufzeit, Deadline/Timeout,
   `fallback_source`, `fallback_reason`, Terminalzustand, Sidecar-Health
   und Command-Latenz sind getestet.
+- Preisreihen koennen ueber einen quellenneutralen Import/API-Pfad in
+  Optimierungsrequests eingehen. Der Default enthaelt keine API-Keys,
+  keine unklar lizenzierten Marktdaten und keine Scraper gegen
+  Marktportale.
 - Roadmap, Quality-Doku und Architektur werden beim Abschluss
   synchronisiert.
 
@@ -417,3 +432,8 @@ M2/M3-Replay-Pipelines aber nicht still brechen.
   JSON-Fixture-Loader oder Multi-Asset-Replay gebaut. M5 darf diese
   Luecken schliessen, muss dabei aber die M2/M3-Kompatibilitaetsstrategie
   einhalten und sollte UI- und Flottenfunktionen nicht vorziehen.
+- **Marktpreisquellen und Open Source.** Konkrete Anbieteradapter koennen
+  Lizenz-, Auth-, Rate-Limit- und Caching-Pflichten in das Projekt ziehen.
+  RM-M5-07 liefert deshalb nur den source-agnostic Port und Import/API-
+  Default. Jeder externe Anbieter braucht eine eigene dokumentierte
+  Quellenentscheidung.

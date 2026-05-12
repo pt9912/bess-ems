@@ -3,7 +3,7 @@
 **Projektname:** bess-ems
 **Dokumenttyp:** Architekturbeschreibung
 **Format:** Markdown
-**Version:** 0.2.0
+**Version:** 0.3.0
 **Status:** Entwurf
 **Bezug:** [`lastenheft.md`](lastenheft.md)
 
@@ -61,14 +61,14 @@ referenzieren ihre `LH-*`-Kennung; Architekturkomponenten erhalten
    └─────┬───────────────────┬──────────────────┬──────────────────┘
          │                   │                  │
    ┌─────▼─────┐      ┌──────▼──────┐    ┌──────▼──────────────┐
-   │ Modbus TCP│      │ MQTT Broker │    │ OPC-UA (nach MVP)   │
+   │ Modbus TCP│      │ MQTT Broker │    │ OPC-UA              │
    └─────┬─────┘      └──────┬──────┘    └──────┬──────────────┘
          │                   │                  │
    ┌─────▼───────────────────▼──────────────────▼──────────────┐
    │   BMS / Wechselrichter / Zähler / PV-Messung / RL-Signal  │
    └───────────────────────────────────────────────────────────┘
 
-   Persistenz: PostgreSQL (TimescaleDB nach MVP)
+   Persistenz: PostgreSQL (TimescaleDB optionaler Folgeausbau)
    Monitoring: strukturierte Logs, Metriken, OpenTelemetry-Traces
 ```
 
@@ -133,7 +133,7 @@ Case → Driven Ports → Driven Adapter**.
 ```text
         ┌──────────────────────────────────────────────────┐
         │              Driving Adapters                    │
-        │  HTTP API   Worker-Loop   Operator-CLI (n. MVP)  │
+        │  HTTP API   Worker-Loop   Operator-CLI (opt.)    │
         └─────────┬─────────────┬─────────────┬────────────┘
                   │             │             │
         ┌─────────▼─────────────▼─────────────▼────────────┐
@@ -199,7 +199,7 @@ bess-ems/
 │   │       ├── BatteryEms.Adapters.OpcUa/    # ab M4
 │   │       ├── BatteryEms.Adapters.Persistence/  # Postgres, Repositories, Migrationen
 │   │       ├── BatteryEms.Adapters.Telemetry/    # OTel, Prometheus, Logging-Exporter
-│   │       ├── BatteryEms.Adapters.Optimization/ # Solver-Bindings, NoOp im MVP
+│   │       ├── BatteryEms.Adapters.Optimization/ # Solver-Bindings, Schedule-/Dispatch-Optimierung
 │   │       └── BatteryEms.Adapters.NativeInterop/ # ab M3, P/Invoke + Fallback-Routing
 │   └── infrastructure/
 │       └── BatteryEms.Infrastructure/        # Cross-cutting: Config-Loader, DI-Wiring, Health
@@ -232,8 +232,11 @@ hier.
 | `IBatteryStatusQuery`           | HTTP API                  | aktueller Status, letzter Command, Datenqualität               | LH-API-002/003   |
 | `IScheduleQuery`                | HTTP API                  | aktiven/historischen Fahrplan abfragen                         | LH-API-004       |
 | `IScheduleImport`               | HTTP API / Worker         | Day-Ahead-/Intraday-Fahrplan importieren                       | LH-MKT-001/002   |
-| `IScheduleOptimizationUseCase`  | HTTP API (n. MVP)         | Horizon-Optimierung auslösen und Ergebnis speichern            | LH-API-005, LH-OPT-001/007/009 |
+| `IScheduleOptimizationUseCase`  | HTTP API                  | Horizon-Optimierung auslösen und Ergebnis speichern            | LH-API-005, LH-OPT-001/007/009 |
+| `IIntradayReoptimizationUseCase` | HTTP API                 | Intraday-Resthorizont reoptimieren und Fahrplan ersetzen       | LH-MKT-002, LH-API-005 |
+| `IRegelleistungActivationUseCase` | Aktivierungs-Adapter    | Regelleistungsaktivierung validieren, deduplizieren und für Dispatch bereitstellen | LH-MKT-005/006 |
 | `IHealthQuery`                  | HTTP API                  | Health-Endpunkt                                                | LH-API-001       |
+| `IRegelleistungHealthQuery`     | HTTP API                  | Health der Regelleistungs-Aktivierungspipeline                 | LH-MKT-005, LH-MON-002 |
 
 #### Driven Ports (vom Kern aufgerufen)
 
@@ -245,9 +248,11 @@ hier.
 | `ICommandRepository`              | Persistence                                     | Commands speichern, Reason erhalten                        | LH-PERSIST-002        |
 | `IScheduleRepository`             | Persistence                                     | Fahrpläne versioniert speichern                            | LH-PERSIST-003        |
 | `IOperatorAuditLog`               | Persistence                                     | Operator-Aktionen auditierbar speichern                    | LH-PERSIST-004, LH-OPS-004 |
-| `IScheduleOptimizer`              | Optimization (LP/MILP/heuristisch ab M2)        | Fahrpläne über Horizon erzeugen oder aktualisieren          | LH-OPT-001..009       |
-| `IDispatchOptimizer`              | Optimization (NoOp im MVP, MPC später)          | Single-Step-Dispatch im Regelzyklus                        | LH-OPT-007, LH-CTRL-005 |
+| `IScheduleOptimizer`              | Optimization (LP ab M2; MILP/heuristisch optional) | Fahrpläne über Horizon erzeugen oder aktualisieren       | LH-OPT-001..009       |
+| `IDispatchOptimizer`              | Optimization (Schedule-Following; MPC später)   | Single-Step-Dispatch im Regelzyklus                        | LH-OPT-007, LH-CTRL-005 |
+| `IPriceSeriesSource`              | Price-Source-Adapter / Import                    | quellenneutrale Preisreihen für Optimierung liefern        | LH-MKT-008, LH-OPEN-003 |
 | `IOptimizationRunRepository`       | Persistence                                     | Optimierungsläufe und Objective Breakdown speichern         | LH-PERSIST-007        |
+| `IActivationDispatchSource`        | Application / Markets                          | aktive Regelleistungsaktivierung für den Dispatch-Tick halten | LH-MKT-005/006        |
 | `IControlKernel`                  | Application (`ManagedControlKernel`) und NativeInterop (`NativeFallbackControlKernel`, ab M3) | Constraint/Ramp/PID ausführen; Native bevorzugt mit deterministischem Managed-Fallback bei nativem Fehler | LH-NATIVE-001/004     |
 | `IClock`                          | Infrastructure                                  | UTC-Zeit, deterministisch in Tests                         | LH-MKT-007            |
 | `ITelemetryExporter`              | Telemetry                                       | Logs/Metrics/Traces nach außen                             | LH-MON-001/002/003    |
@@ -323,7 +328,7 @@ Namespaces; eine spätere Aufspaltung in eigene .NET-Projekte ist optional
 | `BatteryEms.Adapters.OpcUa`              | Driven Adapter (M4)  | OPC-UA Lesen, Schreiben, Subscriptions                       | LH-OPCUA-*           |
 | `BatteryEms.Adapters.Persistence`        | Driven Adapter       | Repositories (EF Core/Dapper), Migrationen, Retention        | LH-PERSIST-*         |
 | `BatteryEms.Adapters.Telemetry`          | Driven Adapter       | OTel-Tracing, Prometheus-Metriken, Logging-Exporter          | LH-MON-*             |
-| `BatteryEms.Adapters.Optimization`       | Driven Adapter       | Solver-Bindings für Horizon-Optimierung; NoOp/Single-Step-Dispatch im MVP | LH-OPT-001..009 |
+| `BatteryEms.Adapters.Optimization`       | Driven Adapter       | Solver-Bindings für Horizon-Optimierung; Schedule-Following-/Single-Step-Dispatch | LH-OPT-001..009 |
 | `BatteryEms.Adapters.NativeInterop`      | Driven Adapter (M3)  | P/Invoke-Bindings, ABI-Check, Fallback-Routing               | LH-NATIVE-*          |
 | `BatteryEms.Infrastructure`              | Composition Root     | DI-Wiring, Konfigurations-Loader, Health, Startvalidierung   | LH-CONF-*, LH-OPS-001 |
 | `BatteryEms.ArchitectureTests`           | Test-Modul           | Boundary-Tests für Dependency Rule und Architektur-Tabus aus §4.2 | LH-NF-006, LH-ARCH-002 |
@@ -365,7 +370,7 @@ Bezug: LH-NATIVE-002 (stabile C-ABI), LH-NATIVE-005 (ABI-Versionierung).
    │            ▼                                             │
    │  Markt-/Fahrplanauflösung ◄──── Schedule (Markets)       │
    │            ▼                                             │
-   │  Regelleistungspriorisierung (n. MVP) ◄── RL-Aktivierung │
+   │  Regelleistungspriorisierung ◄──────────── RL-Aktivierung │
    │            ▼                                             │
    │  Constraint Limiter ────┐                                │
    │            ▼            │ Native Core (optional)         │
@@ -511,23 +516,59 @@ public interface IDispatchOptimizer
 }
 ```
 
-Im MVP: `NoOpDispatchOptimizer` liefert einen sicheren Single-Step-Wert,
-während importierte Fahrpläne durch `IScheduleTracker` aufgelöst werden.
-Ab M2 implementiert `IScheduleOptimizer` LP/MILP/heuristische
-Horizon-Optimierung. MPC kann später `IDispatchOptimizer` für
-Single-Step-Entscheidungen oder `IScheduleOptimizer` für rollierende
-Horizonte implementieren (LH-OPT-001..009).
+Der Basispfad löst importierte oder optimierte Fahrpläne über
+`IScheduleTracker` auf. `IDispatchOptimizer` liefert daraus einen
+regelkreisfähigen Single-Step-Wert und fällt bei fehlender gültiger
+Vorgabe auf einen sicheren Idle-/Stop-Wert zurück. `IScheduleOptimizer`
+stellt seit M2 LP-basierte Horizon-Optimierung bereit; MILP- und
+heuristische Varianten bleiben austauschbare Solver-Ausprägungen. MPC
+kann später `IDispatchOptimizer` für Single-Step-Entscheidungen oder
+`IScheduleOptimizer` für rollierende Horizonte implementieren
+(LH-OPT-001..009).
 
-### 8.3 Externe API (MVP)
+### 8.3 Preisquellen und Open-Source-Policy
+
+Marktpreisquellen sind über einen quellenneutralen Port vom Optimierer
+getrennt. Der Optimierer arbeitet mit normalisierten Preisreihen pro
+Zeitschritt; er kennt keine Anbieter-API, Authentifizierung,
+Rate-Limits oder Caching-Regeln.
+
+```csharp
+public interface IPriceSeriesSource
+{
+    Task<PriceSeries> LoadAsync(
+        PriceSeriesRequest request, CancellationToken ct);
+}
+```
+
+Open-Source-Default ist Import/API statt Anbieterbindung:
+
+- Preisreihen können per API, Fahrplanimport oder Konfiguration
+  eingebracht werden.
+- Im Repository liegen keine API-Keys, keine gecachten Marktdaten mit
+  unklarer Lizenz und keine Scraper gegen Marktportale.
+- Tests verwenden synthetische oder eindeutig frei nutzbare Preisreihen.
+- Externe Quellen werden als optionale Adapter implementiert und müssen
+  Datenlizenz, Nutzungsbedingungen, Auth/API-Key-Anforderungen,
+  Rate-Limits sowie erlaubtes Caching dokumentieren.
+- Eine konkrete Anbieterintegration erfordert eine eigene
+  Quellenentscheidung; bis dahin bleibt der Port source-agnostic.
+
+Bezug: LH-OPEN-003, LH-MKT-008, LH-OPT-001.
+
+### 8.4 Externe API
 
 | Endpoint                                | Methode | Schutz                                      | LH-Bezug   |
 | --------------------------------------- | ------- | ------------------------------------------- | ---------- |
 | `/health`                               | GET     | intern/lokal; produktiv via Reverse Proxy   | LH-API-001 |
+| `/health/regelleistung`                 | GET     | intern/lokal; produktiv via Reverse Proxy   | LH-MKT-005, LH-MON-002 |
 | `/battery/{assetId}/status`             | GET     | read-only intern; produktiv TLS/optional AuthN | LH-API-002 |
 | `/battery/{assetId}/command/current`    | GET     | read-only intern; produktiv TLS/optional AuthN | LH-API-003 |
 | `/markets/schedules/current`            | GET     | read-only intern; produktiv TLS/optional AuthN | LH-API-004 |
 | `/operator/stop`                        | POST    | AuthN+AuthZ + Audit                         | LH-API-006/007 |
-| `/markets/day-ahead/optimize`           | POST    | nach MVP                                    | LH-API-005 |
+| `/markets/day-ahead/optimize`           | POST    | AuthN+AuthZ + Audit                         | LH-API-005 |
+| `/markets/intraday/reoptimize`          | POST    | AuthN+AuthZ + Audit                         | LH-MKT-002, LH-API-005 |
+| `/optimization/runs/{runId}`            | GET     | read-only intern; produktiv TLS/optional AuthN | LH-PERSIST-007, LH-OPT-009 |
 
 Produktiv: TLS-Terminierung oder dokumentierter Reverse-Proxy-Betrieb
 (LH-API-008).
@@ -583,9 +624,9 @@ Bezug: LH-SM-001..003, LH-SAFE-001.
 ```text
 1. Emergency Stop                       (LH-SAFE-001)
 2. Batterie-/Wechselrichter-/Netzgrenzen (LH-CTRL-002, LH-SAFE-002/3)
-3. Regelleistungsaktivierung (n. MVP)   (LH-MKT-005)
+3. Regelleistungsaktivierung            (LH-MKT-005)
 4. Verbindliche Marktverpflichtungen    (LH-MKT-003)
-5. Intraday-Fahrplan (n. MVP)           (LH-MKT-002)
+5. Intraday-Fahrplan                    (LH-MKT-002)
 6. Day-Ahead-Fahrplan                   (LH-MKT-001)
 7. Lokale Optimierung                   (LH-OPT-*)
 ```
@@ -617,10 +658,10 @@ Echtzeit-/Schutzanforderungen werden außerhalb des Docker-EMS abgegrenzt
 
 | Bereich            | Detail                                                  | LH-Bezug         |
 | ------------------ | ------------------------------------------------------- | ---------------- |
-| RDBMS              | PostgreSQL (MVP), TimescaleDB optional (n. MVP)         | LH-PERSIST-005   |
+| RDBMS              | PostgreSQL; TimescaleDB optionaler Folgeausbau          | LH-PERSIST-005   |
 | Telemetrie         | Zeitstempel, AssetId, Werte, DataQuality, Quelle        | LH-PERSIST-001   |
 | Commands           | jeder ausgegebene Command mit Reason und Source         | LH-PERSIST-002   |
-| Fahrpläne          | versioniert (Day-Ahead MVP; Intraday/RL nach MVP)       | LH-PERSIST-003   |
+| Fahrpläne          | versioniert für Day-Ahead, Intraday und Regelleistung   | LH-PERSIST-003   |
 | Optimierungsläufe  | RunId, Inputs, Solverstatus, Objective Breakdown, erzeugte Fahrplanversion | LH-PERSIST-007 |
 | Operator-Audit     | Operator, Zeit, Aktion, Begründung, Ergebnis            | LH-PERSIST-004, LH-OPS-004 |
 | Retention          | konfigurierbar, getrennt je Datentyp, kein Auto-Delete von Audit | LH-PERSIST-006 |
@@ -645,7 +686,7 @@ mehrere Repliken sicher boot-rennen können (RM-M2-MIG-OPEN-06).
 - Bereiche: Assets, Capabilities, Device Points, Adapter, Mappings, Limits,
   Rampen, Markt-/Tarifparameter, Optimierungsparameter, Sicherheitsparameter
   und Northbound-Exports (LH-CONF-001/004).
-- Mappings (Modbus, MQTT, später OPC-UA) versioniert in `config/`
+- Mappings (Modbus, MQTT, OPC-UA) versioniert in `config/`
   (LH-CONF-002).
 - Validierung beim Start; bei Fehlern kein aktiver Regelbetrieb (LH-CONF-003,
   LH-OPS-001).
@@ -655,13 +696,13 @@ config/
 ├─ assets/{assetId}.yaml
 ├─ adapters/modbus/{deviceProfile}.yaml
 ├─ adapters/mqtt/{deviceProfile}.yaml
-├─ adapters/opcua/{deviceProfile}.yaml      # n. MVP
+├─ adapters/opcua/{deviceProfile}.yaml
 ├─ device-points/{profile}.yaml
 ├─ control/limits.yaml
 ├─ control/ramps.yaml
 ├─ markets/zones.yaml
 ├─ markets/tariffs.yaml
-├─ exports/{target}.yaml                    # n. MVP
+├─ exports/{target}.yaml                    # optionaler Folgeausbau
 └─ safety/profiles.yaml
 ```
 
@@ -672,10 +713,10 @@ config/
 ### 13.1 Phasenmodell
 
 ```text
-Phase 1 (MVP)        : .NET-only, kein Native Core
-Phase 2 (post-MVP)   : Native Library via P/Invoke
+Phase 1 (M1/M2)      : .NET-only, kein Native Core
+Phase 2 (M3)         : Native Library via P/Invoke
                        (Constraint, Ramp, PID, schnelle Plausi)
-Phase 3 (later)      : Native Sidecar via gRPC
+Phase 3 (M5)         : Native/externes Sidecar via gRPC
                        (MPC, State-Space, Solver-Anbindung)
 Phase 4 (optional)   : Shared Memory / CPU Pinning / Edge Controller
 ```
@@ -729,7 +770,7 @@ Default-Fallback-Vertrag (siehe `docs/user/quality.md` §5.2).
 | --------- | ------------------------------------------------------------------ | ---------- |
 | Logs      | strukturierte JSON-Logs mit AssetId, Komponente, Reason, Decision  | LH-MON-001 |
 | Metriken  | Regelzyklusdauer, Snapshot-Güte, Fehlerquote, SOC, Power, Solverzeit | LH-MON-002 |
-| Tracing   | OpenTelemetry-Spans über Snapshot → Control → Adapter (n. MVP)     | LH-MON-003 |
+| Tracing   | OpenTelemetry-Spans über Snapshot → Control → Adapter              | LH-MON-003 |
 | Reason    | jeder Command führt strukturiertes Reason-Feld (Codes + Detail)    | LH-MON-004, LH-NF-008 |
 
 Export: Prometheus-Endpoint, OTLP für Traces, stdout-Log (Container-konform).
@@ -740,21 +781,20 @@ Export: Prometheus-Endpoint, OTLP für Traces, stdout-Log (Container-konform).
 
 ```text
 docker-compose.yml
-├─ bess-ems               # MVP: ein eigenes OCI-Image mit Worker + API
+├─ bess-ems               # ein OCI-Image mit Worker + API
 ├─ postgres               # PostgreSQL
 ├─ mosquitto              # MQTT-Broker (lokal/Test)
 └─ monitoring (optional)  # Prometheus, Grafana, Tempo/Jaeger
 ```
 
-Nach dem MVP kann die API bei Bedarf als eigener `bess-ems-api`-Service
-aus demselben Codebestand oder als separates Image ausgekoppelt werden
-(AR-OPEN-001).
+Die API kann bei Bedarf als eigener `bess-ems-api`-Service aus demselben
+Codebestand oder als separates Image ausgekoppelt werden (AR-OPEN-001).
 
 Bezug: LH-DEPLOY-001/2/3, LH-NF-003/4.
 
-MVP-Dockerfile: .NET-Build-Stage + schlankes Runtime-Image ohne Native Core.
-Falls Native Core aktiviert wird, ergänzt ein optionaler nativer Build-Stage
-die `.so` und deponiert sie in `/usr/local/lib` (LH-DEPLOY-004).
+Dockerfile: .NET-Build-Stage + schlankes Runtime-Image. Falls Native Core
+aktiviert wird, ergänzt ein optionaler nativer Build-Stage die `.so` und
+deponiert sie in `/usr/local/lib` (LH-DEPLOY-004).
 
 ---
 
@@ -762,13 +802,13 @@ die `.so` und deponiert sie in `/usr/local/lib` (LH-DEPLOY-004).
 
 | Stufe              | Inhalt                                                 | LH-Bezug    | Geltung                    |
 | ------------------ | ------------------------------------------------------ | ----------- | -------------------------- |
-| Unit               | Domain, State Machine, Limiter, Snapshot-Validierung    | LH-TEST-001 | MVP                        |
-| Unit (Markt)       | Day-Ahead-Logik, Zeitmodell, Sommerzeit                 | LH-TEST-002 | MVP                        |
-| Integration        | Modbus/MQTT-Adapter gegen Simulatoren                   | LH-TEST-003 | MVP                        |
-| Replay             | historische Telemetrie → reproduzierbare Commands       | LH-TEST-004 | nach MVP                   |
-| Native Interop     | Struct-Layout, ABI-Version, Fehlercodes, Werte-Parität  | LH-TEST-005 | nach MVP / falls eingesetzt |
-| Sicherheitsfälle   | Emergency Stop, BMS-Ausfall, stale snapshot, ungültiger Command | LH-TEST-006 | MVP                 |
-| Container          | Image-Boot, Healthcheck; Native Library geladen, falls Native Core eingesetzt wird | LH-TEST-007 | MVP / Native optional |
+| Unit               | Domain, State Machine, Limiter, Snapshot-Validierung    | LH-TEST-001 | M1                         |
+| Unit (Markt)       | Day-Ahead-Logik, Zeitmodell, Sommerzeit                 | LH-TEST-002 | M1/M2                      |
+| Integration        | Modbus/MQTT-Adapter gegen Simulatoren                   | LH-TEST-003 | M1                         |
+| Replay             | historische Telemetrie → reproduzierbare Commands       | LH-TEST-004 | M2                         |
+| Native Interop     | Struct-Layout, ABI-Version, Fehlercodes, Werte-Parität  | LH-TEST-005 | M3 / falls eingesetzt      |
+| Sicherheitsfälle   | Emergency Stop, BMS-Ausfall, stale snapshot, ungültiger Command | LH-TEST-006 | M1                 |
+| Container          | Image-Boot, Healthcheck; Native Library geladen, falls Native Core eingesetzt wird | LH-TEST-007 | M1 / Native optional |
 
 Empfehlung: .NET-Referenzregler parallel zum Native Core pflegen und in
 Replay-Tests gegeneinander vergleichen, um ABI- und Rundungsfehler früh
@@ -804,11 +844,11 @@ zu finden.
 
 | Kennung    | Frage                                                               | Status |
 | ---------- | ------------------------------------------------------------------- | ------ |
-| AR-OPEN-001 | Nach welchen Kriterien wird die API nach MVP als eigener Service ausgekoppelt? | Offen |
+| AR-OPEN-001 | Nach welchen Kriterien wird die API als eigener Service ausgekoppelt? | Offen |
 | AR-OPEN-002 | gRPC vs. REST-only für externe Optimierungs-Sidecars in Phase 3?  | Geschlossen mit [ADR 0005](../docs/plan/adr/0005-optimization-core-sidecar-transport.md) — gRPC über HTTP/2 (UDS-Default für Loopback, mTLS für Cross-Host) ist der Sidecar-Transport für den `optimization-core`. |
 | AR-OPEN-003 | Persistenz-Stack: EF Core, Dapper oder Mischung?                  | Offen  |
 | AR-OPEN-004 | Fahrplanimport-Format (CSV, JSON, ENTSO-E, proprietär)?           | Offen  |
-| AR-OPEN-005 | Konkrete Topic-/Registerprofile für die ersten Hersteller?        | Offen, Bezug LH-OPEN-001 |
+| AR-OPEN-005 | Konkrete Topic-/Registerprofile für die ersten Hersteller?        | Geschlossen mit LH-OPEN-001 — Reihenfolge: SunSpec/Socomec, Victron, SMA; Sungrow nur nach Rechtsklärung. |
 | AR-OPEN-006 | Strategie für Multi-Asset-Hosting (Worker-pro-Asset vs. shared)?  | Offen  |
 | AR-OPEN-007 | Authentifizierungsverfahren (API-Token, OIDC, mTLS)?              | Offen  |
 | AR-OPEN-008 | Wann wird `BatteryEms.Application` in eigene Projekte (Realtime, Control, Markets, Optimization) gesplittet, oder bleibt es ein Modul mit Namespaces? | Offen  |

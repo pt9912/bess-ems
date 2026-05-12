@@ -1,7 +1,7 @@
 # Notiz: Vendor-Shortlist für RM-OPEN-02
 
 **Dokumenttyp:** Vorabklärung / Decision-Input
-**Status:** Offen
+**Status:** Als Entscheidungsinput übernommen; LH-OPEN-001 ist im Lastenheft geklärt
 **Bezug:** [`plan-RM-M1.md`](../done/plan-RM-M1.md) (RM-OPEN-02), [`roadmap.md`](../in-progress/roadmap.md)
 
 ---

@@ -407,6 +407,24 @@ bleibt Fallback und Referenz.
 **Ziel:** Intraday-Reoptimierung, Regelleistungsreservierung und
 -aktivierung, OPC-UA-Adapter über dasselbe Adapter-Interface.
 
+### Produktprofil-Verwendung
+
+Die fachlichen Produktprofile sind im Lastenheft unter
+`LH-OPEN-002 — Regelleistungsprodukte` definiert. M4 verwendet sie wie
+folgt:
+
+| Kennung | Produktprofil | M4-Verwendung |
+| ------- | ------------- | ------------- |
+| LH-MKT-009_FCR_RC | FCR Reservekapazität | erstes reales Reservierungsprofil |
+| LH-MKT-009_AFRR_POS_RC | aFRR positive Reservekapazität | erstes reales Reserveprofil neben FCR |
+| LH-MKT-009_AFRR_NEG_RC | aFRR negative Reservekapazität | erstes reales Reserveprofil neben FCR |
+| LH-MKT-009_AFRR_POS_AE | aFRR positive Aktivierungsenergie | primärer M4-Aktivierungspfad |
+| LH-MKT-009_AFRR_NEG_AE | aFRR negative Aktivierungsenergie | primärer M4-Aktivierungspfad |
+| LH-MKT-009_MFRR_POS_RC | mFRR positive Reservekapazität | Marktmodell und Reservierungsdaten vorbereiten |
+| LH-MKT-009_MFRR_NEG_RC | mFRR negative Reservekapazität | Marktmodell und Reservierungsdaten vorbereiten |
+| LH-MKT-009_MFRR_POS_AE | mFRR positive Aktivierungsenergie | nicht als produktiver M4-Aktivierungspfad |
+| LH-MKT-009_MFRR_NEG_AE | mFRR negative Aktivierungsenergie | nicht als produktiver M4-Aktivierungspfad |
+
 ### Liefergegenstände
 
 | Status | ID         | Inhalt                                                              | LH-Bezug                |
@@ -443,12 +461,15 @@ Solver-nahe Optimierung; ausgebaute Replay- und Vergleichsplattform.
 | ⬜     | RM-M5-04   | Replay-Plattform mit Datensatz-Verwaltung und Sollwertvergleich     | LH-TEST-004             |
 | ⬜     | RM-M5-05   | Erweiterte Metriken / Solverstatus / Command-Latenz                 | LH-MON-002              |
 | ⬜     | RM-M5-06   | Container-Orchestrierungstests (Worker + Sidecar)                   | LH-TEST-007             |
+| ⬜     | RM-M5-07   | `IPriceSeriesSource`-Port + quellenneutraler Preisreihen-Import/API; keine externen Anbieteradapter im Default | LH-OPEN-003, LH-MKT-008 |
 
 ### Abnahmekriterien
 
 - MPC-Lauf erzeugt zulässige Trajektorien, die Limiter nicht verletzen.
 - Sidecar-Crash beeinträchtigt den Regelkreis nicht; Fallback bleibt
   funktionsfähig.
+- Optimierung kann Preisreihen über den source-agnostic Import/API-Pfad
+  laden; externe Anbieteradapter bleiben optional und lizenzgeprüft.
 
 ---
 
@@ -462,10 +483,10 @@ Kubernetes-Deployment, Edge-Anbindung. Inhalte mit hohem Diskussionsbedarf
 
 | Status | ID         | Inhalt                                                              | LH-Bezug             |
 | ------ | ---------- | ------------------------------------------------------------------- | -------------------- |
-| ⬜     | RM-M6-01   | Operator UI (Web)                                                   | LH-OPEN-005          |
+| ⬜     | RM-M6-01   | Operator UI (Web) — optionaler Ausbau; Kernsystem bleibt API-first  | LH-OPEN-005          |
 | ⬜     | RM-M6-02   | Multi-Asset-Flottensteuerung                                        | §28.3                |
 | ⬜     | RM-M6-03   | Kubernetes-Deployment + Helm Charts                                 | §28.3                |
-| ⬜     | RM-M6-04   | TimescaleDB-Integration als Persistenz-Erweiterung                  | LH-PERSIST-005, LH-OPEN-006 |
+| ⬜     | RM-M6-04   | TimescaleDB-Integration als Persistenz-Erweiterung bei Zeitreihen-/Retention-Bedarf | LH-PERSIST-005, LH-OPEN-006 |
 | ⬜     | RM-M6-05   | Edge-Controller-Integration für harte Echtzeitkomponenten           | LH-RISK-001          |
 | ⬜     | RM-M6-06   | Zertifizierungsnahe Regelleistungsintegration                       | §28.3                |
 
@@ -488,7 +509,7 @@ Kubernetes-Deployment, Edge-Anbindung. Inhalte mit hohem Diskussionsbedarf
 | Kennung    | Frage                                                          | Status |
 | ---------- | -------------------------------------------------------------- | ------ |
 | RM-OPEN-01 | Konkrete Zeitachse / Kalenderwochen pro Meilenstein?           | Offen  |
-| RM-OPEN-02 | Welche Hersteller-Integration zuerst (siehe LH-OPEN-001)?      | Offen  |
+| RM-OPEN-02 | Welche Hersteller-Integration zuerst (siehe LH-OPEN-001)?      | Geschlossen mit LH-OPEN-001 — SunSpec/Socomec zuerst, danach Victron und SMA; Sungrow bleibt bis Rechtsklärung zurückgestellt. |
 | RM-OPEN-03 | Solver-Auswahl für M2 (HiGHS vs. OR-Tools default)?            | Offen  |
 | RM-OPEN-04 | Authentifizierung in M1 (API-Token, OIDC)?                     | Geschlossen mit RM-M1-16 — API-Token + Operator-Rolle live; OIDC/mTLS bleiben Folge-ADR. |
 | RM-OPEN-05 | Reihenfolge M3 vs. M4 — Native zuerst oder Markt-/RL zuerst?   | Offen  |

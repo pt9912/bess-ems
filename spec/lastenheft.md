@@ -505,17 +505,19 @@ Das System soll Marktprodukte fachlich differenziert abbilden, sobald diese im j
 
 **Mindestprodukte nach Ausbau:**
 
-- Day-Ahead Energie
-- Intraday Energie
-- FCR Reservekapazität
-- aFRR positive Reservekapazität
-- aFRR negative Reservekapazität
-- aFRR positive Aktivierungsenergie
-- aFRR negative Aktivierungsenergie
-- mFRR positive Reservekapazität
-- mFRR negative Reservekapazität
-- mFRR positive Aktivierungsenergie
-- mFRR negative Aktivierungsenergie
+| Kennung | Marktprodukt |
+| ------- | ------------ |
+| LH-MKT-009_DAE | Day-Ahead Energie |
+| LH-MKT-009_IE | Intraday Energie |
+| LH-MKT-009_FCR_RC | FCR Reservekapazität |
+| LH-MKT-009_AFRR_POS_RC | aFRR positive Reservekapazität |
+| LH-MKT-009_AFRR_NEG_RC | aFRR negative Reservekapazität |
+| LH-MKT-009_AFRR_POS_AE | aFRR positive Aktivierungsenergie |
+| LH-MKT-009_AFRR_NEG_AE | aFRR negative Aktivierungsenergie |
+| LH-MKT-009_MFRR_POS_RC | mFRR positive Reservekapazität |
+| LH-MKT-009_MFRR_NEG_RC | mFRR negative Reservekapazität |
+| LH-MKT-009_MFRR_POS_AE | mFRR positive Aktivierungsenergie |
+| LH-MKT-009_MFRR_NEG_AE | mFRR negative Aktivierungsenergie |
 
 **Abnahmekriterium:** Marktverpflichtungen, Preise und Optimierungsinputs unterscheiden Marktprodukt, Richtung, Einheit und Zeitschritt eindeutig.
 
@@ -527,19 +529,19 @@ Für die Produktplanung werden konkret die im deutschen Regelreservemarkt releva
 
 **Planungsannahme Stand 2026-05-09:**
 
-| Produktprofil | Marktbezug | Richtung | Zeitraster | Leistungsinterpretation | M4-Verwendung |
-| ------------- | ---------- | -------- | ---------- | ----------------------- | ------------- |
-| FCR Reservekapazität | Regelleistung | symmetrisch, positive und negative Leistung müssen gemeinsam vorgehalten werden | 4-h-Produkt; interne Reservierungsauflösung mindestens 15 min | bidirektional reserviertes Leistungsband um den Baseline-Fahrplan; keine getrennte Aktivierungsenergie im EMS-Marktmodell | erstes reales Reservierungsprofil |
-| aFRR positive Reservekapazität | Regelleistung | positiv, Einspeisung erhöhen oder Bezug senken | 4-h-Produkt; interne Reservierungsauflösung mindestens 15 min | entladeseitige Reserve, die Day-Ahead und Intraday nicht verplanen dürfen | erstes reales Reserveprofil neben FCR |
-| aFRR negative Reservekapazität | Regelleistung | negativ, Einspeisung senken oder Bezug erhöhen | 4-h-Produkt; interne Reservierungsauflösung mindestens 15 min | ladeseitige Reserve, die Day-Ahead und Intraday nicht verplanen dürfen | erstes reales Reserveprofil neben FCR |
-| aFRR positive Aktivierungsenergie | Regelarbeit | positiv | 15-min-Abrechnungsraster; Aktivierung im Regelkreis als zeitgestempelter Sollwert | aktivierter Leistungs-Sollwert vor Marktverpflichtungen und Fahrplänen, nach Safety-Limits | primärer M4-Aktivierungspfad |
-| aFRR negative Aktivierungsenergie | Regelarbeit | negativ | 15-min-Abrechnungsraster; Aktivierung im Regelkreis als zeitgestempelter Sollwert | aktivierter Leistungs-Sollwert vor Marktverpflichtungen und Fahrplänen, nach Safety-Limits | primärer M4-Aktivierungspfad |
-| mFRR positive Reservekapazität | Regelleistung | positiv | 4-h-Produkt; interne Reservierungsauflösung mindestens 15 min | entladeseitige Reserve, die Day-Ahead und Intraday nicht verplanen dürfen | Marktmodell und Reservierungsdaten vorbereiten |
-| mFRR negative Reservekapazität | Regelleistung | negativ | 4-h-Produkt; interne Reservierungsauflösung mindestens 15 min | ladeseitige Reserve, die Day-Ahead und Intraday nicht verplanen dürfen | Marktmodell und Reservierungsdaten vorbereiten |
-| mFRR positive Aktivierungsenergie | Regelarbeit | positiv | 15-min-Abrechnungsraster | fachlich relevantes Arbeitsprodukt; produktive MOLS-/MARI-Aktivierung bleibt Folgeausbau | nicht als produktiver M4-Aktivierungspfad |
-| mFRR negative Aktivierungsenergie | Regelarbeit | negativ | 15-min-Abrechnungsraster | fachlich relevantes Arbeitsprodukt; produktive MOLS-/MARI-Aktivierung bleibt Folgeausbau | nicht als produktiver M4-Aktivierungspfad |
+| Kennung | Produktprofil | Marktbezug | Richtung | Zeitraster | Leistungsinterpretation |
+| ------- | ------------- | ---------- | -------- | ---------- | ----------------------- |
+| LH-MKT-009_FCR_RC | FCR Reservekapazität | Regelleistung | symmetrisch, positive und negative Leistung müssen gemeinsam vorgehalten werden | 4-h-Produkt; interne Reservierungsauflösung mindestens 15 min | bidirektional reserviertes Leistungsband um den Baseline-Fahrplan; keine getrennte Aktivierungsenergie im EMS-Marktmodell |
+| LH-MKT-009_AFRR_POS_RC | aFRR positive Reservekapazität | Regelleistung | positiv, Einspeisung erhöhen oder Bezug senken | 4-h-Produkt; interne Reservierungsauflösung mindestens 15 min | entladeseitige Reserve, die Day-Ahead und Intraday nicht verplanen dürfen |
+| LH-MKT-009_AFRR_NEG_RC | aFRR negative Reservekapazität | Regelleistung | negativ, Einspeisung senken oder Bezug erhöhen | 4-h-Produkt; interne Reservierungsauflösung mindestens 15 min | ladeseitige Reserve, die Day-Ahead und Intraday nicht verplanen dürfen |
+| LH-MKT-009_AFRR_POS_AE | aFRR positive Aktivierungsenergie | Regelarbeit | positiv | 15-min-Abrechnungsraster; Aktivierung im Regelkreis als zeitgestempelter Sollwert | aktivierter Leistungs-Sollwert vor Marktverpflichtungen und Fahrplänen, nach Safety-Limits |
+| LH-MKT-009_AFRR_NEG_AE | aFRR negative Aktivierungsenergie | Regelarbeit | negativ | 15-min-Abrechnungsraster; Aktivierung im Regelkreis als zeitgestempelter Sollwert | aktivierter Leistungs-Sollwert vor Marktverpflichtungen und Fahrplänen, nach Safety-Limits |
+| LH-MKT-009_MFRR_POS_RC | mFRR positive Reservekapazität | Regelleistung | positiv | 4-h-Produkt; interne Reservierungsauflösung mindestens 15 min | entladeseitige Reserve, die Day-Ahead und Intraday nicht verplanen dürfen |
+| LH-MKT-009_MFRR_NEG_RC | mFRR negative Reservekapazität | Regelleistung | negativ | 4-h-Produkt; interne Reservierungsauflösung mindestens 15 min | ladeseitige Reserve, die Day-Ahead und Intraday nicht verplanen dürfen |
+| LH-MKT-009_MFRR_POS_AE | mFRR positive Aktivierungsenergie | Regelarbeit | positiv | 15-min-Abrechnungsraster | fachlich relevantes Arbeitsprodukt; produktive MOLS-/MARI-Aktivierung bleibt Folgeausbau |
+| LH-MKT-009_MFRR_NEG_AE | mFRR negative Aktivierungsenergie | Regelarbeit | negativ | 15-min-Abrechnungsraster | fachlich relevantes Arbeitsprodukt; produktive MOLS-/MARI-Aktivierung bleibt Folgeausbau |
 
-**Priorisierung:** M4 modelliert Reserve-Constraints produktneutral, muss aber FCR und aFRR als erste reale Produktprofile nachweisen. mFRR wird im Marktproduktmodell und in den Reservierungsdaten vorbereitet, aber nicht als produktiver Aktivierungspfad vorausgesetzt.
+**Priorisierung:** Das System muss Reserve-Constraints produktneutral modellieren können. FCR und aFRR sind als erste reale Produktprofile nachzuweisen. mFRR wird im Marktproduktmodell und in den Reservierungsdaten vorbereitet, aber nicht als produktiver Aktivierungspfad vorausgesetzt.
 
 **Abnahmekriterium:** Die Produktfamilie, Richtung, Einheit und der Zeitschritt sind für FCR, aFRR und mFRR eindeutig modellierbar. Produktive Aktivierung bleibt deaktiviert, bis das konkrete Produktprofil inklusive Präqualifikations-, Schnittstellen-, Latenz- und Jitter-Annahmen freigegeben ist.
 
@@ -2009,21 +2011,106 @@ Ein zu früher Fokus auf MILP/MPC kann die robuste technische Ausführung verzö
 
 ---
 
-## 30. Offene Punkte
+## 30. Klärungen
 
-| Kennung     | Frage                                                                           | Status |
-| ----------- | ------------------------------------------------------------------------------- | ------ |
-| LH-OPEN-001 | Welche konkreten Batteriesysteme / Hersteller sollen zuerst unterstützt werden? | Offen  |
-| LH-OPEN-002 | Welche Regelleistungsprodukte sind konkret relevant? Siehe Entscheidung in §8.  | Geklärt |
-| LH-OPEN-003 | Welche Marktpreisquellen sollen angebunden werden?                              | Offen  |
-| LH-OPEN-004 | Welche produktive Zykluszeit gilt je Anlagenklasse und Betriebsmodus?           | Offen  |
-| LH-OPEN-005 | Soll ein Operator UI Bestandteil des Projekts sein?                             | Offen  |
-| LH-OPEN-006 | Ab welchem Datenvolumen soll TimescaleDB statt reinem PostgreSQL genutzt werden? | Offen  |
-| LH-OPEN-007 | Welche Native-Core-Komponenten sollen zuerst umgesetzt werden?                  | Offen  |
+### Entscheidung zu LH-OPEN-001 — Erste Herstellerintegrationen
+
+Die erste Herstellerunterstützung folgt einer SunSpec-First-Strategie:
+Zuerst wird ein herstellerübergreifender SunSpec-Modbus-Pfad validiert,
+danach folgen konkrete vendor-spezifische Profile, die unterschiedliche
+Integrationsrisiken abdecken.
+
+| Rang | Zielsystem / Hersteller | Integrationspfad | Entscheidung |
+| ---- | ----------------------- | ---------------- | ------------ |
+| 1 | Socomec SUNSYS HES L | Modbus TCP / SunSpec | Referenzintegration für den SunSpec-Pfad und erstes reales Batteriesystemprofil |
+| 2 | Victron Energy CCGX / Cerbo GX | Modbus TCP mit dynamischer Unit-ID-Zuweisung | Erstes vendor-spezifisches Profil neben SunSpec; validiert Discovery und öffentliche Registerlisten |
+| 3 | SMA Sunny Island / SMA EDMx | Modbus TCP mit Grid-Guard-/Gateway-Besonderheiten | Folgeprofil für Authentifizierung, zyklische Schreibrestriktionen und Aggregationspfade |
+| zurückgestellt | Sungrow SH-Serie / Logger1000 | Modbus TCP / Herstellerprotokoll | Nur nach rechtlicher Klärung der Dokumentations- und Lizenzlage |
+
+Weitere Großspeicher- und Zell-/Rack-Hersteller wie Tesla, Fluence,
+Wärtsilä, BYD, CATL, LG Energy Solution, Samsung SDI und Saft bleiben
+bis zur Verfügbarkeit öffentlicher oder projektvertraglich nutzbarer
+Schnittstellendokumentation unpriorisiert.
+
+**Begründungsquelle:** [`docs/plan/planning/open/note-vendor-shortlist.md`](../docs/plan/planning/open/note-vendor-shortlist.md).
+
+### Arbeitsstand zu LH-OPEN-003 — Marktpreisquellen
+
+Für das Open-Source-Projekt werden Marktpreise zunächst nicht direkt aus
+externen Marktpreisquellen gezogen, sondern als explizite Preisreihen
+über API, Fahrplanimport oder Konfiguration in die Optimierung gegeben.
+Dadurch bleibt der Optimierer unabhängig von Datenanbieter-, Lizenz- und
+Authentifizierungsfragen.
+
+**Open-Source-Policy:**
+
+- Der Default ist ein quellenneutraler Preisreihen-Import/API-Pfad.
+- Das Repository enthält keine API-Keys, keine gecachten Marktdaten mit
+  unklarer Lizenz und keine Scraper gegen Marktportale.
+- Testdaten sind synthetisch oder ausdrücklich frei nutzbar.
+- Externe Marktpreisquellen werden nur als optionale Adapter aufgenommen.
+- Jeder Adapter muss Datenlizenz, Nutzungsbedingungen, Auth/API-Key-
+  Anforderungen, Rate-Limits und erlaubte Caching-/Weitergaberegeln
+  dokumentieren.
+
+Eine konkrete externe Quelle wird erst festgelegt, wenn Marktgebiet,
+Betreibervertrag und Nutzungsrechte geklärt sind. Kandidaten sind
+Day-Ahead-/Intraday-Quellen für die relevante Preiszone sowie lokale
+Tarif-/Einspeisequellen; die Auswahl ist ein eigener Folgepunkt.
+
+### Entscheidung zu LH-OPEN-004 — Produktive Zykluszeit
+
+Der produktive Default für den technischen Regelkreis ist `1 s`. Unter
+Normalbedingungen muss der Regelzyklus innerhalb dieses Intervalls
+abgeschlossen sein.
+
+Kürzere harte Echtzeitpfade, z. B. `10 ms` bis `100 ms`, sind nicht Ziel
+des Docker-/Worker-Regelkreises. Sie müssen über Edge-Controller,
+Herstellersteuerungen oder separat abgegrenzte native/embedded Pfade
+realisiert werden.
+
+### Entscheidung zu LH-OPEN-005 — Operator UI
+
+Ein Operator UI ist Bestandteil des geplanten Ausbaus, aber nicht Teil
+des Kernsystems. Bis zur UI-Umsetzung bleibt `bess-ems` API-first:
+Operator-Funktionen müssen über HTTP-API, AuthN/AuthZ und Audit nutzbar
+sein.
+
+Die Roadmap führt das Web-UI als optionalen M6-Ausbau.
+
+### Entscheidung zu LH-OPEN-006 — TimescaleDB
+
+PostgreSQL bleibt der Default für Persistenz und Betrieb. TimescaleDB
+wird erst als kompatible Erweiterung eingeführt, wenn Zeitreihenvolumen,
+Retention-Abfragen oder Aggregationsbedarf den PostgreSQL-Default
+operativ begrenzen.
+
+Die fachlichen Persistenzmodelle dürfen dabei nicht von TimescaleDB
+abhängen. Eine spätere Aktivierung ist ein M6-Ausbaupunkt.
+
+### Entscheidung zu LH-OPEN-007 — Native-Core-Erstkomponenten
+
+Der Native Core wird inkrementell aktiviert. Zuerst werden Constraint
+Limiter und Ramp Limiter nativ abgebildet, weil sie im heißen
+Regelkreis liegen und die kleinste sicherheitsrelevante native
+Oberfläche bilden. Danach folgt der PID-Regler als eigener additiver
+Slice.
+
+MPC-Kernel, State-Space-Modelle, Kalman-Filter, hochfrequente
+Telemetrie-Filterung und native Solver-Anbindung bleiben spätere
+Ausbaustufen.
 
 ---
 
-## 31. Zusammenfassung
+## 31. Offene Punkte
+
+| Kennung     | Frage                                                                           | Status |
+| ----------- | ------------------------------------------------------------------------------- | ------ |
+| LH-OPEN-003 | Welche Marktpreisquellen sollen angebunden werden?                              | Offen — Open-Source-Default ist quellenneutraler Preisreihen-Import/API; konkrete externe Quellen nur als optionale Adapter nach Lizenz-/Nutzungsprüfung |
+
+---
+
+## 32. Zusammenfassung
 
 `bess-ems` soll ein modulares, containerisiertes Battery Energy Management System werden.
 
