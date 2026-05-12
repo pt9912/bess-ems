@@ -179,11 +179,14 @@ beim Trigger-Watch-Scan revalidiert, weil die LOC-Range stark vom
 Solver-Wrapper-Stand der Drittsprache abhängt.
 
 **Aktivierungs-Pfad:** Sprach-Pivot-ADR zuerst (eigene Folge-ADR im
-`docs/plan/adr/`-Verzeichnis — die ursprünglich vorgemerkte Nummer
-0006 ist mittlerweile durch ADR 0006 (MPC-Kernel-Backend-and-Solver)
-belegt, die nächste freie Nummer ist 0007 oder höher), dann eigener
-Slice-Plan `plan-RM-M5-01-FUP-third-language-sidecar.md` oder
-Schwester-Repo-Init.
+`docs/plan/adr/`-Verzeichnis — erste freie ADR-Nummer zur
+Aktivierungs-Zeit; die ursprünglich vorgemerkte Nummer 0006 ist
+durch ADR 0006 (MPC-Kernel-Backend-and-Solver) belegt, F-M5-12
+zielt auf dieselbe Nummern-Reihe — first-writer-wins entscheidet
+zur Aktivierungs-Zeit welche Folgearbeit welche Nummer bekommt),
+dann eigener Slice-Plan
+`plan-RM-M5-01-FUP-third-language-sidecar.md` oder Schwester-Repo-
+Init.
 
 ---
 
@@ -339,10 +342,11 @@ genannten Trigger zündet.
 
 **Scope-Skizze** (wenn ein Trigger zündet):
 
-- (a) Eigene **Folge-ADR** (Nummer 0007 oder höher) mit Migrations-
-  Plan: welche Trigger zünden, welche Topologie wird gewählt,
-  welche Operator-UX-Pflichten kommen mit, wie wird `MpcBackend`-
-  Slot-Vokabular erweitert. Pivot ändert nicht silent ADR 0006.
+- (a) Eigene **Folge-ADR** (erste freie ADR-Nummer zur Aktivierungs-
+  Zeit) mit Migrations-Plan: welche Trigger zünden, welche
+  Topologie wird gewählt, welche Operator-UX-Pflichten kommen mit,
+  wie wird `MpcBackend`-Slot-Vokabular erweitert. Pivot ändert
+  nicht silent ADR 0006.
 - (b) Zweiter `IMpcModelSolver`-Adapter `OptimizationCoreMpcOptimizer`
   in einem neuen `BatteryEms.Adapters.Optimization.Mpc.Sidecar`-
   Namespace neben dem bestehenden `Local`-Namespace. Adapter
@@ -360,23 +364,33 @@ genannten Trigger zündet.
 - (d) 8+ zusätzliche Roundtrip-Pins gegen den `OptimizationCoreMpcOptimizer`
   (analog zur Sub-Slice-B-Linie für `LocalOsqpMpcSolver`), plus
   TestSidecar-MPC-Stubs (`OptimalMpcStub` + `ScriptableMpcOutcomeStub`)
-  für den In-Process-Test-Pfad — diese Stubs wurden bewusst aus dem
-  M5-02-B-Scope geschnitten (siehe ADR 0006 §3 Verworfene
-  Alternativen).
+  für den In-Process-Test-Pfad — diese gehörten konzeptionell zur
+  Sidecar-First-Linie und sind damit Teil von F-M5-12, nicht von
+  M5-02 (vgl. ADR 0006 §3 Verworfene Alternativen Sidecar-First).
 - (e) Boot-Gate-Erweiterung: wenn `MpcBackend = "optimization_core"`
   und `RuntimeProfile=Production`, dann ist `OptimizationCoreOptions`
   Pflicht (analog zum M5-01-LP-Adapter-Boot-Gate); fehlt der Slot,
   Startup-Fehler `mpc-sidecar-without-config`.
 
-**Aufwandsschätzung:** ~2-3 Wochen (Trigger-abhängig). Wire-Linie
-reuse aus M5-01 (Channel, Idempotency-Store, Fallback-Validator)
-verkürzt den Schätzer; produktionsnahes Sidecar-MPC-Backend (z. B.
-Python-CVXPY-basiert) ist eigene Linie und triggert F-M5-03
-(Drittsprach-Sidecar-Produktiv-Implementierung) als parallele
-Schwester-Linie.
+**Aufwandsschätzung:** ~4-6 Wochen (Trigger-abhängig). Lower-Bound
+~4 Wochen, wenn nur Solver-Isolation zündet und der Wire-Reuse aus
+M5-01 (Channel, Idempotency-Store, Fallback-Validator) maximal
+genutzt wird (Adapter + 8+ Roundtrip-Pins + Boot-Gate +
+TestSidecar-MPC-Stubs `OptimalMpcStub`/`ScriptableMpcOutcomeStub` +
+DI-Wiring + Folge-ADR). Upper-Bound ~6 Wochen, wenn der Multi-
+Language-Trigger (§6 Punkt 3 in ADR 0006) zündet — dann ist
+F-M5-03 (Drittsprach-Sidecar-Produktiv-Implementierung) parallele
+Schwester-Linie mit eigener Aufwandskurve. Vergleichswert für die
+Schätzgröße: RM-M5-01-B (TestSidecar + Roundtrip-Pins) plus
+RM-M5-01-C (Idempotency + Fallback-Pfade) zusammen waren ~3 Wochen
+für den LP-Pfad; F-M5-12 ergänzt um Boot-Gate-Erweiterung und
+Folge-ADR-Aufwand, daher die höhere Spanne.
 
-**Aktivierungs-Pfad:** Folge-ADR (`docs/plan/adr/0007-mpc-sidecar-
-backend.md` o.ä.) zuerst, dann eigener Slice-Plan
+**Aktivierungs-Pfad:** Folge-ADR (`docs/plan/adr/00NN-mpc-sidecar-
+backend.md` — die erste freie ADR-Nummer zur Aktivierungs-Zeit;
+keine Pre-Pinnung weil F-M5-03 dieselbe Nummern-Reihe konsumieren
+würde wenn der Drittsprach-Sidecar-Trigger zuerst zündet — first-
+writer-wins zur Aktivierungs-Zeit), dann eigener Slice-Plan
 `plan-RM-M5-02-FUP-sidecar-backend.md` als Erweiterung des
 M5-02-MPC-Kernel-Slice. Note-Eintrag hier wird beim Aktivierungs-
 Commit auf den neuen Slice-Plan verlinkt.

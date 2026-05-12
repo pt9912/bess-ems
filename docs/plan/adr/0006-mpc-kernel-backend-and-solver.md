@@ -75,6 +75,7 @@ aufzubauen, und benennt die konkreten Trigger für den Pivot.
 | Backend-Abstraktion | `IMpcModelSolver`-Driven-Port bleibt **die einzige Solver-Surface**; der Adapter hängt am Konfigurations-Slot `MpcBackend`. Ein zweiter Adapter (Sidecar-Pfad) wird **nicht** in Sub-Slice B angelegt. Plan §5 D-07 `IFallbackMpcOptimizer`-Driven-Port bleibt orthogonal — Fallback ist in-process, nicht Sidecar. | Sub-Slice-B Architektur-Pin: nur ein Solver-Adapter im `BatteryEms.Adapters.Optimization.Mpc`-Namespace; F-M5-12 öffnet den zweiten Adapter. |
 | Fallback-Pfad | `IFallbackMpcOptimizer`-Driven-Port (D-07 Plan §5) bleibt in-process; **kein** M5-01-Sidecar-Fallback-Reuse für den MPC-Pfad. | Sub-Slice-C Fallback-Wire-Integration-Pin verlangt `IFallbackMpcOptimizer` im DI-Container wenn `MpcBackend != null` und `RuntimeProfile=Production` (Plan §6 Acceptance-Criterium). |
 | Non-Goal Sub-Slice B | **Kein gleichberechtigter Sidecar-Backend-Pfad.** `BessHostOptions.MpcBackend = "optimization_core"` ist Startup-Fehler `mpc-backend-not-implemented`; `MpcBackend = "bi_modal"` ebenfalls. | Sub-Slice-B Negativ-Pin: Boot mit reserviertem Namen ⇒ DI-Build-Fehler mit dem konkreten Reason-Code. |
+| Boot-Gate-Reihenfolge | **Backend-Validation läuft als erste MPC-Boot-Gate-Achse.** Reservierte `MpcBackend`-Werte zünden `mpc-backend-not-implemented` **vor** allen anderen Production-Gates (Fallback aus D-07, Monotonic-Clock aus D-09). Sonst sähe der Operator unter `RuntimeProfile=Production` den falschen Reason-Code (`mpc-production-without-fallback-pathway` statt `mpc-backend-not-implemented`). | Sub-Slice-D Boot-Gate-Reihenfolge-Pin (Plan §4 Sub-Slice-D-DoD); Sub-Slice-B Composition-Root-Test bestätigt die Reihenfolge bereits beim Adapter-Wireup. |
 | Deferred (F-M5-12) | **Sidecar-First-MPC-Backend** wird als eigene Folgearbeit gepflegt (`note-RM-M5-followups.md` F-M5-12) mit konkreten Triggern (§6 unten). Bei Aktivierung: zweiter Adapter `OptimizationCoreMpcOptimizer` neben `LocalOsqpMpcSolver`, `MpcBackend = "optimization_core"` aktiviert ihn, `IFallbackMpcOptimizer` wird Local-OSQP-Adapter. | F-M5-12 lädt eine eigene ADR-Linie (0007 o.ä.) wenn ein Trigger aus §6 zündet — nicht silent erweitern. |
 | Pivot-Kriterien | **Trigger-getrieben** (§6 unten); jeder einzelne Trigger erzwingt eine neue ADR (Pivot ändert nicht silent ADR 0006). | F-M5-12-Trigger-Watch ist Pflicht in jeder Sub-Slice-D-Closure-Checkliste — siehe §8 Sequenz Punkt 5. |
 
@@ -86,36 +87,47 @@ aufzubauen, und benennt die konkreten Trigger für den Pivot.
 
 Konkrete Wins für die **MPC-/QP-Sub-Sekunden-Surface**:
 
-- **Latenz-Korridor passt zur Sample-Time-Range.** OSQP-Solve-Time
-  für ein typisches BESS-Modell (1–8 States, Horizon 16–32 Schritte,
-  10–50 Constraints) liegt in der Größenordnung 100 µs – 5 ms; das
-  ist **in-process** ohne Sidecar-Roundtrip. Plan §3 nennt
-  `sample_time = 250 ms` als Standard-Range; Asset-spezifische Linien
-  bis 100 ms sind absehbar. In-Process erlaubt Headroom für künftige
-  Sample-Time-Verschärfung ohne ADR-Pivot.
-- **Pflichtpfad-Komplexität minimal.** Plan-§7-Risiken-Block nennt
-  „Sidecar healthy + gRPC ok + Idempotency ok" als drei
+Geordnet nach Trade-off-Gewicht (treibende Achsen zuerst):
+
+- **Sub-Slice-B Pin-Volumen (treibend).** Plan §4 Zeile RM-M5-02-B
+  fordert „8+ Roundtrip-Pins". Mit Local-First sind das 8 Pins für
+  **einen** Adapter; mit Bi-Modal würden 16 Pins fällig (8 pro
+  Backend), mit Sidecar-First plus in-process-Fallback ebenfalls.
+  Pin-Volumen ist direkt Sub-Slice-B-Risiko (Plan §4 LOC-Schätzung
+  800–1200; Bi-Modal würde diese Linie sprengen).
+- **Pflichtpfad-Komplexität (treibend).** Plan-§7-Risiken-Block
+  nennt „Sidecar healthy + gRPC ok + Idempotency ok" als drei
   Voraussetzungen pro MPC-Tick im Sidecar-First-Pfad. Local-First
   reduziert das auf „Solver-Adapter loaded" — Plan §6 Acceptance-
   Criterium `mpc-production-without-fallback-pathway` ist die
   einzige Boot-Gate-Achse, die noch greift.
-- **Coherent Fallback-Linie.** Plan §5 D-07 verlangt
+- **Coherent Fallback-Linie (treibend).** Plan §5 D-07 verlangt
   `IFallbackMpcOptimizer` als Driven-Port. Mit Local-First ist
   Primary und Fallback **beide in-process** — ein einziger Solver-
   Engine-Bug kann beide treffen, aber die operative Linie ist
   einfacher (keine Cross-Process-Fallback-Race). Bei Sidecar-First
   würde der Fallback eine zweite Solver-Engine-Linie sein (in-
   process) — doppelte Pflege.
-- **Sub-Slice-B Pin-Volumen.** Plan §4 Zeile RM-M5-02-B fordert „8+
-  Roundtrip-Pins". Mit Local-First sind das 8 Pins für **einen**
-  Adapter; mit Bi-Modal würden 16 Pins fällig (8 pro Backend), mit
-  Sidecar-First plus in-process-Fallback ebenfalls. Pin-Volumen ist
-  direkt Sub-Slice-B-Risiko (Plan §4 LOC-Schätzung 800–1200; Bi-Modal
-  würde diese Linie sprengen).
 - **CVE-Lifecycle synchron mit Worker.** Plan §7 nennt OSQP-Solver-
   Bugs als Sub-Slice-B-Risiko. OSQP-Updates ziehen mit dem Worker-
   Container-Build mit; kein zweiter Sidecar-Container mit eigenem
   Patch-Window.
+- **Latenz-Korridor (sekundär; allein nicht entscheidend).** Die
+  gRPC-Roundtrip-Latenz ist auf der MPC-Tick-Frequenz tolerierbar
+  — M5-01-LP-Linie hat denselben p50-Korridor (200 µs – 2 ms) als
+  „im Rauschen" akzeptiert (siehe ADR 0005 §3 Latenz-Hit-Block).
+  Für `sample_time = 250 ms` sind 2 ms p99 etwa 0,8 % Tick-Time;
+  bei `sample_time = 100 ms` etwa 2 %. Allein wäre das kein
+  Pivot-Grund — die Achse zählt erst harmonisch mit den treibenden
+  drei (Pin-Volumen + Pflichtpfad-Komplexität + Fallback-Kohärenz).
+  Für `sample_time < 10 ms` (ADR 0005 §7 Trigger 1) kippt die
+  Latenz-Linie alleinstehend; bis dahin ist sie ein Begleitargument,
+  nicht das Hauptargument.
+- **Sub-Slice-B Solver-Time-Bound (Begleitargument).** OSQP-Solve-
+  Time für ein typisches BESS-Modell (1–8 States, Horizon 16–32
+  Schritte, 10–50 Constraints) liegt in der Größenordnung 100 µs
+  – 5 ms in-process; Sample-Time-Headroom für künftige Verschärfung
+  ist gegeben ohne ADR-Pivot.
 
 Konkrete Trade-offs:
 
@@ -233,6 +245,41 @@ Konkrete Trade-offs:
 - **Pre-Solve.** OSQP hat einen optionalen Pre-Solve-Schritt; muss
   unter `Strict` deaktiviert / pin-deterministisch konfiguriert
   werden (Plan §5 D-04 Strict-Disziplin).
+- **Byte-identical-Determinismus ist empirisch, nicht formal
+  garantiert.** OSQP-Single-Thread-Determinismus mit `polish=off`/
+  `scaling=0`/`warm_start=false` ist Praxis, nicht im OSQP-Repo als
+  Vertrag dokumentiert; SIMD-Reihenfolge in Sparse-Matrix-Operations
+  oder Pre-Solve-Akkumulation kann Floating-Point-Driften
+  einführen. Plan §5 D-04 fordert „byte-für-byte identische
+  Stempel-Hashes" als Cross-Run-Determinism-Pin — wenn OSQP unter
+  den gepinnten Flags **nicht** byte-identical liefert, bricht der
+  Sub-Slice-D-D-04-Pin.
+
+  **Sub-Slice-B-Validierungs-Pin (Pflicht):** Empirische Bestätigung
+  in einem dedizierten Pin (z. B. `LocalOsqpSolverDeterminismTests`):
+  derselbe MPC-Step zweimal in Folge ⇒ byte-identische
+  `MpcTrajectory.Points` über SIMD/Sparse-Reihenfolge. Wenn der
+  Pin in Sub-Slice B bricht, kommt eine Fallback-Reaktion in zwei
+  Schritten:
+
+  1. **Strict-Mode wird Toleranz-Mode mit hartem Bound.** Plan §5
+     D-04 wird angepasst — `Strict` heißt dann „≤ 1e-12 relativ pro
+     Schedule-Point" statt „byte-identical", die Stempel-Hashes
+     der Identity-Tuple-Felder (asset_id, tick, sample_time,
+     model_version, solver_config_hash, …) bleiben byte-identical
+     weil sie aus deterministischen Serialisierungen entstehen,
+     nicht aus Float-Trajektorien.
+  2. **Cross-Run-Determinism-Pin wird auf Toleranz-basierte
+     Vergleich umgestellt.** Sub-Slice-D-Cross-Run-Determinism-Pin
+     bekommt eine zweite Achse: byte-identical für Identity-Tuple-
+     Hashes, ≤ 1e-12 relativ für Float-Trajektorien.
+
+  Diese zwei-Stufen-Fallback hält Plan §5 D-04 Reproduzierbarkeits-
+  Vertrag operativ, auch wenn OSQP-Determinismus empirisch
+  schwächer als angenommen ausfällt. Reviewer-Pflicht: Sub-Slice B
+  liefert den Validierungs-Pin und meldet das Ergebnis im Closure-
+  Commit; bei Bruch wird Plan §5 D-04 + Sub-Slice-D-DoD in einer
+  Folge-Anpassung aktualisiert (eigene Plan-Review-Iteration).
 
 ### Verworfene Solver-Alternativen
 
@@ -278,12 +325,15 @@ Design-Disziplinen halten:
    wird gültig, `"bi_modal"` bleibt (oder kippt zu „eigener
    Folge-ADR" wenn der Bi-Modal-Trigger explizit dazu kommt).
 
-3. **Sub-Slice-B Adapter-Namespace ist Backend-spezifisch.**
-   `BatteryEms.Adapters.Optimization.Mpc.Local.LocalOsqpMpcSolver`
-   (oder ein analoger Namespace-Pfad — Sub-Slice-B-Plan entscheidet
-   die exakten Folder-Namen). F-M5-12 fügt einen Sibling-Namespace
-   `BatteryEms.Adapters.Optimization.Mpc.Sidecar.OptimizationCoreMpcOptimizer`
-   ein. Kein Code-Conflict im Sub-Slice-B-Lieferpfad.
+3. **Sub-Slice-B Adapter-Namespace ist Backend-spezifisch.** Der
+   Backend-spezifische Sub-Namespace (z. B. `…Mpc.Local` für
+   `LocalOsqpMpcSolver`) ist Sub-Slice-B-Plan-Entscheidung — die
+   ADR fixiert nur die Disziplin („pro Backend ein eigener Sub-
+   Namespace im `BatteryEms.Adapters.Optimization.Mpc.*`-Baum,
+   damit F-M5-12 einen Sibling-Namespace ohne Code-Konflikt
+   einfügen kann"), nicht den konkreten Folder-Pfad. Verschiebt
+   Sub-Slice B den Adapter z. B. nach `…Mpc.Osqp` statt `…Mpc.Local`,
+   bleibt die ADR-Aussage gültig.
 
 Verstößt Sub-Slice B gegen eine dieser Disziplinen (z. B. weil ein
 OSQP-spezifisches Detail in den `IMpcModelSolver`-Port leakt), wird
@@ -343,13 +393,25 @@ Closure-Checkliste (§8 Punkt 5).
    wahrscheinliche Trigger-Vorbote.
 
 5. **Container-/Pod-Co-Location-Constraint.**
-   Wenn die Deployment-Topologie einen Sidecar-Container ohnehin
-   verlangt (z. B. weil M5-01-Sidecar in derselben Pod bereits läuft
-   und der Operator-Migrations-Aufwand für MPC negligibel wird) und
-   gleichzeitig die Worker-Container-Image-Größe relevant wird
-   (OSQP-Binary + Dependencies), kippt die Total-Cost-Linie zu
-   Sidecar-First. F-M5-12 dann mit „Image-Size-Reduktion" als
-   Aktivierungs-Trigger.
+   Wenn alle drei konkreten Bedingungen gleichzeitig zutreffen:
+   (a) M5-01-`optimization-core`-Sidecar läuft bereits in derselben
+       Pod als Compose-/Pod-Service (überprüfbar über
+       `deploy/compose.yml` o.ä.);
+   (b) Worker-Container-Image-Größe überschreitet ein konkretes
+       Operator-Limit (heutiger Bezugspunkt: das `runtime`-Image
+       aus `Dockerfile` Zeile 297+, gemessen via
+       `docker image inspect --format='{{.Size}}'`; konkretes
+       Limit wird zur Trigger-Aktivierung in der F-M5-12-
+       Folge-ADR fixiert — Default-Schwelle bei der Eröffnung: **>
+       800 MB**);
+   (c) DevOps-/Operator-Ticket fordert explizit Worker-Image-
+       Reduktion (Audit-Trail im Issue-Tracker, kein
+       Stimmungs-Trigger).
+   Erst wenn alle drei Bedingungen gleichzeitig erfüllt sind,
+   kippt die Total-Cost-Linie zu Sidecar-First. Eine einzelne
+   Bedingung allein ist kein Trigger — der Reviewer aktiviert
+   F-M5-12 nicht, weil das Worker-Image „groß fühlt", sondern weil
+   ein gemessener Schwellwert plus ein konkretes Ticket vorliegen.
 
 Diese Trigger ändern die ADR nicht silent — jeder bekommt eine
 eigene Folge-ADR mit Migrations-Plan und einer Aktualisierung von

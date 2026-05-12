@@ -845,7 +845,7 @@ zu finden.
 | Kennung    | Frage                                                               | Status |
 | ---------- | ------------------------------------------------------------------- | ------ |
 | AR-OPEN-001 | Nach welchen Kriterien wird die API als eigener Service ausgekoppelt? | Offen |
-| AR-OPEN-002 | gRPC vs. REST-only für externe Optimierungs-Sidecars in Phase 3?  | Geschlossen mit [ADR 0005](../docs/plan/adr/0005-optimization-core-sidecar-transport.md) — gRPC über HTTP/2 (UDS-Default für Loopback, mTLS für Cross-Host) ist der Sidecar-Transport für den `optimization-core`. |
+| AR-OPEN-002 | gRPC vs. REST-only für externe Optimierungs-Sidecars in Phase 3?  | Geschlossen mit [ADR 0005](../docs/plan/adr/0005-optimization-core-sidecar-transport.md) — gRPC über HTTP/2 (UDS-Default für Loopback, mTLS für Cross-Host) ist der Sidecar-**Transport** für den `optimization-core`. Geltungsbereich: LP-Linie (M5-01-`Optimize`-RPC) ist aktiv über gRPC; MPC-Linie hat den `OptimizeMpc`-RPC heute nur als Vertrag (M5-01-D-08) und das produktive **Backend** ist per [ADR 0006](../docs/plan/adr/0006-mpc-kernel-backend-and-solver.md) local-first (OSQP in-process) — die Transport-Achse aus ADR 0005 bleibt für die F-M5-12-Sidecar-MPC-Aktivierung wiederverwendbar. |
 | AR-OPEN-003 | Persistenz-Stack: EF Core, Dapper oder Mischung?                  | Offen  |
 | AR-OPEN-004 | Fahrplanimport-Format (CSV, JSON, ENTSO-E, proprietär)?           | Offen  |
 | AR-OPEN-005 | Konkrete Topic-/Registerprofile für die ersten Hersteller?        | Geschlossen mit LH-OPEN-001 — Reihenfolge: SunSpec/Socomec, Victron, SMA; Sungrow nur nach Rechtsklärung. |
@@ -855,6 +855,7 @@ zu finden.
 | AR-OPEN-009 | Boundary-Test-Tooling: NetArchTest oder ArchUnitNET?              | Offen  |
 | AR-OPEN-010 | Welche Marktprodukte werden in M2 fachlich zuerst umgesetzt: Day-Ahead-only oder Day-Ahead + Tarifmodell? | Offen |
 | AR-OPEN-011 | Northbound Export als eigener Adapter oder als Telemetry-Adapter-Untermodul? | Offen |
+| AR-OPEN-012 | MPC-Backend-Topologie: in-process Local-First vs. Sidecar-First vs. Bi-Modal? | Reserviert — heute geschlossen mit [ADR 0006](../docs/plan/adr/0006-mpc-kernel-backend-and-solver.md) auf Local-First mit OSQP; Sidecar-Erweiterung ist F-M5-12-Folgearbeit mit fünf Triggern (siehe ADR 0006 §6 + `docs/plan/planning/open/note-RM-M5-followups.md`). |
 
 ---
 
