@@ -25,8 +25,11 @@ $COMPOSE up -d --wait --wait-timeout 90
 echo "[rm-m5-06] probing bess-ems /health"
 $COMPOSE exec -T bess-ems curl --fail --silent --show-error http://localhost:8080/health >/dev/null
 
+base_epoch="$($COMPOSE exec -T bess-ems date -u +%s | tr -d '\r')"
+
 iso_at_offset() {
-    date -u -d "@$(( $(date -u +%s) + $1 ))" +"%Y-%m-%dT%H:%M:%SZ"
+    epoch=$(( base_epoch + $1 ))
+    $COMPOSE exec -T bess-ems date -u -d "@$epoch" +"%Y-%m-%dT%H:%M:%SZ" | tr -d '\r'
 }
 
 optimize() {

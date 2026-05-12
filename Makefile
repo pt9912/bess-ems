@@ -178,8 +178,8 @@ gates: lint arch-check test test-safety test-mpc-property test-replay coverage-g
 	native-build native-lint native-sanitizer \
 	native-coverage-gate native-coverage-exclusions \
 	test-native-interop test-native-parity \
-	test-hil-opcua test-hil-optimization-core
-	@echo "[gates] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, simulator-{lint,test,race,coverage-gate}) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + M5 (test-hil-optimization-core, test-mpc-property, test-replay)"
+	test-hil-opcua test-hil-optimization-core test-optimization-core-compose
+	@echo "[gates] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, simulator-{lint,test,race,coverage-gate}) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + M5 (test-hil-optimization-core, test-optimization-core-compose, test-mpc-property, test-replay)"
 
 # --- Welle 3 (partially active) --------------------------------------------
 
