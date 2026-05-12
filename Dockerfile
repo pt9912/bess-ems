@@ -130,6 +130,13 @@ RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.cs
     --logger "console;verbosity=normal"
 
 # ---------------------------------------------------------------------------
+# test-mpc-property: RM-M5-02 MPC determinism / identity / replay-hook pins.
+# The pins live in the normal unit-test projects; this named stage makes
+# the quality gate addressable and mandatory without a second test taxonomy.
+# ---------------------------------------------------------------------------
+FROM test AS test-mpc-property
+
+# ---------------------------------------------------------------------------
 # test-safety: safety-path tests filtered by trait Category=Safety (RM-M1-07)
 # ---------------------------------------------------------------------------
 FROM lint AS test-safety

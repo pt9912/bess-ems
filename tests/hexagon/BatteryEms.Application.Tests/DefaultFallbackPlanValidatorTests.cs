@@ -138,6 +138,90 @@ public sealed class DefaultFallbackPlanValidatorTests
     }
 
     [Fact]
+    public void Mpc_estimator_stamp_mismatch_fails_with_context_mismatch()
+    {
+        var validator = Build();
+        var candidate = new FallbackPlanCandidate(
+            SampleSchedule(),
+            T0,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["state_estimator_variant"] = "kalman-v1",
+                ["estimator_config_hash"] = "estimator-a",
+                ["p0_frobenius_display"] = "1",
+            });
+        var context = SampleContext() with
+        {
+            MpcStamps = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["state_estimator_variant"] = "identity",
+                ["estimator_config_hash"] = "estimator-a",
+                ["p0_frobenius_display"] = "999",
+            },
+        };
+
+        var result = validator.Validate(candidate, context);
+
+        Assert.False(result.IsValid);
+        Assert.Equal(FallbackReason.FallbackContextMismatch, result.Reason);
+        Assert.Contains("mpc-stamp-mismatch", result.Detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void P0_frobenius_stamp_is_visible_but_not_identity_checked()
+    {
+        var validator = Build();
+        var candidate = new FallbackPlanCandidate(
+            SampleSchedule(),
+            T0,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["state_estimator_variant"] = "kalman-v1",
+                ["estimator_config_hash"] = "estimator-a",
+                ["p0_frobenius_display"] = "1",
+            });
+        var context = SampleContext() with
+        {
+            MpcStamps = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["state_estimator_variant"] = "kalman-v1",
+                ["estimator_config_hash"] = "estimator-a",
+                ["p0_frobenius_display"] = "999",
+            },
+        };
+
+        var result = validator.Validate(candidate, context);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Present_mpc_stamp_sets_must_include_identity_keys()
+    {
+        var validator = Build();
+        var candidate = new FallbackPlanCandidate(
+            SampleSchedule(),
+            T0,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["state_estimator_variant"] = "kalman-v1",
+            });
+        var context = SampleContext() with
+        {
+            MpcStamps = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["state_estimator_variant"] = "kalman-v1",
+            },
+        };
+
+        var result = validator.Validate(candidate, context);
+
+        Assert.False(result.IsValid);
+        Assert.Equal(FallbackReason.FallbackContextMismatch, result.Reason);
+        Assert.Contains("estimator_config_hash", result.Detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Current_tick_before_horizon_fails_with_plan_expired()
     {
         var validator = Build();

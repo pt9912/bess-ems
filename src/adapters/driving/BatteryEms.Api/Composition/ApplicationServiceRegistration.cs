@@ -87,6 +87,7 @@ public static class ApplicationServiceRegistration
         // lands in RM-M2-OP-06 and replaces this binding via the
         // composition root, mirroring the M1 in-memory ↔ Dapper pattern.
         services.AddSingleton<IOptimizationRunRepository, InMemoryOptimizationRunRepository>();
+        services.AddSingleton<IMpcRunRepository, InMemoryMpcRunRepository>();
 
         // Schedule optimiser default — stays Failed/no-solver-configured
         // until RM-M2-OP-05 plugs in the OR-Tools adapter through the

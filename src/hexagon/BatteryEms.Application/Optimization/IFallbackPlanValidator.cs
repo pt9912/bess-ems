@@ -32,7 +32,8 @@ public interface IFallbackPlanValidator
 // `OptimizationRun.CreatedAt`.
 public sealed record FallbackPlanCandidate(
     Schedule Schedule,
-    DateTimeOffset CreatedAtUtc);
+    DateTimeOffset CreatedAtUtc,
+    IReadOnlyDictionary<string, string>? MpcStamps = null);
 
 // Use-Case-Kontext gegen den der Kandidat verglichen wird.
 public sealed record FallbackPlanContext(
@@ -44,7 +45,8 @@ public sealed record FallbackPlanContext(
     TimeSpan TimeStep,
     string MarketBidArea,
     BatteryAsset Asset,
-    BatteryTelemetry? CurrentTelemetry);
+    BatteryTelemetry? CurrentTelemetry,
+    IReadOnlyDictionary<string, string>? MpcStamps = null);
 
 // Outcome-Record. `IsValid==true` ⇒ Kandidat darf als Fallback
 // verwendet werden; sonst trägt `Reason` den maschinenlesbaren

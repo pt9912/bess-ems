@@ -1,8 +1,10 @@
 using BatteryEms.Application.Assets;
 using BatteryEms.Application.Control;
 using BatteryEms.Application.IO;
+using BatteryEms.Application.Mpc;
 using BatteryEms.Application.Observability;
 using BatteryEms.Application.Persistence;
+using BatteryEms.Application.Realtime;
 using BatteryEms.Application.Time;
 using BatteryEms.Domain;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -58,26 +60,67 @@ public sealed class ControlCycleHostedServiceTests
             e => e.AssetId == "asset-1" && e.Component == "control-cycle");
     }
 
-    private static (ControlCycleHostedService Service, Harness Harness) Build(params string[] assetIds)
+    [Fact]
+    public async Task Mpc_optimizer_is_called_on_each_control_cycle_tick_when_registered()
+    {
+        var optimizer = new CountingMpcOptimizer();
+        var (service, harness) = BuildWithMpc(optimizer, "asset-1");
+
+        await service.StartAsync(CancellationToken.None);
+        await WaitForAsync(() => optimizer.CallCount >= 3 && harness.MpcRuns.AppendedCount >= 3);
+        await service.StopAsync(CancellationToken.None);
+
+        Assert.True(optimizer.CallCount >= 3);
+        Assert.All(harness.MpcRuns.Appended, run =>
+        {
+            Assert.Equal("asset-1", run.AssetId);
+            Assert.Equal("counting-stub", run.TerminalReason);
+        });
+    }
+
+    private static (ControlCycleHostedService Service, Harness Harness) Build(params string[] assetIds) =>
+        BuildWithMpc(null, assetIds);
+
+    private static (ControlCycleHostedService Service, Harness Harness) BuildWithMpc(
+        IMpcDispatchOptimizer? mpcOptimizer,
+        params string[] assetIds)
     {
         var assets = new InMemoryBatteryAssetRegistry(
             assetIds.Select(id => CreateAsset(id)));
         var cycle = new SpyControlCycle();
         var sink = new SpyCommandSink();
         var repo = new SpyCommandRepository();
+        var mpcRuns = new SpyMpcRunRepository();
         var metrics = new SpyMetrics();
-        var harness = new Harness(cycle, sink, repo, metrics);
+        var harness = new Harness(cycle, sink, repo, mpcRuns, metrics);
         var service = new ControlCycleHostedService(
             cycle,
             assets,
             sink,
             repo,
+            mpcRuns,
             metrics,
+            new InMemorySnapshotStore(TimeSpan.FromSeconds(10)),
             new FakeClock(),
             new BatteryEms.Application.Markets.InMemoryTimebaseHealthSource(),
+            mpcOptimizer is null ? Array.Empty<IMpcDispatchOptimizer>() : [mpcOptimizer],
             NullLogger<ControlCycleHostedService>.Instance,
             Options.Create(new WorkerOptions { CycleInterval = TimeSpan.FromMilliseconds(20) }));
         return (service, harness);
+    }
+
+    private static async Task WaitForAsync(Func<bool> ready)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(2);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (ready())
+            {
+                return;
+            }
+            await Task.Delay(20);
+        }
+        throw new TimeoutException("Condition was not reached within 2 s.");
     }
 
     private static BatteryAsset CreateAsset(string id) => new(
@@ -98,13 +141,15 @@ public sealed class ControlCycleHostedServiceTests
         public SpyControlCycle Cycle { get; }
         public SpyCommandSink Sink { get; }
         public SpyCommandRepository Repository { get; }
+        public SpyMpcRunRepository MpcRuns { get; }
         public SpyMetrics Metrics { get; }
 
-        public Harness(SpyControlCycle cycle, SpyCommandSink sink, SpyCommandRepository repo, SpyMetrics metrics)
+        public Harness(SpyControlCycle cycle, SpyCommandSink sink, SpyCommandRepository repo, SpyMpcRunRepository mpcRuns, SpyMetrics metrics)
         {
             Cycle = cycle;
             Sink = sink;
             Repository = repo;
+            MpcRuns = mpcRuns;
             Metrics = metrics;
         }
 
@@ -169,6 +214,60 @@ public sealed class ControlCycleHostedServiceTests
             => Task.FromResult<BatteryCommand?>(null);
     }
 
+    private sealed class SpyMpcRunRepository : IMpcRunRepository
+    {
+        public List<MpcRun> Appended { get; } = new();
+        public int AppendedCount
+        {
+            get
+            {
+                lock (Appended)
+                {
+                    return Appended.Count;
+                }
+            }
+        }
+
+        public Task AppendAsync(MpcRun run, CancellationToken cancellationToken)
+        {
+            lock (Appended)
+            {
+                Appended.Add(run);
+            }
+            return Task.CompletedTask;
+        }
+
+        public Task<MpcRun?> FindByRequestIdAsync(string mpcRequestId, CancellationToken cancellationToken)
+        {
+            lock (Appended)
+            {
+                return Task.FromResult(Appended.FirstOrDefault(r => r.MpcRequestId == mpcRequestId));
+            }
+        }
+
+        public Task<IReadOnlyList<MpcRun>> QueryAsync(
+            string assetId,
+            DateTimeOffset fromControlCycleTickUtc,
+            DateTimeOffset untilControlCycleTickUtc,
+            CancellationToken cancellationToken)
+        {
+            lock (Appended)
+            {
+                return Task.FromResult<IReadOnlyList<MpcRun>>(Appended
+                    .Where(r => r.AssetId == assetId
+                        && r.ControlCycleTickUtc >= fromControlCycleTickUtc
+                        && r.ControlCycleTickUtc < untilControlCycleTickUtc)
+                    .ToArray());
+            }
+        }
+
+        public Task<int> CompactAsync(
+            MpcRunRetentionPolicy policy,
+            DateTimeOffset nowUtc,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(0);
+    }
+
     private sealed class SpyMetrics : IControlCycleMetrics
     {
         public List<(string AssetId, string Component)> CommunicationErrors { get; } = new();
@@ -185,6 +284,24 @@ public sealed class ControlCycleHostedServiceTests
 
     private sealed class FakeClock : IClock
     {
-        public DateTimeOffset UtcNow { get; set; } = Now;
+        private long _offsetTicks;
+        public DateTimeOffset UtcNow =>
+            Now.AddTicks(Interlocked.Add(ref _offsetTicks, TimeSpan.FromMilliseconds(20).Ticks));
+    }
+
+    private sealed class CountingMpcOptimizer : IMpcDispatchOptimizer
+    {
+        private int _callCount;
+        public int CallCount => Volatile.Read(ref _callCount);
+
+        public Task<MpcDispatchResult> NextStepAsync(MpcRequest request, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _callCount);
+            var identity = MpcRunIdentity.Build(request, "counting-stub");
+            return Task.FromResult(MpcDispatchResult.NotUsable(
+                identity.MpcRequestId,
+                "counting-stub",
+                identity.ToStamps()));
+        }
     }
 }

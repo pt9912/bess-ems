@@ -3,9 +3,12 @@ using BatteryEms.Application.Assets;
 using BatteryEms.Application.Control;
 using BatteryEms.Application.IO;
 using BatteryEms.Application.Markets;
+using BatteryEms.Application.Mpc;
 using BatteryEms.Application.Observability;
 using BatteryEms.Application.Persistence;
+using BatteryEms.Application.Realtime;
 using BatteryEms.Application.Time;
+using BatteryEms.Domain;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -26,9 +29,12 @@ public sealed partial class ControlCycleHostedService : BackgroundService
     private readonly IBatteryAssetRegistry _assets;
     private readonly IBatteryCommandSink _sink;
     private readonly ICommandRepository _commandRepository;
+    private readonly IMpcRunRepository _mpcRuns;
     private readonly IControlCycleMetrics _metrics;
+    private readonly ISnapshotStore _snapshots;
     private readonly IClock _clock;
     private readonly ITimebaseHealthObserver _timebaseObserver;
+    private readonly IMpcDispatchOptimizer? _mpcOptimizer;
     private readonly ILogger<ControlCycleHostedService> _logger;
     private readonly WorkerOptions _options;
 
@@ -47,9 +53,12 @@ public sealed partial class ControlCycleHostedService : BackgroundService
         IBatteryAssetRegistry assets,
         IBatteryCommandSink sink,
         ICommandRepository commandRepository,
+        IMpcRunRepository mpcRuns,
         IControlCycleMetrics metrics,
+        ISnapshotStore snapshots,
         IClock clock,
         ITimebaseHealthObserver timebaseObserver,
+        IEnumerable<IMpcDispatchOptimizer> mpcOptimizers,
         ILogger<ControlCycleHostedService> logger,
         IOptions<WorkerOptions> options)
     {
@@ -57,9 +66,12 @@ public sealed partial class ControlCycleHostedService : BackgroundService
         ArgumentNullException.ThrowIfNull(assets);
         ArgumentNullException.ThrowIfNull(sink);
         ArgumentNullException.ThrowIfNull(commandRepository);
+        ArgumentNullException.ThrowIfNull(mpcRuns);
         ArgumentNullException.ThrowIfNull(metrics);
+        ArgumentNullException.ThrowIfNull(snapshots);
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(timebaseObserver);
+        ArgumentNullException.ThrowIfNull(mpcOptimizers);
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(options);
 
@@ -67,9 +79,12 @@ public sealed partial class ControlCycleHostedService : BackgroundService
         _assets = assets;
         _sink = sink;
         _commandRepository = commandRepository;
+        _mpcRuns = mpcRuns;
         _metrics = metrics;
+        _snapshots = snapshots;
         _clock = clock;
         _timebaseObserver = timebaseObserver;
+        _mpcOptimizer = mpcOptimizers.SingleOrDefault();
         _logger = logger;
         _options = options.Value;
     }
@@ -99,6 +114,7 @@ public sealed partial class ControlCycleHostedService : BackgroundService
     {
         ObserveTimebaseClock();
 
+        var now = _clock.UtcNow;
         foreach (var asset in _assets.GetAll())
         {
             if (cancellationToken.IsCancellationRequested)
@@ -106,8 +122,81 @@ public sealed partial class ControlCycleHostedService : BackgroundService
                 return;
             }
 
+            await ExecuteMpcForAssetAsync(asset, now, cancellationToken).ConfigureAwait(false);
             await ExecuteForAssetAsync(asset.AssetId, cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    private async Task ExecuteMpcForAssetAsync(
+        BatteryAsset asset,
+        DateTimeOffset commandTick,
+        CancellationToken cancellationToken)
+    {
+        if (_mpcOptimizer is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var request = BuildMpcRequest(asset, _snapshots.GetLatest(asset.AssetId, commandTick), commandTick, _options.CycleInterval);
+            var result = await _mpcOptimizer.NextStepAsync(request, cancellationToken).ConfigureAwait(false);
+            var run = MpcRun.FromResult(request, result, _clock.UtcNow);
+            await _mpcRuns.AppendAsync(run, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+#pragma warning disable CA1031 // MPC is advisory in this slice; keep the control-cycle command path alive.
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            _metrics.IncrementCommunicationError(asset.AssetId, "mpc-dispatch");
+            Log.MpcStepFailed(_logger, ex, asset.AssetId);
+        }
+    }
+
+    internal static MpcRequest BuildMpcRequest(
+        BatteryAsset asset,
+        Snapshot? snapshot,
+        DateTimeOffset commandTick,
+        TimeSpan cycleInterval)
+    {
+        ArgumentNullException.ThrowIfNull(asset);
+        if (cycleInterval <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(cycleInterval), cycleInterval, "Cycle interval must be positive.");
+        }
+
+        var constraints = new MpcConstraints(
+            asset.MinSocPercent,
+            asset.MaxSocPercent,
+            -asset.MaxChargePowerKw,
+            asset.MaxDischargePowerKw,
+            asset.MaxRampKwPerSecond);
+        var model = new MpcModel(
+            "worker-lti-soc-v1",
+            MpcMatrix.Identity(1),
+            new MpcMatrix(1, 1, [-0.0006944]),
+            MpcMatrix.Identity(1),
+            new MpcMatrix(1, 1, [0.0]),
+            constraints);
+        var covariance = MpcMatrix.Identity(1);
+        var options = new MpcOptions(
+            cycleInterval,
+            horizonLength: 4,
+            new MpcSolverOptions(TimeSpan.FromMilliseconds(50), 1e-4, 200),
+            new MpcEstimatorOptions(covariance, covariance, covariance, maxConsecutiveMissingMeasurements: 5));
+
+        return new MpcRequest(
+            asset.AssetId,
+            commandTick,
+            asset,
+            snapshot?.Telemetry,
+            model,
+            options,
+            priorState: null);
     }
 
     // Plan-RM-M4-03 §144 Finding-2-Wiring: pro Tick Clock-Anomalien
@@ -218,6 +307,10 @@ public sealed partial class ControlCycleHostedService : BackgroundService
 
         [LoggerMessage(EventId = 1902, Level = LogLevel.Information, Message = "Control-cycle worker stopped")]
         public static partial void LoopStopped(ILogger logger);
+
+        [LoggerMessage(EventId = 1905, Level = LogLevel.Warning,
+            Message = "MPC control-cycle step failed asset_id={asset_id}")]
+        public static partial void MpcStepFailed(ILogger logger, Exception exception, string asset_id);
 
         [LoggerMessage(EventId = 1903, Level = LogLevel.Warning,
             Message = "Command-sink dispatch failed asset_id={asset_id} reason={reason}")]

@@ -73,6 +73,35 @@ public sealed class DefaultFallbackPlanValidator : IFallbackPlanValidator
                 $"market-bid-area-mismatch candidate={candidate.Schedule.MarketBidArea} "
                 + $"context={context.MarketBidArea}");
         }
+        var mpcStampResult = CheckMpcStamps(candidate.MpcStamps, context.MpcStamps);
+        if (!mpcStampResult.IsValid)
+        {
+            return mpcStampResult;
+        }
+        return FallbackPlanValidationResult.Valid;
+    }
+
+    private static FallbackPlanValidationResult CheckMpcStamps(
+        IReadOnlyDictionary<string, string>? candidateStamps,
+        IReadOnlyDictionary<string, string>? contextStamps)
+    {
+        if (candidateStamps is null || contextStamps is null)
+        {
+            return FallbackPlanValidationResult.Valid;
+        }
+
+        foreach (var key in new[] { "state_estimator_variant", "estimator_config_hash" })
+        {
+            var hasCandidate = candidateStamps.TryGetValue(key, out var candidate);
+            var hasContext = contextStamps.TryGetValue(key, out var context);
+            if (!hasCandidate || !hasContext || !string.Equals(candidate, context, StringComparison.Ordinal))
+            {
+                return FallbackPlanValidationResult.Invalid(
+                    FallbackReason.FallbackContextMismatch,
+                    $"mpc-stamp-mismatch key={key} candidate={candidate ?? "<missing>"} "
+                    + $"context={context ?? "<missing>"}");
+            }
+        }
         return FallbackPlanValidationResult.Valid;
     }
 

@@ -2,8 +2,10 @@ using System.Diagnostics;
 using BatteryEms.Application.Assets;
 using BatteryEms.Application.Control;
 using BatteryEms.Application.IO;
+using BatteryEms.Application.Mpc;
 using BatteryEms.Application.Observability;
 using BatteryEms.Application.Persistence;
+using BatteryEms.Application.Realtime;
 using BatteryEms.Application.Time;
 using BatteryEms.Domain;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -155,9 +157,12 @@ public sealed class ControlCycleTracingTests
             assets,
             sink,
             repo,
+            new InMemoryMpcRunRepository(),
             metrics,
+            new InMemorySnapshotStore(TimeSpan.FromSeconds(10)),
             new FakeClock(),
             new BatteryEms.Application.Markets.InMemoryTimebaseHealthSource(),
+            Array.Empty<IMpcDispatchOptimizer>(),
             NullLogger<ControlCycleHostedService>.Instance,
             // 1-hour interval: PeriodicTimer fires the first tick
             // immediately, then waits an hour for the next — by that

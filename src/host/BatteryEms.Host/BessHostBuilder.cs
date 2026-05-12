@@ -15,9 +15,11 @@ using BatteryEms.Api.Observability;
 using BatteryEms.Application.Assets;
 using BatteryEms.Application.IO;
 using BatteryEms.Application.Markets;
+using BatteryEms.Application.Mpc;
 using BatteryEms.Application.Persistence;
 using BatteryEms.Application.Realtime;
 using BatteryEms.Application.Time;
+using BatteryEms.Infrastructure.Time;
 using BatteryEms.Worker;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
@@ -261,21 +263,67 @@ public static class BessHostBuilder
         }
 
         var backend = hostOptions.MpcBackend.Trim();
-        if (string.Equals(backend, "local_osqp", StringComparison.OrdinalIgnoreCase))
-        {
-            services.AddBessLocalOsqpMpcSolver();
-            return;
-        }
         if (string.Equals(backend, "optimization_core", StringComparison.OrdinalIgnoreCase)
             || string.Equals(backend, "bi_modal", StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
                 $"mpc-backend-not-implemented: Bess:MpcBackend='{hostOptions.MpcBackend}' is reserved for F-M5-12.");
         }
+        if (string.Equals(backend, "local_osqp", StringComparison.OrdinalIgnoreCase))
+        {
+            ConfigureMpcClock(services, hostOptions);
+            services.AddBessLocalOsqpMpcSolver();
+            ValidateMpcProductionGates(services, hostOptions);
+            return;
+        }
 
         throw new InvalidOperationException(
             $"Unsupported Bess:MpcBackend '{hostOptions.MpcBackend}'. Supported values: local_osqp.");
     }
+
+    private static void ConfigureMpcClock(IServiceCollection services, BessHostOptions hostOptions)
+    {
+        if (string.IsNullOrWhiteSpace(hostOptions.MpcClock))
+        {
+            return;
+        }
+
+        var clock = hostOptions.MpcClock.Trim();
+        if (string.Equals(clock, "monotonic_anchored", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddSingleton<IClock, MonotonicAnchoredClock>();
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Unsupported Bess:MpcClock '{hostOptions.MpcClock}'. Supported values: monotonic_anchored.");
+    }
+
+    private static void ValidateMpcProductionGates(
+        IServiceCollection services,
+        BessHostOptions hostOptions)
+    {
+        if (hostOptions.MpcRuntimeProfile != MpcRuntimeProfile.Production)
+        {
+            return;
+        }
+
+        if (!services.Any(d => d.ServiceType == typeof(IFallbackMpcOptimizer)))
+        {
+            throw new InvalidOperationException(
+                "mpc-production-without-fallback-pathway: Production MPC requires IFallbackMpcOptimizer.");
+        }
+        if (!services.Any(IsMonotonicAnchoredClockRegistration))
+        {
+            throw new InvalidOperationException(
+                "mpc-production-without-monotonic-clock: Production MPC requires Bess:MpcClock='monotonic_anchored'.");
+        }
+    }
+
+    private static bool IsMonotonicAnchoredClockRegistration(ServiceDescriptor descriptor) =>
+        descriptor.ServiceType == typeof(IClock)
+        && (descriptor.ImplementationType == typeof(MonotonicAnchoredClock)
+            || descriptor.ImplementationInstance is MonotonicAnchoredClock);
 
     // RM-M5-01-C Korrektur-Pass: registriert den lokalen Fallback-
     // Optimizer (plan-RM-M5 §Fallback-Matrix) wenn der Operator

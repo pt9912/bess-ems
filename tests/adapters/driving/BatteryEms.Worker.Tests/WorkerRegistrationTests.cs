@@ -38,6 +38,7 @@ public sealed class WorkerRegistrationTests
         services.AddSingleton<IBatteryAssetRegistry>(_ => new InMemoryBatteryAssetRegistry());
         services.AddSingleton<ISnapshotStore>(_ => new InMemorySnapshotStore(TimeSpan.FromSeconds(10)));
         services.AddSingleton<ICommandRepository, InMemoryCommandRepository>();
+        services.AddSingleton<IMpcRunRepository, InMemoryMpcRunRepository>();
         services.AddSingleton<IScheduleRepository>(_ => new InMemoryScheduleRepository());
         services.AddSingleton<IOperatorStopRegistry, InMemoryOperatorStopRegistry>();
         services.AddSingleton<IScheduleTracker, DefaultScheduleTracker>();

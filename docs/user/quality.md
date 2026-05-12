@@ -385,6 +385,16 @@ UDS-Sockets (`optimization-core-uds-permissions-not-locked`,
 Mode≠0600/0660) hart ab. HilSimulator/Development bleibt für lokale
 Test-Topologien plaintext-tolerant (analog zur OPC-UA-Linie).
 
+**MPC-Produktionsgates (RM-M5-02-D)**: ein gesetztes
+`Bess:MpcBackend` aktiviert den MPC-Pfad nur für `"local_osqp"`.
+Production lehnt zwei unsichere Boot-Formen hart ab:
+fehlender `IFallbackMpcOptimizer` ⇒
+`mpc-production-without-fallback-pathway`; fehlender
+`Bess:MpcClock="monotonic_anchored"` ⇒
+`mpc-production-without-monotonic-clock`. Reservierte Backend-Namen
+`"optimization_core"` und `"bi_modal"` werfen weiterhin zuerst
+`mpc-backend-not-implemented`.
+
 **Konventions-Abgrenzung**:
 
 - `make test-integration` → Modbus + MQTT + Postgres-Roundtrips
@@ -461,12 +471,19 @@ Aktiv ab **M2**. Filter: `Category=Replay` (LH-TEST-004).
 
 ```bash
 make test-replay   # = docker build --target test-replay
+make test-mpc-property   # RM-M5-02 MPC-Identity/Determinism/Replay-Hooks
 ```
 
 Wiedergabe historischer Telemetrie-Datensätze. Erwartete Commands sind
 versioniert als Goldens unter `tests/replay/testdata/`. Byte-stabiler
 Vergleich pro Datensatz; Abweichungen sind erklärungspflichtig (ADR oder
 Plan-Eintrag).
+
+RM-M5-02 ergänzt den MPC-Replay-Vertrag vor der vollständigen
+Replay-Plattform: `make test-mpc-property` pinnt das achtachsige
+`mpc_request_id`-Tuple, deterministische Default-Seeds, Operator-Seed-
+Override, byte-stabile Stamps, Cross-Run-Trajektorien-Toleranz,
+MPC-Fallback-Stempel und `mpc_runs`-Retention/Replays.
 
 ### 2.6 Container-Tests
 
@@ -490,6 +507,7 @@ Fall mit Native Core das erfolgreiche Laden der `.so`-Bibliothek
 | HIL (optional)       | `make test-hil-modbus`           | `Category=HIL`             |
 | OPC-UA-Roundtrip     | `make test-hil-opcua`            | `Category=Integration` im OPC-UA-IntegrationTests-Projekt |
 | Optimization-Core    | `make test-hil-optimization-core` | `Category=Integration` im OptimizationCore-IntegrationTests-Projekt |
+| MPC Property         | `make test-mpc-property`          | RM-M5-02 Unit-Pins in Application/Worker/Architecture |
 | Native Interop       | `make test-native-interop`       | `Category!=Parity` im NativeInterop-IntegrationTests-Projekt |
 | Native Parity        | `make test-native-parity`        | `Category=Parity` im NativeInterop-IntegrationTests-Projekt |
 | Replay               | `make test-replay`               | `Category=Replay`          |

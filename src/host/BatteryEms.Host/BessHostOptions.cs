@@ -114,6 +114,18 @@ public sealed class BessHostOptions
     // "local_osqp". Reserved for F-M5-12 and rejected in this slice:
     // "optimization_core", "bi_modal".
     public string? MpcBackend { get; set; }
+
+    // RM-M5-02-D production gates. Development keeps the previous
+    // opt-in behaviour; Production requires both a registered fallback
+    // optimizer and the monotonic anchored clock for replayable ticks.
+    public MpcRuntimeProfile MpcRuntimeProfile { get; set; } = MpcRuntimeProfile.Development;
+    public string? MpcClock { get; set; }
+}
+
+public enum MpcRuntimeProfile
+{
+    Development,
+    Production,
 }
 
 public sealed class BessScheduleSolverOptions

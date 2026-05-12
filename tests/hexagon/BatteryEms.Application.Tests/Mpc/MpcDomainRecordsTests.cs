@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using BatteryEms.Application.Mpc;
 using Xunit;
 
@@ -86,6 +87,32 @@ public sealed class MpcDomainRecordsTests
             model: MpcTestFixtures.BuildModel(),
             options: MpcTestFixtures.BuildOptions(),
             priorState: null));
+    }
+
+    [Fact]
+    public void MpcRun_from_result_serializes_trajectory_and_state_as_json()
+    {
+        var request = MpcTestFixtures.BuildRequest(
+            measurement: MpcTestFixtures.BuildTelemetry());
+        var identity = MpcRunIdentity.Build(request, "identity");
+        var trajectory = MpcTestFixtures.BuildTrajectory(
+            sampleTime: MpcTestFixtures.SampleTime,
+            segments: new[] { (0.0, 50.0) });
+        var state = new MpcState(MpcTestFixtures.Anchor, [50.0], MpcMatrix.Identity(1));
+        var result = MpcDispatchResult.Usable(
+            identity.MpcRequestId,
+            trajectory,
+            state,
+            identity.ToStamps());
+
+        var run = MpcRun.FromResult(request, result, MpcTestFixtures.Anchor);
+
+        Assert.NotNull(run.TrajectoryJson);
+        Assert.NotNull(run.TerminalStateJson);
+        using var trajectoryJson = JsonDocument.Parse(run.TrajectoryJson);
+        using var stateJson = JsonDocument.Parse(run.TerminalStateJson);
+        Assert.Equal(250, trajectoryJson.RootElement.GetProperty("sample_time_ms").GetInt32());
+        Assert.Equal(1, stateJson.RootElement.GetProperty("covariance").GetProperty("rows").GetInt32());
     }
 
     [Fact]

@@ -2,12 +2,12 @@
 
 **Status:** Accepted — Local-First mit OSQP als QP-Solver für den
 MPC-Kernel; einziger produktiver MPC-Pfad in Sub-Slice
-[`RM-M5-02-B`](../planning/in-progress/plan-RM-M5-02.md). Schließt
+[`RM-M5-02-B`](../planning/done/plan-RM-M5-02.md). Schließt
 die D-02-Achse aus
-[`plan-RM-M5-02.md`](../planning/in-progress/plan-RM-M5-02.md) §5.
+[`plan-RM-M5-02.md`](../planning/done/plan-RM-M5-02.md) §5.
 **Datum:** 2026-05-12
 **Bezug:**
-[`../planning/in-progress/plan-RM-M5-02.md`](../planning/in-progress/plan-RM-M5-02.md)
+[`../planning/done/plan-RM-M5-02.md`](../planning/done/plan-RM-M5-02.md)
 (§2 Aktivierungsbedingungen Zeile „ADR 0006", §5 D-02 Solver-Backend-
 Wahl, §5 D-07 Fallback-Linie, §9 Folgearbeiten),
 [ADR 0005 — Optimization-Core Sidecar: Transport (gRPC)](0005-optimization-core-sidecar-transport.md)
@@ -27,7 +27,7 @@ zündet),
 ## 1. Kontext
 
 Plan
-[`plan-RM-M5-02.md`](../planning/in-progress/plan-RM-M5-02.md)
+[`plan-RM-M5-02.md`](../planning/done/plan-RM-M5-02.md)
 ist der MPC-Backend-Slice für den optimization-core. §5 D-02 hat die
 Solver-Backend-Wahl als **offene Pflicht-Entscheidung vor Sub-Slice-B-
 Start** geführt mit drei Varianten:
@@ -473,7 +473,7 @@ F-M5-12 in `note-RM-M5-followups.md`.
 - **`spec/architecture.md` §18 AR-OPEN-Liste** bekommt keinen neuen
   Eintrag — D-02 war eine Plan-interne Achse, nicht eine offene
   Architektur-Frage. Closure passiert in
-  [`plan-RM-M5-02.md`](../planning/in-progress/plan-RM-M5-02.md) §5
+  [`plan-RM-M5-02.md`](../planning/done/plan-RM-M5-02.md) §5
   D-02-Block, nicht in der Architektur-Spec.
 - **ADR 0005 bleibt `Accepted`.** Der Sidecar-Transport für die
   M5-01-LP-Linie bleibt produktiv; die hiesige ADR 0006 macht keine

@@ -39,6 +39,7 @@ public static class PersistenceRegistration
         services.AddSingleton<IOperatorAuditLog, DapperOperatorAuditLog>();
         services.AddSingleton<IRetentionRepository, DapperRetentionRepository>();
         services.AddSingleton<IOptimizationRunRepository, DapperOptimizationRunRepository>();
+        services.AddSingleton<IMpcRunRepository, DapperMpcRunRepository>();
         // RM-M5-01-C step 4: ersetzt das InMemoryOptimizationIdempotency-
         // Store-Binding aus AddBessApplicationInMemoryStores durch die
         // Postgres-backed Variante (CAS via INSERT...ON CONFLICT +

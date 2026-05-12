@@ -100,8 +100,8 @@ public sealed class DefaultMpcDispatchOrchestratorTests
         var b = MpcTestFixtures.BuildRequest(measurement: MpcTestFixtures.BuildTelemetry());
 
         Assert.Equal(
-            DefaultMpcDispatchOrchestrator.BuildRequestId(a),
-            DefaultMpcDispatchOrchestrator.BuildRequestId(b));
+            DefaultMpcDispatchOrchestrator.BuildRequestId(a, "identity"),
+            DefaultMpcDispatchOrchestrator.BuildRequestId(b, "identity"));
     }
 
     [Fact]
@@ -111,8 +111,60 @@ public sealed class DefaultMpcDispatchOrchestratorTests
         var b = MpcTestFixtures.BuildRequest(commandTick: MpcTestFixtures.Anchor.AddMilliseconds(250));
 
         Assert.NotEqual(
-            DefaultMpcDispatchOrchestrator.BuildRequestId(a),
-            DefaultMpcDispatchOrchestrator.BuildRequestId(b));
+            DefaultMpcDispatchOrchestrator.BuildRequestId(a, "identity"),
+            DefaultMpcDispatchOrchestrator.BuildRequestId(b, "identity"));
+    }
+
+    [Fact]
+    public async Task RequestId_helper_matches_orchestrator_estimator_variant()
+    {
+        var trajectory = MpcTestFixtures.BuildTrajectory(
+            sampleTime: MpcTestFixtures.SampleTime,
+            segments: new[] { (0.0, 50.0), (0.0, 50.0) });
+        var request = MpcTestFixtures.BuildRequest(measurement: MpcTestFixtures.BuildTelemetry());
+        var orchestrator = new DefaultMpcDispatchOrchestrator(
+            new IdentityStateEstimator(),
+            new SpySolver(trajectory));
+
+        var result = await orchestrator.NextStepAsync(request, CancellationToken.None);
+
+        Assert.Equal(
+            DefaultMpcDispatchOrchestrator.BuildRequestId(request, "identity"),
+            result.RequestId);
+    }
+
+    [Fact]
+    public async Task Same_mpc_step_twice_is_byte_stable_within_deterministic_tolerance()
+    {
+        var trajectory = MpcTestFixtures.BuildTrajectory(
+            sampleTime: MpcTestFixtures.SampleTime,
+            segments: new[] { (0.0, 50.0), (1.0, 49.9993056) });
+        var request = MpcTestFixtures.BuildRequest(
+            measurement: MpcTestFixtures.BuildTelemetry());
+        var orchestrator = new DefaultMpcDispatchOrchestrator(
+            new IdentityStateEstimator(),
+            new SpySolver(trajectory));
+
+        var a = await orchestrator.NextStepAsync(request, CancellationToken.None);
+        var b = await orchestrator.NextStepAsync(request, CancellationToken.None);
+
+        Assert.Equal(a.RequestId, b.RequestId);
+        Assert.Equal(a.Stamps.OrderBy(kv => kv.Key), b.Stamps.OrderBy(kv => kv.Key));
+        Assert.NotNull(a.Trajectory);
+        Assert.NotNull(b.Trajectory);
+        Assert.Equal(a.Trajectory.Points.Count, b.Trajectory.Points.Count);
+        for (var i = 0; i < a.Trajectory.Points.Count; i++)
+        {
+            Assert.Equal(a.Trajectory.Points[i].Time, b.Trajectory.Points[i].Time);
+            Assert.InRange(
+                Math.Abs(a.Trajectory.Points[i].ActivePowerKw - b.Trajectory.Points[i].ActivePowerKw),
+                0,
+                1e-9);
+            Assert.InRange(
+                Math.Abs(a.Trajectory.Points[i].PredictedSocPercent - b.Trajectory.Points[i].PredictedSocPercent),
+                0,
+                1e-9);
+        }
     }
 
     [Fact]

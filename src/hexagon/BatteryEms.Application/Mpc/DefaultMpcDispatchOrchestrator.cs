@@ -21,12 +21,9 @@ namespace BatteryEms.Application.Mpc;
 //      code is the validator's, not the orchestrator's, so the reason
 //      vocabulary stays single-sourced.
 //
-// `BuildRequestId` packs the Sub-Slice-D identity-tuple seed: today
-// only `asset_id`, `tick`, `sample_time_ms`, and `mpc_model_version`
-// are folded in; Sub-Slice C adds the estimator variant and Sub-Slice D
-// completes the 8-field tuple (D-09). The seed is short and human-
-// readable on purpose so log lines stay grep-able; Sub-Slice D replaces
-// it with the canonical SHA-256 hash of the full tuple.
+// `MpcRunIdentity` packs the Sub-Slice-D identity tuple and stamps. The
+// orchestrator builds it once before estimator/solver work so unhealthy
+// estimator exits and successful trajectories carry the same replay key.
 public sealed class DefaultMpcDispatchOrchestrator : IMpcDispatchOptimizer
 {
     private readonly IMpcStateEstimator _estimator;
@@ -46,7 +43,8 @@ public sealed class DefaultMpcDispatchOrchestrator : IMpcDispatchOptimizer
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var requestId = BuildRequestId(request);
+        var identity = MpcRunIdentity.Build(request, _estimator.EstimatorVariant);
+        var requestId = identity.MpcRequestId;
 
         var update = await _estimator.PredictUpdateAsync(
             request.PriorState,
@@ -56,7 +54,7 @@ public sealed class DefaultMpcDispatchOrchestrator : IMpcDispatchOptimizer
             request.Options,
             cancellationToken).ConfigureAwait(false);
 
-        var baseStamps = BuildBaseStamps(request, _estimator.EstimatorVariant);
+        var baseStamps = identity.ToStamps();
 
         if (!update.IsHealthy)
         {
@@ -91,23 +89,10 @@ public sealed class DefaultMpcDispatchOrchestrator : IMpcDispatchOptimizer
             baseStamps);
     }
 
-    public static string BuildRequestId(MpcRequest request)
+    public static string BuildRequestId(MpcRequest request, string stateEstimatorVariant)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var tickMs = request.CommandTick.ToUnixTimeMilliseconds();
-        var sampleMs = (long)request.Options.SampleTime.TotalMilliseconds;
-        return $"{request.AssetId}|{tickMs}|{sampleMs}|{request.Model.ModelVersion}";
+        ArgumentException.ThrowIfNullOrWhiteSpace(stateEstimatorVariant);
+        return MpcRunIdentity.Build(request, stateEstimatorVariant).MpcRequestId;
     }
-
-    private static Dictionary<string, string> BuildBaseStamps(MpcRequest request, string estimatorVariant) =>
-        new(StringComparer.Ordinal)
-        {
-            ["mpc_model_version"] = request.Model.ModelVersion,
-            ["estimator_variant"] = estimatorVariant,
-            ["deterministic_mode"] = request.Options.DeterministicMode.ToString(),
-            ["sample_time_ms"] = ((long)request.Options.SampleTime.TotalMilliseconds)
-                .ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["horizon_length"] = request.Options.HorizonLength
-                .ToString(System.Globalization.CultureInfo.InvariantCulture),
-        };
 }

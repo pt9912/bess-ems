@@ -304,7 +304,7 @@ wenn MPC der Trigger ist.
 
 **Quelle:** [ADR 0006](../../adr/0006-mpc-kernel-backend-and-solver.md)
 §6 (Trigger für Backend-Pivot) +
-[`../in-progress/plan-RM-M5-02.md`](../in-progress/plan-RM-M5-02.md)
+[`../done/plan-RM-M5-02.md`](../done/plan-RM-M5-02.md)
 §5 D-02 + §9 Folgearbeiten-Block. Heute (Post-RM-M5-02): MPC läuft
 ausschließlich in-process via `LocalOsqpMpcSolver` (Sub-Slice-B-
 Lieferung); `BessHostOptions.MpcBackend = "optimization_core"` und
