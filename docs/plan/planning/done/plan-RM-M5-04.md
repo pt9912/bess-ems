@@ -1,6 +1,6 @@
 # Plan RM-M5-04 Replay-Plattform
 
-Status: in Arbeit seit 2026-05-12. Dieser Slice baut die M5-Replay-Basis
+Status: abgeschlossen am 2026-05-12. Dieser Slice baut die M5-Replay-Basis
 inkrementell aus, ohne die bestehenden M2/M3-Replay-Pfade zu entfernen.
 
 ## Ziel
@@ -16,8 +16,9 @@ ein ueberlappender CI-Lauf den neuen und alten Pfad verglichen hat.
 | ------ | -- | ------ | -------- |
 | ✅ | RM-M5-04-A | Manifest-v1, Telemetrie-Fixture-v1, Golden-Command-v1, reject-by-default Loader und Golden-Diff-Grundlage | `tests/hexagon/BatteryEms.Application.Tests/Replay/*`, `tests/fixtures/replay/rm-m5-04/telemetry-linear/*`, `make test-replay` |
 | ✅ | RM-M5-04-B | Vollstaendige M2/M3-Kompatibilitaetsmigration mit Golden-Diff-Matrix | Vier M2-Pflichtfaelle haben Manifest-v1-Fixture/Golden und laufen im `make test-replay` parallel zum alten Harness; M3 Native-Parity `cases.v1.json` ist per Manifest-v1 `repo://` referenziert und bleibt ueber `make test-native-parity` aktiv |
-| ✅ | RM-M5-04-C | Manifestgetriebener Engine-Vergleich | `native-control-parity`-Manifest treibt Managed-vs-Native-Vergleich per `NativeParityEngineComparisonRunner`; Sidecar/MPC-Engine-Vergleich bleibt fuer RM-M5-04-D bzw. RM-M5-06-Orchestrierungsnaehe |
+| ✅ | RM-M5-04-C | Manifestgetriebener Native-Engine-Vergleich | `native-control-parity`-Manifest treibt Managed-vs-Native-Vergleich per `NativeParityEngineComparisonRunner` |
 | ✅ | RM-M5-04-D | Entwickler-/CI-Report fuer Replay-Diffs | Maschinenlesbarer `replay-diff-report.v1`-JSON-Report fuer M2-Telemetrie-Replays und M3 Native-Parity; `BESS_REPLAY_REPORT_DIR` schreibt CI-Artefakte |
+| ✅ | RM-M5-04-E | Sidecar-/MPC-Engine-Vergleich | `local-mpc-engine-comparison` pinnt `LocalOsqpMpcSolver` direkt gegen `DefaultMpcDispatchOrchestrator`; `optimization-core-sidecar-comparison` pinnt `OptimizationCoreScheduleOptimizer` gegen den In-Process-Test-Sidecar |
 
 ## RM-M5-04-A Ergebnis
 
@@ -63,10 +64,9 @@ ein ueberlappender CI-Lauf den neuen und alten Pfad verglichen hat.
 - Der bestehende M3-Parity-Test nutzt dieselbe Engine-Ausfuehrung wie der neue
   manifestgetriebene Runner; damit gibt es keinen zweiten, abweichenden
   Native-/Managed-Ausfuehrungspfad.
-- `make test-native-parity` ist der ausfuehrende Engine-Vergleich fuer C. Der
-  Sidecar-/MPC-Engine-Vergleich bleibt bewusst offen, weil er einen
-  Optimierungs-/Orchestrierungsdatensatz braucht und besser mit RM-M5-04-D bzw.
-  RM-M5-06 gekoppelt wird.
+- `make test-native-parity` ist der ausfuehrende Engine-Vergleich fuer C; der
+  Sidecar-/MPC-Vergleich wird in Sub-Slice E separat ueber die passenden
+  Optimierungs-Gates gepinnt.
 
 ## RM-M5-04-D Ergebnis
 
@@ -80,3 +80,23 @@ ein ueberlappender CI-Lauf den neuen und alten Pfad verglichen hat.
 - Beide Replay-Gates schreiben den JSON-Report in die Assertion-Message und
   optional als Datei unter `BESS_REPLAY_REPORT_DIR`, damit CI die Reports als
   Artefakte sammeln kann.
+
+## RM-M5-04-E Ergebnis
+
+- `tests/fixtures/replay/rm-m5-04/local-mpc/manifest.v1.json` fuehrt den
+  Replay-Kind `local-mpc-engine-comparison` ein. Das Fixture vergleicht den
+  direkten `LocalOsqpMpcSolver` mit dem `DefaultMpcDispatchOrchestrator`
+  inklusive `IdentityStateEstimator`; Trajektorienlaenge, Zeitstempel,
+  Active-Power-Sollwerte, predicted SOC, `IsUsable` und Reason muessen
+  innerhalb der Manifest-Toleranz uebereinstimmen.
+- `tests/fixtures/replay/rm-m5-04/optimization-core/manifest.v1.json` fuehrt
+  den Replay-Kind `optimization-core-sidecar-comparison` ein. Das Fixture
+  vergleicht `OptimizationCoreScheduleOptimizer` gegen den
+  `EmbeddedOptimizationCoreSidecar` mit `OptimalAlwaysSucceedsStub` und Golden-
+  Erwartungen fuer Solverstatus, Window-Anzahl und Target-Power.
+- `ReplayManifestLoader` kennt die neuen Manifest-Kinds und Schema-Versionen;
+  `All_rm_m5_04_manifests_use_supported_kinds_and_schemas` scannt den ganzen
+  RM-M5-04-Fixture-Baum fail-closed gegen unbekannte Kinds oder falsche
+  Fixture-/Golden-Schemas.
+- Nachweise: `make test-mpc-property`, `make test-hil-optimization-core` und
+  `make test-replay`.

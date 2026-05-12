@@ -8,6 +8,9 @@ internal static class ReplaySchemaVersions
     public const string TelemetryFixture = "telemetry-replay-fixture.v1";
     public const string GoldenCommands = "telemetry-golden-command.v1";
     public const string NativeParityCases = "native-parity-cases.v1";
+    public const string LocalMpcEngineComparison = "local-mpc-engine-comparison.v1";
+    public const string OptimizationCoreSidecarFixture = "optimization-core-sidecar-fixture.v1";
+    public const string OptimizationCoreSidecarGolden = "optimization-core-sidecar-golden.v1";
     public const string DiffReport = "replay-diff-report.v1";
 }
 

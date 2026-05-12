@@ -1,0 +1,13 @@
+{
+  "schema_version": "optimization-core-sidecar-fixture.v1",
+  "cases": [
+    {
+      "name": "sidecar-zero-power-4h-hourly",
+      "horizon_start_utc": "2026-05-11T12:00:00Z",
+      "horizon_hours": 4,
+      "time_step_hours": 1,
+      "base_schedule_version": 0,
+      "market_bid_area": "DE-LU"
+    }
+  ]
+}

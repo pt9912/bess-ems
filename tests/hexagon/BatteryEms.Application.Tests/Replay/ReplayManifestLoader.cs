@@ -61,6 +61,8 @@ internal static class ReplayManifestLoader
     {
         "telemetry-control-cycle",
         "native-control-parity",
+        "local-mpc-engine-comparison",
+        "optimization-core-sidecar-comparison",
     };
 
     public static ReplayManifestLoadResult Load(string manifestPath)
@@ -215,6 +217,8 @@ internal static class ReplayManifestLoader
     {
         "telemetry-control-cycle" => ReplaySchemaVersions.TelemetryFixture,
         "native-control-parity" => ReplaySchemaVersions.NativeParityCases,
+        "local-mpc-engine-comparison" => ReplaySchemaVersions.LocalMpcEngineComparison,
+        "optimization-core-sidecar-comparison" => ReplaySchemaVersions.OptimizationCoreSidecarFixture,
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported replay kind."),
     };
 
@@ -222,6 +226,8 @@ internal static class ReplayManifestLoader
     {
         "telemetry-control-cycle" => ReplaySchemaVersions.GoldenCommands,
         "native-control-parity" => ReplaySchemaVersions.NativeParityCases,
+        "local-mpc-engine-comparison" => ReplaySchemaVersions.LocalMpcEngineComparison,
+        "optimization-core-sidecar-comparison" => ReplaySchemaVersions.OptimizationCoreSidecarGolden,
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported replay kind."),
     };
 

@@ -1,0 +1,11 @@
+{
+  "schema_version": "optimization-core-sidecar-golden.v1",
+  "cases": [
+    {
+      "name": "sidecar-zero-power-4h-hourly",
+      "expected_status": "Optimal",
+      "expected_window_count": 4,
+      "expected_target_power_kw": 0.0
+    }
+  ]
+}

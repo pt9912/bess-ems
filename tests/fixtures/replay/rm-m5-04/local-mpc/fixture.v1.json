@@ -1,0 +1,23 @@
+{
+  "schema_version": "local-mpc-engine-comparison.v1",
+  "cases": [
+    {
+      "name": "local-osqp-50soc-baseline",
+      "soc_percent": 50.0,
+      "active_power_kw": 0.0,
+      "horizon_length": 4,
+      "sample_time_ms": 250,
+      "expected_usable": true,
+      "expected_reason": "mpc-committed"
+    },
+    {
+      "name": "local-osqp-50soc-horizon6",
+      "soc_percent": 50.0,
+      "active_power_kw": 0.0,
+      "horizon_length": 6,
+      "sample_time_ms": 250,
+      "expected_usable": true,
+      "expected_reason": "mpc-committed"
+    }
+  ]
+}

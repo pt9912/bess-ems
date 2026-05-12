@@ -1,0 +1,50 @@
+{
+  "schema_version": "replay-manifest.v1",
+  "dataset_id": "rm-m5-04-optimization-core-sidecar-comparison",
+  "kind": "optimization-core-sidecar-comparison",
+  "schema": {
+    "required_fields": [
+      "schema_version",
+      "dataset_id",
+      "kind",
+      "fixture",
+      "golden",
+      "determinism",
+      "request_id_rule",
+      "solver_options",
+      "tolerances"
+    ],
+    "optional_fields": [
+      "compatibility"
+    ],
+    "deprecated_fields": [],
+    "tolerated_legacy_fields": []
+  },
+  "fixture": {
+    "path": "fixture.v1.json",
+    "schema_version": "optimization-core-sidecar-fixture.v1"
+  },
+  "golden": {
+    "path": "golden.v1.json",
+    "schema_version": "optimization-core-sidecar-golden.v1"
+  },
+  "determinism": {
+    "mode": "strict",
+    "seed": null,
+    "runtime": "dotnet-net10.0/optimization-core-test-sidecar",
+    "numeric": "ieee754-double"
+  },
+  "request_id_rule": "optimization-core-request-id-v1",
+  "solver_options": {
+    "optimizer": "OptimizationCoreScheduleOptimizer+OptimalAlwaysSucceedsStub"
+  },
+  "tolerances": {
+    "active_power_kw_abs": 0.000000001,
+    "reactive_power_kvar_abs": 0.0
+  },
+  "compatibility": {
+    "covers_legacy_cases": [
+      "sidecar-zero-power-4h-hourly"
+    ]
+  }
+}

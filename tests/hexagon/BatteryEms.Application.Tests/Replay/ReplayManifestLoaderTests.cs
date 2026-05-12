@@ -61,6 +61,25 @@ public sealed class ReplayManifestLoaderTests
     }
 
     [Fact]
+    public void All_rm_m5_04_manifests_use_supported_kinds_and_schemas()
+    {
+        var manifests = Directory.GetFiles(
+            RepositoryPath(ReplayFixtureRoot),
+            "manifest.v1.json",
+            SearchOption.AllDirectories)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.NotEmpty(manifests);
+        foreach (var manifestPath in manifests)
+        {
+            var loadResult = ReplayManifestLoader.Load(manifestPath);
+
+            Assert.True(loadResult.IsSuccess, $"{manifestPath}: {loadResult.ErrorCode} {loadResult.Detail}");
+        }
+    }
+
+    [Fact]
     public void M3_native_parity_manifest_references_existing_dataset()
     {
         var manifestPath = RepositoryPath(

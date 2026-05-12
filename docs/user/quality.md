@@ -474,6 +474,7 @@ liegen unter `tests/fixtures/replay/`.
 ```bash
 make test-replay   # = docker build --target test-replay
 make test-mpc-property   # RM-M5-02 MPC-Identity/Determinism/Replay-Hooks
+make test-hil-optimization-core   # RM-M5-04 Sidecar-Manifest-Replay
 ```
 
 Wiedergabe historischer Telemetrie-Datensätze. Erwartete Commands sind als
@@ -487,6 +488,13 @@ Managed-vs-Native-Engine-Vergleichsreport. Ab RM-M5-04-D geben Replay-Gates
 einen maschinenlesbaren `replay-diff-report.v1`-JSON-Report in der
 Assertion-Message aus; ist `BESS_REPLAY_REPORT_DIR` gesetzt, schreiben sie je
 Datensatz eine gleichnamige Report-Datei fuer CI-Artefakte.
+
+Ab RM-M5-04-E scannt `make test-replay` alle RM-M5-04-Manifestdateien
+gegen bekannte Replay-Kinds und Schema-Versionen. Der lokale MPC-Vergleich
+laeuft ueber `make test-mpc-property` (`LocalOsqpMpcSolver` direkt gegen
+`DefaultMpcDispatchOrchestrator`); der Optimization-Core-Sidecar-Vergleich
+laeuft ueber `make test-hil-optimization-core` (`OptimizationCoreScheduleOptimizer`
+gegen den In-Process-Test-Sidecar).
 
 RM-M5-02 ergänzt den MPC-Replay-Vertrag vor der vollständigen
 Replay-Plattform: `make test-mpc-property` pinnt das achtachsige
@@ -515,8 +523,8 @@ Fall mit Native Core das erfolgreiche Laden der `.so`-Bibliothek
 | Integration          | `make test-integration`          | `Category=Integration`     |
 | HIL (optional)       | `make test-hil-modbus`           | `Category=HIL`             |
 | OPC-UA-Roundtrip     | `make test-hil-opcua`            | `Category=Integration` im OPC-UA-IntegrationTests-Projekt |
-| Optimization-Core    | `make test-hil-optimization-core` | `Category=Integration` im OptimizationCore-IntegrationTests-Projekt |
-| MPC Property         | `make test-mpc-property`          | RM-M5-02 Unit-Pins in Application/Worker/Architecture |
+| Optimization-Core    | `make test-hil-optimization-core` | `Category=Integration` im OptimizationCore-IntegrationTests-Projekt inkl. RM-M5-04-E Sidecar-Manifest-Replay |
+| MPC Property         | `make test-mpc-property`          | RM-M5-02 Unit-Pins plus RM-M5-04-E lokaler MPC-Engine-Vergleich |
 | Native Interop       | `make test-native-interop`       | `Category!=Parity` im NativeInterop-IntegrationTests-Projekt |
 | Native Parity        | `make test-native-parity`        | `Category=Parity` im NativeInterop-IntegrationTests-Projekt |
 | Replay               | `make test-replay`               | `Category=Replay` im Application-Tests-Projekt |
