@@ -178,9 +178,11 @@ Image-Build-Pipeline ist eigene Monatslinie. Diese Schätzung wird
 beim Trigger-Watch-Scan revalidiert, weil die LOC-Range stark vom
 Solver-Wrapper-Stand der Drittsprache abhängt.
 
-**Aktivierungs-Pfad:** Sprach-Pivot-ADR zuerst (`docs/plan/adr/
-0006-optimization-core-sidecar-language.md`), dann eigener Slice-
-Plan `plan-RM-M5-01-FUP-third-language-sidecar.md` oder
+**Aktivierungs-Pfad:** Sprach-Pivot-ADR zuerst (eigene Folge-ADR im
+`docs/plan/adr/`-Verzeichnis — die ursprünglich vorgemerkte Nummer
+0006 ist mittlerweile durch ADR 0006 (MPC-Kernel-Backend-and-Solver)
+belegt, die nächste freie Nummer ist 0007 oder höher), dann eigener
+Slice-Plan `plan-RM-M5-01-FUP-third-language-sidecar.md` oder
 Schwester-Repo-Init.
 
 ---
@@ -292,6 +294,92 @@ muss (~+2-3 Tage).
 **Aktivierungs-Pfad:** eigener `plan-RM-M5-01-FUP-schedule-
 stamp.md` Slice-Plan oder Carve-out im RM-M5-02-MPC-Kernel-Slice
 wenn MPC der Trigger ist.
+
+---
+
+## Item F-M5-12: Sidecar-First-MPC-Backend (zweiter `IMpcModelSolver`-Adapter)
+
+**Quelle:** [ADR 0006](../../adr/0006-mpc-kernel-backend-and-solver.md)
+§6 (Trigger für Backend-Pivot) +
+[`../in-progress/plan-RM-M5-02.md`](../in-progress/plan-RM-M5-02.md)
+§5 D-02 + §9 Folgearbeiten-Block. Heute (Post-RM-M5-02): MPC läuft
+ausschließlich in-process via `LocalOsqpMpcSolver` (Sub-Slice-B-
+Lieferung); `BessHostOptions.MpcBackend = "optimization_core"` und
+`"bi_modal"` sind reservierte Slot-Werte, die zum Startup-Fehler
+`mpc-backend-not-implemented` führen. Ein zweiter, Sidecar-basierter
+Solver-Adapter wäre die natürliche Ergänzung wenn einer der unten
+genannten Trigger zündet.
+
+**Trigger** (eines reicht, jeder erzwingt eigene Folge-ADR):
+
+- **`sample_time < 10 ms` im operativen Profil** würde Sidecar-First
+  ausschließen (Roundtrip-Overhead untolerierbar); F-M5-12 darf in
+  diesem Fall **nicht** aktiviert werden. Trigger zielt auf den
+  umgekehrten Fall: solange `sample_time >> Sidecar-Roundtrip-p99`
+  bleibt, ist Sidecar-First eine Option.
+- **Solver-Isolationspflicht.** OSQP-Crash wird in Produktion zur
+  operativen Quelle (Plan-RM-M5-02 §7 Risiken-Block nennt das als
+  Sub-Slice-B-Risiko; ADR 0004 §4 Trigger 6 = Crash-Isolation ist
+  die generische Linie) ODER Operator-Anforderung nach Solver-
+  Sandbox (Audit, Sicherheits-Zertifizierung). Sidecar-First wird
+  dann „Sidecar primary, in-process-Local-OSQP als Fallback".
+- **Multi-Language-Solver-Anforderung.** Operator-Wunsch nach einem
+  Python-/cvxpy-/Stan-/JAX-basierten Solver (wahrscheinlicher
+  Trigger-Vorbote: F-M5-08 Stochastic-MPC). Sub-Slice-B-Local-OSQP
+  bleibt produktiv für die LTI-Linie; F-M5-12 liefert den zweiten
+  Backend für die Drittsprach-Linie.
+- **Asset-spezifische Operator-Backend-Wahl.** Multi-Asset-Workflow
+  mit Asset A: Local-OSQP, Asset B: Sidecar mit Python-Solver. Löst
+  zusätzlich Bi-Modal-Folge-ADR aus (Operator-UX-Achse). F-M5-06
+  Multi-Asset-MPC ist der wahrscheinliche Trigger-Vorbote.
+- **Container-/Pod-Co-Location-Constraint.** Sidecar-Container ist
+  ohnehin im Deployment (z. B. weil M5-01-Sidecar in derselben Pod
+  läuft) UND Worker-Container-Image-Größe wird relevant (OSQP-Binary
+  + Dependencies vs. „nichts mehr im Worker").
+
+**Scope-Skizze** (wenn ein Trigger zündet):
+
+- (a) Eigene **Folge-ADR** (Nummer 0007 oder höher) mit Migrations-
+  Plan: welche Trigger zünden, welche Topologie wird gewählt,
+  welche Operator-UX-Pflichten kommen mit, wie wird `MpcBackend`-
+  Slot-Vokabular erweitert. Pivot ändert nicht silent ADR 0006.
+- (b) Zweiter `IMpcModelSolver`-Adapter `OptimizationCoreMpcOptimizer`
+  in einem neuen `BatteryEms.Adapters.Optimization.Mpc.Sidecar`-
+  Namespace neben dem bestehenden `Local`-Namespace. Adapter
+  konsumiert die M5-01-Wire-Infrastruktur (`OptimizationCoreClient`,
+  `OptimizationCoreOptions`, `transport-mapping-v1.md`) und füllt
+  den heute nur vertragenen `OptimizeMpc`-RPC (RM-M5-01 D-08).
+- (c) `IMpcDispatchOptimizer`-DI-Wiring im Composition-Root erweitert:
+  - `MpcBackend = "optimization_core"` ⇒ `OptimizationCoreMpcOptimizer`
+    als primary; `LocalOsqpFallbackMpcOptimizer` (oder die Sub-Slice-
+    C-`IFallbackMpcOptimizer`-Linie) als in-process-Fallback.
+  - `MpcBackend = "bi_modal"` bleibt entweder reserviert (eigene
+    Folge-ADR wenn der Bi-Modal-Operator-UX-Trigger zündet) oder
+    aktiviert beide Adapter mit `MpcOptions.PreferredBackend`-Slot
+    (je nach Folge-ADR).
+- (d) 8+ zusätzliche Roundtrip-Pins gegen den `OptimizationCoreMpcOptimizer`
+  (analog zur Sub-Slice-B-Linie für `LocalOsqpMpcSolver`), plus
+  TestSidecar-MPC-Stubs (`OptimalMpcStub` + `ScriptableMpcOutcomeStub`)
+  für den In-Process-Test-Pfad — diese Stubs wurden bewusst aus dem
+  M5-02-B-Scope geschnitten (siehe ADR 0006 §3 Verworfene
+  Alternativen).
+- (e) Boot-Gate-Erweiterung: wenn `MpcBackend = "optimization_core"`
+  und `RuntimeProfile=Production`, dann ist `OptimizationCoreOptions`
+  Pflicht (analog zum M5-01-LP-Adapter-Boot-Gate); fehlt der Slot,
+  Startup-Fehler `mpc-sidecar-without-config`.
+
+**Aufwandsschätzung:** ~2-3 Wochen (Trigger-abhängig). Wire-Linie
+reuse aus M5-01 (Channel, Idempotency-Store, Fallback-Validator)
+verkürzt den Schätzer; produktionsnahes Sidecar-MPC-Backend (z. B.
+Python-CVXPY-basiert) ist eigene Linie und triggert F-M5-03
+(Drittsprach-Sidecar-Produktiv-Implementierung) als parallele
+Schwester-Linie.
+
+**Aktivierungs-Pfad:** Folge-ADR (`docs/plan/adr/0007-mpc-sidecar-
+backend.md` o.ä.) zuerst, dann eigener Slice-Plan
+`plan-RM-M5-02-FUP-sidecar-backend.md` als Erweiterung des
+M5-02-MPC-Kernel-Slice. Note-Eintrag hier wird beim Aktivierungs-
+Commit auf den neuen Slice-Plan verlinkt.
 
 ---
 

@@ -81,12 +81,16 @@ einzelne ist im §9 Folgearbeiten-Block dokumentiert.
 - **M2-OptimizationRun-Modell stabil** (`done/plan-RM-M2-optimization.md`;
   Reproduzibilität-Stempel-Felder im `OptimizationRun` sind die
   Basis für die MPC-Stempel-Erweiterung — D-04).
-- **ADR 0006 ggf.** (`docs/plan/adr/0006-mpc-kernel-modeling-and-
-  solver.md` — Modell-Form-Wahl LTI vs. piecewise vs. nichtlinear +
-  Solver-Wahl LP/QP/SOCP). Dieser Plan **kann** ohne ADR 0006
-  starten, wenn Sub-Slice A bewusst LTI fixiert und die Modell-
-  Erweiterung als ADR-Trigger im Folgearbeiten-Block dokumentiert
-  wird. Reviewer entscheidet beim Plan-Review-Pass.
+- **ADR 0006 ✅** ([`../../adr/0006-mpc-kernel-backend-and-solver.md`](../../adr/0006-mpc-kernel-backend-and-solver.md)
+  am 2026-05-12 angenommen). Schließt die D-02-Achse mit
+  (a) Local-First + OSQP als einzigem produktiven Backend-Pfad in
+  Sub-Slice B; Sidecar-First-Linie wandert als F-M5-12 in die
+  Folgearbeiten (Trigger: `sample_time < 10 ms`, Solver-Isolationspflicht,
+  Multi-Language-Solver-Anforderung, Asset-spezifische Backend-Wahl,
+  Container-Co-Location-Constraint). Modell-Form-Wahl (LTI vs.
+  piecewise vs. nichtlinear) bleibt LTI per Sub-Slice-A-Cut; piecewise/
+  nichtlinear ist eigene F-M5-07-Linie und braucht eine eigene ADR
+  wenn der Trigger zündet.
 
 **Optional, nicht-zündend:**
 
@@ -136,24 +140,25 @@ einzelne ist im §9 Folgearbeiten-Block dokumentiert.
   divergence`. Validator-Hook in `MpcDispatchResult` damit der
   Control-Cycle den State-Status sieht (nicht nur den Trajektorie-
   Output).
-- **MPC-Solver-Backend** (D-02 entscheidet die konkrete Linie):
-  - **Variante (a) Local-First**: lokaler QP-Solver (OR-Tools /
-    OSQP / HiGHS) als Default; Sidecar nur wenn explizit
-    konfiguriert (`BessHostOptions.MpcBackend = "optimization_core"`).
-    Spiegelt die M5-01-Linie wo Sidecar opt-in war.
-  - **Variante (b) Sidecar-First**: `optimization-core`-Sidecar
-    via `OptimizeMpc`-RPC ist Default; lokaler Fallback ist die
-    bekannte Linie aus M5-01-Korrektur-Pass.
-  - **Variante (c) Bi-Modal**: beide Backends gleichberechtigt
-    registriert, Operator wählt per `BessHostOptions.MpcBackend`-
-    Slot.
-  Pre-Code-Entscheidung — Reviewer + ADR 0006 entscheiden im
-  Plan-Review-Pass.
-- **`OptimizeMpc`-RPC-Backend** in `BatteryEms.Adapters.
-  OptimizationCore.OptimizationCoreMpcOptimizer` (neu, sitzt
-  neben dem bestehenden `OptimizationCoreScheduleOptimizer`).
-  Wire-Übersetzung: `MpcRequest` → `OptimizeMpcRequest`-Proto,
-  Stream-Reading, Result-Decoding zu `MpcTrajectory`.
+- **MPC-Solver-Backend** ([ADR 0006](../../adr/0006-mpc-kernel-backend-and-solver.md)
+  fixiert die Wahl auf **Local-First mit OSQP**):
+  - `LocalOsqpMpcSolver` (Sub-Slice-B-Lieferung) als
+    `IMpcModelSolver`-Adapter in `BatteryEms.Adapters.Optimization.
+    Mpc.Local`. OSQP läuft Single-Thread-deterministisch unter
+    `DeterministicMode = Strict` (Polish=off, Pre-Solve
+    deterministisch). NuGet-Wrapper-Reuse vs. Eigenbau-P/Invoke
+    entscheidet der Sub-Slice-B-Plan-Header.
+  - **Bewusst draußen**: Sidecar-First (`MpcBackend =
+    "optimization_core"`) und Bi-Modal (`MpcBackend = "bi_modal"`)
+    sind reservierte Werte für F-M5-12 (§9). Sub-Slice-B-Negativ-
+    Pin asseritert dass beide heute zu Startup-Fehler
+    `mpc-backend-not-implemented` führen.
+  - **Begründung gegen Sidecar-First/Bi-Modal in M5-02**:
+    Sub-Sekunden-Tick (`sample_time` 250 ms–1 s) duldet
+    gRPC-Roundtrip-Overhead nur knapp; Sub-Slice-B-DoD (8+
+    Roundtrip-Pins) verdoppelt das Pin-Volumen bei zweitem
+    Backend; Plan §1 Scope-Cut schließt Bi-Modal-Coordination aus.
+    Vollständige Trade-off-Diskussion in ADR 0006 §3.
 - **MPC-spezifische Request-ID + Retention** (siehe D-09): die
   Master-LP-Linie aus M5-01 verwendet eine deterministische
   `request_id` aus `(asset_id, schedule_type, horizon_start,
@@ -274,8 +279,8 @@ einzelne ist im §9 Folgearbeiten-Block dokumentiert.
 | Status | ID | Paket | DoD |
 | ------ | -- | ----- | --- |
 | ✅ | RM-M5-02-A | State-Space-Modell + Application-Schicht-Ports + Constraint-Property-Pins — **~700-1000 LOC** | Neuer `BatteryEms.Application.Mpc`-Namespace mit `MpcModel`, `MpcState`, `MpcTrajectory`, `MpcOptions`-Records. `IMpcDispatchOptimizer`-Driving-Port + `IMpcStateEstimator`-Driven-Port + `IMpcModelSolver`-Driven-Port. `DefaultMpcDispatchOrchestrator` als wireing-Klasse, die `IMpcStateEstimator.PredictUpdateAsync` + `IMpcModelSolver.SolveAsync` orchestriert. **In diesem Sub-Slice kein konkreter Solver-Adapter** — `IMpcModelSolver` wird als `NotImplementedException`-Stub registriert; das hält die Schicht-Wartbarkeit beim Cut sauber. Constraint-Property-Pins (5+): SOC-in-Bounds, Power-in-Bounds, Ramp-in-Bounds, Constraint-Violation-Reason-Pinning, Empty-Trajectory-Reject. State-Estimator-Stub `IdentityStateEstimator` (`State_new = State_old`, kein Filtering) für die Property-Pins. Tests in `BatteryEms.Application.Tests/Mpc/`. **Geliefert 2026-05-12**: 14 `.cs`-Quelldateien (Application + Tests), 41 grüne Pins über 4 Test-Klassen (`MpcConstraintValidatorTests` 18 Pins inkl. Reason-Code-Tabelle, `DefaultMpcDispatchOrchestratorTests` 7 Pins inkl. Solver-Stub-Bubble-Through, `IdentityStateEstimatorTests` 3 Pins, `MpcDomainRecordsTests` 12 Pins), `make lint` + `make arch-check` + `make test` grün (Application.Tests 317 Pins gesamt). |
-| ⬜ | RM-M5-02-B | QP-Solver-Backend + erster Roundtrip-Pin — **~800-1200 LOC** | Konkreter `IMpcModelSolver`-Adapter gemäß D-02-Entscheidung. Bei Local-First (a): neuer `BatteryEms.Adapters.Optimization.Mpc.OrToolsMpcSolver` oder ein dedizierter `OsqpMpcSolver` (Solver-Wahl steckt in der ADR-Entscheidung). Bei Sidecar-First (b): `OptimizeMpc`-RPC im optimization-core-Adapter wird mit Body gefüllt; `OptimizationCoreMpcOptimizer` lebt **neben** dem bestehenden `OptimizationCoreScheduleOptimizer` und teilt sich Channel + Idempotency-Store. TestSidecar-Erweiterung mit `OptimalMpcStub` (Echo: liefert konstante SOC-Trajektorie) + `ScriptableMpcOutcomeStub` (Per-Test-Outcome-Queue, deckt Solver-Time-Limit/Infeasible/Stream-Crash). 8+ Roundtrip-Pins in neuer `OptimizationCoreMpcRoundtripTests` + `OptimizationCoreMpcNegativeTests`. Constraint-Property-Pins aus A werden gegen den echten Solver erneut gefahren — die Property-Tests laufen jetzt nicht nur gegen den Stub sondern auch gegen die Production-Linie. |
-| ⬜ | RM-M5-02-C | Kalman-Filter + Robustheits-Pfade + Fallback-Erweiterung + Monotonic-Clock — **~900-1100 LOC** | `DefaultLinearKalmanFilter`-Implementierung in `BatteryEms.Application.Mpc.Estimators`: Predict-Step (`x_pred = A * x_old + B * u`, `P_pred = A * P_old * A^T + Q`), Update-Step (`K = P_pred * C^T * (C * P_pred * C^T + R)^{-1}`, `x_new = x_pred + K * (y - C * x_pred)`, `P_new = (I - K * C) * P_pred`). Robustheits-Pfade: Missing-Measurement-Skip (counter persistent, nach `MaxConsecutiveMissingMeasurements` → `mpc-state-stale-too-long`), Unplausible-Werte-Validator (SOC im physischen Bereich, Temperatur in Asset-Bounds; sonst `mpc-state-non-physical`), Covariance-Divergence-Check (Determinant > threshold → `mpc-covariance-diverged`). Fallback-Erweiterung: `OptimizationCoreMpcOptimizer` erbt die `TryRunFallbackAsync`-Linie aus M5-01-Korrektur-Pass für den Sidecar-Failure-Pfad; lokaler Fallback bei MPC ist ein `IFallbackMpcOptimizer`-Driven-Port (neuer Marker, analog zu `IFallbackScheduleOptimizer`). **MonotonicAnchoredClock-Adapter** (D-09 Production-Pflicht): `BatteryEms.Adapters.Time.MonotonicAnchoredClock` mit Wall-Clock-Anchor + Stopwatch-Offset; periodischer Resync mit Toleranz-Check; DI-Registrierung als opt-in `IClock`-Override (Composition-Root entscheidet pre-Boot). 12+ Pins (Kalman-Convergence, Missing-Measurement-Recovery, Unplausible-State-Reject, Covariance-Divergence-Reject, Fallback-Wire-Integration, MonotonicClock-Backsprung-Resilience, MonotonicClock-Resync-Reject-Bei-Drift). |
+| ⬜ | RM-M5-02-B | QP-Solver-Backend `LocalOsqpMpcSolver` + erster Solver-Pin — **~800-1200 LOC** | Konkreter `IMpcModelSolver`-Adapter per ADR 0006: `BatteryEms.Adapters.Optimization.Mpc.Local.LocalOsqpMpcSolver` (OSQP via NuGet-Wrapper oder Eigenbau-P/Invoke — Sub-Slice-B-Plan-Header entscheidet). OSQP-Default-Flags pin't `polish=off`, `scaling=0`, `warm_start=false` für `DeterministicMode=Strict` (siehe D-04). `BessHostOptions.MpcBackend = "local_osqp"` aktiviert den Adapter; **Negativ-Pin (Sub-Slice-B-Pflicht)**: Boot mit `MpcBackend = "optimization_core"` oder `"bi_modal"` ⇒ Startup-Fehler `mpc-backend-not-implemented` (reservierte F-M5-12-Werte). 8+ Solver-Wire-Pins in neuer `LocalOsqpMpcSolverRoundtripTests` + `LocalOsqpMpcSolverNegativeTests` (Solver-Time-Limit, Infeasible, OSQP-Solver-Status-Mapping). Constraint-Property-Pins aus A werden gegen den echten OSQP-Solver erneut gefahren — die Property-Tests laufen jetzt nicht nur gegen den Stub sondern auch gegen die Production-Linie. TestSidecar-MPC-Stubs entfallen aus dem M5-02-Scope (siehe ADR 0006 — Sidecar-Linie ist F-M5-12). |
+| ⬜ | RM-M5-02-C | Kalman-Filter + Robustheits-Pfade + Fallback-Erweiterung + Monotonic-Clock — **~900-1100 LOC** | `DefaultLinearKalmanFilter`-Implementierung in `BatteryEms.Application.Mpc.Estimators`: Predict-Step (`x_pred = A * x_old + B * u`, `P_pred = A * P_old * A^T + Q`), Update-Step (`K = P_pred * C^T * (C * P_pred * C^T + R)^{-1}`, `x_new = x_pred + K * (y - C * x_pred)`, `P_new = (I - K * C) * P_pred`). Robustheits-Pfade: Missing-Measurement-Skip (counter persistent, nach `MaxConsecutiveMissingMeasurements` → `mpc-state-stale-too-long`), Unplausible-Werte-Validator (SOC im physischen Bereich, Temperatur in Asset-Bounds; sonst `mpc-state-non-physical`), Covariance-Divergence-Check (Determinant > threshold → `mpc-covariance-diverged`). Fallback-Erweiterung: `IFallbackMpcOptimizer`-Driven-Port (neuer Marker, analog zu `IFallbackScheduleOptimizer`); konkrete Implementierung in `BatteryEms.Adapters.Optimization.Mpc.Local.LocalOsqpFallbackMpcOptimizer` mit `MpcOptions.SolverFallbackProfile` (lockere Toleranzen, reduzierter Horizon). Sidecar-basierte Fallback-Linie (M5-01 `TryRunFallbackAsync`-Pattern für `OptimizationCoreMpcOptimizer`) entfällt im M5-02-Scope — Sidecar-MPC ist F-M5-12-Folgearbeit und bringt seinen eigenen Fallback-Pfad in der Folge-ADR. **MonotonicAnchoredClock-Adapter** (D-09 Production-Pflicht): `BatteryEms.Adapters.Time.MonotonicAnchoredClock` mit Wall-Clock-Anchor + Stopwatch-Offset; periodischer Resync mit Toleranz-Check; DI-Registrierung als opt-in `IClock`-Override (Composition-Root entscheidet pre-Boot). 12+ Pins (Kalman-Convergence, Missing-Measurement-Recovery, Unplausible-State-Reject, Covariance-Divergence-Reject, Fallback-Wire-Integration, MonotonicClock-Backsprung-Resilience, MonotonicClock-Resync-Reject-Bei-Drift). |
 | ⬜ | RM-M5-02-D | Reproduzierbarkeitsvertrag + Replay-Hooks + Worker-Wiring + Retention + Production-Boot-Gates + Quality-Doku + Master-Plan-Closure — **~900-1100 LOC** | `MpcRun`-Domain-Typ + Migration `0004_mpc_runs.sql` mit D-09-Schema (acht Identity-Felder als reguläre Spalten + `mpc_request_id` PK + `numerik_stamp_json` + `p0_frobenius_display` + `deterministic_mode` + Terminal-/Trajektor-Felder + 3-Index-Set). Dapper-Repository `DapperMpcRunRepository` mit Restart-Replay-Pin + Retention-Compaction-Pin (D-09: Top-N + MaxAge). `MpcDispatchResult` exposed `IReadOnlyDictionary<string, string>`-Stempel für RM-M5-04-Replay. `FallbackPlanValidator` erweitert um MPC-Stempel-Achse (State-Estimator-Variante + `estimator_config_hash` vs. Kontext; Frobenius-Norm bleibt operator-sichtbar aber nicht identitätsbildend). **Cross-Run-Determinism-Pin** (D-04 Pflicht): zweimal selber MPC-Step → byte-für-byte identische Stempel-Hashes + Schedule-Points innerhalb der DeterministicMode-Toleranz. **Worker-Control-Cycle-Wiring-Pin** in `BatteryEms.Worker.Tests`: zählender Stub-`IMpcDispatchOptimizer` registriert, `ControlCycleHostedService` läuft ≥3 Ticks, Stub-CallCount ≥3 (D-01-Wiring-Beweis). **Identity-Tuple-Vollständigkeits-Pin-Serie** (D-09 Pflicht): 8 Pins, jeder ändert genau eine Verhaltens-Achse (asset_id / tick / sample_time / model_version / estimator_variant / solver_config / estimator_config / random_seed) und beweist dass eine neue `mpc_request_id` resultiert; plus 1 Negativ-Pin (identische Inputs → identischer Hash); plus 1 Default-Seed-Determinism-Pin (Default-`random_seed` aus den anderen sieben Feldern abgeleitet ⇒ Tuple-Hash unverändert) und 1 Operator-Seed-Override-Pin (expliziter Seed-Override ⇒ neue `mpc_request_id`). **Production-Fallback-Active-Pin** (D-07 Pflicht): Boot mit `MpcBackend != null` + ohne registrierten `IFallbackMpcOptimizer` + `RuntimeProfile=Production` ⇒ Startup-Fehler `mpc-production-without-fallback-pathway`. **Production-Monotonic-Clock-Pin** (D-09 Pflicht): Boot mit `MpcBackend != null` + `RuntimeProfile=Production` ohne `MonotonicAnchoredClock` ⇒ Startup-Fehler `mpc-production-without-monotonic-clock`. **MPC-Aktivierungs-Default-Pin** (D-02 Pflicht): Default-Bootstrap ohne `MpcBackend`-Wert ⇒ kein `IMpcDispatchOptimizer` im DI-Container; `ControlCycleHostedService` führt keinen MPC-Step aus. 12+ Persistence-Pins (Run-Roundtrip aller acht Identity-Spalten + Stempel-Achsen, Restart-Replay, CAS-Race, Late-Response-Ignored, Retention-Compaction-100k, forensische Per-SampleTime-Query). Quality-Doku §2.2.3-Erweiterung + neue §2.5 (`make test-mpc-property` Property-Gate). F-Folgearbeiten (§9) in `note-RM-M5-followups.md` ergänzen. Master-Plan-Zeile RM-M5-02 flippt auf ✅ mit D-05-Replacement-Text. Slice-Plan wird nach `done/plan-RM-M5-02.md` verschoben. |
 
 ---
@@ -296,8 +301,9 @@ Sub-Modus von `IScheduleOptimizer`": die Schnittstellen-Verbreiterung
 zwingt LP-Callers, MPC-spezifische State-/Estimator-Felder zu
 ignorieren — bricht das M2-Optimization-Modell.
 
-**D-02 Solver-Backend-Wahl + Aktivierungs-Disziplin (offen,
-ADR-Trigger).**
+**D-02 Solver-Backend-Wahl + Aktivierungs-Disziplin (fixiert mit
+[ADR 0006](../../adr/0006-mpc-kernel-backend-and-solver.md):
+(a) Local-First mit OSQP).**
 
 **MPC ist opt-in** — analog zur M5-01-Linie wo
 `ScheduleSolver.Backend = "optimization_core"` den Sidecar-Slot
@@ -315,31 +321,33 @@ Aktivierungs-Slot**.
   „MPC aktiviert" ausschließlich „`MpcBackend` ist auf einen
   konkreten Wert gesetzt".
 
-Drei Backend-Werte — Reviewer + ggf. ADR 0006 entscheiden vor
-RM-M5-02-B:
+Backend-Werte (per ADR 0006 §2 fixiert):
 
-- **(a) Local-First** (`MpcBackend = "or_tools"`): QP-Solver
-  lebt in-process (OR-Tools-QP / OSQP / HiGHS — Solver-Auswahl
-  ist eigene D-02-Sub-Achse). Sidecar opt-in via eigenem Slot,
-  z. B. zusätzliches `MpcSidecarOptIn`-Flag bei Bi-Modal.
-- **(b) Sidecar-First** (`MpcBackend = "optimization_core"`):
-  `OptimizeMpc`-RPC ist primary; lokaler Fallback aus M5-01-
-  `IFallbackMpcOptimizer`-Linie.
-- **(c) Bi-Modal** (`MpcBackend = "bi_modal"`): beide Backends
-  gleichberechtigt; primary/fallback-Reihenfolge per
-  `MpcOptions.PreferredBackend`-Sub-Slot.
+- **`"local_osqp"`** (einzig produktiver Wert): aktiviert den
+  `LocalOsqpMpcSolver`-Adapter in-process (`BatteryEms.Adapters.
+  Optimization.Mpc.Local`). Sub-Slice B liefert genau diesen
+  Adapter; OSQP läuft Single-Thread-deterministisch unter
+  `DeterministicMode = Strict` (Polish=off, Pre-Solve deterministisch
+  konfiguriert) — siehe ADR 0006 §4 Achse 2.
+- **`"optimization_core"`** und **`"bi_modal"`**: reservierte
+  Namen für F-M5-12 (Sidecar-First-Folgearbeit). Sub-Slice-B-Negativ-
+  Pin asseritert dass beide Werte heute zu Startup-Fehler
+  `mpc-backend-not-implemented` führen — der Slot bleibt frei für
+  die spätere Erweiterung ohne Re-Plumbing.
 
-Default-Vorschlag wenn kein ADR 0006: **(c) Bi-Modal mit
-Local-First-Default** für die Backend-Architektur, aber
-`MpcBackend = null` bleibt Default-Aktivierungs-Stand. Hosts die
-MPC nicht brauchen müssen den Slot explizit auf einen Wert setzen
-um MPC einzuschalten — Production-Hosts ohne den expliziten
-Aktivierungs-Slot laufen weiterhin M5-01-LP-only.
+ADR 0006 §3 dokumentiert die verworfenen Alternativen (Sidecar-First
+und Bi-Modal) mit den konkreten Trade-offs gegen den Sub-Slice-B-
+Scope (LOC-Schätzung, Pin-Volumen, Pflichtpfad-Komplexität); §5
+dokumentiert die schmale Backend-Abstraktion, die F-M5-12 die Tür
+offen hält. §6 listet die fünf Trigger für den Pivot zur F-M5-12-
+Linie.
 
 Pin-Erwartung: Sub-Slice-D-DoD pin't den Default-Aktivierungs-
 Stand (`MpcBackend == null` ⇒ `IMpcDispatchOptimizer` ist nicht im
 DI-Container) damit die Aktivierungs-Disziplin nicht stillschweigend
-driftet.
+driftet. Sub-Slice-B-DoD ergänzt den Negativ-Pin für die
+reservierten Werte (`"optimization_core"`/`"bi_modal"` ⇒
+`mpc-backend-not-implemented`-Startup-Fehler).
 
 **D-03 Kalman-Variante: Linear-KF als Default.**
 LTI-Modell-Hülle aus Sub-Slice A passt zu einem Standard-Linear-KF.
@@ -379,12 +387,13 @@ Disziplin-Vertrag:
     Patch-Versionen; off ist die einzige reproduzierbare Default).
     Sub-Slice-B-Adapter pin't die Flag-Kombination als Default
     und exposed Operator-Overrides nur über expliziten Slot.
-  - **Sidecar (Sidecar-First / Bi-Modal)**: der Sidecar selbst
-    garantiert die Strict-Disziplin; der Worker übergibt
-    `MpcOptions.RandomSeed` und die DeterministicMode-Flag im
-    `OptimizeMpcRequest`-Proto und prüft im Sub-Slice-D Cross-
-    Run-Determinism-Pin dass derselbe Sidecar denselben Output
-    liefert.
+  - **Sidecar (F-M5-12-Folgearbeit, nicht in M5-02 Sub-Slice B)**:
+    der Sidecar selbst würde die Strict-Disziplin garantieren; der
+    Worker übergäbe `MpcOptions.RandomSeed` und die
+    DeterministicMode-Flag im `OptimizeMpcRequest`-Proto. Diese
+    Linie ist via ADR 0006 / D-02 aus dem M5-02-Scope geschnitten;
+    falls F-M5-12 aktiviert wird, gilt der Cross-Run-Determinism-Pin
+    auch für den Sidecar (separate Folge-ADR).
 
   Alle Strict-Adapter persistieren den verwendeten Random-Seed
   als Identitäts-Feld im `MpcRun` (D-09).
@@ -459,8 +468,9 @@ Verbindlicher Replacement-Text:
 > ruft `NextStepAsync` pro Tick auf, verifiziert per Worker-Wiring-
 > Integration-Pin). `IMpcStateEstimator`-Driven-Port mit
 > `DefaultLinearKalmanFilter` als Default-Estimator (D-03);
-> `IMpcModelSolver`-Driven-Port verdrahtet gemäß im Plan-Review-Pass
-> gewählter D-02-Variante (Local-First / Sidecar-First / Bi-Modal).
+> `IMpcModelSolver`-Driven-Port verdrahtet mit `LocalOsqpMpcSolver`
+> (D-02 / ADR 0006 — Local-First mit OSQP als einziger produktiver
+> Backend; Sidecar-/Bi-Modal-Linie ist F-M5-12).
 > Constraints-Einhaltung (SOC-, Power-, Ramp-Bounds) per Property-
 > Pins gegen das State-Space-Modell; hard im QP plus `IFallbackMpcOptimizer`-
 > Driven-Port als Production-Pflicht (D-07 — Boot-Gate wirft
@@ -748,11 +758,10 @@ ist die saubere Trennung.
 - **State-Space-Modell** als `MpcModel`-Domain-Typ; LTI-Constraints
   (SOC, Power, Ramp) sind im Modell verankert.
 - **`IMpcDispatchOptimizer`** ist composition-root-mäßig austauschbar
-  via konfigurierten Adapter-Slot. Die konkrete D-02-Variante (Local-
-  First / Sidecar-First / Bi-Modal) entscheidet der Plan-Review-Pass
-  vor Sub-Slice-B-Start; das Acceptance-Criterium gilt unabhängig
-  davon, weil alle drei Varianten die `IMpcDispatchOptimizer`-DI-
-  Schicht erfüllen.
+  via konfigurierten Adapter-Slot. D-02 ist mit ADR 0006 auf
+  Local-First mit OSQP fixiert; das Acceptance-Criterium gilt für
+  den `LocalOsqpMpcSolver`-Adapter und bleibt strukturell unverändert
+  wenn F-M5-12 später einen Sidecar-Adapter danebenstellt.
 - **MPC-Aktivierungs-Disziplin** (D-02): MPC ist opt-in via
   `BessHostOptions.MpcBackend` — `null` (Default) bedeutet kein
   MPC, `IMpcDispatchOptimizer` ist nicht registriert,
@@ -815,14 +824,16 @@ ist die saubere Trennung.
   werden zusätzlich als reguläre Spalten in `mpc_runs` persistiert
   (forensische Queries).
 - **Production-Monotonic-Clock-Pflicht** (D-09): Boot mit
-  `BessHostOptions.MpcBackend != null` (jeder Aktivierungs-Wert —
-  `or_tools`, `optimization_core`, `bi_modal`; siehe D-02
-  Aktivierungs-Disziplin) + `RuntimeProfile=Production` ohne
-  `MonotonicAnchoredClock`-Adapter ⇒ Startup-Fehler
-  `mpc-production-without-monotonic-clock`. Die D-09-Identitäts-
-  Logik (Tick-Truncate auf SampleTime-Boundary) ist für alle drei
-  Backend-Varianten gleich abhängig vom monotonen Uhrverhalten,
-  deshalb gilt das Gate unabhängig von der konkreten Backend-Wahl.
+  `BessHostOptions.MpcBackend != null` (heute praktisch
+  `"local_osqp"` — siehe D-02 / ADR 0006; `"optimization_core"`
+  und `"bi_modal"` sind reservierte F-M5-12-Werte) +
+  `RuntimeProfile=Production` ohne `MonotonicAnchoredClock`-Adapter
+  ⇒ Startup-Fehler `mpc-production-without-monotonic-clock`. Die
+  D-09-Identitäts-Logik (Tick-Truncate auf SampleTime-Boundary) ist
+  unabhängig von der konkreten Backend-Wahl abhängig vom monotonen
+  Uhrverhalten, deshalb gilt das Gate für jeden gesetzten
+  `MpcBackend`-Wert (auch wenn F-M5-12 später zusätzliche Werte
+  aktiviert).
   Default-`SystemClock` (wall-clock-following) ist im Production-
   Pfad mit aktivem MPC explizit abgelehnt. HilSimulator/Development
   bleibt tolerant.
@@ -872,11 +883,14 @@ ist die saubere Trennung.
   nichtlinearer Lauf nicht stillschweigend als „selbe Modell-
   Identität" gilt.
 - **Sidecar-Latenz für Sub-Sekunden-Cycle.** Wenn MPC pro Control-
-  Cycle (z. B. alle 250 ms) läuft und über den Sidecar geht, ist
-  der gRPC-Roundtrip möglicherweise zu langsam. Mitigation: D-02
-  Bi-Modal-Default mit Local-First erlaubt Production-Topologie
-  ohne Sidecar; ADR 0005 §7 Phase-4-Pivot-Trigger ist der
-  formalisierte Pfad wenn Local-First nicht ausreicht.
+  Cycle (z. B. alle 250 ms) läuft und über den Sidecar gehen würde,
+  wäre der gRPC-Roundtrip möglicherweise zu langsam. Mitigation:
+  D-02 / ADR 0006 fixiert Local-First mit OSQP als einzigen
+  produktiven Backend-Pfad — Sidecar-First ist F-M5-12-Folgearbeit
+  und ihre `sample_time < 10 ms`-Triggergrenze schützt vor blindem
+  Aktivieren. ADR 0005 §7 Phase-4-Pivot-Trigger bleibt der
+  formalisierte Pfad wenn selbst der in-process-OSQP-Solve den
+  1-ms-Bound überschreitet (RM-M5-03 Native-Embed).
 - **Constraint-Hardness vs. QP-Infeasible-Rate.** Hard-Constraints
   (D-07) erhöhen die Infeasible-Rate bei eng angesetzten Bounds.
   Mitigation: Fallback-Matrix aus M5-01 fängt Infeasible auf — der
@@ -934,9 +948,10 @@ M5-01-Linie. Kritische Punkte:
 
 - Hält D-01 (MPC neben LP)? Reviewer prüft ob die Worker-Control-
   Cycle-Linie aus M1 ohne Erweiterung den MPC-Port aufrufen kann.
-- Hält D-02 (Solver-Wahl-Variante)? **Pflicht-Entscheidung vor
-  Sub-Slice-B-Start**. Reviewer entscheidet zwischen (a)/(b)/(c)
-  und triggert ggf. ADR 0006.
+- ~~Hält D-02 (Solver-Wahl-Variante)?~~ **Geschlossen mit
+  [ADR 0006](../../adr/0006-mpc-kernel-backend-and-solver.md)** am
+  2026-05-12 — Local-First mit OSQP als einziger produktiver Pfad in
+  Sub-Slice B; Sidecar-First-Linie ist F-M5-12.
 - Hält D-03 (Linear-KF-Default)? Reviewer prüft ob nichtlineares
   Modell-Element im aktuellen Asset-Set bereits erforderlich ist.
 - Hält D-04 (Stempel-Achsen)? Reviewer prüft ob die drei Achsen
@@ -944,18 +959,22 @@ M5-01-Linie. Kritische Punkte:
 - Hält D-07 (hard Constraints)? Reviewer prüft ob Soft-Variante
   als opt-in carve-out gebraucht wird.
 
-**Schritt 2: ADR 0006 (optional, Pflicht bei Solver-Wahl-Ambiguität).**
-Wenn D-02 nicht im Plan-Review-Pass fixiert werden kann, entsteht
-`docs/plan/adr/0006-mpc-kernel-modeling-and-solver.md` mit den drei
-Solver-Varianten + Modell-Form-Diskussion. Schreibstil und Tabellen-
-Form analog zu ADR 0005.
+**Schritt 2: ADR 0006 ✅ geschrieben am 2026-05-12.**
+[`../../adr/0006-mpc-kernel-backend-and-solver.md`](../../adr/0006-mpc-kernel-backend-and-solver.md)
+fixiert D-02 auf (a) Local-First mit OSQP. Reviewer-Pflicht-
+Entscheidung vor Sub-Slice-B-Start ist damit erledigt; die ADR
+dokumentiert die verworfenen Alternativen, die schmale Backend-
+Abstraktion (Sub-Slice-B-Architektur-Pin) und die fünf Trigger für
+einen späteren Pivot zur F-M5-12-Linie.
 
 **Schritt 3: Sub-Slices in Reihenfolge A → B → C → D umsetzen.**
 
 1. **Sub-Slice A**: Application-Schicht + Constraint-Property-Pins.
    Reines Domain-/Port-/Property-Test-Material; kein Solver-Adapter.
-2. **Sub-Slice B**: QP-Solver-Backend (D-02-Variante). Erste echte
-   MPC-Wire-Roundtrip-Surface plus TestSidecar-MPC-Stubs.
+2. **Sub-Slice B**: QP-Solver-Backend `LocalOsqpMpcSolver` (D-02 /
+   ADR 0006 — Local-First mit OSQP). Erster produktiver Solver-
+   Wire-Pin plus In-Process-Solver-Test-Linie (TestSidecar-MPC-Stubs
+   wären die F-M5-12-Linie und sind nicht in M5-02-B).
 3. **Sub-Slice C**: Kalman-Filter + Robustheits-Pfade + Fallback-
    Erweiterung. Estimator-Schicht; größter Sub-Slice.
 4. **Sub-Slice D**: Reproduzierbarkeits-Vertrag + Persistenz +
@@ -1002,6 +1021,20 @@ führte).
   Pattern für netzweite Determinism-Anforderungen). Scope:
   Adapter-Erweiterung neben dem bestehenden
   `MonotonicAnchoredClock` mit Per-Asset/Per-Domain-Konfiguration.
+- **F-M5-12 Sidecar-First-MPC-Backend** (verlinkt mit
+  [ADR 0006](../../adr/0006-mpc-kernel-backend-and-solver.md) §6
+  Trigger-Watch). Trigger (jeder erzwingt eigene Folge-ADR):
+  (1) `sample_time < 10 ms` im operativen Profil; (2) Solver-
+  Isolationspflicht (OSQP-Crash-Quelle in Produktion oder Operator-
+  Sandbox-Anforderung); (3) Multi-Language-Solver-Anforderung
+  (Python/cvxpy-/Stan-/JAX-basierter Solver — wahrscheinlich
+  Trigger-Vorbote ist F-M5-08 Stochastic-MPC); (4) Asset-
+  spezifische Operator-Backend-Wahl (löst zusätzlich Bi-Modal-
+  Folge-ADR aus); (5) Container-/Pod-Co-Location-Constraint
+  (Sidecar-Container ohnehin vorhanden, Worker-Image-Size relevant).
+  Scope: zweiter `IMpcModelSolver`-Adapter `OptimizationCoreMpcOptimizer`
+  neben `LocalOsqpMpcSolver`; `MpcBackend = "optimization_core"`
+  aktiviert ihn; `IFallbackMpcOptimizer` wird der Local-OSQP-Adapter.
 
 **Bestehend, unverändert (aus RM-M5-01-Linie):**
 
@@ -1013,6 +1046,8 @@ führte).
 **Bestehend, getrennt (aus ADR 0005 §7 Phase-4-Pivot):**
 
 - Latenz-Pflicht-Bound unter 1 ms pro MPC-Schritt → RM-M5-03
-  Native-Embed-Pivot. M5-02 fährt im Default mit Bi-Modal-Local-
-  First; wenn die Latenz-Telemetrie aus M5-02-D-Doku konsistent
-  über dem Bound liegt, zündet RM-M5-03.
+  Native-Embed-Pivot. M5-02 fährt mit Local-First + OSQP (ADR 0006
+  §2); wenn die Latenz-Telemetrie aus M5-02-D-Doku einen
+  in-process-OSQP-Solve über dem 1-ms-Bound zeigt, zündet RM-M5-03
+  (nicht F-M5-12 — F-M5-12 zielt auf die Sidecar-Linie, nicht auf
+  einen Shared-Memory-Native-Embed).
