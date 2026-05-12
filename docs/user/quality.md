@@ -43,13 +43,16 @@ make lint   # = docker build --target lint
 
 Die Stage führt aus:
 
-| Tool                                                    | Zweck                                                              |
-| ------------------------------------------------------- | ------------------------------------------------------------------ |
-| `dotnet build -warnaserror`                             | Compiler- und Analyzer-Warnings als Fehler                         |
-| Roslyn-Analyzer (`Microsoft.CodeAnalysis.NetAnalyzers`) | Maintainability- und SOLID-Regeln auf `AnalysisLevel=latest-all`   |
+| Tool                                                    | Zweck                                                                           |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `dotnet build -warnaserror`                             | Compiler- und Analyzer-Warnings als Fehler                                      |
+| Roslyn-Analyzer (`Microsoft.CodeAnalysis.NetAnalyzers`) | Maintainability- und SOLID-Regeln auf `AnalysisLevel=latest-all`                |
 | `Microsoft.CodeAnalysis.Metrics` (optional)             | Erzeugt `*.Metrics.xml` über `dotnet build /t:Metrics`, Linux-CLI eingeschränkt |
 
-`#pragma warning disable` und `[SuppressMessage]` sind nur mit
+Für die unten aufgeführten SOLID-nahen Diagnose-IDs sind
+`#pragma warning disable` und `[SuppressMessage]` nicht zulässig; das
+Lint-Gate `solid-suppression-gate` bricht solche Unterdrückungen ab.
+Für andere Diagnose-IDs sind lokale Unterdrückungen nur mit
 `Justification`-Attribut zulässig, das den Pfad und die Begründung
 nennt. Globaler `<NoWarn>` ist verboten — Ausnahme: `CA1014`
 (CLSCompliant-Markierung) ist projektweit per `Directory.Build.props`
@@ -59,18 +62,24 @@ unterdrückt, weil Bess-EMS keine NuGet-Library publiziert.
 in `Directory.Build.props`, Severities pro Diagnose-ID in
 `.editorconfig`, scharf gestellt ab M1 RM-M1-20):
 
-| Diagnostic-ID                         | Bezug             | Zweck                                                         |
-| ------------------------------------- | ----------------- | ------------------------------------------------------------- |
-| CA1501                                | SRP               | Vererbungstiefe begrenzt                                      |
-| CA1502                                | SRP               | Cyclomatic Complexity ≤ 25 pro Methode                        |
-| CA1505                                | SRP               | Maintainability Index pro Typ/Methode                         |
-| CA1506                                | SRP               | Class Coupling pro Typ                                        |
-| CA1000                                | LSP               | Keine statischen Member auf generischen Typen                 |
-| CA1001                                | OCP               | Typen mit Disposable-Feldern müssen `IDisposable` sein        |
-| CA1012                                | DIP               | Abstrakte Typen ohne öffentliche Konstruktoren                |
-| CA1033                                | LSP / OCP / ISP   | Interface-Methoden auch in Subtypen aufrufbar                 |
-| CA1040                                | ISP               | Keine leeren Interfaces                                       |
-| CA1715                                | LSP               | Korrektes Präfix für Interfaces / Typparameter                |
+| Diagnostic-ID | Prinzip         | Regel-Name (Deutsch)                                                   | Zweck / Auswirkung auf SOLID                                                                                           |
+| ------------- | --------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| CA1000        | LSP             | Keine statischen Member auf generischen Typen                          | Verhindert APIs, deren statische Member je geschlossenem Generic-Typ anders wirken und Austauschbarkeit erschweren.     |
+| CA1001        | SRP             | Typen mit Freigabefeldern müssen freigegeben werden können             | Wer Ressourcen (`IDisposable`) besitzt, muss auch für deren Freigabe verantwortlich sein.                               |
+| CA1002        | DIP             | Generische Listen nicht offenlegen                                     | Verbietet `List<T>` in öffentlichen APIs, damit Konsumenten gegen abstraktere Collection-Verträge programmieren.        |
+| CA1010        | ISP             | Sammlungen sollten generische Schnittstellen implementieren            | Erzwingt schlanke, typisierte Collection-Schnittstellen statt mächtiger, ungeprüfter Basisklassen.                      |
+| CA1012        | OCP             | Abstrakte Typen sollten keine öffentlichen Konstruktoren besitzen      | Sichert ab, dass abstrakte Typen nur durch Erweiterung und nicht direkt instanziiert werden.                            |
+| CA1033        | LSP / OCP / ISP | Schnittstellenmethoden sollten für untergeordnete Typen aufrufbar sein | Verhindert, dass abgeleitete Klassen das Verhalten von Basis-Schnittstellen unzugänglich machen.                        |
+| CA1040        | ISP             | Leere Schnittstellen vermeiden                                         | Vermeidet Marker-Interfaces ohne konkretes, spezifisches Verhalten.                                                     |
+| CA1047        | OCP             | Keine geschützten Member in versiegelten Typen deklarieren             | Verhindert Erweiterungspunkte in Klassen, die explizit für Vererbung geschlossen (`sealed`) sind.                       |
+| CA1051        | SRP             | Keine sichtbaren Instanzfelder deklarieren                             | Erzwingt Kapselung statt direkter Freigabe interner Datenstrukturen.                                                    |
+| CA1065        | LSP             | Keine Ausnahmen an unerwarteten Orten auslösen                         | Schützt erwartbare Basisverträge, besonders bei Properties, Events und Vergleichs-/Hashing-Pfaden.                     |
+| CA1501        | OCP / LSP       | Übermäßige Vererbung vermeiden                                         | Tiefe Hierarchien machen Erweiterungen und Austauschbarkeit schwer vorhersagbar.                                        |
+| CA1502        | SRP             | Übermäßige Komplexität vermeiden                                       | Hohe zyklomatische Komplexität zeigt, dass eine Methode zu viele Logikpfade und Aufgaben bündelt.                      |
+| CA1505        | SRP             | Unwartbaren Code vermeiden                                             | Ein schlechter Wartbarkeitsindex ist ein Signal für zu viele Verantwortlichkeiten oder zu dichte Logik.                |
+| CA1506        | SRP             | Übermäßige Klassenkopplung vermeiden                                   | Zu hohe Kopplung signalisiert, dass ein Typ zu viele Abhängigkeiten und Aufgaben kennt.                                 |
+| CA1715        | LSP / ISP       | Korrektes Präfix für Interfaces / Typparameter                         | Stabile Namenskonventionen machen Interface- und Generic-Verträge eindeutig erkennbar.                                  |
+| CA1822        | DIP             | Member als statisch markieren                                          | Zeigt Methoden ohne Instanzzustand; solche Logik kann entkoppelt oder bewusst als zustandsfrei markiert werden.         |
 
 Die vollständige Aktivierungstabelle lebt in `.editorconfig` im
 Repository-Root und ist Teil des Lint-Gates. Der Build kopiert die
@@ -91,10 +100,10 @@ make native-lint   # = docker build --target native-lint
 
 Die Stage führt für `native/battery_control_core/src/` aus:
 
-| Tool          | Zweck                                                         |
-| ------------- | ------------------------------------------------------------- |
-| `clang-tidy` (auf `compile_commands.json` mit `--warnings-as-errors=*`) | regelbasierte statische Analyse gegen `.clang-tidy`-Profil: `-* + bugprone-* + clang-analyzer-* + readability-function-cognitive-complexity` (Threshold 20); `bugprone-easily-swappable-parameters` mit dokumentierter Begründung deaktiviert; `HeaderFilterRegex` schließt FetchContent-Quellen aus |
-| Compiler-Flags `-Wall -Wextra -Wpedantic -Werror -Wshadow -Wnull-dereference -Wdouble-promotion` | jede Warnung ist Fehler |
+| Tool                                                                                             | Zweck                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `clang-tidy` (auf `compile_commands.json` mit `--warnings-as-errors=*`)                          | regelbasierte statische Analyse gegen `.clang-tidy`-Profil: `-* + bugprone-* + clang-analyzer-* + readability-function-cognitive-complexity` (Threshold 20); `bugprone-easily-swappable-parameters` mit dokumentierter Begründung deaktiviert; `HeaderFilterRegex` schließt FetchContent-Quellen aus |
+| Compiler-Flags `-Wall -Wextra -Wpedantic -Werror -Wshadow -Wnull-dereference -Wdouble-promotion` | jede Warnung ist Fehler                                                                                                                                                                                                                                                                              |
 
 Komplexitätsmetriken auf Funktionsebene (Cognitive-Complexity)
 laufen heute über die clang-tidy-Regel
@@ -105,11 +114,11 @@ denkbar, aber nicht Bestandteil der RM-M3-09-Closure.
 `clang-tidy`-Profil (vollständige Liste in
 `native/battery_control_core/.clang-tidy`):
 
-| Check-Gruppe              | Zweck                                                  |
-| ------------------------- | ------------------------------------------------------ |
-| `bugprone-*`              | klassische Bug-Patterns (mit Ausnahme `bugprone-easily-swappable-parameters`, dokumentierte Begründung im Config-Header) |
-| `clang-analyzer-*`        | statische Programmanalyse (Null-Deref, uninitialisierte Variablen, Dead Stores) |
-| `readability-function-cognitive-complexity` | Cognitive-Complexity-Limit pro Funktion |
+| Check-Gruppe                                | Zweck                                                                                                                    |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `bugprone-*`                                | klassische Bug-Patterns (mit Ausnahme `bugprone-easily-swappable-parameters`, dokumentierte Begründung im Config-Header) |
+| `clang-analyzer-*`                          | statische Programmanalyse (Null-Deref, uninitialisierte Variablen, Dead Stores)                                          |
+| `readability-function-cognitive-complexity` | Cognitive-Complexity-Limit pro Funktion                                                                                  |
 
 `// NOLINT`-Kommentare sind im Native-Core nicht zulässig — die
 Lint-Stage ist hart auf `--warnings-as-errors=*`. Eine bewusste
@@ -130,15 +139,15 @@ make native-sanitizer   # = docker build --target native-sanitizer
 
 ### 1.3 Konfigurationsdateien
 
-| Datei                       | Zweck                                                |
-| --------------------------- | ---------------------------------------------------- |
-| `.editorconfig`             | C#-Style + Roslyn-Diagnostic-Severities (CA-Regeln aus §1.1)        |
-| `Directory.Build.props`     | `TreatWarningsAsErrors=true`, `AnalysisLevel=latest-all`, `RestorePackagesWithLockFile=true` (siehe §1.4), gemeinsame Analyzer-PackageReference |
-| `Directory.Packages.props`  | Zentrale Package-Versionen inkl. `Microsoft.CodeAnalysis.NetAnalyzers` |
-| `**/packages.lock.json`     | Pro Projekt eingecheckte Lock-Datei mit Content-Hashes (siehe §1.4) |
-| `native/.clang-format`      | C/C++ Layout                                         |
-| `native/.clang-tidy`        | C/C++ Check-Profil                                   |
-| `native/CMakeLists.txt`     | Compiler-Flags `-Wall -Wextra -Wpedantic -Werror`    |
+| Datei                      | Zweck                                                                                                                                           |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.editorconfig`            | C#-Style + Roslyn-Diagnostic-Severities (CA-Regeln aus §1.1)                                                                                    |
+| `Directory.Build.props`    | `TreatWarningsAsErrors=true`, `AnalysisLevel=latest-all`, `RestorePackagesWithLockFile=true` (siehe §1.4), gemeinsame Analyzer-PackageReference |
+| `Directory.Packages.props` | Zentrale Package-Versionen inkl. `Microsoft.CodeAnalysis.NetAnalyzers`                                                                          |
+| `**/packages.lock.json`    | Pro Projekt eingecheckte Lock-Datei mit Content-Hashes (siehe §1.4)                                                                             |
+| `native/.clang-format`     | C/C++ Layout                                                                                                                                    |
+| `native/.clang-tidy`       | C/C++ Check-Profil                                                                                                                              |
+| `native/CMakeLists.txt`    | Compiler-Flags `-Wall -Wextra -Wpedantic -Werror`                                                                                               |
 
 ### 1.4 Supply-Chain: NuGet-Lock-Files
 
@@ -205,16 +214,16 @@ Pflicht ab M1 (LH-TEST-001/002).
 
 Mindestumfang:
 
-| Komponente               | LH-Bezug             |
-| ------------------------ | -------------------- |
-| Constraint Limiter       | LH-CTRL-002, LH-SAFE-002/3 |
-| Ramp Limiter             | LH-CTRL-003          |
-| State Machine            | LH-SM-001..003       |
-| Snapshot Validation      | LH-RT-003, LH-DOM-004 |
-| Vorzeichenkonvention     | LH §4.1              |
-| Day-Ahead-Fahrplanlogik  | LH-MKT-001, LH-MKT-007 |
-| Zeitmodell inkl. DST     | LH-MKT-007           |
-| PID (ab M2)              | LH-CTRL-004          |
+| Komponente              | LH-Bezug                   |
+| ----------------------- | -------------------------- |
+| Constraint Limiter      | LH-CTRL-002, LH-SAFE-002/3 |
+| Ramp Limiter            | LH-CTRL-003                |
+| State Machine           | LH-SM-001..003             |
+| Snapshot Validation     | LH-RT-003, LH-DOM-004      |
+| Vorzeichenkonvention    | LH §4.1                    |
+| Day-Ahead-Fahrplanlogik | LH-MKT-001, LH-MKT-007     |
+| Zeitmodell inkl. DST    | LH-MKT-007                 |
+| PID (ab M2)             | LH-CTRL-004                |
 
 ### 2.2 Integrationstests
 
@@ -228,14 +237,14 @@ einen Mosquitto-MQTT-Broker und Modbus-/OPC-UA-Simulatoren.
 Pflicht ab M1 für Modbus + MQTT (LH-TEST-003); OPC-UA-Integrationstests
 werden mit M4 aktiv.
 
-| Adapter / Pfad                         | Aktiv ab | LH-Bezug                  |
-| -------------------------------------- | -------- | ------------------------- |
-| Modbus-TCP gegen Simulator             | M1       | LH-MODB-001..005, LH-TEST-003 |
-| MQTT gegen Mosquitto                   | M1       | LH-MQTT-001..005          |
-| Postgres-Persistenz                    | M1       | LH-PERSIST-001..005       |
-| API gegen `WebApplicationFactory`      | M1       | LH-API-001..007           |
-| OPC-UA gegen Simulator                 | M4       | LH-OPCUA-001..005         |
-| Optimization-Sidecar (gRPC)            | M5       | LH-OPT-006                |
+| Adapter / Pfad                    | Aktiv ab | LH-Bezug                      |
+| --------------------------------- | -------- | ----------------------------- |
+| Modbus-TCP gegen Simulator        | M1       | LH-MODB-001..005, LH-TEST-003 |
+| MQTT gegen Mosquitto              | M1       | LH-MQTT-001..005              |
+| Postgres-Persistenz               | M1       | LH-PERSIST-001..005           |
+| API gegen `WebApplicationFactory` | M1       | LH-API-001..007               |
+| OPC-UA gegen Simulator            | M4       | LH-OPCUA-001..005             |
+| Optimization-Sidecar (gRPC)       | M5       | LH-OPT-006                    |
 
 #### 2.2.1 HIL-Pfad (optional, RM-M2-HIL-Welle)
 
@@ -270,21 +279,21 @@ Kernel-Allocate).
 **Pin-Inventory** (13 Pins gesamt — 5 happy-path + 2 negativ/stress
 + 6 security):
 
-| Datei | Pin | Quelle |
-| ----- | --- | ------ |
-| `OpcUaRoundtripTests.cs` | EndToEnd_Read_emits_telemetry_with_mapped_values | RM-M4-04-D |
-| `OpcUaRoundtripTests.cs` | EndToEnd_Subscribe_picks_up_value_change_within_two_intervals | RM-M4-04-D |
-| `OpcUaRoundtripTests.cs` | EndToEnd_Write_setpoint_roundtrips_through_server | RM-M4-04-D |
-| `OpcUaRoundtripTests.cs` | EndToEnd_StatusCode_bad_surfaces_as_protocol_error | RM-M4-04-D |
-| `OpcUaRoundtripTests.cs` | EndToEnd_Reconnect_after_server_restart_keeps_stream_alive | RM-M4-04-D |
-| `OpcUaNegativeTests.cs` | Multi_cycle_reconnect_keeps_stream_alive_and_does_not_leak_subscriptions | RM-M4-08-A |
-| `OpcUaNegativeTests.cs` | Concurrent_source_and_sink_survive_restart_under_contention | RM-M4-08-A |
-| `OpcUaSecurityTests.cs` | Secure_handshake_signandencrypt_succeeds_against_test_server | RM-M4-05-D |
-| `OpcUaSecurityTests.cs` | Secure_handshake_sign_mode_succeeds_against_test_server | RM-M4-05-D |
-| `OpcUaSecurityTests.cs` | Non_allowlisted_policy_throws_at_construction | RM-M4-05-D |
-| `OpcUaSecurityTests.cs` | Production_profile_with_unsecured_mode_throws_at_construction | RM-M4-05-D |
-| `OpcUaSecurityTests.cs` | Hil_simulator_profile_with_unsecured_mode_passes | RM-M4-05-D |
-| `OpcUaSecurityTests.cs` | Production_profile_without_trusted_server_certificate_fails | RM-M4-05-D |
+| Datei                    | Pin                                                                      | Quelle     |
+| ------------------------ | ------------------------------------------------------------------------ | ---------- |
+| `OpcUaRoundtripTests.cs` | EndToEnd_Read_emits_telemetry_with_mapped_values                         | RM-M4-04-D |
+| `OpcUaRoundtripTests.cs` | EndToEnd_Subscribe_picks_up_value_change_within_two_intervals            | RM-M4-04-D |
+| `OpcUaRoundtripTests.cs` | EndToEnd_Write_setpoint_roundtrips_through_server                        | RM-M4-04-D |
+| `OpcUaRoundtripTests.cs` | EndToEnd_StatusCode_bad_surfaces_as_protocol_error                       | RM-M4-04-D |
+| `OpcUaRoundtripTests.cs` | EndToEnd_Reconnect_after_server_restart_keeps_stream_alive               | RM-M4-04-D |
+| `OpcUaNegativeTests.cs`  | Multi_cycle_reconnect_keeps_stream_alive_and_does_not_leak_subscriptions | RM-M4-08-A |
+| `OpcUaNegativeTests.cs`  | Concurrent_source_and_sink_survive_restart_under_contention              | RM-M4-08-A |
+| `OpcUaSecurityTests.cs`  | Secure_handshake_signandencrypt_succeeds_against_test_server             | RM-M4-05-D |
+| `OpcUaSecurityTests.cs`  | Secure_handshake_sign_mode_succeeds_against_test_server                  | RM-M4-05-D |
+| `OpcUaSecurityTests.cs`  | Non_allowlisted_policy_throws_at_construction                            | RM-M4-05-D |
+| `OpcUaSecurityTests.cs`  | Production_profile_with_unsecured_mode_throws_at_construction            | RM-M4-05-D |
+| `OpcUaSecurityTests.cs`  | Hil_simulator_profile_with_unsecured_mode_passes                         | RM-M4-05-D |
+| `OpcUaSecurityTests.cs`  | Production_profile_without_trusted_server_certificate_fails              | RM-M4-05-D |
 
 **Security-Default-Schwenk (RM-M4-05)**: pre-M4-05 fuhr der OPC-UA-
 Adapter mit `MessageSecurityMode.None` plus dem `AllowUnsecured`-
@@ -306,12 +315,12 @@ ausreichend (M4-05 D-02).
 - `make test-hil-opcua` → mandatory, process-internal Embedded
   TestServer; das einzige OPC-UA-spezifische End-to-End-Gate.
 
-| Voraussetzung | Wer liefert |
-| ------------- | ----------- |
+| Voraussetzung                                         | Wer liefert               |
+| ----------------------------------------------------- | ------------------------- |
 | `bess-hil-simulator:local` lokal gebaut (HIL-OPEN-01) | Schwesterprojekt-Operator |
-| `tests/hil/compose.yml` + `tests/hil/Dockerfile` | bess-ems |
-| `config/examples/adapters/modbus.hil-simulator.json` | bess-ems |
-| `BatteryEms.Hil.IntegrationTests` | bess-ems |
+| `tests/hil/compose.yml` + `tests/hil/Dockerfile`      | bess-ems                  |
+| `config/examples/adapters/modbus.hil-simulator.json`  | bess-ems                  |
+| `BatteryEms.Hil.IntegrationTests`                     | bess-ems                  |
 
 Wann den HIL-Pfad fahren: bei Änderungen am Modbus-Adapter
 (Word-Order, Register-Tabellen, Float-Encoding) oder vor einem
@@ -341,34 +350,34 @@ idempotency-Pins + 5 local-fallback-Pins kommen aus dem
 Sub-Slice-C-Korrektur-Pass (plan §5.1) als Wire-Verhalten gegen
 `IOptimizationIdempotencyStore` + Fallback-Matrix-Integration):
 
-| Datei | Pin | Quelle |
-| ----- | --- | ------ |
-| `OptimizationCoreRoundtripTests.cs` | Health_probe_succeeds_against_test_sidecar | RM-M5-01-B |
-| `OptimizationCoreRoundtripTests.cs` | Version_probe_compatibility_check_passes | RM-M5-01-B |
-| `OptimizationCoreRoundtripTests.cs` | Optimize_success_produces_optimal_run_with_schedule | RM-M5-01-B + RM-M5-05 Metrics-Pin |
-| `OptimizationCoreRoundtripTests.cs` | Optimize_streaming_progress_does_not_block_final_result | RM-M5-01-B |
-| `OptimizationCoreRoundtripTests.cs` | Optimize_cancellation_mid_stream_returns_failed_run | RM-M5-01-B |
-| `OptimizationCoreNegativeTests.cs` | Deadline_exceeded_returns_failed_run_with_time_limit_status | RM-M5-01-B |
-| `OptimizationCoreNegativeTests.cs` | Sidecar_unavailable_returns_failed_run_with_failed_status | RM-M5-01-B |
-| `OptimizationCoreNegativeTests.cs` | Infeasible_sidecar_result_produces_no_schedule | RM-M5-01-B |
-| `OptimizationCoreNegativeTests.cs` | Invalid_trajectory_output_is_rejected_as_failed_run | RM-M5-01-B |
-| `OptimizationCoreMixedVersionTests.cs` | Worker_1_0_against_sidecar_1_0_optimizes_successfully | RM-M5-01-D |
-| `OptimizationCoreMixedVersionTests.cs` | Worker_1_0_against_sidecar_0_5_returns_contract_incompatible | RM-M5-01-D |
-| `OptimizationCoreMixedVersionTests.cs` | Worker_1_0_against_sidecar_2_0_min_returns_contract_incompatible | RM-M5-01-D |
-| `OptimizationCoreMixedVersionTests.cs` | Worker_required_feature_missing_returns_contract_incompatible | RM-M5-01-D |
-| `OptimizationCoreSecurityTests.cs` | Production_profile_with_plaintext_http_endpoint_throws_at_construction | RM-M5-01-C |
-| `OptimizationCoreSecurityTests.cs` | Production_profile_with_world_readable_uds_throws_at_connect | RM-M5-01-C |
-| `OptimizationCoreSecurityTests.cs` | Production_profile_with_locked_uds_passes_uds_mode_check | RM-M5-01-C |
-| `OptimizationCoreSecurityTests.cs` | Hil_simulator_profile_with_world_readable_uds_passes | RM-M5-01-C |
-| `OptimizationCoreIdempotencyTests.cs` | First_optimize_creates_pending_then_finalizes_as_sidecar_committed | RM-M5-01-C |
-| `OptimizationCoreIdempotencyTests.cs` | Duplicate_optimize_with_same_inputs_skips_sidecar_call | RM-M5-01-C |
-| `OptimizationCoreIdempotencyTests.cs` | Different_request_inputs_get_different_request_id | RM-M5-01-C |
-| `OptimizationCoreFallbackTests.cs` | Transport_failure_with_fallback_returns_fallback_committed_schedule | RM-M5-01-C-fixup |
-| `OptimizationCoreFallbackTests.cs` | Transport_failure_without_fallback_returns_failed_no_activation | RM-M5-01-C-fixup |
-| `OptimizationCoreFallbackTests.cs` | Transport_failure_with_fallback_that_throws_falls_through_to_failed | RM-M5-01-C-fixup |
-| `OptimizationCoreFallbackTests.cs` | Sidecar_success_does_not_invoke_fallback | RM-M5-01-C-fixup |
-| `OptimizationCoreFallbackTests.cs` | Fallback_with_context_mismatch_is_rejected_by_validator | RM-M5-01-C-fixup |
-| `OptimizationCoreManifestReplayTests.cs` | Manifest_drives_sidecar_schedule_engine_comparison | RM-M5-04-E |
+| Datei                                    | Pin                                                                    | Quelle                            |
+| ---------------------------------------- | ---------------------------------------------------------------------- | --------------------------------- |
+| `OptimizationCoreRoundtripTests.cs`      | Health_probe_succeeds_against_test_sidecar                             | RM-M5-01-B                        |
+| `OptimizationCoreRoundtripTests.cs`      | Version_probe_compatibility_check_passes                               | RM-M5-01-B                        |
+| `OptimizationCoreRoundtripTests.cs`      | Optimize_success_produces_optimal_run_with_schedule                    | RM-M5-01-B + RM-M5-05 Metrics-Pin |
+| `OptimizationCoreRoundtripTests.cs`      | Optimize_streaming_progress_does_not_block_final_result                | RM-M5-01-B                        |
+| `OptimizationCoreRoundtripTests.cs`      | Optimize_cancellation_mid_stream_returns_failed_run                    | RM-M5-01-B                        |
+| `OptimizationCoreNegativeTests.cs`       | Deadline_exceeded_returns_failed_run_with_time_limit_status            | RM-M5-01-B                        |
+| `OptimizationCoreNegativeTests.cs`       | Sidecar_unavailable_returns_failed_run_with_failed_status              | RM-M5-01-B                        |
+| `OptimizationCoreNegativeTests.cs`       | Infeasible_sidecar_result_produces_no_schedule                         | RM-M5-01-B                        |
+| `OptimizationCoreNegativeTests.cs`       | Invalid_trajectory_output_is_rejected_as_failed_run                    | RM-M5-01-B                        |
+| `OptimizationCoreMixedVersionTests.cs`   | Worker_1_0_against_sidecar_1_0_optimizes_successfully                  | RM-M5-01-D                        |
+| `OptimizationCoreMixedVersionTests.cs`   | Worker_1_0_against_sidecar_0_5_returns_contract_incompatible           | RM-M5-01-D                        |
+| `OptimizationCoreMixedVersionTests.cs`   | Worker_1_0_against_sidecar_2_0_min_returns_contract_incompatible       | RM-M5-01-D                        |
+| `OptimizationCoreMixedVersionTests.cs`   | Worker_required_feature_missing_returns_contract_incompatible          | RM-M5-01-D                        |
+| `OptimizationCoreSecurityTests.cs`       | Production_profile_with_plaintext_http_endpoint_throws_at_construction | RM-M5-01-C                        |
+| `OptimizationCoreSecurityTests.cs`       | Production_profile_with_world_readable_uds_throws_at_connect           | RM-M5-01-C                        |
+| `OptimizationCoreSecurityTests.cs`       | Production_profile_with_locked_uds_passes_uds_mode_check               | RM-M5-01-C                        |
+| `OptimizationCoreSecurityTests.cs`       | Hil_simulator_profile_with_world_readable_uds_passes                   | RM-M5-01-C                        |
+| `OptimizationCoreIdempotencyTests.cs`    | First_optimize_creates_pending_then_finalizes_as_sidecar_committed     | RM-M5-01-C                        |
+| `OptimizationCoreIdempotencyTests.cs`    | Duplicate_optimize_with_same_inputs_skips_sidecar_call                 | RM-M5-01-C                        |
+| `OptimizationCoreIdempotencyTests.cs`    | Different_request_inputs_get_different_request_id                      | RM-M5-01-C                        |
+| `OptimizationCoreFallbackTests.cs`       | Transport_failure_with_fallback_returns_fallback_committed_schedule    | RM-M5-01-C-fixup                  |
+| `OptimizationCoreFallbackTests.cs`       | Transport_failure_without_fallback_returns_failed_no_activation        | RM-M5-01-C-fixup                  |
+| `OptimizationCoreFallbackTests.cs`       | Transport_failure_with_fallback_that_throws_falls_through_to_failed    | RM-M5-01-C-fixup                  |
+| `OptimizationCoreFallbackTests.cs`       | Sidecar_success_does_not_invoke_fallback                               | RM-M5-01-C-fixup                  |
+| `OptimizationCoreFallbackTests.cs`       | Fallback_with_context_mismatch_is_rejected_by_validator                | RM-M5-01-C-fixup                  |
+| `OptimizationCoreManifestReplayTests.cs` | Manifest_drives_sidecar_schedule_engine_comparison                     | RM-M5-04-E                        |
 
 Plus 13 Persistence-Pins in `BatteryEms.Persistence.IntegrationTests`
 (`OptimizationIdempotencyStoreIntegrationTests.cs`) für den
@@ -431,19 +440,19 @@ make test-safety   # = docker build --target test-safety
 
 Verbindliche Sicherheitsfälle aus LH-TEST-006:
 
-| Fall                         | Erwartetes Verhalten                                | LH-Bezug      |
-| ---------------------------- | --------------------------------------------------- | ------------- |
-| Emergency Stop aktiv         | spätestens nächster Zyklus → Stop-Command           | LH-SAFE-001   |
-| BMS nicht verfügbar          | sicherer Zustand (`0 kW`/Stop) mit Reason           | LH-SAFE-004   |
-| Wechselrichter nicht verfügbar | sicherer Zustand mit Reason                       | LH-SAFE-004   |
-| SOC ungültig (NaN, <0, >100) | DataQuality `invalid`, kein aktiver Befehl          | LH-SAFE-006   |
-| Temperatur unplausibel       | DataQuality `invalid`, kein aktiver Befehl          | LH-SAFE-006   |
-| Veralteter Snapshot (>3 s)   | sicherer Zustand mit Reason                         | LH-RT-003, LH-CTRL-007 |
-| Kommunikationsverlust        | sicherer Zustand nach max. Messwertalter            | LH-SAFE-004   |
-| Abgelaufener `ValidUntil`    | Command verworfen                                   | LH-SAFE-005   |
-| SOC ≥ MAX                    | Ladeanteil = 0                                      | LH-SAFE-002   |
-| SOC ≤ MIN                    | Entladeanteil = 0                                   | LH-SAFE-003   |
-| Schreibwert > Limit          | Adapter-seitige Schreibbegrenzung greift            | LH-SAFE-007   |
+| Fall                           | Erwartetes Verhalten                       | LH-Bezug               |
+| ------------------------------ | ------------------------------------------ | ---------------------- |
+| Emergency Stop aktiv           | spätestens nächster Zyklus → Stop-Command  | LH-SAFE-001            |
+| BMS nicht verfügbar            | sicherer Zustand (`0 kW`/Stop) mit Reason  | LH-SAFE-004            |
+| Wechselrichter nicht verfügbar | sicherer Zustand mit Reason                | LH-SAFE-004            |
+| SOC ungültig (NaN, <0, >100)   | DataQuality `invalid`, kein aktiver Befehl | LH-SAFE-006            |
+| Temperatur unplausibel         | DataQuality `invalid`, kein aktiver Befehl | LH-SAFE-006            |
+| Veralteter Snapshot (>3 s)     | sicherer Zustand mit Reason                | LH-RT-003, LH-CTRL-007 |
+| Kommunikationsverlust          | sicherer Zustand nach max. Messwertalter   | LH-SAFE-004            |
+| Abgelaufener `ValidUntil`      | Command verworfen                          | LH-SAFE-005            |
+| SOC ≥ MAX                      | Ladeanteil = 0                             | LH-SAFE-002            |
+| SOC ≤ MIN                      | Entladeanteil = 0                          | LH-SAFE-003            |
+| Schreibwert > Limit            | Adapter-seitige Schreibbegrenzung greift   | LH-SAFE-007            |
 
 Jeder Sicherheitsfall ist mit einem dedizierten Test belegt; ein
 fehlender Test gilt als Coverage-Fehler unabhängig vom Coverage-Gate.
@@ -461,13 +470,13 @@ make test-native-parity    # Replay-basierte Native↔Managed-Parität (Category
 
 `make test-native-interop` (RM-M3-07) deckt:
 
-| Prüfung                                             | LH-Bezug                |
-| --------------------------------------------------- | ----------------------- |
-| Struct-Layout (Sequential, Größen 24/56/32/24 Bytes, Offsets, Konstanten) | LH-NATIVE-003 |
-| ABI-Handshake `NativeControlLoader.TryLoad` mit echter `.so` | LH-NATIVE-005     |
-| Loader-Pfade `Disabled` / `LibraryMissing` / `Loaded` mit echtem Gateway | LH-NATIVE-005 |
+| Prüfung                                                                     | LH-Bezug      |
+| --------------------------------------------------------------------------- | ------------- |
+| Struct-Layout (Sequential, Größen 24/56/32/24 Bytes, Offsets, Konstanten)   | LH-NATIVE-003 |
+| ABI-Handshake `NativeControlLoader.TryLoad` mit echter `.so`                | LH-NATIVE-005 |
+| Loader-Pfade `Disabled` / `LibraryMissing` / `Loaded` mit echtem Gateway    | LH-NATIVE-005 |
 | Native-Contract bei nicht-finiten Inputs (Snapshot/Limits/Request/Previous) | LH-NATIVE-004 |
-| Negatives `dt` mit `has_previous=1` → `BCC_STATUS_NEGATIVE_DT` | LH-NATIVE-004 |
+| Negatives `dt` mit `has_previous=1` → `BCC_STATUS_NEGATIVE_DT`              | LH-NATIVE-004 |
 
 `make test-native-parity` (RM-M3-10) deckt den replay-basierten
 Parity-Vergleich gegen den versionierten Datensatz unter
@@ -537,20 +546,20 @@ korrelierbare `request_id`/`run_id`-Logs.
 
 ### 2.7 Tag-Steuerung
 
-| Modus                | Stage / Make-Target              | Filter                     |
-| -------------------- | -------------------------------- | -------------------------- |
-| Unit (Default)       | `make test`                      | `Category!=Integration & !Replay & !Container & !NativeInterop` |
-| Sicherheitsfälle     | `make test-safety`               | `Category=Safety`          |
-| Integration          | `make test-integration`          | `Category=Integration`     |
-| HIL (optional)       | `make test-hil-modbus`           | `Category=HIL`             |
-| OPC-UA-Roundtrip     | `make test-hil-opcua`            | `Category=Integration` im OPC-UA-IntegrationTests-Projekt |
-| Optimization-Core    | `make test-hil-optimization-core` | `Category=Integration` im OptimizationCore-IntegrationTests-Projekt inkl. RM-M5-04-E Sidecar-Manifest-Replay |
-| Optimization-Core Compose | `make test-optimization-core-compose` | RM-M5-06 Worker+Sidecar-Compose-Gate |
-| MPC Property         | `make test-mpc-property`          | RM-M5-02 Unit-Pins plus RM-M5-04-E lokaler MPC-Engine-Vergleich |
-| Native Interop       | `make test-native-interop`       | `Category!=Parity` im NativeInterop-IntegrationTests-Projekt |
-| Native Parity        | `make test-native-parity`        | `Category=Parity` im NativeInterop-IntegrationTests-Projekt |
-| Replay               | `make test-replay`               | `Category=Replay` im Application-Tests-Projekt |
-| Container            | `make test-container`            | `Category=Container`       |
+| Modus                     | Stage / Make-Target                   | Filter                                                                                                       |
+| ------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Unit (Default)            | `make test`                           | `Category!=Integration & !Replay & !Container & !NativeInterop`                                              |
+| Sicherheitsfälle          | `make test-safety`                    | `Category=Safety`                                                                                            |
+| Integration               | `make test-integration`               | `Category=Integration`                                                                                       |
+| HIL (optional)            | `make test-hil-modbus`                | `Category=HIL`                                                                                               |
+| OPC-UA-Roundtrip          | `make test-hil-opcua`                 | `Category=Integration` im OPC-UA-IntegrationTests-Projekt                                                    |
+| Optimization-Core         | `make test-hil-optimization-core`     | `Category=Integration` im OptimizationCore-IntegrationTests-Projekt inkl. RM-M5-04-E Sidecar-Manifest-Replay |
+| Optimization-Core Compose | `make test-optimization-core-compose` | RM-M5-06 Worker+Sidecar-Compose-Gate                                                                         |
+| MPC Property              | `make test-mpc-property`              | RM-M5-02 Unit-Pins plus RM-M5-04-E lokaler MPC-Engine-Vergleich                                              |
+| Native Interop            | `make test-native-interop`            | `Category!=Parity` im NativeInterop-IntegrationTests-Projekt                                                 |
+| Native Parity             | `make test-native-parity`             | `Category=Parity` im NativeInterop-IntegrationTests-Projekt                                                  |
+| Replay                    | `make test-replay`                    | `Category=Replay` im Application-Tests-Projekt                                                               |
+| Container                 | `make test-container`                 | `Category=Container`                                                                                         |
 
 ---
 
@@ -596,12 +605,12 @@ Defaults ist eine ADR-pflichtige Entscheidung.
 
 Artefakte:
 
-| Datei                                | Form                          |
-| ------------------------------------ | ----------------------------- |
-| `build/coverage/dotnet/cobertura.xml`| Cobertura-XML                 |
-| `build/coverage/dotnet/lcov.info`    | LCOV                          |
-| `build/coverage/dotnet/index.html`   | HTML-Report                   |
-| `build/coverage/dotnet/Summary.txt`  | Plain-Text mit Total          |
+| Datei                                 | Form                 |
+| ------------------------------------- | -------------------- |
+| `build/coverage/dotnet/cobertura.xml` | Cobertura-XML        |
+| `build/coverage/dotnet/lcov.info`     | LCOV                 |
+| `build/coverage/dotnet/index.html`    | HTML-Report          |
+| `build/coverage/dotnet/Summary.txt`   | Plain-Text mit Total |
 
 ### 3.2 Native-Coverage
 
@@ -695,11 +704,11 @@ Coverage-Gates kompensierbar.
 
 Aktiv ab **M3** (LH-NATIVE-005, RM-M3-03).
 
-| Gate                                                | Ort                              |
-| --------------------------------------------------- | -------------------------------- |
-| `battery_control_core_abi_version()` exportiert     | `native/battery_control_core/include/battery_control_core.h` |
-| `.NET`-Startup-Check vergleicht erwartete ABI       | `BatteryEms.Adapters.NativeInterop` (`NativeControlLoader.TryLoad`) |
-| Mismatch → .NET-Fallback, Health/Logs/Metrik nennen `abi-mismatch` | Integrationstest in M3 |
+| Gate                                                               | Ort                                                                 |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| `battery_control_core_abi_version()` exportiert                    | `native/battery_control_core/include/battery_control_core.h`        |
+| `.NET`-Startup-Check vergleicht erwartete ABI                      | `BatteryEms.Adapters.NativeInterop` (`NativeControlLoader.TryLoad`) |
+| Mismatch → .NET-Fallback, Health/Logs/Metrik nennen `abi-mismatch` | Integrationstest in M3                                              |
 
 Der Loader liefert fünf dokumentierte Endzustände: `disabled` (Opt-in
 nicht gesetzt), `library-missing` (Pfad existiert nicht),
@@ -785,15 +794,15 @@ Build und sind nicht über Coverage- oder andere Gates kompensierbar.
 
 Verbindliche Regeln:
 
-| Regel                                                                | Bezug                  |
-| -------------------------------------------------------------------- | ---------------------- |
-| `BatteryEms.Domain` referenziert keine Adapter-Bibliothek (ASP.NET, EF Core, MQTTnet, NModbus, OPC Foundation, OTel, Npgsql, gRPC, P/Invoke); nur `Microsoft.Extensions.Logging.Abstractions`/`Options` erlaubt | Architektur §4.2, AR-P-011 |
-| `BatteryEms.Application` referenziert nur `BatteryEms.Domain`; keine Adapter-Refs, kein konkreter Solver | Architektur §4.2 |
-| `adapters/driving/*` referenzieren nicht `adapters/driven/*` und keine anderen `adapters/driving/*` | Architektur §4.2 |
-| `adapters/driven/*` referenzieren nicht `adapters/driving/*` und keine anderen `adapters/driven/*` | Architektur §4.2 |
-| `BatteryEms.Adapters.NativeInterop` (ab M3) referenziert nur Application-Ports und Domain | Architektur §4.2, LH-NATIVE-* |
-| Nur `BatteryEms.Infrastructure` referenziert sowohl `hexagon/` als auch `adapters/`; kein anderer Pfad referenziert `Infrastructure` | Architektur §4.2 |
-| Driving Adapter implementieren nur Driving-Ports (`I*UseCase`, `I*Query`); Driven Adapter implementieren nur Driven-Ports | Architektur §4.2 §5.1 |
+| Regel                                                                                                                                                                                                           | Bezug                         |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| `BatteryEms.Domain` referenziert keine Adapter-Bibliothek (ASP.NET, EF Core, MQTTnet, NModbus, OPC Foundation, OTel, Npgsql, gRPC, P/Invoke); nur `Microsoft.Extensions.Logging.Abstractions`/`Options` erlaubt | Architektur §4.2, AR-P-011    |
+| `BatteryEms.Application` referenziert nur `BatteryEms.Domain`; keine Adapter-Refs, kein konkreter Solver                                                                                                        | Architektur §4.2              |
+| `adapters/driving/*` referenzieren nicht `adapters/driven/*` und keine anderen `adapters/driving/*`                                                                                                             | Architektur §4.2              |
+| `adapters/driven/*` referenzieren nicht `adapters/driving/*` und keine anderen `adapters/driven/*`                                                                                                              | Architektur §4.2              |
+| `BatteryEms.Adapters.NativeInterop` (ab M3) referenziert nur Application-Ports und Domain                                                                                                                       | Architektur §4.2, LH-NATIVE-* |
+| Nur `BatteryEms.Infrastructure` referenziert sowohl `hexagon/` als auch `adapters/`; kein anderer Pfad referenziert `Infrastructure`                                                                            | Architektur §4.2              |
+| Driving Adapter implementieren nur Driving-Ports (`I*UseCase`, `I*Query`); Driven Adapter implementieren nur Driven-Ports                                                                                       | Architektur §4.2 §5.1         |
 
 Suppressionen sind nicht zulässig. Eine bewusste Ausnahme erfordert eine
 ADR und ergänzt die Regelmenge in dieser Sektion.
@@ -929,6 +938,8 @@ wenn Registry, Namensschema und Signatur-/OIDC-Policy entschieden sind.
   explizit als Platzhalter mit Aktivierungs-Meilenstein gekennzeichnet.
   Ergänzungen werden hier eingetragen, sobald die jeweilige Folge-ADR
   existiert.
-- Suppressionen (`SuppressMessage`, `// NOLINT`, `[ExcludeFromCodeCoverage]`,
-  `LCOV_EXCL_*`) sind ohne `Why:`-/`Justification`-Begründung
-  nicht zulässig. CI prüft das Vorhandensein der Begründung pro Pfad.
+- SOLID-nahe Diagnose-IDs aus §1.1 dürfen nicht unterdrückt werden.
+  Andere Suppressionen (`SuppressMessage`, `// NOLINT`,
+  `[ExcludeFromCodeCoverage]`, `LCOV_EXCL_*`) sind ohne
+  `Why:`-/`Justification`-Begründung nicht zulässig. CI prüft das
+  Vorhandensein der Begründung pro Pfad.

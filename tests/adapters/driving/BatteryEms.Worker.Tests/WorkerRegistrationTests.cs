@@ -21,44 +21,11 @@ namespace BatteryEms.Worker.Tests;
 public sealed class WorkerRegistrationTests
 {
     [Fact]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506", Justification = "DI-composition smoke test wires the full Application surface inline; extracting helpers would obscure the intent.")]
     public void AddBessWorker_registers_control_cycle_use_case_and_hosted_service()
     {
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Worker:CycleInterval"] = "00:00:00.500",
-            })
-            .Build();
-        var services = new ServiceCollection();
-        services.AddLogging(b => b.AddProvider(NullLoggerProvider.Instance));
+        using var provider = BuildWorkerProvider();
 
-        // Application-side dependencies the worker resolves from DI.
-        services.AddSingleton<IClock>(new SystemClock());
-        services.AddSingleton<IBatteryAssetRegistry>(_ => new InMemoryBatteryAssetRegistry());
-        services.AddSingleton<ISnapshotStore>(_ => new InMemorySnapshotStore(TimeSpan.FromSeconds(10)));
-        services.AddSingleton<ICommandRepository, InMemoryCommandRepository>();
-        services.AddSingleton<IMpcRunRepository, InMemoryMpcRunRepository>();
-        services.AddSingleton<IScheduleRepository>(_ => new InMemoryScheduleRepository());
-        services.AddSingleton<IOperatorStopRegistry, InMemoryOperatorStopRegistry>();
-        services.AddSingleton<IScheduleTracker, DefaultScheduleTracker>();
-        services.AddSingleton<IDispatchOptimizer, NullOptimizer>();
-        services.AddSingleton<IControlCycleMetrics>(NoOpControlCycleMetrics.Instance);
-        services.AddSingleton<IBatteryTelemetrySource, NoOpBatteryTelemetrySource>();
-        services.AddSingleton<IBatteryCommandSink, NoOpBatteryCommandSink>();
-        services.AddSingleton<BatteryEms.Application.Markets.ITimebaseHealthObserver,
-            BatteryEms.Application.Markets.InMemoryTimebaseHealthSource>();
-
-        services.AddBessWorker(configuration);
-
-        using var provider = services.BuildServiceProvider();
-        var cycle = provider.GetRequiredService<IControlCycleUseCase>();
-        var options = provider.GetRequiredService<IOptions<WorkerOptions>>().Value;
-        var hosted = provider.GetServices<IHostedService>().OfType<ControlCycleHostedService>().ToArray();
-
-        Assert.NotNull(cycle);
-        Assert.Equal(TimeSpan.FromMilliseconds(500), options.CycleInterval);
-        Assert.Single(hosted);
+        AssertWorkerRegistration(provider);
     }
 
     [Fact]
@@ -79,6 +46,52 @@ public sealed class WorkerRegistrationTests
     private sealed class SystemClock : IClock
     {
         public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
+    }
+
+    private static ServiceProvider BuildWorkerProvider()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging(b => b.AddProvider(NullLoggerProvider.Instance));
+        AddApplicationDependencies(services);
+        services.AddBessWorker(BuildWorkerConfiguration());
+        return services.BuildServiceProvider();
+    }
+
+    private static IConfiguration BuildWorkerConfiguration() =>
+        new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Worker:CycleInterval"] = "00:00:00.500",
+            })
+            .Build();
+
+    private static void AddApplicationDependencies(IServiceCollection services)
+    {
+        services.AddSingleton<IClock>(new SystemClock());
+        services.AddSingleton<IBatteryAssetRegistry>(_ => new InMemoryBatteryAssetRegistry());
+        services.AddSingleton<ISnapshotStore>(_ => new InMemorySnapshotStore(TimeSpan.FromSeconds(10)));
+        services.AddSingleton<ICommandRepository, InMemoryCommandRepository>();
+        services.AddSingleton<IMpcRunRepository, InMemoryMpcRunRepository>();
+        services.AddSingleton<IScheduleRepository>(_ => new InMemoryScheduleRepository());
+        services.AddSingleton<IOperatorStopRegistry, InMemoryOperatorStopRegistry>();
+        services.AddSingleton<IScheduleTracker, DefaultScheduleTracker>();
+        services.AddSingleton<IDispatchOptimizer, NullOptimizer>();
+        services.AddSingleton<IControlCycleMetrics>(NoOpControlCycleMetrics.Instance);
+        services.AddSingleton<IBatteryTelemetrySource, NoOpBatteryTelemetrySource>();
+        services.AddSingleton<IBatteryCommandSink, NoOpBatteryCommandSink>();
+        services.AddSingleton<BatteryEms.Application.Markets.ITimebaseHealthObserver,
+            BatteryEms.Application.Markets.InMemoryTimebaseHealthSource>();
+    }
+
+    private static void AssertWorkerRegistration(ServiceProvider provider)
+    {
+        var cycle = provider.GetRequiredService<IControlCycleUseCase>();
+        var options = provider.GetRequiredService<IOptions<WorkerOptions>>().Value;
+        var hosted = provider.GetServices<IHostedService>().OfType<ControlCycleHostedService>().ToArray();
+
+        Assert.NotNull(cycle);
+        Assert.Equal(TimeSpan.FromMilliseconds(500), options.CycleInterval);
+        Assert.Single(hosted);
     }
 
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]

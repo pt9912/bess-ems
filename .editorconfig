@@ -33,7 +33,13 @@ dotnet_diagnostic.CA1506.severity = error
 # OCP / LSP / ISP / DIP
 dotnet_diagnostic.CA1000.severity = error
 dotnet_diagnostic.CA1001.severity = error
+dotnet_diagnostic.CA1002.severity = error
+dotnet_diagnostic.CA1010.severity = error
 dotnet_diagnostic.CA1012.severity = error
 dotnet_diagnostic.CA1033.severity = error
 dotnet_diagnostic.CA1040.severity = error
+dotnet_diagnostic.CA1047.severity = error
+dotnet_diagnostic.CA1051.severity = error
+dotnet_diagnostic.CA1065.severity = error
 dotnet_diagnostic.CA1715.severity = error
+dotnet_diagnostic.CA1822.severity = error

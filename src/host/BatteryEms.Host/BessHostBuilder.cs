@@ -36,27 +36,47 @@ namespace BatteryEms.Host;
 // Modbus/MQTT adapters once the mapping loaders are wired.
 public static class BessHostBuilder
 {
-    // CA1506 fires on the composition root because it touches every
-    // adapter and the Application layer by design — that's its job.
-    // Splitting the wiring across helper classes only hides the coupling
-    // (it still exists in the dependency graph). Suppress with intent.
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Maintainability",
-        "CA1506",
-        Justification = "Composition root: wires every adapter together; high class coupling is intrinsic.")]
     public static WebApplication BuildApp(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
-        var hostOptions = builder.Configuration
-            .GetSection(BessHostOptions.SectionName)
-            .Get<BessHostOptions>() ?? new BessHostOptions();
+        var hostOptions = LoadHostOptions(builder.Configuration);
         var runtimeConfig = BessConfigurationBootstrap.Load(hostOptions);
 
-        // LH-MON-001: structured stdout — same JsonConsole the API host uses.
-        builder.Host.ConfigureBessJsonLogging();
+        ConfigureHostBuilder(builder, hostOptions, runtimeConfig);
+        var app = builder.Build();
+        ConfigureApp(app, hostOptions, runtimeConfig);
+        return app;
+    }
 
-        // System.Text.Json snake-case + enum converter for the API surface.
-        builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
+    private static BessHostOptions LoadHostOptions(ConfigurationManager configuration) =>
+        configuration
+            .GetSection(BessHostOptions.SectionName)
+            .Get<BessHostOptions>() ?? new BessHostOptions();
+
+    private static void ConfigureHostBuilder(
+        WebApplicationBuilder builder,
+        BessHostOptions hostOptions,
+        BessRuntimeConfiguration runtimeConfig)
+    {
+        builder.Host.ConfigureBessJsonLogging();
+        ConfigureJson(builder.Services);
+        builder.Services.AddOpenApi();
+        builder.Services.AddBessApplicationInMemoryStores();
+        builder.Services.AddBessNativeControl(builder.Configuration);
+        ConfigurePersistence(builder.Services, hostOptions);
+        ConfigureOptimization(builder.Services, hostOptions);
+        builder.Services.AddBessTelemetry();
+        builder.Services.AddBessTracing();
+        builder.Services.AddSingleton(runtimeConfig.Asset);
+        ConfigureIoAdapters(builder.Services, hostOptions, runtimeConfig);
+        builder.Services.AddBessWorker(builder.Configuration);
+        builder.Services.AddApiTokenAuth(builder.Configuration);
+        builder.Services.AddSingleton(runtimeConfig);
+    }
+
+    private static void ConfigureJson(IServiceCollection services)
+    {
+        services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
         {
             o.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower;
             o.SerializerOptions.DefaultIgnoreCondition =
@@ -64,52 +84,58 @@ public static class BessHostBuilder
             o.SerializerOptions.Converters.Add(
                 new System.Text.Json.Serialization.JsonStringEnumConverter(System.Text.Json.JsonNamingPolicy.SnakeCaseLower));
         });
+    }
 
-        builder.Services.AddOpenApi();
-
-        // Application-side wiring (clock, registries, snapshot store,
-        // use cases). The persistence-backed alternatives below replace
-        // the in-memory repositories when a connection string is set.
-        builder.Services.AddBessApplicationInMemoryStores();
-
-        // M3-D2: explicit IControlKernel registration. Default profile
-        // (NativeControl:Enabled=false in appsettings.json) wires the
-        // ManagedControlKernel — bit-identisch zum Pre-M3-D2-Verhalten,
-        // wo `ControlCycleUseCase` auf `new ManagedControlKernel()` im
-        // Konstruktor zurückfiel. Das produktionsnahe Native-Profil
-        // (`NativeControl:Enabled=true`, `LibraryPath=/app/native/...`)
-        // schaltet auf `NativeFallbackControlKernel` um, mit
-        // deterministischem Managed-Fallback bei Native-Fehlern und
-        // opt-in `AbortOnAbiMismatch` als Production-Policy
-        // (siehe `docs/user/quality.md` §5.2 + ADR 0003/0004).
-        builder.Services.AddBessNativeControl(builder.Configuration);
-
-        // Composition-root only: persistence adapter swap.
+    private static void ConfigurePersistence(IServiceCollection services, BessHostOptions hostOptions)
+    {
         if (!string.IsNullOrWhiteSpace(hostOptions.PersistenceConnectionString))
         {
-            builder.Services.AddBessPersistence(hostOptions.PersistenceConnectionString!);
+            services.AddBessPersistence(hostOptions.PersistenceConnectionString!);
         }
+    }
 
-        // Driven adapters: optimisation + telemetry are always wired.
-        builder.Services.AddBessOptimization();
-        ConfigureScheduleSolver(builder.Services, hostOptions);
-        ConfigureMpcBackend(builder.Services, hostOptions);
-        builder.Services.AddBessTelemetry();
-        // RM-M2-06: OTel tracing for the three Application-grenze flows.
-        // Exporter is opt-in via OTEL_EXPORTER_OTLP_ENDPOINT; without it
-        // spans flow through the SDK pipeline but never leave the host.
-        builder.Services.AddBessTracing();
+    private static void ConfigureOptimization(IServiceCollection services, BessHostOptions hostOptions)
+    {
+        services.AddBessOptimization();
+        ConfigureScheduleSolver(services, hostOptions);
+        ConfigureMpcBackend(services, hostOptions);
+    }
 
-        // The Modbus / MQTT command sinks need the BatteryAsset; expose
-        // the loaded asset to DI so the adapter constructors resolve it.
-        builder.Services.AddSingleton(runtimeConfig.Asset);
+    private static void ConfigureIoAdapters(
+        IServiceCollection services,
+        BessHostOptions hostOptions,
+        BessRuntimeConfiguration runtimeConfig)
+    {
+        var family = SelectIoAdapterFamily(hostOptions, runtimeConfig);
+        switch (family)
+        {
+            case IoAdapterTriage.Family.Modbus:
+                services.AddBessModbus(
+                    runtimeConfig.ModbusMapping!,
+                    ModbusAdapterOptions.Defaults(hostOptions.ModbusHost!, hostOptions.ModbusPort, runtimeConfig.Asset.AssetId));
+                break;
+            case IoAdapterTriage.Family.Mqtt:
+                services.AddBessMqtt(
+                    runtimeConfig.MqttMapping!,
+                    MqttAdapterOptions.Defaults(hostOptions.MqttBrokerHost!, hostOptions.MqttBrokerPort, hostOptions.MqttClientId!, runtimeConfig.Asset.AssetId));
+                break;
+            case IoAdapterTriage.Family.OpcUa:
+                services.AddBessOpcUa(
+                    runtimeConfig.OpcUaMapping!,
+                    BuildOpcUaAdapterOptions(hostOptions));
+                break;
+            case IoAdapterTriage.Family.None:
+            default:
+                services.AddSingleton<IBatteryTelemetrySource, NoOpBatteryTelemetrySource>();
+                services.AddSingleton<IBatteryCommandSink, NoOpBatteryCommandSink>();
+                break;
+        }
+    }
 
-        // I/O-Adapter-Triage. Detection-Logik in
-        // `IoAdapterTriage.SelectConfiguredFamily` (Application/IO),
-        // damit sie ohne WebApplicationFactory-Boot unit-getestet
-        // werden kann (review-fix #2 zu Sub-Slice C). Mehr als eine
-        // konfigurierte Familie wirft `multiple-io-adapters-configured`
-        // — der Operator muss sich für genau eine entscheiden.
+    private static IoAdapterTriage.Family SelectIoAdapterFamily(
+        BessHostOptions hostOptions,
+        BessRuntimeConfiguration runtimeConfig)
+    {
         var modbusConfigured = runtimeConfig.ModbusMapping is not null
             && !string.IsNullOrWhiteSpace(hostOptions.ModbusHost)
             && hostOptions.ModbusPort > 0;
@@ -119,56 +145,36 @@ public static class BessHostBuilder
             && !string.IsNullOrWhiteSpace(hostOptions.MqttClientId);
         var opcUaConfigured = runtimeConfig.OpcUaMapping is not null
             && hostOptions.OpcUaEndpointUrl is not null;
-        var family = IoAdapterTriage.SelectConfiguredFamily(
+        return IoAdapterTriage.SelectConfiguredFamily(
             modbusConfigured, mqttConfigured, opcUaConfigured);
-        switch (family)
-        {
-            case IoAdapterTriage.Family.Modbus:
-                builder.Services.AddBessModbus(
-                    runtimeConfig.ModbusMapping!,
-                    ModbusAdapterOptions.Defaults(hostOptions.ModbusHost!, hostOptions.ModbusPort, runtimeConfig.Asset.AssetId));
-                break;
-            case IoAdapterTriage.Family.Mqtt:
-                builder.Services.AddBessMqtt(
-                    runtimeConfig.MqttMapping!,
-                    MqttAdapterOptions.Defaults(hostOptions.MqttBrokerHost!, hostOptions.MqttBrokerPort, hostOptions.MqttClientId!, runtimeConfig.Asset.AssetId));
-                break;
-            case IoAdapterTriage.Family.OpcUa:
-                builder.Services.AddBessOpcUa(
-                    runtimeConfig.OpcUaMapping!,
-                    BuildOpcUaAdapterOptions(hostOptions));
-                break;
-            case IoAdapterTriage.Family.None:
-            default:
-                builder.Services.AddSingleton<IBatteryTelemetrySource, NoOpBatteryTelemetrySource>();
-                builder.Services.AddSingleton<IBatteryCommandSink, NoOpBatteryCommandSink>();
-                break;
-        }
+    }
 
-        // Worker hosted-service.
-        builder.Services.AddBessWorker(builder.Configuration);
+    private static void ConfigureApp(
+        WebApplication app,
+        BessHostOptions hostOptions,
+        BessRuntimeConfiguration runtimeConfig)
+    {
+        MigratePersistence(app, hostOptions);
+        SeedRuntimeState(app, runtimeConfig);
+        _ = app.Services.GetRequiredService<ApiTokenRegistry>();
+        app.UseAuthentication();
+        app.UseAuthorization();
+        app.MapOpenApi();
+        app.MapBatteryEms();
+        app.MapMetrics();
+    }
 
-        // API auth (RM-M1-16).
-        builder.Services.AddApiTokenAuth(builder.Configuration);
-
-        // Make the runtime configuration available so the seed step can
-        // run after the container is built (the registry is a singleton).
-        builder.Services.AddSingleton(runtimeConfig);
-
-        var app = builder.Build();
-
-        // Eager schema migration when persistence is wired — fails the
-        // start-up if Postgres is unreachable, matching LH-OPS-001.
-        // ADR 0001 + RM-M2-MIG-04: pg_advisory_lock inside the migrator
-        // serialises this call across replicas; DbUp's __schema_versions
-        // journal tracks which scripts have already been applied.
+    private static void MigratePersistence(WebApplication app, BessHostOptions hostOptions)
+    {
         if (!string.IsNullOrWhiteSpace(hostOptions.PersistenceConnectionString))
         {
             var migrator = app.Services.GetRequiredService<BessDbMigrator>();
             migrator.MigrateAsync(CancellationToken.None).GetAwaiter().GetResult();
         }
+    }
 
-        // Seed asset + schedule before the worker starts ticking.
+    private static void SeedRuntimeState(WebApplication app, BessRuntimeConfiguration runtimeConfig)
+    {
         var assets = app.Services.GetRequiredService<IBatteryAssetRegistry>();
         BessConfigurationBootstrap.SeedAssetRegistry(assets, runtimeConfig.Asset);
         if (runtimeConfig.Schedule is not null)
@@ -176,17 +182,6 @@ public static class BessHostBuilder
             var schedules = app.Services.GetRequiredService<IScheduleRepository>();
             BessConfigurationBootstrap.SeedScheduleRepository(schedules, runtimeConfig.Schedule);
         }
-
-        // Eager validation of the API-token table — otherwise a malformed
-        // token list would only surface on the first 401.
-        _ = app.Services.GetRequiredService<ApiTokenRegistry>();
-
-        app.UseAuthentication();
-        app.UseAuthorization();
-        app.MapOpenApi();
-        app.MapBatteryEms();
-        app.MapMetrics();
-        return app;
     }
 
     private static void ConfigureScheduleSolver(

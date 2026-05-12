@@ -1,10 +1,7 @@
-using System.Security.Cryptography;
-using System.Text;
 using BatteryEms.Application.Observability;
 using BatteryEms.Application.Optimization;
 using BatteryEms.Application.Time;
 using BatteryEms.Domain;
-using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
 
@@ -36,26 +33,15 @@ namespace BatteryEms.Adapters.OptimizationCore;
 // Gültigkeits-Check (Zeitindex / MaxFallbackScheduleAge / Kontext-
 // Stempel / Telemetrie-Drift), Local-Optimizer-Fallback bei
 // `or_tools`-Backend → alles RM-M5-01-C.
-// CA1506-Schwelle (96) ist überschritten weil dieser Adapter der
-// hexagonale Wire-Endpunkt für den optimization-core-Sidecar ist:
-// gRPC-Generated-Types + Domain-Model + Application-Driven-Ports
-// (IOptimizationIdempotencyStore, IFallbackScheduleOptimizer,
-// IFallbackPlanValidator) + Mapper. Das Coupling ist Pattern-immanent;
-// alle Inputs sind bewusste Driven-Port-Kopplungen aus plan-RM-M5
-// §Komponenten.
-[System.Diagnostics.CodeAnalysis.SuppressMessage(
-    "Maintainability", "CA1506",
-    Justification = "Sidecar-Adapter-Top-Level: koppelt M2-Domain, gRPC-Wire-Typen, Idempotency-Store, Fallback-Optimizer und Plan-Validator — Pattern-immanent.")]
 internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, IDisposable
 {
-    private const string SolverName = "optimization-core";
-
     private readonly OptimizationCoreClient _client;
     private readonly OptimizationCoreOptions _options;
     private readonly IOptimizationIdempotencyStore _idempotencyStore;
     private readonly IClock _clock;
     private readonly ILogger<OptimizationCoreScheduleOptimizer> _logger;
     private readonly IOptimizationCoreMetrics _metrics;
+    private readonly OptimizationCoreResultFactory _resultFactory;
     // RM-M5-01-C Korrektur-Pass: optionaler lokaler Fallback-Optimizer
     // (z. B. OR-Tools) + Plan-Validator gemäß plan-RM-M5 §Fallback-Matrix
     // Zeile „Timeout/Deadline oder Unavailable vor Ergebnis". Beide
@@ -102,13 +88,16 @@ internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, ID
         _clock = clock;
         _logger = logger;
         _metrics = metrics ?? NoOpOptimizationCoreMetrics.Instance;
+        _resultFactory = new OptimizationCoreResultFactory(clock, logger);
         _fallbackOptimizer = fallbackOptimizer;
         _planValidator = planValidator;
     }
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Maintainability", "CA1506",
-        Justification = "Sidecar-Adapter-Top-Level: koppelt M2-Domain-Modell, gRPC-Wire-Typen und Idempotency-Store — die Kopplung ist intrinsisch dem Adapter-Pattern.")]
+    private readonly record struct OptimizationRequestContext(
+        string RequestId,
+        DateTimeOffset HorizonStartUtc,
+        DateTimeOffset StartedAt);
+
     public async Task<ScheduleOptimizationResult> OptimizeAsync(
         ScheduleOptimizationRequest request,
         CancellationToken cancellationToken)
@@ -116,235 +105,275 @@ internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, ID
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var horizonStartUtc = request.HorizonStart.ToUniversalTime();
-        var startedAt = _clock.UtcNow;
-
-        // Plan-RM-M5 §Request-Idempotenz: deterministische `request_id`
-        // aus den fachlichen Identitäts-Feldern; TryBegin atomar pre-
-        // Sidecar. Existiert ein finaler Eintrag mit dieser ID, wird
-        // der Sidecar-Call übersprungen und ein `late_response_ignored`-
-        // Failed-Run zurückgegeben (Worker liest den ursprünglichen
-        // OptimizationRun via IOptimizationRunRepository für den
-        // echten Verlauf).
-        var requestId = ComputeRequestId(request);
-        var beginResult = await _idempotencyStore.TryBeginAsync(
-            requestId, startedAt, cancellationToken).ConfigureAwait(false);
-        if (!beginResult.IsNewlyCreated)
+        var (context, existingResult) = await BeginRequestAsync(
+            request, cancellationToken).ConfigureAwait(false);
+        if (existingResult is not null)
         {
-            return HandleExistingIdempotencyEntry(
-                request, horizonStartUtc, beginResult.Entry, startedAt);
+            return existingResult;
         }
 
         try
         {
-            await _client.ConnectAsync(cancellationToken).ConfigureAwait(false);
-            await EnsureContractCompatibleAsync(cancellationToken).ConfigureAwait(false);
+            await PrepareSidecarAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (ContractIncompatibleException ex)
         {
-            _metrics.RecordSidecarHealth("contract_incompatible");
-            OptimizationCoreLog.LogContractIncompatible(_logger, ex.Detail);
-            var contractFailed = BuildFailedResult(
-                request,
-                horizonStartUtc,
-                OptimizationCoreStatusMapper.ClassifyContractIncompatible(),
-                terminationCode: "contract-incompatible",
-                terminationDetail: ex.Detail,
-                elapsed: _clock.UtcNow - startedAt);
-            return await FinalizeAndReturnAsync(
-                requestId, contractFailed,
-                OptimizationTerminalState.FailedNoActivation,
-                "contract-incompatible",
-                FallbackSource.NoActivation,
-                FallbackReason.ContractIncompatible,
-                cancellationToken).ConfigureAwait(false);
+            return await HandleContractIncompatibleAsync(
+                request, context, ex, cancellationToken).ConfigureAwait(false);
         }
         catch (RpcException ex)
         {
-            _metrics.RecordSidecarHealth("unavailable");
-            // Plan-RM-M5 §Fallback-Matrix: Sidecar-Connect-/Health-/
-            // Version-Pfad scheitert ⇒ Lokaler Optimierer-Fallback wenn
-            // konfiguriert; sonst no_valid_plan + Safe-Stop.
-            var outcome = OptimizationCoreStatusMapper.ClassifyTransport(ex.StatusCode);
-            var fallbackOutcome = await TryRunFallbackAsync(
-                request, horizonStartUtc, cancellationToken).ConfigureAwait(false);
-            if (fallbackOutcome is not null)
-            {
-                return await FinalizeAndReturnAsync(
-                    requestId, fallbackOutcome,
-                    OptimizationTerminalState.FallbackCommitted,
-                    "local-optimizer-fallback-committed",
-                    FallbackSource.LocalOptimizer,
-                    outcome.FallbackReason,
-                    cancellationToken)
-                    .ConfigureAwait(false);
-            }
-            var transportFailed = BuildFailedResult(
-                request,
-                horizonStartUtc,
-                outcome,
-                terminationCode: ex.StatusCode.ToString(),
-                terminationDetail: NormalizeTerminationDetail(ex.Status.Detail),
-                elapsed: _clock.UtcNow - startedAt);
-            return await FinalizeAndReturnAsync(
-                requestId, transportFailed,
-                OptimizationTerminalState.FailedNoActivation,
-                MapTerminalReason(outcome.FallbackReason),
-                ResolveFallbackSource(outcome.FallbackSource, OptimizationTerminalState.FailedNoActivation),
-                outcome.FallbackReason,
-                cancellationToken)
-                .ConfigureAwait(false);
+            return await HandleTransportFailureAsync(
+                request, context, ex, cancellationToken).ConfigureAwait(false);
         }
 
-        var protoRequest = BuildProtoRequest(request);
+        return await OptimizeWithConnectedSidecarAsync(
+            request, context, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<(OptimizationRequestContext Context, ScheduleOptimizationResult? ExistingResult)>
+        BeginRequestAsync(
+            ScheduleOptimizationRequest request,
+            CancellationToken cancellationToken)
+    {
+        var horizonStartUtc = request.HorizonStart.ToUniversalTime();
+        var startedAt = _clock.UtcNow;
+        var requestId = OptimizationCoreRequestIdentity.ComputeRequestId(request);
+        var beginResult = await _idempotencyStore.TryBeginAsync(
+            requestId, startedAt, cancellationToken).ConfigureAwait(false);
+        var context = new OptimizationRequestContext(
+            requestId, horizonStartUtc, startedAt);
+
+        if (!beginResult.IsNewlyCreated)
+        {
+            var existing = HandleExistingIdempotencyEntry(
+                request, horizonStartUtc, beginResult.Entry, startedAt);
+            return (context, existing);
+        }
+
+        return (context, null);
+    }
+
+    private async Task PrepareSidecarAsync(CancellationToken cancellationToken)
+    {
+        await _client.ConnectAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureContractCompatibleAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<ScheduleOptimizationResult> HandleContractIncompatibleAsync(
+        ScheduleOptimizationRequest request,
+        OptimizationRequestContext context,
+        ContractIncompatibleException exception,
+        CancellationToken cancellationToken)
+    {
+        _metrics.RecordSidecarHealth("contract_incompatible");
+        OptimizationCoreLog.LogContractIncompatible(_logger, exception.Detail);
+        var contractFailed = _resultFactory.BuildFailedResult(
+            request,
+            context.HorizonStartUtc,
+            OptimizationCoreStatusMapper.ClassifyContractIncompatible(),
+            terminationCode: "contract-incompatible",
+            terminationDetail: exception.Detail,
+            elapsed: _clock.UtcNow - context.StartedAt);
+        return await FinalizeAndReturnAsync(
+            context.RequestId, contractFailed,
+            OptimizationTerminalState.FailedNoActivation,
+            "contract-incompatible",
+            FallbackSource.NoActivation,
+            FallbackReason.ContractIncompatible,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<ScheduleOptimizationResult> OptimizeWithConnectedSidecarAsync(
+        ScheduleOptimizationRequest request,
+        OptimizationRequestContext context,
+        CancellationToken cancellationToken)
+    {
+        var protoRequest = OptimizationCoreProtoMapper.BuildRequest(request);
         var deadline = DateTime.UtcNow + _options.RequestDeadline;
 
         try
         {
             using var call = _client.Client.Optimize(
                 protoRequest, deadline: deadline, cancellationToken: cancellationToken);
-
-            Grpc.V1.OptimizeResult? final = null;
-            await foreach (var update in call.ResponseStream
-                .ReadAllAsync(cancellationToken).ConfigureAwait(false))
-            {
-                switch (update.UpdateCase)
-                {
-                    case Grpc.V1.OptimizeUpdate.UpdateOneofCase.Progress:
-                        OptimizationCoreLog.LogProgress(
-                            _logger,
-                            update.Progress.StepIndex,
-                            update.Progress.ObjectiveSoFar);
-                        break;
-                    case Grpc.V1.OptimizeUpdate.UpdateOneofCase.Result:
-                        final = update.Result;
-                        break;
-                    default:
-                        break;
-                }
-            }
+            var final = await ReadFinalOptimizeResultAsync(
+                call.ResponseStream, cancellationToken).ConfigureAwait(false);
 
             if (final is null)
             {
-                // Stream-Crash mid-Optimize ⇒ Fallback-Versuch wenn
-                // verfügbar (plan-RM-M5 §Fallback-Matrix „Timeout/
-                // Deadline oder Unavailable vor Ergebnis").
-                var fallbackOutcome = await TryRunFallbackAsync(
-                    request, horizonStartUtc, cancellationToken).ConfigureAwait(false);
-                if (fallbackOutcome is not null)
-                {
-                    return await FinalizeAndReturnAsync(
-                        requestId, fallbackOutcome,
-                        OptimizationTerminalState.FallbackCommitted,
-                        "local-optimizer-fallback-committed",
-                        FallbackSource.LocalOptimizer,
-                        FallbackReason.TransportInternalError,
-                        cancellationToken)
-                        .ConfigureAwait(false);
-                }
-                var streamFailed = BuildFailedResult(
-                    request,
-                    horizonStartUtc,
-                    new OptimizationCoreOutcome(
-                        Status: OptimizationSolverStatus.Failed,
-                        FallbackSource: FallbackSource.FromMatrix,
-                        FallbackReason: FallbackReason.TransportInternalError,
-                        PersistSchedule: false),
-                    terminationCode: "stream-closed-without-result",
-                    terminationDetail: null,
-                    elapsed: _clock.UtcNow - startedAt);
-                return await FinalizeAndReturnAsync(
-                    requestId, streamFailed,
-                    OptimizationTerminalState.FailedNoActivation,
-                    "transport-internal-error",
-                    FallbackSource.NoActivation,
-                    FallbackReason.TransportInternalError,
-                    cancellationToken).ConfigureAwait(false);
+                return await HandleMissingFinalResultAsync(
+                    request, context, cancellationToken).ConfigureAwait(false);
             }
 
-            var resultOutcome = OptimizationCoreStatusMapper.ClassifyResult(
-                final.SolverStatus, final.HasUsableSolution);
-            var built = BuildResult(request, horizonStartUtc, final, resultOutcome,
-                elapsed: _clock.UtcNow - startedAt);
-            // Wenn das Schedule persistiert wird (sidecar-result) →
-            // SidecarCommitted; sonst (Infeasible/Unbounded/Invalid-
-            // Trajectory) → FailedNoActivation.
-            var (state, reason) = built.ProducedSchedule is not null
-                ? (OptimizationTerminalState.SidecarCommitted, "sidecar-committed")
-                : (OptimizationTerminalState.FailedNoActivation,
-                   MapTerminalReason(resultOutcome.FallbackReason));
-            var fallbackSource = built.ProducedSchedule is not null
-                ? FallbackSource.SidecarResult
-                : ResolveFallbackSource(resultOutcome.FallbackSource, state);
-            var fallbackReason = built.ProducedSchedule is not null
-                ? FallbackReason.None
-                : ResolveFallbackReasonForBuiltResult(resultOutcome, built);
-            return await FinalizeAndReturnAsync(
-                requestId, built, state, reason, fallbackSource, fallbackReason, cancellationToken).ConfigureAwait(false);
+            return await HandleFinalResultAsync(
+                request, context, final, cancellationToken).ConfigureAwait(false);
         }
         catch (RpcException ex)
         {
-            _metrics.RecordSidecarHealth("unavailable");
-            // Sidecar-RpcException während des Optimize-Streams ⇒
-            // Fallback-Versuch wenn verfügbar (plan-RM-M5 §Fallback-
-            // Matrix). Status-Mapper-Outcome wird nur verwendet wenn
-            // kein Fallback registriert oder Fallback fehlschlägt.
-            var outcome = OptimizationCoreStatusMapper.ClassifyTransport(ex.StatusCode);
-            var fallbackOutcome = await TryRunFallbackAsync(
-                request, horizonStartUtc, cancellationToken).ConfigureAwait(false);
-            if (fallbackOutcome is not null)
+            return await HandleTransportFailureAsync(
+                request, context, ex, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return await HandleCancelledOptimizeAsync(
+                request, context, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<Grpc.V1.OptimizeResult?> ReadFinalOptimizeResultAsync(
+        IAsyncStreamReader<Grpc.V1.OptimizeUpdate> responseStream,
+        CancellationToken cancellationToken)
+    {
+        Grpc.V1.OptimizeResult? final = null;
+        await foreach (var update in responseStream
+            .ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        {
+            switch (update.UpdateCase)
             {
-                return await FinalizeAndReturnAsync(
-                    requestId, fallbackOutcome,
-                    OptimizationTerminalState.FallbackCommitted,
-                    "local-optimizer-fallback-committed",
-                    FallbackSource.LocalOptimizer,
-                    outcome.FallbackReason,
-                    cancellationToken)
-                    .ConfigureAwait(false);
+                case Grpc.V1.OptimizeUpdate.UpdateOneofCase.Progress:
+                    OptimizationCoreLog.LogProgress(
+                        _logger,
+                        update.Progress.StepIndex,
+                        update.Progress.ObjectiveSoFar);
+                    break;
+                case Grpc.V1.OptimizeUpdate.UpdateOneofCase.Result:
+                    final = update.Result;
+                    break;
+                default:
+                    break;
             }
-            var rpcFailed = BuildFailedResult(
-                request,
-                horizonStartUtc,
-                outcome,
-                terminationCode: ex.StatusCode.ToString(),
-                terminationDetail: NormalizeTerminationDetail(ex.Status.Detail),
-                elapsed: _clock.UtcNow - startedAt);
+        }
+        return final;
+    }
+
+    private async Task<ScheduleOptimizationResult> HandleMissingFinalResultAsync(
+        ScheduleOptimizationRequest request,
+        OptimizationRequestContext context,
+        CancellationToken cancellationToken)
+    {
+        var fallbackOutcome = await TryRunFallbackAsync(
+            request, context.HorizonStartUtc, cancellationToken).ConfigureAwait(false);
+        if (fallbackOutcome is not null)
+        {
             return await FinalizeAndReturnAsync(
-                requestId, rpcFailed,
-                OptimizationTerminalState.FailedNoActivation,
-                MapTerminalReason(outcome.FallbackReason),
-                ResolveFallbackSource(outcome.FallbackSource, OptimizationTerminalState.FailedNoActivation),
+                context.RequestId, fallbackOutcome,
+                OptimizationTerminalState.FallbackCommitted,
+                "local-optimizer-fallback-committed",
+                FallbackSource.LocalOptimizer,
+                FallbackReason.TransportInternalError,
+                cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        var streamFailed = _resultFactory.BuildFailedResult(
+            request,
+            context.HorizonStartUtc,
+            new OptimizationCoreOutcome(
+                Status: OptimizationSolverStatus.Failed,
+                FallbackSource: FallbackSource.FromMatrix,
+                FallbackReason: FallbackReason.TransportInternalError,
+                PersistSchedule: false),
+            terminationCode: "stream-closed-without-result",
+            terminationDetail: null,
+            elapsed: _clock.UtcNow - context.StartedAt);
+        return await FinalizeAndReturnAsync(
+            context.RequestId, streamFailed,
+            OptimizationTerminalState.FailedNoActivation,
+            "transport-internal-error",
+            FallbackSource.NoActivation,
+            FallbackReason.TransportInternalError,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<ScheduleOptimizationResult> HandleFinalResultAsync(
+        ScheduleOptimizationRequest request,
+        OptimizationRequestContext context,
+        Grpc.V1.OptimizeResult final,
+        CancellationToken cancellationToken)
+    {
+        var resultOutcome = OptimizationCoreStatusMapper.ClassifyResult(
+            final.SolverStatus, final.HasUsableSolution);
+        var built = _resultFactory.BuildResult(
+            request, context.HorizonStartUtc, final, resultOutcome,
+            elapsed: _clock.UtcNow - context.StartedAt);
+        var (state, reason) = built.ProducedSchedule is not null
+            ? (OptimizationTerminalState.SidecarCommitted, "sidecar-committed")
+            : (OptimizationTerminalState.FailedNoActivation,
+               OptimizationCoreTerminalTaxonomy.MapTerminalReason(resultOutcome.FallbackReason));
+        var fallbackSource = built.ProducedSchedule is not null
+            ? FallbackSource.SidecarResult
+            : OptimizationCoreTerminalTaxonomy.ResolveFallbackSource(resultOutcome.FallbackSource, state);
+        var fallbackReason = built.ProducedSchedule is not null
+            ? FallbackReason.None
+            : OptimizationCoreTerminalTaxonomy.ResolveFallbackReasonForBuiltResult(resultOutcome, built);
+        return await FinalizeAndReturnAsync(
+            context.RequestId, built, state, reason, fallbackSource, fallbackReason, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task<ScheduleOptimizationResult> HandleTransportFailureAsync(
+        ScheduleOptimizationRequest request,
+        OptimizationRequestContext context,
+        RpcException exception,
+        CancellationToken cancellationToken)
+    {
+        _metrics.RecordSidecarHealth("unavailable");
+        var outcome = OptimizationCoreStatusMapper.ClassifyTransport(exception.StatusCode);
+        var fallbackOutcome = await TryRunFallbackAsync(
+            request, context.HorizonStartUtc, cancellationToken).ConfigureAwait(false);
+        if (fallbackOutcome is not null)
+        {
+            return await FinalizeAndReturnAsync(
+                context.RequestId, fallbackOutcome,
+                OptimizationTerminalState.FallbackCommitted,
+                "local-optimizer-fallback-committed",
+                FallbackSource.LocalOptimizer,
                 outcome.FallbackReason,
                 cancellationToken)
                 .ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
-        {
-            // Caller-initiated Cancel mid-stream. Idempotency-Eintrag
-            // wird als Cancelled finalisiert (plan-RM-M5 §Atomare
-            // Finalisierung: einer der vier Terminalzustände), damit
-            // ein späterer Retry mit derselben request_id den Status
-            // sieht statt einen zweiten Sidecar-Call zu schicken.
-            var cancelledOutcome = new OptimizationCoreOutcome(
-                Status: OptimizationSolverStatus.Failed,
-                FallbackSource: FallbackSource.FromMatrix,
-                FallbackReason: FallbackReason.TransportCancelled,
-                PersistSchedule: false);
-            var cancelled = BuildFailedResult(
-                request, horizonStartUtc, cancelledOutcome,
-                terminationCode: "Cancelled",
-                terminationDetail: "caller-cancelled-mid-optimize",
-                elapsed: _clock.UtcNow - startedAt);
-            return await FinalizeAndReturnAsync(
-                requestId, cancelled,
-                OptimizationTerminalState.Cancelled,
-                "transport-cancelled",
-                FallbackSource.NoActivation,
-                FallbackReason.TransportCancelled,
-                cancellationToken)
-                .ConfigureAwait(false);
-        }
+
+        var transportFailed = _resultFactory.BuildFailedResult(
+            request,
+            context.HorizonStartUtc,
+            outcome,
+            terminationCode: exception.StatusCode.ToString(),
+            terminationDetail: OptimizationCoreResultFactory.NormalizeTerminationDetail(exception.Status.Detail),
+            elapsed: _clock.UtcNow - context.StartedAt);
+        return await FinalizeAndReturnAsync(
+            context.RequestId, transportFailed,
+            OptimizationTerminalState.FailedNoActivation,
+            OptimizationCoreTerminalTaxonomy.MapTerminalReason(outcome.FallbackReason),
+            OptimizationCoreTerminalTaxonomy.ResolveFallbackSource(
+                outcome.FallbackSource, OptimizationTerminalState.FailedNoActivation),
+            outcome.FallbackReason,
+            cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task<ScheduleOptimizationResult> HandleCancelledOptimizeAsync(
+        ScheduleOptimizationRequest request,
+        OptimizationRequestContext context,
+        CancellationToken cancellationToken)
+    {
+        var cancelledOutcome = new OptimizationCoreOutcome(
+            Status: OptimizationSolverStatus.Failed,
+            FallbackSource: FallbackSource.FromMatrix,
+            FallbackReason: FallbackReason.TransportCancelled,
+            PersistSchedule: false);
+        var cancelled = _resultFactory.BuildFailedResult(
+            request, context.HorizonStartUtc, cancelledOutcome,
+            terminationCode: "Cancelled",
+            terminationDetail: "caller-cancelled-mid-optimize",
+            elapsed: _clock.UtcNow - context.StartedAt);
+        return await FinalizeAndReturnAsync(
+            context.RequestId, cancelled,
+            OptimizationTerminalState.Cancelled,
+            "transport-cancelled",
+            FallbackSource.NoActivation,
+            FallbackReason.TransportCancelled,
+            cancellationToken)
+            .ConfigureAwait(false);
     }
 
     // Plan-RM-M5 §Fallback-Matrix Zeile „Timeout/Deadline oder
@@ -431,102 +460,6 @@ internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, ID
         return fallbackResult;
     }
 
-    // Plan-RM-M5 §Fallback-Taxonomie: kebab-case-Reason aus dem
-    // Mapper-Enum für die Persistenz im Idempotency-Store.
-    private static string MapTerminalReason(FallbackReason reason) => reason switch
-    {
-        FallbackReason.None => "none",
-        FallbackReason.DeadlineExceeded => "deadline-exceeded",
-        FallbackReason.SidecarUnavailable => "sidecar-unavailable",
-        FallbackReason.TransportCancelled => "transport-cancelled",
-        FallbackReason.TransportInternalError => "transport-internal-error",
-        FallbackReason.InvalidRequest => "invalid-request",
-        FallbackReason.SolverInfeasible => "solver-infeasible",
-        FallbackReason.SolverUnbounded => "solver-unbounded",
-        FallbackReason.SolverTimeLimit => "solver-time-limit",
-        FallbackReason.SolverIterationLimit => "solver-iteration-limit",
-        FallbackReason.NoValidPlan => "no-valid-plan",
-        FallbackReason.FallbackPlanExpired => "fallback-plan-expired",
-        FallbackReason.FallbackContextMismatch => "fallback-context-mismatch",
-        FallbackReason.FallbackTelemetryDrift => "fallback-telemetry-drift",
-        FallbackReason.InvalidSnapshot => "invalid-snapshot",
-        FallbackReason.InvalidMpcState => "invalid-mpc-state",
-        FallbackReason.ContractIncompatible => "contract-incompatible",
-        FallbackReason.UnauthorizedClient => "unauthorized-client",
-        FallbackReason.DuplicateRequest => "duplicate-request",
-        FallbackReason.LateResponseIgnored => "late-response-ignored",
-        _ => "transport-internal-error",
-    };
-
-    private static string MapFallbackSource(FallbackSource source) => source switch
-    {
-        FallbackSource.None => "none",
-        FallbackSource.SidecarResult => "sidecar_result",
-        FallbackSource.LocalOptimizer => "local_optimizer",
-        FallbackSource.LastValidSchedule => "last_valid_schedule",
-        FallbackSource.SafeStop => "safe_stop",
-        FallbackSource.NoActivation => "no_activation",
-        // `FromMatrix` is an internal mapper placeholder; metrics must
-        // expose the canonical taxonomy after the adapter resolved the
-        // path, never the placeholder.
-        FallbackSource.FromMatrix => "no_activation",
-        _ => "no_activation",
-    };
-
-    private static string MapFallbackReason(FallbackReason reason) => reason switch
-    {
-        FallbackReason.None => "none",
-        FallbackReason.DeadlineExceeded => "deadline_exceeded",
-        FallbackReason.SidecarUnavailable => "sidecar_unavailable",
-        FallbackReason.TransportCancelled => "transport_cancelled",
-        FallbackReason.TransportInternalError => "transport_internal_error",
-        FallbackReason.InvalidRequest => "invalid_request",
-        FallbackReason.SolverInfeasible => "solver_infeasible",
-        FallbackReason.SolverUnbounded => "solver_unbounded",
-        FallbackReason.SolverTimeLimit => "solver_time_limit",
-        FallbackReason.SolverIterationLimit => "solver_iteration_limit",
-        FallbackReason.NoValidPlan => "no_valid_plan",
-        FallbackReason.FallbackPlanExpired => "fallback_plan_expired",
-        FallbackReason.FallbackContextMismatch => "fallback_context_mismatch",
-        FallbackReason.FallbackTelemetryDrift => "fallback_telemetry_drift",
-        FallbackReason.InvalidSnapshot => "invalid_snapshot",
-        FallbackReason.InvalidMpcState => "invalid_mpc_state",
-        FallbackReason.ContractIncompatible => "contract_incompatible",
-        FallbackReason.UnauthorizedClient => "unauthorized_client",
-        FallbackReason.DuplicateRequest => "duplicate_request",
-        FallbackReason.LateResponseIgnored => "late_response_ignored",
-        _ => "transport_internal_error",
-    };
-
-    private static FallbackSource ResolveFallbackSource(
-        FallbackSource source,
-        OptimizationTerminalState terminalState)
-    {
-        if (source != FallbackSource.FromMatrix)
-        {
-            return source;
-        }
-
-        return terminalState switch
-        {
-            OptimizationTerminalState.FallbackCommitted => FallbackSource.LocalOptimizer,
-            OptimizationTerminalState.SidecarCommitted => FallbackSource.SidecarResult,
-            _ => FallbackSource.NoActivation,
-        };
-    }
-
-    private static FallbackReason ResolveFallbackReasonForBuiltResult(
-        OptimizationCoreOutcome outcome,
-        ScheduleOptimizationResult result)
-    {
-        if (outcome.PersistSchedule && result.ProducedSchedule is null)
-        {
-            return FallbackReason.TransportInternalError;
-        }
-
-        return outcome.FallbackReason;
-    }
-
     // Lazy: Health + Version-Probe einmal pro Adapter-Lifetime
     // ausführen. Bei inkompatibler Version → ContractIncompatibleException
     // (statt RpcException) damit der äußere Catch sie nicht als
@@ -608,305 +541,6 @@ internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, ID
         return dash >= 0 ? s[..dash] : s;
     }
 
-    private static Grpc.V1.OptimizeRequest BuildProtoRequest(
-        ScheduleOptimizationRequest request)
-    {
-        var horizonStart = request.HorizonStart.ToUniversalTime();
-        var horizonEnd = request.HorizonEnd.ToUniversalTime();
-        var proto = new Grpc.V1.OptimizeRequest
-        {
-            RequestId = Guid.NewGuid().ToString("D"),
-            AssetId = request.AssetId,
-            ScheduleType = MapScheduleType(request.ScheduleType),
-            HorizonStart = Timestamp.FromDateTimeOffset(horizonStart),
-            HorizonEnd = Timestamp.FromDateTimeOffset(horizonEnd),
-            TimeStep = Duration.FromTimeSpan(request.TimeStep),
-            PriceUnit = request.PriceUnit ?? string.Empty,
-            MarketBidArea = request.MarketBidArea,
-            BaseScheduleVersion = request.BaseScheduleVersion,
-            Asset = MapAsset(request.Asset),
-        };
-        if (request.PricesPerStep is { } prices)
-        {
-            proto.PricesPerStep.AddRange(prices);
-        }
-        foreach (var reserve in request.Reserves)
-        {
-            proto.Reserves.Add(MapReserve(reserve));
-        }
-        return proto;
-    }
-
-    private static Grpc.V1.ScheduleType MapScheduleType(ScheduleType type) => type switch
-    {
-        ScheduleType.DayAhead => Grpc.V1.ScheduleType.DayAhead,
-        ScheduleType.Intraday => Grpc.V1.ScheduleType.Intraday,
-        ScheduleType.RegelLeistungReserve => Grpc.V1.ScheduleType.RegelleistungReserve,
-        _ => Grpc.V1.ScheduleType.Unspecified,
-    };
-
-    private static Grpc.V1.AssetCapabilities MapAsset(BatteryAsset asset) => new()
-    {
-        AssetId = asset.AssetId,
-        CapacityKwh = asset.CapacityKwh,
-        MaxChargePowerKw = asset.MaxChargePowerKw,
-        MaxDischargePowerKw = asset.MaxDischargePowerKw,
-        MinSocPercent = asset.MinSocPercent,
-        MaxSocPercent = asset.MaxSocPercent,
-        ChargeEfficiency = asset.ChargeEfficiency,
-        DischargeEfficiency = asset.DischargeEfficiency,
-        MaxRampKwPerSecond = asset.MaxRampKwPerSecond,
-        MinOperatingTemperatureCelsius = asset.MinOperatingTemperatureCelsius,
-        MaxOperatingTemperatureCelsius = asset.MaxOperatingTemperatureCelsius,
-    };
-
-    private static Grpc.V1.ReserveBand MapReserve(ReserveBand band) => new()
-    {
-        Product = band.Product switch
-        {
-            ReserveProduct.Fcr => Grpc.V1.ReserveBand.Types.Product.Fcr,
-            ReserveProduct.Afrr => Grpc.V1.ReserveBand.Types.Product.Afrr,
-            ReserveProduct.Mfrr => Grpc.V1.ReserveBand.Types.Product.Mfrr,
-            _ => Grpc.V1.ReserveBand.Types.Product.Unspecified,
-        },
-        Direction = band.Direction switch
-        {
-            ReserveDirection.Symmetric => Grpc.V1.ReserveBand.Types.Direction.Symmetric,
-            ReserveDirection.Up => Grpc.V1.ReserveBand.Types.Direction.Up,
-            ReserveDirection.Down => Grpc.V1.ReserveBand.Types.Direction.Down,
-            _ => Grpc.V1.ReserveBand.Types.Direction.Unspecified,
-        },
-        WindowStart = Timestamp.FromDateTimeOffset(band.Start.ToUniversalTime()),
-        WindowEnd = Timestamp.FromDateTimeOffset(band.End.ToUniversalTime()),
-        PowerKw = band.PowerKw,
-    };
-
-    private ScheduleOptimizationResult BuildResult(
-        ScheduleOptimizationRequest request,
-        DateTimeOffset horizonStartUtc,
-        Grpc.V1.OptimizeResult result,
-        OptimizationCoreOutcome outcome,
-        TimeSpan elapsed)
-    {
-        var solverRuntime = result.SolverRuntime?.ToTimeSpan() ?? elapsed;
-        var breakdown = BuildObjectiveBreakdown(result.ObjectiveBreakdown, request.PriceUnit);
-        var warnings = result.Warnings.ToArray();
-        var producedVersion = request.BaseScheduleVersion + 1;
-
-        if (outcome.PersistSchedule)
-        {
-            // Plan-RM-M5-01 §Fallback-Matrix „nicht-finite, schema-
-            // ungültige oder constraint-verletzende Trajektorie":
-            // Ergebnis verwerfen statt einer Exception aus dem Schedule-
-            // Konstruktor zu blasen. `target_power_kw=NaN`/`Infinity`,
-            // leere Schedule-Points, oder verletzter chronologischer
-            // Vertrag mappen alle auf einen Failed-Run mit
-            // `transport-internal-error`-Reason.
-            if (!TryBuildSchedule(request, result, producedVersion,
-                    out var schedule, out var validationDetail))
-            {
-                OptimizationCoreLog.LogInvalidTrajectory(_logger, validationDetail);
-                var rejectedRun = CreateRun(
-                    request,
-                    horizonStartUtc,
-                    OptimizationSolverStatus.Failed,
-                    terminationCode: "invalid-trajectory",
-                    terminationDetail: validationDetail,
-                    elapsed: solverRuntime,
-                    objectiveValue: 0.0,
-                    breakdown: OptimizationObjectiveBreakdown.Empty,
-                    warnings: warnings,
-                    producedSchedule: null,
-                    solverName: NormalizeSolverName(result.SolverName));
-                return new ScheduleOptimizationResult(rejectedRun, producedSchedule: null);
-            }
-            var producedRef = new ScheduleReference(
-                request.AssetId, request.ScheduleType, producedVersion);
-            var run = CreateRun(
-                request,
-                horizonStartUtc,
-                outcome.Status,
-                terminationCode: NormalizeTerminationCode(result.TerminationCode),
-                terminationDetail: NormalizeTerminationDetail(result.TerminationDetail),
-                elapsed: solverRuntime,
-                objectiveValue: result.ObjectiveValue,
-                breakdown: breakdown,
-                warnings: warnings,
-                producedSchedule: producedRef,
-                solverName: NormalizeSolverName(result.SolverName));
-            return new ScheduleOptimizationResult(run, schedule);
-        }
-
-        var failedRun = CreateRun(
-            request,
-            horizonStartUtc,
-            outcome.Status,
-            terminationCode: NormalizeTerminationCode(result.TerminationCode),
-            terminationDetail: NormalizeTerminationDetail(result.TerminationDetail),
-            elapsed: solverRuntime,
-            objectiveValue: 0.0,
-            breakdown: OptimizationObjectiveBreakdown.Empty,
-            warnings: warnings,
-            producedSchedule: null,
-            solverName: NormalizeSolverName(result.SolverName));
-        return new ScheduleOptimizationResult(failedRun, producedSchedule: null);
-    }
-
-    private ScheduleOptimizationResult BuildFailedResult(
-        ScheduleOptimizationRequest request,
-        DateTimeOffset horizonStartUtc,
-        OptimizationCoreOutcome outcome,
-        string terminationCode,
-        string? terminationDetail,
-        TimeSpan elapsed)
-    {
-        var run = CreateRun(
-            request,
-            horizonStartUtc,
-            outcome.Status,
-            terminationCode: terminationCode,
-            terminationDetail: terminationDetail,
-            elapsed: elapsed,
-            objectiveValue: 0.0,
-            breakdown: OptimizationObjectiveBreakdown.Empty,
-            warnings: Array.Empty<string>(),
-            producedSchedule: null,
-            solverName: SolverName);
-        return new ScheduleOptimizationResult(run, producedSchedule: null);
-    }
-
-    private OptimizationRun CreateRun(
-        ScheduleOptimizationRequest request,
-        DateTimeOffset horizonStartUtc,
-        OptimizationSolverStatus status,
-        string terminationCode,
-        string? terminationDetail,
-        TimeSpan elapsed,
-        double objectiveValue,
-        OptimizationObjectiveBreakdown breakdown,
-        IReadOnlyList<string> warnings,
-        ScheduleReference? producedSchedule,
-        string solverName)
-    {
-        return new OptimizationRun(
-            runId: Guid.NewGuid(),
-            assetId: request.AssetId,
-            solverName: solverName,
-            status: status,
-            horizonStart: horizonStartUtc,
-            horizonEnd: horizonStartUtc + (request.HorizonEnd - request.HorizonStart),
-            timeStep: request.TimeStep,
-            objectiveValue: objectiveValue,
-            objectiveBreakdown: breakdown,
-            constraintViolations: Array.Empty<string>(),
-            warnings: warnings,
-            solverRuntime: elapsed,
-            terminationCode: terminationCode,
-            terminationDetail: terminationDetail,
-            createdAt: _clock.UtcNow,
-            inputs: request.Inputs,
-            producedSchedule: producedSchedule);
-    }
-
-    // Plan-RM-M5-01 §Fallback-Matrix: Invalid-Trajectory-Detection
-    // bevor wir das Domain-Schedule konstruieren (das würde sonst per
-    // ArgumentException blow-up'en). Akzeptiert: nicht-leere Liste
-    // von Schedule-Points mit chronologisch aufsteigenden, halb-
-    // offenen Windows (Start < End, next.Start >= prev.End) und
-    // finiten TargetPowerKw.
-    private static bool TryBuildSchedule(
-        ScheduleOptimizationRequest request,
-        Grpc.V1.OptimizeResult result,
-        int producedVersion,
-        out Schedule? schedule,
-        out string validationDetail)
-    {
-        schedule = null;
-        if (result.SchedulePoints.Count == 0)
-        {
-            validationDetail = "schedule-points-empty";
-            return false;
-        }
-        var windows = new ScheduleWindow[result.SchedulePoints.Count];
-        for (var i = 0; i < result.SchedulePoints.Count; i++)
-        {
-            var p = result.SchedulePoints[i];
-            if (!double.IsFinite(p.TargetPowerKw))
-            {
-                validationDetail = $"non-finite-power-at-index-{i}";
-                return false;
-            }
-            var start = p.WindowStart.ToDateTimeOffset();
-            var end = p.WindowEnd.ToDateTimeOffset();
-            if (start >= end)
-            {
-                validationDetail = $"non-positive-window-duration-at-index-{i}";
-                return false;
-            }
-            if (i > 0 && windows[i - 1].End > start)
-            {
-                validationDetail = $"overlapping-windows-at-index-{i}";
-                return false;
-            }
-            windows[i] = new ScheduleWindow(start, end, p.TargetPowerKw);
-        }
-        schedule = new Schedule(
-            assetId: request.AssetId,
-            type: request.ScheduleType,
-            marketBidArea: request.MarketBidArea,
-            version: producedVersion,
-            windows: windows);
-        validationDetail = string.Empty;
-        return true;
-    }
-
-    // Konvertiert das Proto-ObjectiveBreakdown (3 named doubles) in
-    // M2-Komponenten. Sidecar-Side darf fehlen → Empty-Breakdown.
-    // Unit: aus dem Request-PriceUnit; Default "EUR" wenn nicht
-    // gesetzt (M2-Convention für monetäre Objectives).
-    private static OptimizationObjectiveBreakdown BuildObjectiveBreakdown(
-        Grpc.V1.ObjectiveBreakdown? proto, string? priceUnit)
-    {
-        if (proto is null) { return OptimizationObjectiveBreakdown.Empty; }
-        var unit = string.IsNullOrWhiteSpace(priceUnit) ? "EUR" : priceUnit!;
-        return new OptimizationObjectiveBreakdown(new[]
-        {
-            new OptimizationObjectiveComponent("energy_cost", proto.EnergyCost, unit),
-            new OptimizationObjectiveComponent("degradation_cost", proto.DegradationCost, unit),
-            new OptimizationObjectiveComponent("soc_target_penalty", proto.SocTargetPenalty, unit),
-        });
-    }
-
-    private static string NormalizeTerminationCode(string? code) =>
-        string.IsNullOrWhiteSpace(code) ? "sidecar-no-termination-code" : code;
-
-    private static string? NormalizeTerminationDetail(string? detail) =>
-        string.IsNullOrWhiteSpace(detail) ? null : detail;
-
-    private static string NormalizeSolverName(string? name) =>
-        string.IsNullOrWhiteSpace(name) ? SolverName : name!;
-
-    // Plan-RM-M5 §Request-Idempotenz: deterministischer Idempotency-
-    // Key aus dem fachlichen Identitäts-Tupel. SHA-256-Hash auf einer
-    // canonical-form-String-Repräsentation, formatiert als UUIDv5-
-    // style GUID-String für DB/Wire-Kompatibilität.
-    private static string ComputeRequestId(ScheduleOptimizationRequest request)
-    {
-        var canonical = string.Join('|',
-            request.AssetId,
-            request.ScheduleType.ToString(),
-            request.HorizonStart.ToUniversalTime().ToString("O"),
-            request.HorizonEnd.ToUniversalTime().ToString("O"),
-            request.TimeStep.ToString("c"),
-            request.BaseScheduleVersion.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            request.MarketBidArea);
-        var bytes = Encoding.UTF8.GetBytes(canonical);
-        var hash = SHA256.HashData(bytes);
-        // Erste 16 Bytes als GUID; deterministisch + idempotent über
-        // identische Eingaben.
-        return new Guid(hash.AsSpan(0, 16).ToArray()).ToString("D");
-    }
-
     // Plan-RM-M5 §Atomare Finalisierung: pro request_id genau ein
     // atomarer Terminalzustand. Worker-side CAS via
     // IOptimizationIdempotencyStore.TryFinalizeAsync.
@@ -939,8 +573,8 @@ internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, ID
         _metrics.RecordRun(
             result.Run.AssetId,
             result.Run.Status,
-            MapFallbackSource(fallbackSource),
-            MapFallbackReason(fallbackReason),
+            OptimizationCoreTerminalTaxonomy.MapFallbackSource(fallbackSource),
+            OptimizationCoreTerminalTaxonomy.MapFallbackReason(fallbackReason),
             terminalState,
             result.Run.SolverRuntime);
         OptimizationCoreLog.LogRunFinalized(
@@ -968,7 +602,7 @@ internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, ID
         {
             OptimizationCoreLog.LogLateResponseIgnored(
                 _logger, request.AssetId, entry.TerminalState);
-            var result = BuildFailedResult(
+            var result = _resultFactory.BuildFailedResult(
                 request, horizonStartUtc,
                 new OptimizationCoreOutcome(
                     Status: OptimizationSolverStatus.Failed,
@@ -981,15 +615,15 @@ internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, ID
             _metrics.RecordRun(
                 result.Run.AssetId,
                 result.Run.Status,
-                MapFallbackSource(FallbackSource.NoActivation),
-                MapFallbackReason(FallbackReason.LateResponseIgnored),
+                OptimizationCoreTerminalTaxonomy.MapFallbackSource(FallbackSource.NoActivation),
+                OptimizationCoreTerminalTaxonomy.MapFallbackReason(FallbackReason.LateResponseIgnored),
                 OptimizationTerminalState.LateResponseIgnored,
                 result.Run.SolverRuntime);
             return result;
         }
         // Existing pending → Concurrent-Caller. Fail-closed.
         OptimizationCoreLog.LogDuplicateRequest(_logger, request.AssetId, entry.RequestId);
-        var duplicate = BuildFailedResult(
+        var duplicate = _resultFactory.BuildFailedResult(
             request, horizonStartUtc,
             new OptimizationCoreOutcome(
                 Status: OptimizationSolverStatus.Failed,
@@ -1002,8 +636,8 @@ internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, ID
         _metrics.RecordRun(
             duplicate.Run.AssetId,
             duplicate.Run.Status,
-            MapFallbackSource(FallbackSource.NoActivation),
-            MapFallbackReason(FallbackReason.DuplicateRequest),
+            OptimizationCoreTerminalTaxonomy.MapFallbackSource(FallbackSource.NoActivation),
+            OptimizationCoreTerminalTaxonomy.MapFallbackReason(FallbackReason.DuplicateRequest),
             OptimizationTerminalState.FailedNoActivation,
             duplicate.Run.SolverRuntime);
         return duplicate;

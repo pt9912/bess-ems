@@ -120,8 +120,6 @@ public sealed class OpcUaNegativeTests : IClassFixture<OpcUaTestServerFixture>, 
     }
 
     [Fact]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506",
-        Justification = "Integration test orchestrates Source + Sink + Restart concurrently; the coupling is intrinsic to the pin's purpose (Plan-RM-M4-08 H4-Reshape).")]
     public async Task Concurrent_source_and_sink_survive_restart_under_contention()
     {
         // Plan-RM-M4-08-A Pin: Source und Sink teilen einen

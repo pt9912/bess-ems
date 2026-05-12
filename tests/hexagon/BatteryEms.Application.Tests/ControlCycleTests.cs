@@ -71,37 +71,47 @@ public sealed class ControlCycleTests
     }
 
     [Fact]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506", Justification = "Inline ControlCycle assembly composition is the SUT — extracting helpers would obscure the intent of the schedule-flows-to-optimizer test.")]
     public async Task Cycle_passes_active_schedule_commitments_into_dispatch_request()
     {
-        // Day-Ahead schedule with a window covering TestFixtures.Now must
-        // arrive at the optimizer as a Binding MarketCommitment. This is
-        // RM-M1-12's "im Regelkreis verwendet" acceptance: the schedule
-        // tracker bridges the repository and the dispatch boundary without
-        // the cycle having to know about the storage shape.
-        var assets = new InMemoryBatteryAssetRegistry(new[] { TestFixtures.CreateAsset() });
-        var snapshots = new InMemorySnapshotStore(TimeSpan.FromSeconds(10));
-        var clock = new FakeClock();
-        var schedule = new Schedule("asset-1", ScheduleType.DayAhead, "DE-LU", 1, new List<ScheduleWindow>
-        {
-            new(TestFixtures.Now - TimeSpan.FromMinutes(30), TestFixtures.Now + TimeSpan.FromMinutes(30), 12),
-        });
-        var repo = new InMemoryScheduleRepository(new[] { schedule });
-        var optimizer = new CapturingOptimizer();
-        var cycle = new ControlCycleUseCase(
-            assets,
-            snapshots,
-            new DefaultScheduleTracker(repo),
-            new InMemoryOperatorStopRegistry(),
-            optimizer,
-            clock,
-            NoOpControlCycleMetrics.Instance,
-            NullLogger<ControlCycleUseCase>.Instance,
-            ControlCycleOptions.Default);
+        var (cycle, snapshots, optimizer) = BuildCycleWithActiveDayAheadSchedule();
         snapshots.Update(TestFixtures.CreateTelemetry(), TestFixtures.Now);
 
         await cycle.ExecuteAsync("asset-1", CancellationToken.None);
 
+        AssertBindingCommitmentCaptured(optimizer);
+    }
+
+    private static (ControlCycleUseCase Cycle, InMemorySnapshotStore Snapshots, CapturingOptimizer Optimizer)
+        BuildCycleWithActiveDayAheadSchedule()
+    {
+        var assets = new InMemoryBatteryAssetRegistry(new[] { TestFixtures.CreateAsset() });
+        var snapshots = new InMemorySnapshotStore(TimeSpan.FromSeconds(10));
+        var optimizer = new CapturingOptimizer();
+        var cycle = new ControlCycleUseCase(
+            assets,
+            snapshots,
+            new DefaultScheduleTracker(new InMemoryScheduleRepository(new[] { ActiveDayAheadSchedule() })),
+            new InMemoryOperatorStopRegistry(),
+            optimizer,
+            new FakeClock(),
+            NoOpControlCycleMetrics.Instance,
+            NullLogger<ControlCycleUseCase>.Instance,
+            ControlCycleOptions.Default);
+        return (cycle, snapshots, optimizer);
+    }
+
+    private static Schedule ActiveDayAheadSchedule() => new(
+        "asset-1",
+        ScheduleType.DayAhead,
+        "DE-LU",
+        1,
+        new List<ScheduleWindow>
+        {
+            new(TestFixtures.Now - TimeSpan.FromMinutes(30), TestFixtures.Now + TimeSpan.FromMinutes(30), 12),
+        });
+
+    private static void AssertBindingCommitmentCaptured(CapturingOptimizer optimizer)
+    {
         Assert.NotNull(optimizer.LastRequest);
         var commitment = Assert.Single(optimizer.LastRequest!.Commitments);
         Assert.Equal(MarketType.DayAhead, commitment.Market);

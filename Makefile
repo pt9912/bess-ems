@@ -19,7 +19,7 @@ DOCKER_BUILD = $(DOCKER) build $(BUILD_CONTEXT) \
 .DEFAULT_GOAL := help
 
 .PHONY: help \
-	lint arch-check gates \
+	lint solid-suppression-gate arch-check gates \
 	test test-safety test-mpc-property test-replay test-integration test-hil-modbus test-hil-opcua test-hil-optimization-core test-optimization-core-compose test-hil-closed-loop test-container coverage-gate \
 	native-build test-native-interop test-native-parity \
 	native-lint native-sanitizer native-coverage-report native-coverage-gate native-coverage-exclusions \
@@ -39,7 +39,7 @@ help:
 	@echo "  DOCKER_BUILD_ARGS=$(DOCKER_BUILD_ARGS)"
 	@echo ""
 	@echo "Welle 1 (Foundation, active):"
-	@echo "  make lint        Build with -warnaserror plus code-metrics gate (CA1501/1502/1505/1506)"
+	@echo "  make lint        SOLID suppression audit + build with -warnaserror/code-metrics gate"
 	@echo "  make arch-check  Boundary tests (Dependency Rule + tabus)"
 	@echo ""
 	@echo "Welle 2 (Domain & Control, active):"
@@ -148,7 +148,10 @@ schema-drift-check: schema-generate
 
 # --- Welle 1 (active) ------------------------------------------------------
 
-lint:
+solid-suppression-gate:
+	./scripts/solid-suppression-gate.sh
+
+lint: solid-suppression-gate
 	$(DOCKER_BUILD) --target lint -t $(IMAGE_PREFIX)-lint:latest
 
 arch-check:
