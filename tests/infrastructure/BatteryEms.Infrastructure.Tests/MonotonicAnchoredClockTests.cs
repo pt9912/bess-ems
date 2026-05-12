@@ -44,6 +44,25 @@ public sealed class MonotonicAnchoredClockTests
     }
 
     [Fact]
+    public void Resync_with_small_negative_drift_does_not_move_utc_now_backwards()
+    {
+        var source = new ManualTimestampSource { Timestamp = 1_000 };
+        var clock = new MonotonicAnchoredClock(
+            new DateTimeOffset(2026, 5, 12, 10, 0, 0, TimeSpan.Zero),
+            anchorTimestamp: 0,
+            timestampFrequency: 1_000,
+            source.GetTimestamp);
+        var before = clock.UtcNow;
+
+        var accepted = clock.TryResync(
+            new DateTimeOffset(2026, 5, 12, 10, 0, 0, 980, TimeSpan.Zero),
+            TimeSpan.FromMilliseconds(50));
+
+        Assert.True(accepted);
+        Assert.Equal(before, clock.UtcNow);
+    }
+
+    [Fact]
     public void Resync_rejects_large_wall_clock_backstep()
     {
         var source = new ManualTimestampSource { Timestamp = 1_000 };

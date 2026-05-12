@@ -24,9 +24,25 @@ public sealed class DefaultLinearKalmanFilter : IMpcStateEstimator
         ArgumentNullException.ThrowIfNull(options);
         ValidateShape(priorState, model, options);
 
+        if (measurement is not null && IsNonPhysical(measurement, asset))
+        {
+            var state = priorState ?? BuildColdBootState(null, asset, model, options);
+            return Task.FromResult(new MpcStateUpdate(
+                state,
+                IsHealthy: false,
+                Reason: MpcEstimatorReasons.NonPhysical));
+        }
+
         var previous = priorState ?? BuildColdBootState(measurement, asset, model, options);
         var inputPowerKw = measurement?.ActivePowerKw ?? 0.0;
         var predicted = Predict(previous, inputPowerKw, model, options);
+        if (IsCovarianceDiverged(predicted.Covariance))
+        {
+            return Task.FromResult(new MpcStateUpdate(
+                predicted,
+                IsHealthy: false,
+                Reason: MpcEstimatorReasons.CovarianceDiverged));
+        }
 
         if (measurement is null || !measurement.Available || !measurement.DataQuality.IsUsableForControl)
         {
@@ -39,14 +55,6 @@ public sealed class DefaultLinearKalmanFilter : IMpcStateEstimator
         }
 
         ResetMissingCount(asset.AssetId);
-        if (IsNonPhysical(measurement, asset))
-        {
-            return Task.FromResult(new MpcStateUpdate(
-                predicted,
-                IsHealthy: false,
-                Reason: MpcEstimatorReasons.NonPhysical));
-        }
-
         var updated = Update(predicted, measurement, inputPowerKw, model, options);
         if (IsCovarianceDiverged(updated.Covariance))
         {
@@ -114,6 +122,9 @@ public sealed class DefaultLinearKalmanFilter : IMpcStateEstimator
     }
 
     private static bool IsNonPhysical(BatteryTelemetry measurement, BatteryAsset asset) =>
+        !double.IsFinite(measurement.SocPercent) ||
+        !double.IsFinite(measurement.ActivePowerKw) ||
+        !double.IsFinite(measurement.TemperatureCelsius) ||
         measurement.SocPercent < asset.MinSocPercent ||
         measurement.SocPercent > asset.MaxSocPercent ||
         measurement.TemperatureCelsius < asset.MinOperatingTemperatureCelsius ||

@@ -10,6 +10,7 @@ public sealed class MonotonicAnchoredClock : IClock
     private readonly object _gate = new();
     private DateTimeOffset _anchorUtc;
     private long _anchorTimestamp;
+    private DateTimeOffset _lastReturnedUtc;
 
     public MonotonicAnchoredClock()
         : this(DateTimeOffset.UtcNow, Stopwatch.GetTimestamp(), Stopwatch.Frequency, Stopwatch.GetTimestamp)
@@ -30,6 +31,7 @@ public sealed class MonotonicAnchoredClock : IClock
 
         _anchorUtc = anchorUtc.ToUniversalTime();
         _anchorTimestamp = anchorTimestamp;
+        _lastReturnedUtc = _anchorUtc;
         _timestampProvider = timestampProvider;
         _ticksPerTimestamp = (double)TimeSpan.TicksPerSecond / timestampFrequency;
     }
@@ -40,7 +42,13 @@ public sealed class MonotonicAnchoredClock : IClock
         {
             lock (_gate)
             {
-                return Project(_timestampProvider());
+                var projected = Project(_timestampProvider());
+                if (projected < _lastReturnedUtc)
+                {
+                    return _lastReturnedUtc;
+                }
+                _lastReturnedUtc = projected;
+                return projected;
             }
         }
     }
@@ -62,7 +70,13 @@ public sealed class MonotonicAnchoredClock : IClock
                 return false;
             }
 
-            _anchorUtc = observedUtc.ToUniversalTime();
+            var observed = observedUtc.ToUniversalTime();
+            if (observed < _lastReturnedUtc)
+            {
+                observed = _lastReturnedUtc;
+            }
+
+            _anchorUtc = observed;
             _anchorTimestamp = nowTimestamp;
             return true;
         }

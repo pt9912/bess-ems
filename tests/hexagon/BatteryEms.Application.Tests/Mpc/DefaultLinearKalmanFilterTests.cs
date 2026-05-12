@@ -115,6 +115,32 @@ public sealed class DefaultLinearKalmanFilterTests
         Assert.Equal(MpcEstimatorReasons.NonPhysical, update.Reason);
     }
 
+    [Theory]
+    [InlineData(double.NaN, 0.0, 25.0)]
+    [InlineData(50.0, double.NaN, 25.0)]
+    [InlineData(50.0, 0.0, double.PositiveInfinity)]
+    public async Task Non_finite_measurement_fails_closed(
+        double socPercent,
+        double activePowerKw,
+        double temperatureCelsius)
+    {
+        var estimator = new DefaultLinearKalmanFilter();
+
+        var update = await estimator.PredictUpdateAsync(
+            null,
+            MpcTestFixtures.BuildTelemetry(
+                socPercent: socPercent,
+                activePowerKw: activePowerKw,
+                temperatureCelsius: temperatureCelsius),
+            MpcTestFixtures.BuildAsset(),
+            MpcTestFixtures.BuildModel(),
+            MpcTestFixtures.BuildOptions(),
+            CancellationToken.None);
+
+        Assert.False(update.IsHealthy);
+        Assert.Equal(MpcEstimatorReasons.NonPhysical, update.Reason);
+    }
+
     [Fact]
     public async Task Diverged_covariance_fails_closed()
     {
@@ -130,6 +156,27 @@ public sealed class DefaultLinearKalmanFilterTests
             MpcTestFixtures.BuildAsset(),
             MpcTestFixtures.BuildModel(),
             BuildOptions(processNoise: 0.0, measurementNoise: 1e18),
+            CancellationToken.None);
+
+        Assert.False(update.IsHealthy);
+        Assert.Equal(MpcEstimatorReasons.CovarianceDiverged, update.Reason);
+    }
+
+    [Fact]
+    public async Task Missing_measurement_with_diverged_covariance_fails_closed()
+    {
+        var estimator = new DefaultLinearKalmanFilter();
+        var prior = new MpcState(
+            MpcTestFixtures.Anchor,
+            [50.0],
+            new MpcMatrix(1, 1, [2e12]));
+
+        var update = await estimator.PredictUpdateAsync(
+            prior,
+            null,
+            MpcTestFixtures.BuildAsset(),
+            MpcTestFixtures.BuildModel(),
+            BuildOptions(processNoise: 0.0),
             CancellationToken.None);
 
         Assert.False(update.IsHealthy);
