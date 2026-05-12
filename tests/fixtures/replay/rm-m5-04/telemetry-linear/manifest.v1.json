@@ -1,0 +1,53 @@
+{
+  "schema_version": "replay-manifest.v1",
+  "dataset_id": "rm-m5-04-telemetry-linear",
+  "kind": "telemetry-control-cycle",
+  "schema": {
+    "required_fields": [
+      "schema_version",
+      "dataset_id",
+      "kind",
+      "fixture",
+      "golden",
+      "determinism",
+      "request_id_rule",
+      "solver_options",
+      "tolerances"
+    ],
+    "optional_fields": [
+      "compatibility"
+    ],
+    "deprecated_fields": [],
+    "tolerated_legacy_fields": []
+  },
+  "fixture": {
+    "path": "fixture.v1.json",
+    "schema_version": "telemetry-replay-fixture.v1"
+  },
+  "golden": {
+    "path": "golden.v1.json",
+    "schema_version": "telemetry-golden-command.v1"
+  },
+  "determinism": {
+    "mode": "strict",
+    "seed": 5004,
+    "runtime": "dotnet-net10.0",
+    "numeric": "ieee754-double"
+  },
+  "request_id_rule": "control-cycle-command-id-v1",
+  "solver_options": {
+    "optimizer": "NoOpDispatchOptimizer"
+  },
+  "tolerances": {
+    "active_power_kw_abs": 0.0,
+    "reactive_power_kvar_abs": 0.0
+  },
+  "compatibility": {
+    "covers_legacy_cases": [
+      "m2-replay-bit-exact",
+      "m2-schedule-following-golden",
+      "m2-missing-valid-recovery",
+      "m2-stale-valid-recovery"
+    ]
+  }
+}

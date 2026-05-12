@@ -1,0 +1,68 @@
+{
+  "schema_version": "telemetry-replay-fixture.v1",
+  "records": [
+    {
+      "timestamp_utc": "2026-02-05T12:00:00Z",
+      "received_at_utc": "2026-02-05T12:00:00Z",
+      "telemetry": {
+        "timestamp_utc": "2026-02-05T12:00:00Z",
+        "asset_id": "asset-1",
+        "soc_percent": 50.0,
+        "soh_percent": 100.0,
+        "active_power_kw": 0.0,
+        "reactive_power_kvar": 0.0,
+        "dc_voltage": 800.0,
+        "dc_current": 0.0,
+        "temperature_celsius": 22.0,
+        "available": true,
+        "fault_status": "ok",
+        "data_quality": {
+          "flag": "Valid",
+          "reason": "valid"
+        }
+      }
+    },
+    {
+      "timestamp_utc": "2026-02-05T12:00:01Z",
+      "received_at_utc": "2026-02-05T12:00:01Z",
+      "telemetry": {
+        "timestamp_utc": "2026-02-05T12:00:01Z",
+        "asset_id": "asset-1",
+        "soc_percent": 51.0,
+        "soh_percent": 100.0,
+        "active_power_kw": 0.0,
+        "reactive_power_kvar": 0.0,
+        "dc_voltage": 800.0,
+        "dc_current": 0.0,
+        "temperature_celsius": 22.0,
+        "available": true,
+        "fault_status": "ok",
+        "data_quality": {
+          "flag": "Valid",
+          "reason": "valid"
+        }
+      }
+    },
+    {
+      "timestamp_utc": "2026-02-05T12:00:02Z",
+      "received_at_utc": "2026-02-05T12:00:02Z",
+      "telemetry": {
+        "timestamp_utc": "2026-02-05T12:00:02Z",
+        "asset_id": "asset-1",
+        "soc_percent": 52.0,
+        "soh_percent": 100.0,
+        "active_power_kw": 0.0,
+        "reactive_power_kvar": 0.0,
+        "dc_voltage": 800.0,
+        "dc_current": 0.0,
+        "temperature_celsius": 22.0,
+        "available": true,
+        "fault_status": "ok",
+        "data_quality": {
+          "flag": "Valid",
+          "reason": "valid"
+        }
+      }
+    }
+  ]
+}

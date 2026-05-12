@@ -1,0 +1,35 @@
+{
+  "schema_version": "telemetry-golden-command.v1",
+  "commands": [
+    {
+      "command_id": "ctrl-1770292800000-asset-1",
+      "timestamp_utc": "2026-02-05T12:00:00Z",
+      "asset_id": "asset-1",
+      "mode": "Idle",
+      "active_power_kw": 0.0,
+      "reactive_power_kvar": 0.0,
+      "reason": "noop-optimizer",
+      "source": "Optimization"
+    },
+    {
+      "command_id": "ctrl-1770292801000-asset-1",
+      "timestamp_utc": "2026-02-05T12:00:01Z",
+      "asset_id": "asset-1",
+      "mode": "Idle",
+      "active_power_kw": 0.0,
+      "reactive_power_kvar": 0.0,
+      "reason": "noop-optimizer",
+      "source": "Optimization"
+    },
+    {
+      "command_id": "ctrl-1770292802000-asset-1",
+      "timestamp_utc": "2026-02-05T12:00:02Z",
+      "asset_id": "asset-1",
+      "mode": "Idle",
+      "active_power_kw": 0.0,
+      "reactive_power_kvar": 0.0,
+      "reason": "noop-optimizer",
+      "source": "Optimization"
+    }
+  ]
+}

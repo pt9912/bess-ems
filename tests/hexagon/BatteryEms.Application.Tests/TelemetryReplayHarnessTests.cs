@@ -19,6 +19,7 @@ namespace BatteryEms.Application.Tests;
 //   3. Recovery — a sequence that starts with a missing snapshot then
 //      pumps valid telemetry produces safe-stop first, normal dispatch
 //      second; the sequence is reproducible.
+[Trait("Category", "Replay")]
 public sealed class TelemetryReplayHarnessTests
 {
     private const string AssetId = "asset-1";

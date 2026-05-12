@@ -467,17 +467,19 @@ bricht den Build.
 
 ### 2.5 Replay-Tests
 
-Aktiv ab **M2**. Filter: `Category=Replay` (LH-TEST-004).
+Aktiv ab **M2**. Filter: `Category=Replay` (LH-TEST-004). RM-M5-04 stellt
+das Gate als eigenes Docker-Target bereit. Die ersten Manifest-v1-Fixtures
+liegen unter `tests/fixtures/replay/`.
 
 ```bash
 make test-replay   # = docker build --target test-replay
 make test-mpc-property   # RM-M5-02 MPC-Identity/Determinism/Replay-Hooks
 ```
 
-Wiedergabe historischer Telemetrie-Datensätze. Erwartete Commands sind
-versioniert als Goldens unter `tests/replay/testdata/`. Byte-stabiler
-Vergleich pro Datensatz; Abweichungen sind erklärungspflichtig (ADR oder
-Plan-Eintrag).
+Wiedergabe historischer Telemetrie-Datensätze. Erwartete Commands sind als
+versionierte Goldens neben dem Manifest abgelegt; Abweichungen sind
+erklärungspflichtig (ADR oder Plan-Eintrag). Der RM-M5-04-Diff trennt
+`numeric_tolerance` von `business_drift`.
 
 RM-M5-02 ergänzt den MPC-Replay-Vertrag vor der vollständigen
 Replay-Plattform: `make test-mpc-property` pinnt das achtachsige
@@ -510,7 +512,7 @@ Fall mit Native Core das erfolgreiche Laden der `.so`-Bibliothek
 | MPC Property         | `make test-mpc-property`          | RM-M5-02 Unit-Pins in Application/Worker/Architecture |
 | Native Interop       | `make test-native-interop`       | `Category!=Parity` im NativeInterop-IntegrationTests-Projekt |
 | Native Parity        | `make test-native-parity`        | `Category=Parity` im NativeInterop-IntegrationTests-Projekt |
-| Replay               | `make test-replay`               | `Category=Replay`          |
+| Replay               | `make test-replay`               | `Category=Replay` im Application-Tests-Projekt |
 | Container            | `make test-container`            | `Category=Container`       |
 
 ---

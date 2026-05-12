@@ -20,7 +20,7 @@ DOCKER_BUILD = $(DOCKER) build $(BUILD_CONTEXT) \
 
 .PHONY: help \
 	lint arch-check gates \
-	test test-safety test-mpc-property test-integration test-hil-modbus test-hil-opcua test-hil-optimization-core test-hil-closed-loop test-container coverage-gate \
+	test test-safety test-mpc-property test-replay test-integration test-hil-modbus test-hil-opcua test-hil-optimization-core test-hil-closed-loop test-container coverage-gate \
 	native-build test-native-interop test-native-parity \
 	native-lint native-sanitizer native-coverage-report native-coverage-gate native-coverage-exclusions \
 	simulator-test simulator-race simulator-lint simulator-coverage-gate \
@@ -46,6 +46,7 @@ help:
 	@echo "  make test          Domain + Application unit tests"
 	@echo "  make test-safety   Safety-path subset (Category=Safety)"
 	@echo "  make test-mpc-property  MPC determinism / identity / replay-hook pins (RM-M5-02)"
+	@echo "  make test-replay   Replay manifest / fixture / golden-diff pins (RM-M5-04)"
 	@echo "  make coverage-gate Line-coverage gate, 90% per M1 production assembly"
 	@echo ""
 	@echo "Aggregated:"
@@ -163,18 +164,21 @@ test-safety:
 test-mpc-property:
 	$(DOCKER_BUILD) --target test-mpc-property -t $(IMAGE_PREFIX)-test-mpc-property:latest
 
+test-replay:
+	$(DOCKER_BUILD) --target test-replay -t $(IMAGE_PREFIX)-test-replay:latest
+
 coverage-gate:
 	$(DOCKER_BUILD) --target coverage-gate -t $(IMAGE_PREFIX)-coverage-gate:latest
 
 # --- Aggregated gates ------------------------------------------------------
 
-gates: lint arch-check test test-safety test-mpc-property coverage-gate \
+gates: lint arch-check test test-safety test-mpc-property test-replay coverage-gate \
 	simulator-lint simulator-test simulator-race simulator-coverage-gate \
 	native-build native-lint native-sanitizer \
 	native-coverage-gate native-coverage-exclusions \
 	test-native-interop test-native-parity \
 	test-hil-opcua test-hil-optimization-core
-	@echo "[gates] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, simulator-{lint,test,race,coverage-gate}) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + M5 (test-hil-optimization-core, test-mpc-property)"
+	@echo "[gates] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, simulator-{lint,test,race,coverage-gate}) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + M5 (test-hil-optimization-core, test-mpc-property, test-replay)"
 
 # --- Welle 3 (partially active) --------------------------------------------
 
@@ -365,7 +369,7 @@ test-container: runtime
 # (RM-M1-20). Erst .NET-Lint/-Boundary/-Tests, dann Coverage, dann
 # Simulator und zuletzt Integration — wenn ein früheres Gate kippt,
 # bricht der Lauf hier ab. Container-Smoke gehört zu `runtime`/`fullbuild`.
-ci: lint arch-check test test-safety test-mpc-property coverage-gate \
+ci: lint arch-check test test-safety test-mpc-property test-replay coverage-gate \
     simulator-lint simulator-test simulator-race simulator-coverage-gate \
     schema-validate schema-drift-check \
     native-build native-lint native-sanitizer \
@@ -373,7 +377,7 @@ ci: lint arch-check test test-safety test-mpc-property coverage-gate \
     test-native-interop test-native-parity \
     test-hil-opcua test-hil-optimization-core \
     test-integration
-	@echo "[ci] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, simulator-*) + M2 schema (validate, drift-check) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + M5 (test-hil-optimization-core, test-mpc-property) + test-integration"
+	@echo "[ci] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, simulator-*) + M2 schema (validate, drift-check) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + M5 (test-hil-optimization-core, test-mpc-property, test-replay) + test-integration"
 
 # Fresh-clone-naher Komplettlauf: alle CI-Gates plus Runtime-Image und
 # Compose-Smoke. Letzte Stufe vor einem M1-Tag (RM-M1-20).

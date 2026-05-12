@@ -137,6 +137,20 @@ RUN dotnet test tests/hexagon/BatteryEms.Domain.Tests/BatteryEms.Domain.Tests.cs
 FROM test AS test-mpc-property
 
 # ---------------------------------------------------------------------------
+# test-replay: RM-M5-04 replay manifest / fixture / golden-diff pins.
+# Runs the replay-tagged Application tests, including the existing M2 harness
+# compatibility cases and the RM-M5-04 manifest/golden-diff basis.
+# ---------------------------------------------------------------------------
+FROM lint AS test-replay
+ARG BUILD_CONFIGURATION
+RUN dotnet test tests/hexagon/BatteryEms.Application.Tests/BatteryEms.Application.Tests.csproj \
+    --configuration "${BUILD_CONFIGURATION}" \
+    --no-build \
+    --no-restore \
+    --filter "Category=Replay" \
+    --logger "console;verbosity=normal"
+
+# ---------------------------------------------------------------------------
 # test-safety: safety-path tests filtered by trait Category=Safety (RM-M1-07)
 # ---------------------------------------------------------------------------
 FROM lint AS test-safety
