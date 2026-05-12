@@ -458,7 +458,7 @@ Solver-nahe Optimierung; ausgebaute Replay- und Vergleichsplattform.
 | ✅     | RM-M5-01   | gRPC-Sidecar `optimization-core` (LP/MILP/MPC) — Detail-Slice [`../done/plan-RM-M5-01.md`](../done/plan-RM-M5-01.md) (abgeschlossen 2026-05-11 inkl. Sub-Slice-C-Korrektur-Pass); gRPC-Transport per [ADR 0005](../../adr/0005-optimization-core-sidecar-transport.md), UDS-Default + mTLS-Cross-Host, In-Process TestSidecar via Grpc.AspNetCore. | LH-OPT-002/003/006      |
 | ✅     | RM-M5-02   | MPC-Kernel (State-Space, Kalman, Vorhersagehorizont) — Detail-Slice [`../done/plan-RM-M5-02.md`](../done/plan-RM-M5-02.md) abgeschlossen 2026-05-12 mit Local-OSQP, Kalman-Estimator, Replay-Stempeln, `mpc_runs`-Migration, Worker-Wiring und Production-Gates. | LH-CTRL-005/006         |
 | ⬜     | RM-M5-03   | Hochfrequente Telemetrie-Filterung im Native Core (optional)        | LH-NATIVE-001           |
-| ⬜     | RM-M5-04   | Replay-Plattform mit Datensatz-Verwaltung und Sollwertvergleich     | LH-TEST-004             |
+| ✅     | RM-M5-04   | Replay-Plattform mit Datensatz-Verwaltung und Sollwertvergleich — Detail-Slice [`../done/plan-RM-M5-04.md`](../done/plan-RM-M5-04.md) abgeschlossen 2026-05-12 mit Manifest-/Fixture-/Golden-Diff-Grundlage, M2/M3-Migration, Replay-Diff-Reports und Sidecar-/MPC-Engine-Vergleichen. | LH-TEST-004             |
 | ⬜     | RM-M5-05   | Erweiterte Metriken / Solverstatus / Command-Latenz                 | LH-MON-002              |
 | ⬜     | RM-M5-06   | Container-Orchestrierungstests (Worker + Sidecar)                   | LH-TEST-007             |
 | ⬜     | RM-M5-07   | `IPriceSeriesSource`-Port + quellenneutraler Preisreihen-Import/API; keine externen Anbieteradapter im Default | LH-OPEN-003, LH-MKT-008 |
