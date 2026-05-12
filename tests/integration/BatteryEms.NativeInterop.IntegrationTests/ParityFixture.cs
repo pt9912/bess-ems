@@ -85,16 +85,19 @@ internal static class ParityFixtureLoader
 
     public static ParityFixtureV1 Load() => Cached.Value;
 
-    private static ParityFixtureV1 LoadFromDisk()
+    public static ParityFixtureV1 LoadFromPath(string path) => LoadFromPathCore(path);
+
+    private static ParityFixtureV1 LoadFromDisk() =>
+        LoadFromPathCore(Path.Combine(AppContext.BaseDirectory, FixtureRelativePath));
+
+    private static ParityFixtureV1 LoadFromPathCore(string path)
     {
-        var path = Path.Combine(AppContext.BaseDirectory, FixtureRelativePath);
         if (!File.Exists(path))
         {
             throw new FileNotFoundException(
-                $"Native parity fixture missing at '{path}'. The csproj copies "
-                + "tests/fixtures/native_parity/cases.v1.json into the test "
-                + "output via <None CopyToOutputDirectory='PreserveNewest' />; "
-                + "rebuild the test project (`dotnet build`) to refresh.",
+                $"Native parity fixture missing at '{path}'. Ensure "
+                + "tests/fixtures/native_parity/cases.v1.json exists in the "
+                + "repository or is copied into the test output.",
                 path);
         }
 

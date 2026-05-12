@@ -2,7 +2,6 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using BatteryEms.Adapters.NativeInterop;
 using BatteryEms.Application.Control;
-using BatteryEms.Domain;
 using Xunit;
 
 namespace BatteryEms.NativeInterop.IntegrationTests;
@@ -56,8 +55,8 @@ public sealed class NativeParityReplayTests
         var handle = NativeLibrary.Load(libraryPath);
         using var native = new NativeControlKernel(handle);
 
-        var managed       = RunManaged(theCase);
-        var nativeResult  = RunNative(native, theCase, out var nativeMode);
+        var managed       = NativeParityReplayEngine.RunManaged(theCase);
+        var nativeResult  = NativeParityReplayEngine.RunNative(native, theCase, out var nativeMode);
         var expected      = theCase.Expected;
         var tolerance     = Fixture.ToleranceActivePowerKw;
 
@@ -72,7 +71,7 @@ public sealed class NativeParityReplayTests
         // worker layer downstream. Pin the native side here so a
         // future BCC mode mapping change surfaces; managed mode is
         // implicitly checked via the active_power_kw equality.
-        Assert.Equal(NormaliseMode(expected.Mode), nativeMode);
+        Assert.Equal(NativeParityReplayEngine.NormaliseMode(expected.Mode), nativeMode);
 
         // Native ↔ managed parity: redundant given the two checks
         // above, but explicit so the gate's contract reads cleanly.
@@ -81,86 +80,6 @@ public sealed class NativeParityReplayTests
             $"native and managed disagree on ActivePowerKw: managed={managed.ActivePowerKw} native={nativeResult.ActivePowerKw} tol={tolerance}");
         Assert.Equal(managed.Reason,     nativeResult.Reason);
         Assert.Equal(managed.WasLimited, nativeResult.WasLimited);
-    }
-
-    private static KernelResult RunManaged(ParityCase theCase)
-    {
-        var asset = new BatteryAsset(
-            assetId:                         "asset-replay",
-            capacityKwh:                     100,
-            maxChargePowerKw:                theCase.Limits.MaxChargePowerKw,
-            maxDischargePowerKw:             theCase.Limits.MaxDischargePowerKw,
-            minSocPercent:                   theCase.Limits.MinSocPercent,
-            maxSocPercent:                   theCase.Limits.MaxSocPercent,
-            chargeEfficiency:                0.95,
-            dischargeEfficiency:             0.95,
-            maxRampKwPerSecond:              theCase.Limits.MaxRampKwPerSecond,
-            minOperatingTemperatureCelsius:  theCase.Limits.MinTemperatureCelsius,
-            maxOperatingTemperatureCelsius:  theCase.Limits.MaxTemperatureCelsius);
-
-        var telemetry = new BatteryTelemetry(
-            Timestamp:           DateTimeOffset.UnixEpoch,
-            AssetId:             "asset-replay",
-            SocPercent:          theCase.Snapshot.SocPercent,
-            SohPercent:          100,
-            ActivePowerKw:       theCase.Snapshot.ActivePowerKw,
-            ReactivePowerKvar:   0,
-            DcVoltage:           800,
-            DcCurrent:           0,
-            TemperatureCelsius:  theCase.Snapshot.TemperatureCelsius,
-            Available:           true,
-            FaultStatus:         "ok",
-            DataQuality:         DataQuality.Valid);
-
-        var input = new KernelInput(
-            asset, telemetry,
-            theCase.Request.TargetActivePowerKw,
-            theCase.Request.PreviousActivePowerKw,
-            TimeSpan.FromSeconds(theCase.Request.DtSeconds));
-
-        return new ManagedControlKernel().Compute(input);
-    }
-
-    private static KernelResult RunNative(
-        NativeControlKernel native, ParityCase theCase, out int mode)
-    {
-        var snapshot = new BccSnapshot
-        {
-            SocPercent          = theCase.Snapshot.SocPercent,
-            ActivePowerKw       = theCase.Snapshot.ActivePowerKw,
-            TemperatureCelsius  = theCase.Snapshot.TemperatureCelsius,
-        };
-        var limits = new BccLimits
-        {
-            MaxChargePowerKw       = theCase.Limits.MaxChargePowerKw,
-            MaxDischargePowerKw    = theCase.Limits.MaxDischargePowerKw,
-            MinSocPercent          = theCase.Limits.MinSocPercent,
-            MaxSocPercent          = theCase.Limits.MaxSocPercent,
-            MaxRampKwPerSecond     = theCase.Limits.MaxRampKwPerSecond,
-            MinTemperatureCelsius  = theCase.Limits.MinTemperatureCelsius,
-            MaxTemperatureCelsius  = theCase.Limits.MaxTemperatureCelsius,
-        };
-        var request = new BccRequest
-        {
-            TargetActivePowerKw    = theCase.Request.TargetActivePowerKw,
-            PreviousActivePowerKw  = theCase.Request.PreviousActivePowerKw ?? 0.0,
-            DtSeconds              = theCase.Request.DtSeconds,
-            HasPrevious            = theCase.Request.PreviousActivePowerKw.HasValue ? 1 : 0,
-        };
-
-        var status = native.Compute(in snapshot, in limits, in request, out var command);
-        Assert.True(
-            status == BccStatus.Ok || status == BccStatus.Limited,
-            $"native returned non-OK status {status} for case '{theCase.Name}' "
-            + $"(reason {command.ReasonCode}); replay cases must stay on the OK/LIMITED path "
-            + "by construction (see fixtures/native_parity/README.md).");
-
-        mode = command.Mode;
-        return new KernelResult(
-            ActivePowerKw: command.ActivePowerKw,
-            Reason:        NativeFallbackControlKernel.MapReason(command.ReasonCode),
-            WasLimited:    status == BccStatus.Limited,
-            Source:        KernelResultSource.Native);
     }
 
     private static void AssertMatchesExpected(
@@ -172,15 +91,4 @@ public sealed class NativeParityReplayTests
         Assert.Equal(expected.Reason,     result.Reason);
         Assert.Equal(expected.WasLimited, result.WasLimited);
     }
-
-    private static int NormaliseMode(string expected) => expected switch
-    {
-        "stop"      => BccMode.Stop,
-        "idle"      => BccMode.Idle,
-        "charge"    => BccMode.Charge,
-        "discharge" => BccMode.Discharge,
-        _ => throw new ArgumentOutOfRangeException(
-            nameof(expected), expected,
-            "fixture mode must be one of stop|idle|charge|discharge"),
-    };
 }

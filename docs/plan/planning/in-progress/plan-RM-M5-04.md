@@ -16,7 +16,7 @@ ein ueberlappender CI-Lauf den neuen und alten Pfad verglichen hat.
 | ------ | -- | ------ | -------- |
 | ✅ | RM-M5-04-A | Manifest-v1, Telemetrie-Fixture-v1, Golden-Command-v1, reject-by-default Loader und Golden-Diff-Grundlage | `tests/hexagon/BatteryEms.Application.Tests/Replay/*`, `tests/fixtures/replay/rm-m5-04/telemetry-linear/*`, `make test-replay` |
 | ✅ | RM-M5-04-B | Vollstaendige M2/M3-Kompatibilitaetsmigration mit Golden-Diff-Matrix | Vier M2-Pflichtfaelle haben Manifest-v1-Fixture/Golden und laufen im `make test-replay` parallel zum alten Harness; M3 Native-Parity `cases.v1.json` ist per Manifest-v1 `repo://` referenziert und bleibt ueber `make test-native-parity` aktiv |
-| ⬜ | RM-M5-04-C | MPC-/Optimization-Core-Replay-Runner mit Engine-Vergleich | Manifest kann Managed, Native und Sidecar-Sollwerte vergleichen |
+| ✅ | RM-M5-04-C | Manifestgetriebener Engine-Vergleich | `native-control-parity`-Manifest treibt Managed-vs-Native-Vergleich per `NativeParityEngineComparisonRunner`; Sidecar/MPC-Engine-Vergleich bleibt fuer RM-M5-04-D bzw. RM-M5-06-Orchestrierungsnaehe |
 | ⬜ | RM-M5-04-D | Entwickler-/CI-Report fuer Replay-Diffs | Maschinenlesbarer Report mit `numeric_tolerance` vs `business_drift` |
 
 ## RM-M5-04-A Ergebnis
@@ -49,3 +49,21 @@ ein ueberlappender CI-Lauf den neuen und alten Pfad verglichen hat.
   und pinnt alle 25 Case-Namen als Kompatibilitaetsinventar.
 - `make test-replay` prueft alte M2-Harness-Tests und neue Manifest-Goldens im
   selben Gate; `make test-native-parity` bleibt der ueberlappende M3-Pfad.
+
+## RM-M5-04-C Ergebnis
+
+- `NativeParityManifestReplayTests` laedt das RM-M5-04-Manifest
+  `tests/fixtures/replay/rm-m5-04/native-parity/manifest.v1.json`, loest die
+  `repo://`-Referenz auf `tests/fixtures/native_parity/cases.v1.json` auf und
+  prueft, dass Manifest-Inventar und Datensatz exakt dieselben 25 Cases
+  enthalten.
+- `NativeParityEngineComparisonRunner` fuehrt jeden manifestgelisteten Case
+  durch `ManagedControlKernel` und den realen `NativeControlKernel` und erzeugt
+  einen Diff-Report mit `numeric_tolerance` und `business_drift`.
+- Der bestehende M3-Parity-Test nutzt dieselbe Engine-Ausfuehrung wie der neue
+  manifestgetriebene Runner; damit gibt es keinen zweiten, abweichenden
+  Native-/Managed-Ausfuehrungspfad.
+- `make test-native-parity` ist der ausfuehrende Engine-Vergleich fuer C. Der
+  Sidecar-/MPC-Engine-Vergleich bleibt bewusst offen, weil er einen
+  Optimierungs-/Orchestrierungsdatensatz braucht und besser mit RM-M5-04-D bzw.
+  RM-M5-06 gekoppelt wird.
