@@ -74,6 +74,8 @@ jobs:
           run_gate arch-check arch-check
           run_gate test test
           run_gate test-safety test-safety
+          run_gate test-replay test-replay
+          copy_from_image "bess-ems-test-replay:latest" "/tmp/bess-ems-replay-reports" "artifacts/ci/replay-reports/test-replay"
           run_gate coverage-gate coverage-gate
           copy_from_image "bess-ems-coverage-gate:latest" "/src/coverage" "artifacts/ci/dotnet-coverage"
           run_gate simulator-lint
@@ -90,6 +92,7 @@ jobs:
           run_gate native-coverage-exclusions
           run_gate test-native-interop test-native-interop
           run_gate test-native-parity test-native-parity
+          copy_from_image "bess-ems-test-native-parity:latest" "/tmp/bess-ems-replay-reports" "artifacts/ci/replay-reports/test-native-parity"
           run_gate test-integration
           run_gate test-container runtime
           run_gate build runtime

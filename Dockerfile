@@ -143,6 +143,7 @@ FROM test AS test-mpc-property
 # ---------------------------------------------------------------------------
 FROM lint AS test-replay
 ARG BUILD_CONFIGURATION
+ENV BESS_REPLAY_REPORT_DIR=/tmp/bess-ems-replay-reports
 RUN dotnet test tests/hexagon/BatteryEms.Application.Tests/BatteryEms.Application.Tests.csproj \
     --configuration "${BUILD_CONFIGURATION}" \
     --no-build \
@@ -393,6 +394,7 @@ FROM lint AS test-native-parity
 ARG BUILD_CONFIGURATION
 COPY --from=native-build /build/native/libbattery_control_core.so /native/libbattery_control_core.so
 ENV BESS_NATIVE_LIB_PATH=/native/libbattery_control_core.so
+ENV BESS_REPLAY_REPORT_DIR=/tmp/bess-ems-replay-reports
 RUN dotnet test tests/integration/BatteryEms.NativeInterop.IntegrationTests/BatteryEms.NativeInterop.IntegrationTests.csproj \
     --configuration "${BUILD_CONFIGURATION}" \
     --no-build \
