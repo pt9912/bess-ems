@@ -19,6 +19,7 @@ public static class TelemetryRegistration
         // by AddBessApplicationInMemoryStores; last registration wins for
         // GetService<IOptimizationRunMetrics>().
         services.AddSingleton<IOptimizationRunMetrics, PrometheusOptimizationRunMetrics>();
+        services.AddSingleton<IOptimizationCoreMetrics, PrometheusOptimizationCoreMetrics>();
         return services;
     }
 

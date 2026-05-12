@@ -333,9 +333,9 @@ fährt im selben Test-Prozess als `Grpc.AspNetCore`-Application gegen
 einen Per-Test-UDS in `Path.GetTempPath()/BatteryEms/OptimizationCore/`;
 kein externes Asset und kein Container.
 
-**Pin-Inventory** (25 Pins gesamt — 5 happy-path + 4 negativ + 4
+**Pin-Inventory** (26 Pins gesamt — 5 happy-path + 4 negativ + 4
 mixed-version + 4 security + 3 adapter-side idempotency + 5
-local-fallback; die 4 mixed-version- und 4 security-Pins decken die
+local-fallback + 1 Manifest-Replay; die 4 mixed-version- und 4 security-Pins decken die
 plan-RM-M5-01 §6 Akzeptanzkriterien, die 3 adapter-side
 idempotency-Pins + 5 local-fallback-Pins kommen aus dem
 Sub-Slice-C-Korrektur-Pass (plan §5.1) als Wire-Verhalten gegen
@@ -345,7 +345,7 @@ Sub-Slice-C-Korrektur-Pass (plan §5.1) als Wire-Verhalten gegen
 | ----- | --- | ------ |
 | `OptimizationCoreRoundtripTests.cs` | Health_probe_succeeds_against_test_sidecar | RM-M5-01-B |
 | `OptimizationCoreRoundtripTests.cs` | Version_probe_compatibility_check_passes | RM-M5-01-B |
-| `OptimizationCoreRoundtripTests.cs` | Optimize_success_produces_optimal_run_with_schedule | RM-M5-01-B |
+| `OptimizationCoreRoundtripTests.cs` | Optimize_success_produces_optimal_run_with_schedule | RM-M5-01-B + RM-M5-05 Metrics-Pin |
 | `OptimizationCoreRoundtripTests.cs` | Optimize_streaming_progress_does_not_block_final_result | RM-M5-01-B |
 | `OptimizationCoreRoundtripTests.cs` | Optimize_cancellation_mid_stream_returns_failed_run | RM-M5-01-B |
 | `OptimizationCoreNegativeTests.cs` | Deadline_exceeded_returns_failed_run_with_time_limit_status | RM-M5-01-B |
@@ -368,6 +368,7 @@ Sub-Slice-C-Korrektur-Pass (plan §5.1) als Wire-Verhalten gegen
 | `OptimizationCoreFallbackTests.cs` | Transport_failure_with_fallback_that_throws_falls_through_to_failed | RM-M5-01-C-fixup |
 | `OptimizationCoreFallbackTests.cs` | Sidecar_success_does_not_invoke_fallback | RM-M5-01-C-fixup |
 | `OptimizationCoreFallbackTests.cs` | Fallback_with_context_mismatch_is_rejected_by_validator | RM-M5-01-C-fixup |
+| `OptimizationCoreManifestReplayTests.cs` | Manifest_drives_sidecar_schedule_engine_comparison | RM-M5-04-E |
 
 Plus 13 Persistence-Pins in `BatteryEms.Persistence.IntegrationTests`
 (`OptimizationIdempotencyStoreIntegrationTests.cs`) für den
@@ -394,6 +395,19 @@ fehlender `IFallbackMpcOptimizer` ⇒
 `mpc-production-without-monotonic-clock`. Reservierte Backend-Namen
 `"optimization_core"` und `"bi_modal"` werfen weiterhin zuerst
 `mpc-backend-not-implemented`.
+
+**Erweiterte Metriken (RM-M5-05)**: `AddBessTelemetry` registriert
+`PrometheusOptimizationRunMetrics`, `PrometheusControlCycleMetrics` und
+`PrometheusOptimizationCoreMetrics`. Der generische Optimierungspfad exportiert
+Solverstatus und Solverlaufzeit; der Control-Cycle-Pfad exportiert
+`bess_command_latency_seconds`. Der optimization-core-Pfad exportiert
+`bess_optimization_core_runs_total`,
+`bess_optimization_core_run_duration_seconds`,
+`bess_optimization_core_terminal_states_total` und
+`bess_optimization_core_sidecar_health_status` mit Labels fuer
+`fallback_source`, `fallback_reason` und `terminal_state`. Scrape-Pins liegen in
+`PrometheusOptimizationCoreMetricsTests`; der echte Test-Sidecar-Fluss pinnt
+Metrics-Writes in `Optimize_success_produces_optimal_run_with_schedule`.
 
 **Konventions-Abgrenzung**:
 

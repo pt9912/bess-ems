@@ -1,4 +1,5 @@
 using BatteryEms.Application.Optimization;
+using BatteryEms.Application.Observability;
 using BatteryEms.Application.Time;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -40,7 +41,8 @@ public static class OptimizationCoreRegistration
             sp.GetRequiredService<IClock>(),
             sp.GetRequiredService<ILogger<OptimizationCoreScheduleOptimizer>>(),
             sp.GetService<IFallbackScheduleOptimizer>(),
-            sp.GetService<IFallbackPlanValidator>()));
+            sp.GetService<IFallbackPlanValidator>(),
+            sp.GetService<IOptimizationCoreMetrics>()));
         return services;
     }
 }

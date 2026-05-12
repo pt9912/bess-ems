@@ -1,5 +1,6 @@
 using BatteryEms.Adapters.OptimizationCore;
 using BatteryEms.Adapters.OptimizationCore.Grpc.V1;
+using BatteryEms.Application.Observability;
 using BatteryEms.Application.Optimization;
 using BatteryEms.Domain;
 using Google.Protobuf.WellKnownTypes;
@@ -71,7 +72,8 @@ public sealed class OptimizationCoreRoundtripTests
     {
         await using var sidecar = await EmbeddedOptimizationCoreSidecar
             .StartAsync<OptimalAlwaysSucceedsStub>();
-        var optimizer = BuildOptimizer(sidecar);
+        var metrics = new RecordingOptimizationCoreMetrics();
+        var optimizer = BuildOptimizer(sidecar, metrics);
 
         var request = Defaults.SampleRequest(HorizonStart, Horizon, TimeStep);
         var result = await optimizer.OptimizeAsync(request, default);
@@ -81,6 +83,11 @@ public sealed class OptimizationCoreRoundtripTests
         Assert.Equal(request.AssetId, result.ProducedSchedule!.AssetId);
         Assert.Equal((int)(Horizon.Ticks / TimeStep.Ticks),
             result.ProducedSchedule.Windows.Count);
+        Assert.Contains(metrics.HealthStatuses, status => status == "serving");
+        var run = Assert.Single(metrics.Runs);
+        Assert.Equal("sidecar_result", run.FallbackSource);
+        Assert.Equal("none", run.FallbackReason);
+        Assert.Equal(OptimizationTerminalState.SidecarCommitted, run.TerminalState);
     }
 
     // Pin 4: Streaming-Progress wird vom Adapter konsumiert ohne den
@@ -177,7 +184,8 @@ public sealed class OptimizationCoreRoundtripTests
     }
 
     private static OptimizationCoreScheduleOptimizer BuildOptimizer(
-        EmbeddedOptimizationCoreSidecar sidecar)
+        EmbeddedOptimizationCoreSidecar sidecar,
+        IOptimizationCoreMetrics? metrics = null)
     {
         var options = Defaults.ForHilSimulator(sidecar.Endpoint);
         var client = new OptimizationCoreClient(options);
@@ -186,6 +194,32 @@ public sealed class OptimizationCoreRoundtripTests
             options,
             new BatteryEms.Application.Optimization.InMemoryOptimizationIdempotencyStore(),
             new Defaults.FixedClock(),
-            NullLogger<OptimizationCoreScheduleOptimizer>.Instance);
+            NullLogger<OptimizationCoreScheduleOptimizer>.Instance,
+            metrics: metrics);
     }
+
+    private sealed class RecordingOptimizationCoreMetrics : IOptimizationCoreMetrics
+    {
+        public List<RecordedRun> Runs { get; } = new();
+        public List<string> HealthStatuses { get; } = new();
+
+        public void RecordRun(
+            string assetId,
+            OptimizationSolverStatus status,
+            string fallbackSource,
+            string fallbackReason,
+            OptimizationTerminalState terminalState,
+            TimeSpan duration) =>
+            Runs.Add(new RecordedRun(assetId, status, fallbackSource, fallbackReason, terminalState, duration));
+
+        public void RecordSidecarHealth(string status) => HealthStatuses.Add(status);
+    }
+
+    private sealed record RecordedRun(
+        string AssetId,
+        OptimizationSolverStatus Status,
+        string FallbackSource,
+        string FallbackReason,
+        OptimizationTerminalState TerminalState,
+        TimeSpan Duration);
 }

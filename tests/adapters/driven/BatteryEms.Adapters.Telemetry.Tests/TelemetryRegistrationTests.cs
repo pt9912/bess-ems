@@ -18,6 +18,11 @@ public sealed class TelemetryRegistrationTests
         var second = provider.GetRequiredService<IControlCycleMetrics>();
         Assert.IsType<PrometheusControlCycleMetrics>(first);
         Assert.Same(first, second);
+
+        Assert.IsType<PrometheusOptimizationRunMetrics>(
+            provider.GetRequiredService<IOptimizationRunMetrics>());
+        Assert.IsType<PrometheusOptimizationCoreMetrics>(
+            provider.GetRequiredService<IOptimizationCoreMetrics>());
     }
 
     [Fact]

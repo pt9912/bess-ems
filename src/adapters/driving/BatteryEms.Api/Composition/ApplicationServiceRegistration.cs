@@ -107,6 +107,7 @@ public static class ApplicationServiceRegistration
         // API-only test hosts keep the no-op so the use case resolves
         // without dragging the Prometheus adapter in.
         services.AddSingleton<IOptimizationRunMetrics>(_ => NoOpOptimizationRunMetrics.Instance);
+        services.AddSingleton<IOptimizationCoreMetrics>(_ => NoOpOptimizationCoreMetrics.Instance);
 
         // Driving-port use cases.
         services.AddSingleton<IHealthQuery, DefaultHealthQuery>();
