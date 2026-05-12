@@ -1,3 +1,4 @@
+using System.Text.Json;
 using BatteryEms.Adapters.Optimization;
 using BatteryEms.Application.Markets;
 using BatteryEms.Application.Optimization;
@@ -51,7 +52,9 @@ public sealed class ReplayManifestLoaderTests
                 .RunAsync("asset-1", dataset.Records, CancellationToken.None);
 
             var diff = ReplayGoldenComparer.Compare(commands, golden, manifest.Tolerances);
-            Assert.True(diff.IsMatch, string.Join(Environment.NewLine, diff.Differences));
+            var reportJson = ReplayDiffReportJsonWriter.ToJson(manifest, diff);
+            ReplayDiffReportJsonWriter.WriteIfConfigured(manifest, diff);
+            Assert.True(diff.IsMatch, reportJson);
         }
 
         Assert.Equal(MandatoryM2Cases.Order(StringComparer.Ordinal), covered.Order(StringComparer.Ordinal));
@@ -150,6 +153,58 @@ public sealed class ReplayManifestLoaderTests
 
         Assert.Contains(report.Differences, difference => difference.Kind == "business_drift");
         Assert.Contains(report.Differences, difference => difference.Kind == "numeric_tolerance");
+    }
+
+    [Fact]
+    public void Replay_diff_report_serializes_machine_readable_json_and_artifact()
+    {
+        var loadResult = ReplayManifestLoader.Load(
+            RepositoryPath($"{ReplayFixtureRoot}/telemetry-linear/manifest.v1.json"));
+        var manifest = Assert.IsType<ReplayManifest>(loadResult.Manifest);
+        var report = new ReplayDiffReport(
+        [
+            new ReplayDiff(
+                Kind: "numeric_tolerance",
+                Path: "$.commands[0].active_power_kw",
+                Expected: "1",
+                Actual: "1.5",
+                Tolerance: 0.1),
+            new ReplayDiff(
+                Kind: "business_drift",
+                Path: "$.commands[0].mode",
+                Expected: "Idle",
+                Actual: "Discharge",
+                Tolerance: null),
+        ]);
+
+        var json = ReplayDiffReportJsonWriter.ToJson(manifest, report);
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+
+        Assert.Equal(ReplaySchemaVersions.DiffReport, root.GetProperty("schema_version").GetString());
+        Assert.Equal("rm-m5-04-telemetry-linear", root.GetProperty("dataset_id").GetString());
+        Assert.False(root.GetProperty("is_match").GetBoolean());
+        Assert.Equal(2, root.GetProperty("difference_count").GetInt32());
+        Assert.Equal("numeric_tolerance", root.GetProperty("differences")[0].GetProperty("kind").GetString());
+        Assert.Equal(0.1, root.GetProperty("differences")[0].GetProperty("tolerance").GetDouble());
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("differences")[1].GetProperty("tolerance").ValueKind);
+
+        var directory = Path.Combine(Path.GetTempPath(), $"replay-report-{Guid.NewGuid():N}");
+        try
+        {
+            var path = ReplayDiffReportJsonWriter.WriteToDirectory(manifest, report, directory);
+            Assert.Equal(
+                "rm-m5-04-telemetry-linear.replay-diff-report.v1.json",
+                Path.GetFileName(path));
+            Assert.Equal(json, File.ReadAllText(path));
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
     }
 
     private static string RepositoryPath(string relativePath)

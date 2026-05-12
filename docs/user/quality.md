@@ -483,7 +483,10 @@ erklärungspflichtig (ADR oder Plan-Eintrag). Der RM-M5-04-Diff trennt
 unter `tests/fixtures/native_parity/cases.v1.json` und werden von RM-M5-04 per
 Replay-Manifest referenziert; das ausführende Gate bleibt
 `make test-native-parity`. Ab RM-M5-04-C treibt dieses Manifest auch einen
-Managed-vs-Native-Engine-Vergleichsreport.
+Managed-vs-Native-Engine-Vergleichsreport. Ab RM-M5-04-D geben Replay-Gates
+einen maschinenlesbaren `replay-diff-report.v1`-JSON-Report in der
+Assertion-Message aus; ist `BESS_REPLAY_REPORT_DIR` gesetzt, schreiben sie je
+Datensatz eine gleichnamige Report-Datei fuer CI-Artefakte.
 
 RM-M5-02 ergänzt den MPC-Replay-Vertrag vor der vollständigen
 Replay-Plattform: `make test-mpc-property` pinnt das achtachsige

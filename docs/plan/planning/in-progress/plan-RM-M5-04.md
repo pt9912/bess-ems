@@ -17,7 +17,7 @@ ein ueberlappender CI-Lauf den neuen und alten Pfad verglichen hat.
 | ✅ | RM-M5-04-A | Manifest-v1, Telemetrie-Fixture-v1, Golden-Command-v1, reject-by-default Loader und Golden-Diff-Grundlage | `tests/hexagon/BatteryEms.Application.Tests/Replay/*`, `tests/fixtures/replay/rm-m5-04/telemetry-linear/*`, `make test-replay` |
 | ✅ | RM-M5-04-B | Vollstaendige M2/M3-Kompatibilitaetsmigration mit Golden-Diff-Matrix | Vier M2-Pflichtfaelle haben Manifest-v1-Fixture/Golden und laufen im `make test-replay` parallel zum alten Harness; M3 Native-Parity `cases.v1.json` ist per Manifest-v1 `repo://` referenziert und bleibt ueber `make test-native-parity` aktiv |
 | ✅ | RM-M5-04-C | Manifestgetriebener Engine-Vergleich | `native-control-parity`-Manifest treibt Managed-vs-Native-Vergleich per `NativeParityEngineComparisonRunner`; Sidecar/MPC-Engine-Vergleich bleibt fuer RM-M5-04-D bzw. RM-M5-06-Orchestrierungsnaehe |
-| ⬜ | RM-M5-04-D | Entwickler-/CI-Report fuer Replay-Diffs | Maschinenlesbarer Report mit `numeric_tolerance` vs `business_drift` |
+| ✅ | RM-M5-04-D | Entwickler-/CI-Report fuer Replay-Diffs | Maschinenlesbarer `replay-diff-report.v1`-JSON-Report fuer M2-Telemetrie-Replays und M3 Native-Parity; `BESS_REPLAY_REPORT_DIR` schreibt CI-Artefakte |
 
 ## RM-M5-04-A Ergebnis
 
@@ -67,3 +67,16 @@ ein ueberlappender CI-Lauf den neuen und alten Pfad verglichen hat.
   Sidecar-/MPC-Engine-Vergleich bleibt bewusst offen, weil er einen
   Optimierungs-/Orchestrierungsdatensatz braucht und besser mit RM-M5-04-D bzw.
   RM-M5-06 gekoppelt wird.
+
+## RM-M5-04-D Ergebnis
+
+- `ReplayDiffReportJsonWriter` serialisiert M2-Telemetrie-Golden-Diffs als
+  `replay-diff-report.v1` mit Dataset, Replay-Art, Match-Status,
+  Difference-Anzahl und strukturierten `numeric_tolerance`-/
+  `business_drift`-Eintraegen.
+- `NativeParityEngineComparisonReportJsonWriter` nutzt dieselbe Report-Schema-
+  Version fuer den manifestgetriebenen M3 Managed-vs-Native-Vergleich und
+  erweitert Difference-Eintraege um `case_name`, `engine` und `field`.
+- Beide Replay-Gates schreiben den JSON-Report in die Assertion-Message und
+  optional als Datei unter `BESS_REPLAY_REPORT_DIR`, damit CI die Reports als
+  Artefakte sammeln kann.
