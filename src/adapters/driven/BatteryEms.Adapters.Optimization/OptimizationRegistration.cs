@@ -90,9 +90,11 @@ public static class OptimizationRegistration
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        services.TryAddSingleton<IMpcStateEstimator, IdentityStateEstimator>();
-        services.AddSingleton<IMpcModelSolver, LocalOsqpMpcSolver>();
+        services.TryAddSingleton<IMpcStateEstimator, DefaultLinearKalmanFilter>();
+        services.TryAddSingleton<LocalOsqpMpcSolver>();
+        services.AddSingleton<IMpcModelSolver>(sp => sp.GetRequiredService<LocalOsqpMpcSolver>());
         services.AddSingleton<IMpcDispatchOptimizer, DefaultMpcDispatchOrchestrator>();
+        services.AddSingleton<IFallbackMpcOptimizer, LocalOsqpFallbackMpcOptimizer>();
         return services;
     }
 }

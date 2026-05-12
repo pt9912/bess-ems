@@ -13,9 +13,12 @@ namespace BatteryEms.Application.Mpc;
 // divergence reason codes from plan §3.
 public interface IMpcStateEstimator
 {
+    string EstimatorVariant { get; }
+
     Task<MpcStateUpdate> PredictUpdateAsync(
         MpcState? priorState,
         BatteryTelemetry? measurement,
+        BatteryAsset asset,
         MpcModel model,
         MpcOptions options,
         CancellationToken cancellationToken);

@@ -20,6 +20,7 @@ public sealed class MpcBackendCompositionTests
         using var provider = services.BuildServiceProvider();
         Assert.IsType<LocalOsqpMpcSolver>(provider.GetRequiredService<IMpcModelSolver>());
         Assert.IsType<DefaultMpcDispatchOrchestrator>(provider.GetRequiredService<IMpcDispatchOptimizer>());
+        Assert.IsType<LocalOsqpFallbackMpcOptimizer>(provider.GetRequiredService<IFallbackMpcOptimizer>());
     }
 
     [Theory]

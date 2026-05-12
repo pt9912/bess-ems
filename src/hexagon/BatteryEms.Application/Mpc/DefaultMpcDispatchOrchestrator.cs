@@ -51,11 +51,12 @@ public sealed class DefaultMpcDispatchOrchestrator : IMpcDispatchOptimizer
         var update = await _estimator.PredictUpdateAsync(
             request.PriorState,
             request.LatestMeasurement,
+            request.Asset,
             request.Model,
             request.Options,
             cancellationToken).ConfigureAwait(false);
 
-        var baseStamps = BuildBaseStamps(request);
+        var baseStamps = BuildBaseStamps(request, _estimator.EstimatorVariant);
 
         if (!update.IsHealthy)
         {
@@ -98,10 +99,11 @@ public sealed class DefaultMpcDispatchOrchestrator : IMpcDispatchOptimizer
         return $"{request.AssetId}|{tickMs}|{sampleMs}|{request.Model.ModelVersion}";
     }
 
-    private static Dictionary<string, string> BuildBaseStamps(MpcRequest request) =>
+    private static Dictionary<string, string> BuildBaseStamps(MpcRequest request, string estimatorVariant) =>
         new(StringComparer.Ordinal)
         {
             ["mpc_model_version"] = request.Model.ModelVersion,
+            ["estimator_variant"] = estimatorVariant,
             ["deterministic_mode"] = request.Options.DeterministicMode.ToString(),
             ["sample_time_ms"] = ((long)request.Options.SampleTime.TotalMilliseconds)
                 .ToString(System.Globalization.CultureInfo.InvariantCulture),

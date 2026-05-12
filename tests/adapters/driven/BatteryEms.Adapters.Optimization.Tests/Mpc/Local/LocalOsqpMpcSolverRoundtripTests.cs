@@ -78,6 +78,30 @@ public sealed class LocalOsqpMpcSolverRoundtripTests
     }
 
     [Fact]
+    public async Task Fallback_optimizer_applies_solver_fallback_profile()
+    {
+        var primaryOptions = LocalOsqpMpcTestFixtures.BuildOptions(horizonLength: 4);
+        var fallbackOptions = new MpcOptions(
+            primaryOptions.SampleTime,
+            primaryOptions.HorizonLength,
+            primaryOptions.Solver,
+            primaryOptions.Estimator,
+            solverFallbackProfile: new MpcFallbackOptions(
+                new MpcSolverOptions(TimeSpan.FromMilliseconds(500), 1e-4, 4_000),
+                horizonLength: 2));
+        var fallback = new LocalOsqpFallbackMpcOptimizer(
+            new IdentityStateEstimator(),
+            new LocalOsqpMpcSolver());
+
+        var result = await fallback.NextStepAsync(
+            LocalOsqpMpcTestFixtures.BuildRequest(options: fallbackOptions),
+            CancellationToken.None);
+
+        Assert.True(result.IsUsable);
+        Assert.Equal(2, result.Trajectory?.Length);
+    }
+
+    [Fact]
     public void AddBessLocalOsqpMpcSolver_registers_mpc_driving_port()
     {
         var services = new ServiceCollection();
@@ -87,6 +111,7 @@ public sealed class LocalOsqpMpcSolverRoundtripTests
         using var provider = services.BuildServiceProvider();
         Assert.IsType<LocalOsqpMpcSolver>(provider.GetRequiredService<IMpcModelSolver>());
         Assert.IsType<DefaultMpcDispatchOrchestrator>(provider.GetRequiredService<IMpcDispatchOptimizer>());
-        Assert.IsType<IdentityStateEstimator>(provider.GetRequiredService<IMpcStateEstimator>());
+        Assert.IsType<DefaultLinearKalmanFilter>(provider.GetRequiredService<IMpcStateEstimator>());
+        Assert.IsType<LocalOsqpFallbackMpcOptimizer>(provider.GetRequiredService<IFallbackMpcOptimizer>());
     }
 }

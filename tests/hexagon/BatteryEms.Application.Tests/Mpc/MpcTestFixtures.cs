@@ -81,6 +81,7 @@ internal static class MpcTestFixtures
     public static BatteryTelemetry BuildTelemetry(
         double socPercent = 50,
         double activePowerKw = 0,
+        double temperatureCelsius = 25,
         DateTimeOffset? timestamp = null) =>
         new(
             Timestamp: timestamp ?? Anchor,
@@ -91,7 +92,7 @@ internal static class MpcTestFixtures
             ReactivePowerKvar: 0,
             DcVoltage: 800,
             DcCurrent: 0,
-            TemperatureCelsius: 25,
+            TemperatureCelsius: temperatureCelsius,
             Available: true,
             FaultStatus: "ok",
             DataQuality: DataQuality.Valid);

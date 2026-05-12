@@ -19,13 +19,17 @@ namespace BatteryEms.Application.Mpc;
 // always sees a populated `MpcState`.
 public sealed class IdentityStateEstimator : IMpcStateEstimator
 {
+    public string EstimatorVariant => "identity";
+
     public Task<MpcStateUpdate> PredictUpdateAsync(
         MpcState? priorState,
         BatteryTelemetry? measurement,
+        BatteryAsset asset,
         MpcModel model,
         MpcOptions options,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(asset);
         ArgumentNullException.ThrowIfNull(model);
         ArgumentNullException.ThrowIfNull(options);
 

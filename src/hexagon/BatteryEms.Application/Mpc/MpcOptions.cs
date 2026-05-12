@@ -41,6 +41,22 @@ public sealed record MpcSolverOptions
     }
 }
 
+public sealed record MpcFallbackOptions
+{
+    public MpcSolverOptions Solver { get; }
+    public int HorizonLength { get; }
+
+    public MpcFallbackOptions(MpcSolverOptions solver, int horizonLength)
+    {
+        ArgumentNullException.ThrowIfNull(solver);
+        if (horizonLength <= 0)
+            throw new ArgumentOutOfRangeException(nameof(horizonLength), horizonLength, "HorizonLength must be positive.");
+
+        Solver = solver;
+        HorizonLength = horizonLength;
+    }
+}
+
 // Kalman-filter shapes that Sub-Slice C's `DefaultLinearKalmanFilter`
 // consumes (`P_0` is the initial covariance; `ProcessNoise` is Q;
 // `MeasurementNoise` is R). Sub-Slice A only carries them through —
@@ -93,6 +109,7 @@ public sealed record MpcOptions
     public MpcEstimatorOptions Estimator { get; }
     public DeterministicMode DeterministicMode { get; }
     public long? RandomSeedOverride { get; }
+    public MpcFallbackOptions? SolverFallbackProfile { get; }
 
     public MpcOptions(
         TimeSpan sampleTime,
@@ -100,7 +117,8 @@ public sealed record MpcOptions
         MpcSolverOptions solver,
         MpcEstimatorOptions estimator,
         DeterministicMode deterministicMode = DeterministicMode.Strict,
-        long? randomSeedOverride = null)
+        long? randomSeedOverride = null,
+        MpcFallbackOptions? solverFallbackProfile = null)
     {
         if (sampleTime <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(sampleTime), sampleTime, "SampleTime must be positive.");
@@ -115,6 +133,7 @@ public sealed record MpcOptions
         Estimator = estimator;
         DeterministicMode = deterministicMode;
         RandomSeedOverride = randomSeedOverride;
+        SolverFallbackProfile = solverFallbackProfile;
     }
 
     public TimeSpan Horizon => TimeSpan.FromTicks(SampleTime.Ticks * HorizonLength);

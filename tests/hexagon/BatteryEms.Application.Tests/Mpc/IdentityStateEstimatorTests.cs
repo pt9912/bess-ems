@@ -24,6 +24,7 @@ public sealed class IdentityStateEstimatorTests
         var update = await estimator.PredictUpdateAsync(
             priorState: prior,
             measurement: MpcTestFixtures.BuildTelemetry(socPercent: 99.0),
+            asset: MpcTestFixtures.BuildAsset(),
             model: MpcTestFixtures.BuildModel(),
             options: MpcTestFixtures.BuildOptions(),
             cancellationToken: CancellationToken.None);
@@ -42,6 +43,7 @@ public sealed class IdentityStateEstimatorTests
         var update = await estimator.PredictUpdateAsync(
             priorState: null,
             measurement: telemetry,
+            asset: MpcTestFixtures.BuildAsset(),
             model: MpcTestFixtures.BuildModel(),
             options: MpcTestFixtures.BuildOptions(),
             cancellationToken: CancellationToken.None);
@@ -60,6 +62,7 @@ public sealed class IdentityStateEstimatorTests
         var update = await estimator.PredictUpdateAsync(
             priorState: null,
             measurement: null,
+            asset: MpcTestFixtures.BuildAsset(),
             model: MpcTestFixtures.BuildModel(),
             options: MpcTestFixtures.BuildOptions(),
             cancellationToken: CancellationToken.None);

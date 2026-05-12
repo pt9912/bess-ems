@@ -87,6 +87,7 @@ public sealed class DefaultMpcDispatchOrchestratorTests
         Assert.Same(trajectory, result.Trajectory);
         Assert.NotNull(result.PosteriorState);
         Assert.Equal("lti-soc-v1", result.Stamps["mpc_model_version"]);
+        Assert.Equal("identity", result.Stamps["estimator_variant"]);
         Assert.Equal("Strict", result.Stamps["deterministic_mode"]);
         Assert.Equal("250", result.Stamps["sample_time_ms"]);
         Assert.Equal("4", result.Stamps["horizon_length"]);
@@ -134,10 +135,12 @@ public sealed class DefaultMpcDispatchOrchestratorTests
     private sealed class ScriptedEstimator : IMpcStateEstimator
     {
         private readonly MpcStateUpdate _update;
+        public string EstimatorVariant => "scripted";
         public ScriptedEstimator(MpcStateUpdate update) => _update = update;
         public Task<MpcStateUpdate> PredictUpdateAsync(
             MpcState? priorState,
             BatteryTelemetry? measurement,
+            BatteryAsset asset,
             MpcModel model,
             MpcOptions options,
             CancellationToken cancellationToken) =>
@@ -146,9 +149,12 @@ public sealed class DefaultMpcDispatchOrchestratorTests
 
     private sealed class CancellingEstimator : IMpcStateEstimator
     {
+        public string EstimatorVariant => "cancelling";
+
         public Task<MpcStateUpdate> PredictUpdateAsync(
             MpcState? priorState,
             BatteryTelemetry? measurement,
+            BatteryAsset asset,
             MpcModel model,
             MpcOptions options,
             CancellationToken cancellationToken)
