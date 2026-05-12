@@ -479,7 +479,10 @@ make test-mpc-property   # RM-M5-02 MPC-Identity/Determinism/Replay-Hooks
 Wiedergabe historischer Telemetrie-Datensätze. Erwartete Commands sind als
 versionierte Goldens neben dem Manifest abgelegt; Abweichungen sind
 erklärungspflichtig (ADR oder Plan-Eintrag). Der RM-M5-04-Diff trennt
-`numeric_tolerance` von `business_drift`.
+`numeric_tolerance` von `business_drift`. Die M3-Native-Parity-Daten bleiben
+unter `tests/fixtures/native_parity/cases.v1.json` und werden von RM-M5-04 per
+Replay-Manifest referenziert; das ausführende Gate bleibt
+`make test-native-parity`.
 
 RM-M5-02 ergänzt den MPC-Replay-Vertrag vor der vollständigen
 Replay-Plattform: `make test-mpc-property` pinnt das achtachsige

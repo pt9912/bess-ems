@@ -1,0 +1,76 @@
+{
+  "schema_version": "replay-manifest.v1",
+  "dataset_id": "m3-native-parity-cases-v1",
+  "kind": "native-control-parity",
+  "schema": {
+    "required_fields": [
+      "schema_version",
+      "dataset_id",
+      "kind",
+      "fixture",
+      "golden",
+      "determinism",
+      "request_id_rule",
+      "solver_options",
+      "tolerances"
+    ],
+    "optional_fields": [
+      "compatibility"
+    ],
+    "deprecated_fields": [],
+    "tolerated_legacy_fields": [
+      "tests/fixtures/native_parity/cases.v1.json"
+    ]
+  },
+  "fixture": {
+    "path": "repo://tests/fixtures/native_parity/cases.v1.json",
+    "schema_version": "native-parity-cases.v1"
+  },
+  "golden": {
+    "path": "repo://tests/fixtures/native_parity/cases.v1.json",
+    "schema_version": "native-parity-cases.v1"
+  },
+  "determinism": {
+    "mode": "strict",
+    "seed": null,
+    "runtime": "dotnet-net10.0/native-bcc",
+    "numeric": "ieee754-double"
+  },
+  "request_id_rule": "native-parity-case-name-v1",
+  "solver_options": {
+    "optimizer": "ManagedControlKernel+NativeControlKernel"
+  },
+  "tolerances": {
+    "active_power_kw_abs": 0.000000000001,
+    "reactive_power_kvar_abs": 0.0
+  },
+  "compatibility": {
+    "covers_legacy_cases": [
+      "simulator-typical-discharge-no-prev",
+      "simulator-typical-charge-no-prev",
+      "simulator-typical-idle",
+      "simulator-discharge-25kw-from-idle",
+      "simulator-charge-15kw-with-prev",
+      "boundary-target-equal-max-discharge",
+      "boundary-target-equal-neg-max-charge",
+      "boundary-soc-exactly-at-max-blocks-charge",
+      "boundary-soc-exactly-at-min-blocks-discharge",
+      "boundary-temp-exactly-at-max-allowed",
+      "boundary-temp-exactly-at-min-allowed",
+      "clamp-max-discharge-power",
+      "clamp-max-charge-power",
+      "block-soc-above-max-charge",
+      "block-soc-below-min-discharge",
+      "block-temperature-above-max",
+      "block-temperature-below-min",
+      "ramp-up-clamp",
+      "ramp-down-clamp",
+      "ramp-inside-window-no-clamp",
+      "ramp-fractional-dt-up-clamp",
+      "ramp-not-permitted-dt-zero-changing-target",
+      "ramp-dt-zero-equal-target-ok",
+      "combined-constraint-and-ramp-constraint-reason-wins",
+      "first-tick-no-prev-skips-ramp"
+    ]
+  }
+}

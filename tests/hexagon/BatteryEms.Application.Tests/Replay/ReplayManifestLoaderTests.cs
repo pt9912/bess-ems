@@ -1,4 +1,6 @@
 using BatteryEms.Adapters.Optimization;
+using BatteryEms.Application.Markets;
+using BatteryEms.Application.Optimization;
 using BatteryEms.Domain;
 using Xunit;
 
@@ -7,8 +9,7 @@ namespace BatteryEms.Application.Tests.Replay;
 [Trait("Category", "Replay")]
 public sealed class ReplayManifestLoaderTests
 {
-    private const string FixtureRelativePath =
-        "tests/fixtures/replay/rm-m5-04/telemetry-linear/manifest.v1.json";
+    private const string ReplayFixtureRoot = "tests/fixtures/replay/rm-m5-04";
 
     private static readonly string[] MandatoryM2Cases =
     {
@@ -19,35 +20,73 @@ public sealed class ReplayManifestLoaderTests
     };
 
     [Fact]
-    public async Task Manifest_fixture_replays_against_golden_commands()
+    public async Task M2_manifest_fixtures_replay_against_goldens_and_cover_legacy_inventory()
     {
-        var manifestPath = RepositoryPath(FixtureRelativePath);
+        var manifests = Directory.GetFiles(
+            RepositoryPath(ReplayFixtureRoot),
+            "manifest.v1.json",
+            SearchOption.AllDirectories)
+            .Where(path => path.Contains("telemetry-", StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(MandatoryM2Cases.Length, manifests.Length);
+        var covered = new List<string>();
+        foreach (var manifestPath in manifests)
+        {
+            var loadResult = ReplayManifestLoader.Load(manifestPath);
+            Assert.True(loadResult.IsSuccess, loadResult.Detail);
+            var manifest = Assert.IsType<ReplayManifest>(loadResult.Manifest);
+            covered.AddRange(manifest.Compatibility.CoversLegacyCases);
+
+            var manifestDirectory = Path.GetDirectoryName(manifestPath) ?? string.Empty;
+            var dataset = TelemetryReplayJsonLoader.LoadDataset(
+                Path.Combine(manifestDirectory, manifest.Fixture.Path));
+            var golden = ReplayGoldenJsonLoader.Load(
+                Path.Combine(manifestDirectory, manifest.Golden.Path));
+            var commands = await new TelemetryReplayHarness(
+                TestFixtures.CreateAsset("asset-1"),
+                CreateOptimizer(manifest),
+                dataset.Schedules)
+                .RunAsync("asset-1", dataset.Records, CancellationToken.None);
+
+            var diff = ReplayGoldenComparer.Compare(commands, golden, manifest.Tolerances);
+            Assert.True(diff.IsMatch, string.Join(Environment.NewLine, diff.Differences));
+        }
+
+        Assert.Equal(MandatoryM2Cases.Order(StringComparer.Ordinal), covered.Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void M3_native_parity_manifest_references_existing_dataset()
+    {
+        var manifestPath = RepositoryPath(
+            $"{ReplayFixtureRoot}/native-parity/manifest.v1.json");
         var loadResult = ReplayManifestLoader.Load(manifestPath);
 
         Assert.True(loadResult.IsSuccess, loadResult.Detail);
         var manifest = Assert.IsType<ReplayManifest>(loadResult.Manifest);
-        Assert.Equal(MandatoryM2Cases.Order(StringComparer.Ordinal), manifest.Compatibility.CoversLegacyCases.Order(StringComparer.Ordinal));
+        Assert.Equal("native-control-parity", manifest.Kind);
+        Assert.Equal("repo://tests/fixtures/native_parity/cases.v1.json", manifest.Fixture.Path);
+        Assert.Equal(manifest.Fixture.Path, manifest.Golden.Path);
 
-        var manifestDirectory = Path.GetDirectoryName(manifestPath) ?? string.Empty;
-        var records = TelemetryReplayJsonLoader.LoadFixture(
-            Path.Combine(manifestDirectory, manifest.Fixture.Path));
-        var golden = ReplayGoldenJsonLoader.Load(
-            Path.Combine(manifestDirectory, manifest.Golden.Path));
+        var referencedPath = ResolveRepoReference(manifest.Fixture.Path);
+        Assert.True(File.Exists(referencedPath), $"Missing referenced native parity fixture at {referencedPath}.");
 
-        var commands = await new TelemetryReplayHarness(
-            TestFixtures.CreateAsset("asset-1"),
-            new NoOpDispatchOptimizer())
-            .RunAsync("asset-1", records, CancellationToken.None);
-
-        var diff = ReplayGoldenComparer.Compare(commands, golden, manifest.Tolerances);
-
-        Assert.True(diff.IsMatch, string.Join(Environment.NewLine, diff.Differences));
+        using var document = System.Text.Json.JsonDocument.Parse(File.ReadAllText(referencedPath));
+        var root = new ReplayJsonReader(document.RootElement, "$");
+        Assert.Equal("v1", root.RequiredString("schema_version"));
+        var caseNames = root.RequiredArray(
+            "cases",
+            (item, path) => new ReplayJsonReader(item, path).RequiredString("name"));
+        Assert.Equal(25, caseNames.Count);
+        Assert.Equal(manifest.Compatibility.CoversLegacyCases.Order(StringComparer.Ordinal), caseNames.Order(StringComparer.Ordinal));
     }
 
     [Fact]
     public void Unknown_manifest_schema_version_is_rejected_with_machine_readable_error()
     {
-        var json = File.ReadAllText(RepositoryPath(FixtureRelativePath))
+        var json = File.ReadAllText(RepositoryPath($"{ReplayFixtureRoot}/telemetry-linear/manifest.v1.json"))
             .Replace(ReplaySchemaVersions.Manifest, "replay-manifest.v99", StringComparison.Ordinal);
         using var temporary = TemporaryReplayFile.FromContent(json);
 
@@ -61,7 +100,7 @@ public sealed class ReplayManifestLoaderTests
     [Fact]
     public void Unknown_manifest_top_level_field_is_rejected()
     {
-        var json = File.ReadAllText(RepositoryPath(FixtureRelativePath))
+        var json = File.ReadAllText(RepositoryPath($"{ReplayFixtureRoot}/telemetry-linear/manifest.v1.json"))
             .Replace(
                 "\"compatibility\":",
                 "\"unexpected\": true, \"compatibility\":",
@@ -128,6 +167,21 @@ public sealed class ReplayManifestLoaderTests
 
         return Path.Combine(directory.FullName, relativePath);
     }
+
+    private static string ResolveRepoReference(string path)
+    {
+        const string Prefix = "repo://";
+        Assert.StartsWith(Prefix, path, StringComparison.Ordinal);
+        return RepositoryPath(path[Prefix.Length..]);
+    }
+
+    private static IDispatchOptimizer CreateOptimizer(ReplayManifest manifest) =>
+        manifest.SolverOptions.Optimizer switch
+        {
+            "NoOpDispatchOptimizer" => new NoOpDispatchOptimizer(),
+            "ScheduleFollowingDispatchOptimizer" => new ScheduleFollowingDispatchOptimizer(new NoOpActivationDispatchSource()),
+            _ => throw new InvalidOperationException($"Unsupported replay optimizer '{manifest.SolverOptions.Optimizer}'."),
+        };
 
     private sealed class TemporaryReplayFile : IDisposable
     {

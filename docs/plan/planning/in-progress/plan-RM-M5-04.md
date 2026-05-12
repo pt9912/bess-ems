@@ -15,7 +15,7 @@ ein ueberlappender CI-Lauf den neuen und alten Pfad verglichen hat.
 | Status | ID | Inhalt | Nachweis |
 | ------ | -- | ------ | -------- |
 | ✅ | RM-M5-04-A | Manifest-v1, Telemetrie-Fixture-v1, Golden-Command-v1, reject-by-default Loader und Golden-Diff-Grundlage | `tests/hexagon/BatteryEms.Application.Tests/Replay/*`, `tests/fixtures/replay/rm-m5-04/telemetry-linear/*`, `make test-replay` |
-| ⬜ | RM-M5-04-B | Vollstaendige M2/M3-Kompatibilitaetsmigration mit Golden-Diff-Matrix | Alle Pflichtfaelle haben Manifest-v1-Aequivalent und alter/neuer Pfad laufen ueberlappend |
+| ✅ | RM-M5-04-B | Vollstaendige M2/M3-Kompatibilitaetsmigration mit Golden-Diff-Matrix | Vier M2-Pflichtfaelle haben Manifest-v1-Fixture/Golden und laufen im `make test-replay` parallel zum alten Harness; M3 Native-Parity `cases.v1.json` ist per Manifest-v1 `repo://` referenziert und bleibt ueber `make test-native-parity` aktiv |
 | ⬜ | RM-M5-04-C | MPC-/Optimization-Core-Replay-Runner mit Engine-Vergleich | Manifest kann Managed, Native und Sidecar-Sollwerte vergleichen |
 | ⬜ | RM-M5-04-D | Entwickler-/CI-Report fuer Replay-Diffs | Maschinenlesbarer Report mit `numeric_tolerance` vs `business_drift` |
 
@@ -33,3 +33,19 @@ ein ueberlappender CI-Lauf den neuen und alten Pfad verglichen hat.
   und `business_drift`.
 - `make test-replay` ist als eigenes Docker-/Make-Gate vorhanden und in
   `make gates` / `make ci` verdrahtet.
+
+## RM-M5-04-B Ergebnis
+
+- M2-Kompatibilitaet ist nicht mehr nur inventarisiert: `telemetry-linear`,
+  `telemetry-schedule-following`, `telemetry-missing-valid-recovery` und
+  `telemetry-stale-valid-recovery` besitzen jeweils Manifest, Fixture und
+  Golden-Datei unter `tests/fixtures/replay/rm-m5-04/`.
+- `TelemetryReplayJsonLoader` unterstuetzt optionale Schedules, damit der
+  bestehende Schedule-Following-Golden-Fall ohne Sonderpfad ueber die neue
+  Fixture-Struktur laeuft.
+- Das M3-Native-Parity-Set bleibt Single Source of Truth unter
+  `tests/fixtures/native_parity/cases.v1.json`; das neue
+  `native-control-parity`-Manifest referenziert diesen Datensatz per `repo://`
+  und pinnt alle 25 Case-Namen als Kompatibilitaetsinventar.
+- `make test-replay` prueft alte M2-Harness-Tests und neue Manifest-Goldens im
+  selben Gate; `make test-native-parity` bleibt der ueberlappende M3-Pfad.

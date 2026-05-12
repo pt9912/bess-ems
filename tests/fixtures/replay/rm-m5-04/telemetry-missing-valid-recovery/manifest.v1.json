@@ -1,6 +1,6 @@
 {
   "schema_version": "replay-manifest.v1",
-  "dataset_id": "rm-m5-04-telemetry-linear",
+  "dataset_id": "m2-missing-valid-recovery",
   "kind": "telemetry-control-cycle",
   "schema": {
     "required_fields": [
@@ -44,7 +44,7 @@
   },
   "compatibility": {
     "covers_legacy_cases": [
-      "m2-replay-bit-exact"
+      "m2-missing-valid-recovery"
     ]
   }
 }

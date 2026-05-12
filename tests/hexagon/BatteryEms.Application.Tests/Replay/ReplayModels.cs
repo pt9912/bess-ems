@@ -7,6 +7,7 @@ internal static class ReplaySchemaVersions
     public const string Manifest = "replay-manifest.v1";
     public const string TelemetryFixture = "telemetry-replay-fixture.v1";
     public const string GoldenCommands = "telemetry-golden-command.v1";
+    public const string NativeParityCases = "native-parity-cases.v1";
 }
 
 internal sealed record ReplayManifest(
@@ -42,6 +43,10 @@ internal sealed record ReplayTolerances(
     double ReactivePowerKvarAbs);
 
 internal sealed record ReplayCompatibility(IReadOnlyList<string> CoversLegacyCases);
+
+internal sealed record TelemetryReplayDataset(
+    IReadOnlyList<TelemetryReplayRecord> Records,
+    IReadOnlyList<Schedule> Schedules);
 
 internal sealed record ReplayManifestLoadResult
 {

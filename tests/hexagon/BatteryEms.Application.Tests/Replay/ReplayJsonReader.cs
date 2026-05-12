@@ -61,6 +61,17 @@ internal sealed class ReplayJsonReader
         return result;
     }
 
+    public int RequiredInt32(string name)
+    {
+        var value = Required(name);
+        if (!value.TryGetInt32(out var result))
+        {
+            throw TypeError(name, "integer");
+        }
+
+        return result;
+    }
+
     public double RequiredFiniteDouble(string name)
     {
         var value = Required(name);
@@ -142,6 +153,29 @@ internal sealed class ReplayJsonReader
         foreach (var item in value.EnumerateArray())
         {
             result.Add(map(item, $"{ChildPath(name)}[{index}]"));
+            index++;
+        }
+
+        return result;
+    }
+
+    public IReadOnlyList<(JsonElement Item, string Path)>? OptionalArray(string name)
+    {
+        if (!_element.TryGetProperty(name, out var value) || value.ValueKind is JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        if (value.ValueKind is not JsonValueKind.Array)
+        {
+            throw TypeError(name, "array");
+        }
+
+        var result = new List<(JsonElement Item, string Path)>();
+        var index = 0;
+        foreach (var item in value.EnumerateArray())
+        {
+            result.Add((item, $"{ChildPath(name)}[{index}]"));
             index++;
         }
 

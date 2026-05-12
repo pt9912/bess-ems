@@ -1,4 +1,5 @@
 using System.Text.Json;
+using BatteryEms.Application.Markets;
 using BatteryEms.Domain;
 
 namespace BatteryEms.Application.Tests.Replay;
@@ -9,6 +10,7 @@ internal static class TelemetryReplayJsonLoader
     {
         "schema_version",
         "records",
+        "schedules",
     };
 
     private static readonly HashSet<string> RecordFields = new(StringComparer.Ordinal)
@@ -40,7 +42,26 @@ internal static class TelemetryReplayJsonLoader
         "reason",
     };
 
+    private static readonly HashSet<string> ScheduleFields = new(StringComparer.Ordinal)
+    {
+        "asset_id",
+        "type",
+        "market_bid_area",
+        "version",
+        "windows",
+    };
+
+    private static readonly HashSet<string> ScheduleWindowFields = new(StringComparer.Ordinal)
+    {
+        "start_utc",
+        "end_utc",
+        "target_power_kw",
+    };
+
     public static IReadOnlyList<TelemetryReplayRecord> LoadFixture(string fixturePath)
+        => LoadDataset(fixturePath).Records;
+
+    public static TelemetryReplayDataset LoadDataset(string fixturePath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fixturePath);
 
@@ -48,7 +69,9 @@ internal static class TelemetryReplayJsonLoader
         var root = new ReplayJsonReader(document.RootElement, "$");
         root.RejectUnknownProperties(FixtureFields);
         RequireSchemaVersion(root, ReplaySchemaVersions.TelemetryFixture);
-        return root.RequiredArray("records", ReadRecord);
+        return new TelemetryReplayDataset(
+            Records: root.RequiredArray("records", ReadRecord),
+            Schedules: ReadSchedules(root));
     }
 
     private static TelemetryReplayRecord ReadRecord(JsonElement item, string path)
@@ -103,6 +126,44 @@ internal static class TelemetryReplayJsonLoader
             DataQualityState.ProtocolError => DataQuality.ProtocolError(reason),
             _ => throw new ReplayJsonException("invalid_enum", $"{reader.Path}.flag", "Unknown data quality."),
         };
+    }
+
+    private static IReadOnlyList<Schedule> ReadSchedules(ReplayJsonReader root)
+    {
+        if (root.OptionalArray("schedules") is not { } schedules)
+        {
+            return Array.Empty<Schedule>();
+        }
+
+        return schedules.Select(ReadSchedule).ToArray();
+    }
+
+    private static Schedule ReadSchedule((JsonElement Item, string Path) item)
+    {
+        var reader = new ReplayJsonReader(item.Item, item.Path);
+        reader.RejectUnknownProperties(ScheduleFields);
+        var rawType = reader.RequiredString("type");
+        if (!Enum.TryParse<ScheduleType>(rawType, ignoreCase: false, out var type))
+        {
+            throw new ReplayJsonException("invalid_enum", $"{reader.Path}.type", $"Unknown schedule type '{rawType}'.");
+        }
+
+        return new Schedule(
+            assetId: reader.RequiredString("asset_id"),
+            type: type,
+            marketBidArea: reader.RequiredString("market_bid_area"),
+            version: reader.RequiredInt32("version"),
+            windows: reader.RequiredArray("windows", ReadScheduleWindow));
+    }
+
+    private static ScheduleWindow ReadScheduleWindow(JsonElement item, string path)
+    {
+        var reader = new ReplayJsonReader(item, path);
+        reader.RejectUnknownProperties(ScheduleWindowFields);
+        return new ScheduleWindow(
+            reader.RequiredDateTimeOffset("start_utc"),
+            reader.RequiredDateTimeOffset("end_utc"),
+            reader.RequiredFiniteDouble("target_power_kw"));
     }
 
     private static void RequireSchemaVersion(ReplayJsonReader reader, string expected)

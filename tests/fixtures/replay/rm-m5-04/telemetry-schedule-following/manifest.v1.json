@@ -1,6 +1,6 @@
 {
   "schema_version": "replay-manifest.v1",
-  "dataset_id": "rm-m5-04-telemetry-linear",
+  "dataset_id": "m2-schedule-following-golden",
   "kind": "telemetry-control-cycle",
   "schema": {
     "required_fields": [
@@ -36,7 +36,7 @@
   },
   "request_id_rule": "control-cycle-command-id-v1",
   "solver_options": {
-    "optimizer": "NoOpDispatchOptimizer"
+    "optimizer": "ScheduleFollowingDispatchOptimizer"
   },
   "tolerances": {
     "active_power_kw_abs": 0.0,
@@ -44,7 +44,7 @@
   },
   "compatibility": {
     "covers_legacy_cases": [
-      "m2-replay-bit-exact"
+      "m2-schedule-following-golden"
     ]
   }
 }

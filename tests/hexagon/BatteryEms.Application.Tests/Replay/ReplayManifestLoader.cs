@@ -60,6 +60,7 @@ internal static class ReplayManifestLoader
     private static readonly HashSet<string> SupportedKinds = new(StringComparer.Ordinal)
     {
         "telemetry-control-cycle",
+        "native-control-parity",
     };
 
     public static ReplayManifestLoadResult Load(string manifestPath)
@@ -114,8 +115,8 @@ internal static class ReplayManifestLoader
             DatasetId: root.RequiredString("dataset_id"),
             Kind: kind,
             Schema: ReadSchema(root.RequiredObject("schema")),
-            Fixture: ReadFileReference(root.RequiredObject("fixture"), ReplaySchemaVersions.TelemetryFixture),
-            Golden: ReadFileReference(root.RequiredObject("golden"), ReplaySchemaVersions.GoldenCommands),
+            Fixture: ReadFileReference(root.RequiredObject("fixture"), ExpectedFixtureSchema(kind)),
+            Golden: ReadFileReference(root.RequiredObject("golden"), ExpectedGoldenSchema(kind)),
             Determinism: ReadDeterminism(root.RequiredObject("determinism")),
             RequestIdRule: root.RequiredString("request_id_rule"),
             SolverOptions: ReadSolverOptions(root.RequiredObject("solver_options")),
@@ -150,12 +151,12 @@ internal static class ReplayManifestLoader
                 $"Unsupported file schema '{reference.SchemaVersion}'.");
         }
 
-        if (Path.IsPathRooted(reference.Path) || reference.Path.Contains("..", StringComparison.Ordinal))
+        if (!IsValidReplayPath(reference.Path))
         {
             throw new ReplayJsonException(
                 "invalid_relative_path",
                 $"{reader.Path}.path",
-                "Replay file paths must be relative to the manifest directory.");
+                "Replay file paths must be relative to the manifest directory or repo:// references.");
         }
 
         return reference;
@@ -208,5 +209,34 @@ internal static class ReplayManifestLoader
         }
 
         return item.GetString() ?? string.Empty;
+    }
+
+    private static string ExpectedFixtureSchema(string kind) => kind switch
+    {
+        "telemetry-control-cycle" => ReplaySchemaVersions.TelemetryFixture,
+        "native-control-parity" => ReplaySchemaVersions.NativeParityCases,
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported replay kind."),
+    };
+
+    private static string ExpectedGoldenSchema(string kind) => kind switch
+    {
+        "telemetry-control-cycle" => ReplaySchemaVersions.GoldenCommands,
+        "native-control-parity" => ReplaySchemaVersions.NativeParityCases,
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported replay kind."),
+    };
+
+    private static bool IsValidReplayPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        var candidate = path.StartsWith("repo://", StringComparison.Ordinal)
+            ? path["repo://".Length..]
+            : path;
+        return !Path.IsPathRooted(candidate)
+            && !candidate.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                .Contains("..", StringComparer.Ordinal);
     }
 }
