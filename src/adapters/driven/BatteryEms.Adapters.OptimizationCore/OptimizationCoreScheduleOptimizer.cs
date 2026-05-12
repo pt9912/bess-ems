@@ -943,6 +943,13 @@ internal sealed class OptimizationCoreScheduleOptimizer : IScheduleOptimizer, ID
             MapFallbackReason(fallbackReason),
             terminalState,
             result.Run.SolverRuntime);
+        OptimizationCoreLog.LogRunFinalized(
+            _logger,
+            result.Run.AssetId,
+            result.Run.RunId,
+            requestId,
+            terminalState,
+            terminalReason);
         return result;
     }
 
@@ -1083,4 +1090,14 @@ internal static partial class OptimizationCoreLog
         Message = "optimization-core fallback committed asset_id={AssetId} solver={SolverName}")]
     public static partial void LogFallbackCommitted(
         ILogger logger, string assetId, string solverName);
+
+    [LoggerMessage(EventId = 5120, Level = LogLevel.Information,
+        Message = "optimization-core run finalized asset_id={AssetId} run_id={RunId} request_id={RequestId} terminal_state={TerminalState} terminal_reason={TerminalReason}")]
+    public static partial void LogRunFinalized(
+        ILogger logger,
+        string assetId,
+        Guid runId,
+        string requestId,
+        BatteryEms.Application.Optimization.OptimizationTerminalState terminalState,
+        string terminalReason);
 }

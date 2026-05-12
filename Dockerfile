@@ -359,6 +359,39 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=15s --retries=5 \
 ENTRYPOINT ["dotnet", "BatteryEms.Host.dll"]
 
 # ---------------------------------------------------------------------------
+# optimization-core-test-sidecar (RM-M5-06): standalone gRPC test sidecar
+# used only by the Worker+Sidecar compose gate. Production sidecar images
+# remain out of scope; this image gives CI a real cross-container endpoint
+# instead of the process-internal IntegrationTest fixture.
+# ---------------------------------------------------------------------------
+FROM restore AS optimization-core-test-sidecar-publish
+ARG BUILD_CONFIGURATION
+RUN dotnet restore tests/support/BatteryEms.OptimizationCore.TestSidecar/BatteryEms.OptimizationCore.TestSidecar.csproj \
+    --locked-mode \
+ && dotnet publish tests/support/BatteryEms.OptimizationCore.TestSidecar/BatteryEms.OptimizationCore.TestSidecar.csproj \
+    --configuration "${BUILD_CONFIGURATION}" \
+    --no-restore \
+    --output /publish-test-sidecar
+
+FROM ${DOTNET_RUNTIME_IMAGE} AS optimization-core-test-sidecar
+ENV DOTNET_NOLOGO=true \
+    DOTNET_CLI_TELEMETRY_OPTOUT=true \
+    DOTNET_GENERATE_ASPNETCORE_CERTIFICATE=false \
+    ASPNETCORE_ENVIRONMENT=Development \
+    BESS_TEST_SIDECAR_GRPC_PORT=8081 \
+    BESS_TEST_SIDECAR_HEALTH_PORT=8082
+WORKDIR /app
+RUN apt-get update \
+ && apt-get install --yes --no-install-recommends curl \
+ && rm -rf /var/lib/apt/lists/*
+COPY --from=optimization-core-test-sidecar-publish --chown=app:app /publish-test-sidecar /app
+USER app:app
+EXPOSE 8081 8082
+HEALTHCHECK --interval=5s --timeout=2s --start-period=5s --retries=10 \
+    CMD curl --fail --silent --show-error http://localhost:8082/healthz || exit 1
+ENTRYPOINT ["dotnet", "BatteryEms.OptimizationCore.TestSidecar.dll"]
+
+# ---------------------------------------------------------------------------
 # test-native-interop (RM-M3-07): drives the layout / ABI handshake
 # / non-finite-input contract subset of
 # BatteryEms.NativeInterop.IntegrationTests against the real

@@ -1,0 +1,38 @@
+services:
+  bess-ems:
+    image: ${IMAGE_PREFIX:-bess-ems}-runtime:latest
+    pull_policy: never
+    depends_on:
+      optimization-core:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      ASPNETCORE_ENVIRONMENT: Development
+      Bess__SchemaDirectory: /app/config/schema
+      Bess__AssetConfigPath: /app/config/examples/asset.single-bess.json
+      Bess__ScheduleSolver__Backend: optimization_core
+      Bess__ScheduleSolver__TimeLimitSeconds: "2"
+      Bess__OptimizationCoreSidecarEndpoint: http://optimization-core:8081
+      Bess__OptimizationCoreRuntimeProfile: Development
+      Bess__OptimizationCoreFallbackBackend: or_tools
+      Worker__CycleInterval: "00:00:01"
+      ApiTokens__Tokens__0__Token: rm-m5-06-operator-token
+      ApiTokens__Tokens__0__Operator: rm-m5-06
+      ApiTokens__Tokens__0__Role: operator
+    networks: [bessnet]
+
+  optimization-core:
+    image: ${IMAGE_PREFIX:-bess-ems}-optimization-core-test-sidecar:latest
+    pull_policy: never
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      BESS_TEST_SIDECAR_GRPC_PORT: "8081"
+      BESS_TEST_SIDECAR_HEALTH_PORT: "8082"
+    expose:
+      - "8081"
+      - "8082"
+    networks: [bessnet]
+
+networks:
+  bessnet:
+    driver: bridge

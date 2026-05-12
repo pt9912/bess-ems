@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>BatteryEms.OptimizationCore.TestSidecar</RootNamespace>
+    <AssemblyName>BatteryEms.OptimizationCore.TestSidecar</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);CA1303</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Grpc.AspNetCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\adapters\driven\BatteryEms.Adapters.OptimizationCore\BatteryEms.Adapters.OptimizationCore.csproj" />
+  </ItemGroup>
+
+</Project>

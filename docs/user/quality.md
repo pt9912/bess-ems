@@ -522,11 +522,18 @@ Aktiv ab M1 (LH-TEST-007). Filter: `Category=Container`.
 
 ```bash
 make test-container
+make test-optimization-core-compose
 ```
 
-Startet das Compose-Setup, prüft Health-Endpoint, Boot-Zeit und im
-Fall mit Native Core das erfolgreiche Laden der `.so`-Bibliothek
-über die ABI-Versionsabfrage.
+`make test-container` startet das Produktions-Compose-Setup, prüft
+Health-Endpoint, Boot-Zeit und im Fall mit Native Core das erfolgreiche Laden
+der `.so`-Bibliothek über die ABI-Versionsabfrage.
+
+Ab RM-M5-06 startet `make test-optimization-core-compose` zusätzlich eine
+Worker-plus-`optimization-core`-Sidecar-Topologie. Das Gate baut ein
+standalone TestSidecar-Image, prüft Sidecar-Commit, Sidecar-Stopp mit lokalem
+`or_tools`-Fallback, Restart-Recovery, Prometheus-Terminalzustandslabels und
+korrelierbare `request_id`/`run_id`-Logs.
 
 ### 2.7 Tag-Steuerung
 
@@ -538,6 +545,7 @@ Fall mit Native Core das erfolgreiche Laden der `.so`-Bibliothek
 | HIL (optional)       | `make test-hil-modbus`           | `Category=HIL`             |
 | OPC-UA-Roundtrip     | `make test-hil-opcua`            | `Category=Integration` im OPC-UA-IntegrationTests-Projekt |
 | Optimization-Core    | `make test-hil-optimization-core` | `Category=Integration` im OptimizationCore-IntegrationTests-Projekt inkl. RM-M5-04-E Sidecar-Manifest-Replay |
+| Optimization-Core Compose | `make test-optimization-core-compose` | RM-M5-06 Worker+Sidecar-Compose-Gate |
 | MPC Property         | `make test-mpc-property`          | RM-M5-02 Unit-Pins plus RM-M5-04-E lokaler MPC-Engine-Vergleich |
 | Native Interop       | `make test-native-interop`       | `Category!=Parity` im NativeInterop-IntegrationTests-Projekt |
 | Native Parity        | `make test-native-parity`        | `Category=Parity` im NativeInterop-IntegrationTests-Projekt |

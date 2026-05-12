@@ -20,7 +20,7 @@ DOCKER_BUILD = $(DOCKER) build $(BUILD_CONTEXT) \
 
 .PHONY: help \
 	lint arch-check gates \
-	test test-safety test-mpc-property test-replay test-integration test-hil-modbus test-hil-opcua test-hil-optimization-core test-hil-closed-loop test-container coverage-gate \
+	test test-safety test-mpc-property test-replay test-integration test-hil-modbus test-hil-opcua test-hil-optimization-core test-optimization-core-compose test-hil-closed-loop test-container coverage-gate \
 	native-build test-native-interop test-native-parity \
 	native-lint native-sanitizer native-coverage-report native-coverage-gate native-coverage-exclusions \
 	simulator-test simulator-race simulator-lint simulator-coverage-gate \
@@ -61,7 +61,8 @@ help:
 	@echo "  make test-integration        Modbus roundtrip vs Go-Simulator via docker compose"
 	@echo "  make test-hil-modbus         Optional: HIL roundtrip vs bess-hil-simulator:local (RM-M2-HIL-08)"
 	@echo "  make test-hil-opcua          5 pinned OPC-UA-Roundtrips vs embedded TestServer (RM-M4-04 Sub-Slice D)"
-	@echo "  make test-hil-optimization-core   25 pins (5 roundtrip + 4 negative + 4 mixed-version + 4 security + 3 idempotency + 5 fallback) vs In-Process gRPC-Sidecar (RM-M5-01)"
+	@echo "  make test-hil-optimization-core   26 pins vs In-Process gRPC-Sidecar (RM-M5-01/RM-M5-04/RM-M5-05)"
+	@echo "  make test-optimization-core-compose Worker + standalone optimization-core TestSidecar compose gate (RM-M5-06)"
 	@echo "  make test-hil-closed-loop    Optional: Closed-loop optimize→dispatch→HIL smoke (Carve-out Demo-01)"
 	@echo ""
 	@echo "Welle M3 (active):"
@@ -211,11 +212,19 @@ test-integration:
 test-hil-opcua:
 	$(DOCKER_BUILD) --target test-hil-opcua -t $(IMAGE_PREFIX)-test-hil-opcua:latest
 
-# RM-M5-01-B: 9 pinned Tests (5 Roundtrip + 4 Negative) gegen den
-# In-Process gRPC-Sidecar (Grpc.AspNetCore + Kestrel-UDS-Listener im
-# selben Test-Prozess). Process-internal — kein Compose-Asset.
+# RM-M5-01..05: pinned Tests gegen den In-Process gRPC-Sidecar
+# (Grpc.AspNetCore + Kestrel-UDS-Listener im selben Test-Prozess).
+# Process-internal — das echte Cross-Container-Gate ist RM-M5-06
+# (`make test-optimization-core-compose`).
 test-hil-optimization-core:
 	$(DOCKER_BUILD) --target test-hil-optimization-core -t $(IMAGE_PREFIX)-test-hil-optimization-core:latest
+
+# RM-M5-06: real cross-container Worker + optimization-core sidecar gate.
+# Builds the production runtime image plus a standalone test-sidecar image,
+# then drives Health, Sidecar-Optimize, Sidecar-stop fallback and restart.
+test-optimization-core-compose: build
+	$(DOCKER_BUILD) --target optimization-core-test-sidecar -t $(IMAGE_PREFIX)-optimization-core-test-sidecar:latest
+	DOCKER=$(DOCKER) IMAGE_PREFIX=$(IMAGE_PREFIX) scripts/test-optimization-core-compose.sh
 
 # RM-M2-HIL-08: optionales HIL-Gate. Bringt den externen
 # `bess-hil-simulator:local`-Container hoch (siehe HIL-OPEN-01:
@@ -376,8 +385,8 @@ ci: lint arch-check test test-safety test-mpc-property test-replay coverage-gate
     native-coverage-gate native-coverage-exclusions \
     test-native-interop test-native-parity \
     test-hil-opcua test-hil-optimization-core \
-    test-integration
-	@echo "[ci] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, simulator-*) + M2 schema (validate, drift-check) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + M5 (test-hil-optimization-core, test-mpc-property, test-replay) + test-integration"
+    test-optimization-core-compose test-integration
+	@echo "[ci] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, simulator-*) + M2 schema (validate, drift-check) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + M5 (test-hil-optimization-core, test-optimization-core-compose, test-mpc-property, test-replay) + test-integration"
 
 # Fresh-clone-naher Komplettlauf: alle CI-Gates plus Runtime-Image und
 # Compose-Smoke. Letzte Stufe vor einem M1-Tag (RM-M1-20).
