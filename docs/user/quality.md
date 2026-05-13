@@ -674,16 +674,13 @@ FetchContent-`_deps/`-Quellen sind nicht Teil des Nenners.
 Pflicht-Threshold: **100 % Line-Coverage**, weil der Native Core
 eng abgegrenzt ist und im Regelpfad sicherheitskritisch wirkt.
 
-**Coverage-Ausnahmen-Disziplin:** Ausnahmen über `// GCOVR_EXCL_START`
-… `// GCOVR_EXCL_STOP`-Blöcke sind nur mit `// Why:`-Kommentar
-innerhalb des Blocks zulässig. Geprüft über ein dediziertes
-Make-Target:
+**Coverage-Ausnahmen-Disziplin:** Der Native-Core-Coverage-Nenner erlaubt
+keine `// GCOVR_EXCL_START` … `// GCOVR_EXCL_STOP`-Blöcke. Geprüft über
+ein dediziertes Make-Target:
 
 ```bash
 make native-coverage-exclusions
 ```
-
-Es gibt keine Coverage-Ausnahmen.
 
 ### 3.3 Monorepo-Gate
 
