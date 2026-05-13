@@ -10,7 +10,7 @@ Schliesst `AR-OPEN-006`.
 §18 (`AR-OPEN-006`),
 [`../planning/in-progress/plan-RM-M6.md`](../planning/in-progress/plan-RM-M6.md)
 (RM-M6-02),
-[`../planning/in-progress/plan-RM-M6-02.md`](../planning/in-progress/plan-RM-M6-02.md)
+[`../planning/done/plan-RM-M6-02.md`](../planning/done/plan-RM-M6-02.md)
 (Detail-Slice),
 [`0005-optimization-core-sidecar-transport.md`](0005-optimization-core-sidecar-transport.md)
 (Sidecar-Topologie),
