@@ -96,7 +96,7 @@ Roadmap, Lastenheft und Architektur sichtbar.
 
 | Check | Erwartung |
 | ----- | --------- |
-| M5-Closure | ✅ `../done/plan-RM-M5.md` ist geschlossen; RM-M5-01..07 sind gruen. |
+| M5-Closure | ✅ `plan-RM-M5.md` ist geschlossen; RM-M5-01..07 sind gruen. |
 | API-first | Operator-Funktionen bleiben bis zur UI ueber HTTP-API, AuthN/AuthZ und Audit nutzbar. |
 | Multi-Asset-Blocker | ✅ `AR-OPEN-006` ist mit ADR 0007 geschlossen; konkrete Flotten-, UI- und Kubernetes-Slices referenzieren den shared-Worker-Default. |
 | Timescale-Grenze | PostgreSQL bleibt Default; TimescaleDB darf nur kompatible Erweiterung sein. |
