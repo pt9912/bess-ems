@@ -2,7 +2,7 @@
 
 **Dokumenttyp:** Detailplan / M6 (aktiv)
 **Status:** In Arbeit - aktiviert am 2026-05-13 nach Abschluss von M5.
-Die Arbeitspakete RM-M6-01, RM-M6-02 und RM-M6-03 sind abgeschlossen;
+Die Arbeitspakete RM-M6-01 bis RM-M6-05 sind abgeschlossen;
 `AR-OPEN-006` ist mit ADR 0007 geschlossen (shared Worker als Default,
 Worker-pro-Asset als Deployment-/Isolation-Pattern).
 **Bezug:**
@@ -20,6 +20,8 @@ LH-OPEN-005, LH-OPEN-006),
 (Sidecar-/MPC-Trigger-Watch),
 [`../../adr/0007-multi-asset-hosting-strategy.md`](../../adr/0007-multi-asset-hosting-strategy.md)
 (Multi-Asset-Hosting-Strategie),
+[`../../adr/0008-edge-controller-boundary.md`](../../adr/0008-edge-controller-boundary.md)
+(Edge-Controller-Boundary),
 [`../done/plan-RM-M6-01.md`](../done/plan-RM-M6-01.md)
 (abgeschlossener Operator-UI-Slice),
 [`../done/plan-RM-M6-02.md`](../done/plan-RM-M6-02.md)
@@ -28,6 +30,10 @@ LH-OPEN-005, LH-OPEN-006),
 (abgeschlossener Kubernetes-/Helm-Slice),
 [`../done/plan-RM-M6-04.md`](../done/plan-RM-M6-04.md)
 (abgeschlossener TimescaleDB-Erweiterungs-Slice),
+[`../done/plan-RM-M6-05.md`](../done/plan-RM-M6-05.md)
+(abgeschlossener Edge-Controller-Boundary-Slice),
+[`../../../user/edge-controller.md`](../../../user/edge-controller.md)
+(Betreiber-/Integrationssicht auf die Edge-Grenze),
 [`../open/note-RM-M6-followups.md`](../open/note-RM-M6-followups.md)
 (M6-Trigger-Watch)
 
@@ -103,7 +109,7 @@ Roadmap, Lastenheft und Architektur sichtbar.
 | ✅ | RM-M6-02 | Multi-Asset-Flottensteuerung / Hosting-Strategie | Abgeschlossen: [`../done/plan-RM-M6-02.md`](../done/plan-RM-M6-02.md). ADR 0007 schliesst `AR-OPEN-006`: shared Worker mit per-Asset fan-out ist Default; Worker-pro-Asset bleibt Deployment-/Isolation-Pattern. Trigger-Watch fuer Parallel-Fanout, Worker-pro-Asset, per-Asset-Sidecar und Multi-Asset-MPC: [`../open/note-RM-M6-followups.md`](../open/note-RM-M6-followups.md). |
 | ✅ | RM-M6-03 | Kubernetes-Deployment + Helm Charts | Abgeschlossen: [`../done/plan-RM-M6-03.md`](../done/plan-RM-M6-03.md). Helm-Chart fuer Worker/API, Postgres, optionale Sidecars und Secrets/Volumes mit shared-Worker-Default, Worker-pro-Asset-Rendering, UDS-/mTLS-Werten, `replicaCount`-Schutz und `make helm-lint`. Compose bleibt Referenzpfad bis ein Cluster-Gate stabil ist. |
 | ✅ | RM-M6-04 | TimescaleDB-Erweiterung | Abgeschlossen: [`../done/plan-RM-M6-04.md`](../done/plan-RM-M6-04.md). Erster kompatibler Adapter-/Migrationspfad: `telemetry` wird nur bei verfuegbarer TimescaleDB-Extension zur Hypertable; Plain-Postgres bleibt Default und No-op-Pfad. Continuous Aggregates/Compression bleiben Folge-Slice. |
-| ⬜ | RM-M6-05 | Edge-Controller-Integration | Abgrenzungs- und Integrationspfad fuer harte Echtzeitkomponenten. Liefert klare Verantwortung zwischen EMS, Edge/Herstellersteuerung, BMS/PCS und hardwareseitiger Schutzkette; kein impliziter Ersatz fuer zertifizierte Schutzfunktionen. |
+| ✅ | RM-M6-05 | Edge-Controller-Integration | Abgeschlossen: [`../done/plan-RM-M6-05.md`](../done/plan-RM-M6-05.md). ADR 0008 normiert die Edge-Controller-Grenze: EMS bleibt supervisory/1-s-Dispatch; harte Echtzeit, zertifizierungsnahe Schutzlogik und finale Aktorensperren liegen in Edge/Herstellercontroller, BMS/PCS oder Hardware-Schutzkette. Konkrete Edge-Adapter bleiben trigger-getriebene Folgearbeit. |
 | ⬜ | RM-M6-06 | Zertifizierungsnahe Regelleistungsintegration | Aktivierung erst mit konkretem Produkt-/TSO-/Anlagenkonzept. Vertieft M4-Regelleistung um Produktregeln, Nachweise, Audit/Replay und externe Schnittstellen; harte Echtzeit bleibt Edge-/Hardware-Thema, wenn das Produkt es verlangt. |
 
 ---
@@ -118,9 +124,12 @@ Roadmap, Lastenheft und Architektur sichtbar.
    Asset-/Operator-API-Sicht ist als API-first statische Shell geliefert.
 4. RM-M6-04 ist abgeschlossen: TimescaleDB als kompatibler
    Telemetrie-Migrationspfad; PostgreSQL bleibt weiter Default.
-5. RM-M6-05 und RM-M6-06 nur mit konkretem Edge-/Produkttrigger
-   aktivieren; beide duerfen keine harte Echtzeitfaehigkeit des
-   Docker-Regelkreises behaupten.
+5. RM-M6-05 ist abgeschlossen: Edge-Controller ist als
+   Integrations-/Schutzgrenze dokumentiert; das Docker-EMS behauptet
+   keine harte Echtzeitfaehigkeit.
+6. RM-M6-06 nur mit konkretem Produkt-/TSO-/Anlagenkonzept aktivieren;
+   zertifizierungsnahe Regelleistung muss die Edge-/Hardwaregrenze aus
+   ADR 0008 referenzieren, sobald harte Echtzeit betroffen ist.
 
 ---
 
@@ -135,7 +144,9 @@ Roadmap, Lastenheft und Architektur sichtbar.
 - PostgreSQL bleibt lauffaehiger Default; TimescaleDB ist kompatibler
   Ausbau.
 - Harte Echtzeit- und Schutzketten bleiben in Lastenheft und Architektur
-  klar ausserhalb des Docker-Regelkreises abgegrenzt.
+  klar ausserhalb des Docker-Regelkreises abgegrenzt; ADR 0008 macht die
+  Edge-Verantwortung und die Trigger fuer konkrete Integrationen
+  normativ.
 
 ---
 
@@ -150,5 +161,6 @@ Roadmap, Lastenheft und Architektur sichtbar.
   Application-Ports leaken. Mitigation: Adapter-/Migrationsgrenze und
   PostgreSQL-Default-Pins.
 - **Edge-/Zertifizierungsversprechen.** EMS-Software ersetzt keine
-  Hardware-Schutzkette. Mitigation: M6-05/M6-06 starten nur mit
-  expliziter Produkt- und Anlagenkonzept-Abgrenzung.
+  Hardware-Schutzkette. Mitigation: RM-M6-05 ist mit ADR 0008
+  geschlossen; konkrete Edge-Adapter und RM-M6-06 starten nur mit
+  expliziter Produkt-, Hersteller- oder Anlagenkonzept-Abgrenzung.

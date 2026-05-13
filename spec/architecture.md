@@ -650,7 +650,11 @@ Ausgabe + persistierter Reason. Tritt ein bei:
 Softwareseitige Stop-Funktionen ersetzen keinen Hardware-Not-Aus, keine
 BMS-Schutztechnik und keine Wechselrichter-Schutzfunktionen. Harte
 Echtzeit-/Schutzanforderungen werden außerhalb des Docker-EMS abgegrenzt
-(LH-SAFE-001 Hinweis, LH-RISK-001).
+(LH-SAFE-001 Hinweis, LH-RISK-001). RM-M6-05 normiert diese Grenze in
+[`docs/plan/adr/0008-edge-controller-boundary.md`](../docs/plan/adr/0008-edge-controller-boundary.md):
+Das EMS bleibt supervisory/1-s-Dispatch; Edge-/Herstellercontroller,
+BMS/PCS und Hardware-Schutzketten uebernehmen sub-cycle oder
+zertifizierungsnahe Schutzaufgaben.
 
 ---
 

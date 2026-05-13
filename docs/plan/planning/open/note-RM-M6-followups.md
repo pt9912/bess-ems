@@ -1,27 +1,34 @@
 # Notiz: M6-Folgearbeiten (Trigger-Watch)
 
 **Dokumenttyp:** Vorabklaerung / Trigger-Watch
-**Status:** Offen - Folgearbeiten aus RM-M6-02 ohne aktiven
+**Status:** Offen - Folgearbeiten aus RM-M6-02/RM-M6-05 ohne aktiven
 Implementierungsscope
 **Bezug:**
 [`../done/plan-RM-M6-02.md`](../done/plan-RM-M6-02.md)
 (Multi-Asset-Hosting-Slice, abgeschlossen am 2026-05-13),
 [`../done/plan-RM-M6-03.md`](../done/plan-RM-M6-03.md)
 (Kubernetes-/Helm-Slice, abgeschlossen am 2026-05-13),
+[`../done/plan-RM-M6-05.md`](../done/plan-RM-M6-05.md)
+(Edge-Controller-Boundary-Slice, abgeschlossen am 2026-05-13),
 [`../in-progress/plan-RM-M6.md`](../in-progress/plan-RM-M6.md)
 (M6-Masterplan),
 [`../../adr/0007-multi-asset-hosting-strategy.md`](../../adr/0007-multi-asset-hosting-strategy.md)
-(shared Worker als M6-Default)
+(shared Worker als M6-Default),
+[`../../adr/0008-edge-controller-boundary.md`](../../adr/0008-edge-controller-boundary.md)
+(Edge-Controller-Boundary)
 
 ---
 
 ## Zweck
 
 RM-M6-02 hat den Multi-Asset-Default festgelegt und gepinnt: shared
-Worker mit per-Asset fan-out. Einige Folgearbeiten bleiben bewusst
-trigger-getrieben, weil sie eigene Topologie-, Performance- oder
-Fachentscheidungen brauchen. Diese Notiz haelt sie sichtbar, ohne den
-Hosting-Slice mit spekulativer Implementierung zu ueberladen.
+Worker mit per-Asset fan-out. RM-M6-05 hat die Edge-Controller-Grenze
+festgelegt: harte Echtzeit, zertifizierungsnahe Schutzlogik und finale
+Aktorensperren bleiben ausserhalb des Docker-EMS. Einige Folgearbeiten
+bleiben bewusst trigger-getrieben, weil sie eigene Topologie-,
+Performance-, Produkt- oder Herstellerentscheidungen brauchen. Diese
+Notiz haelt sie sichtbar, ohne die abgeschlossenen Slices mit
+spekulativer Implementierung zu ueberladen.
 
 Die Items hier werden beim Start von RM-M6-01 (Operator UI), RM-M6-03
 (Kubernetes/Helm), beim Architektur-Review oder beim ersten produktiven
@@ -202,3 +209,41 @@ Assets, gemeinsame Netzpunkte, Constraints und Operator-Workflows.
 
 **Aktivierungs-Pfad:** eigener RM-M6-Folgeplan, wahrscheinlich nach
 RM-M6-01/RM-M6-03, sobald UI-Workflow und Deployment-Topologie klar sind.
+
+---
+
+## Item F-M6-05-01: Konkreter Edge-/Vendor-Adapter
+
+**Quelle:** ADR 0008 §3/§4 und RM-M6-05. Der Edge-Pfad ist als
+Integrationsgrenze entschieden, aber kein konkreter Hersteller-,
+Protokoll- oder Standortvertrag ist aktiv.
+
+**Trigger** (eines reicht):
+
+- Ein BMS, PCS, Gateway oder Edge-Controller ist als Produktkomponente
+  ausgewaehlt und bringt ein verbindliches Protokoll mit.
+- Ein Standort oder Produkt verlangt sub-cycle Reaktionszeiten,
+  deterministische Jitter-Grenzen oder zertifizierungsnahe lokale
+  Schutzlogik.
+- Ein TSO-/DSO-, Netzschutz- oder Herstellerkonzept verlangt eine
+  getrennte lokale Steuer-/Schutzinstanz.
+- Ein Betreiber verlangt asset-nahe Offline-Faehigkeit, getrennte
+  Restart-Domaenen, eigene Secrets oder getrennte Wartungszustaende.
+
+**Scope-Skizze** (wenn der Trigger zuendet):
+
+- Versionierter Contract fuer Commands, Status, Limits, Freigaben,
+  Heartbeat und Fehlercodes.
+- Transportentscheidung passend zum Produkt: vorhandener Feldadapter
+  (Modbus, MQTT, OPC-UA) oder eigener Sidecar-/gRPC-Pfad.
+- Freshness-, Health- und Kompatibilitaetschecks vor Aktivierung in
+  API/UI.
+- Fail-closed oder explizit vendor-safe dokumentiertes Verhalten bei
+  Heartbeat-Verlust, stale Telemetrie, lokaler Sperre und Recovery.
+- Audit-/Replay-Pins fuer ausgegebene, begrenzte, verworfene oder durch
+  Edge blockierte Commands.
+- HIL- oder Integrationstest fuer die relevanten Stoerfallpfade.
+
+**Aktivierungs-Pfad:** eigener
+`plan-RM-M6-05-FUP-edge-adapter.md` oder Teil von RM-M6-06, falls die
+zertifizierungsnahe Regelleistungsintegration den Edge-Trigger ausloest.
