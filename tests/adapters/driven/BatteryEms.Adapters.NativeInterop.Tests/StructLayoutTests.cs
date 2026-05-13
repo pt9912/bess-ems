@@ -172,16 +172,71 @@ public sealed class StructLayoutTests
         Assert.Equal(0, BccPidAntiWindupMode.ConditionalIntegration);
     }
 
+    // RM-M5-03 telemetry-filter layout pins.
+
     [Fact]
-    public void NativeControlLoader_expected_abi_minor_matches_pid_slice()
+    public void BccTelemetryFilterState_size_and_offsets_match_C_layout()
     {
-        // RM-M3-13 bumped the ABI to 0.2 (additive: pid_step plus the
-        // four new pid_* structs and reason codes 13..16). The host
+        Assert.Equal(32, Marshal.SizeOf<BccTelemetryFilterState>());
+        Assert.Equal(0,  (int)Marshal.OffsetOf<BccTelemetryFilterState>(nameof(BccTelemetryFilterState.FilteredSocPercent)));
+        Assert.Equal(8,  (int)Marshal.OffsetOf<BccTelemetryFilterState>(nameof(BccTelemetryFilterState.FilteredActivePowerKw)));
+        Assert.Equal(16, (int)Marshal.OffsetOf<BccTelemetryFilterState>(nameof(BccTelemetryFilterState.FilteredTemperatureCelsius)));
+        Assert.Equal(24, (int)Marshal.OffsetOf<BccTelemetryFilterState>(nameof(BccTelemetryFilterState.Initialized)));
+    }
+
+    [Fact]
+    public void BccTelemetryFilterOptions_size_and_offsets_match_C_layout()
+    {
+        Assert.Equal(48, Marshal.SizeOf<BccTelemetryFilterOptions>());
+        Assert.Equal(0,  (int)Marshal.OffsetOf<BccTelemetryFilterOptions>(nameof(BccTelemetryFilterOptions.Alpha)));
+        Assert.Equal(8,  (int)Marshal.OffsetOf<BccTelemetryFilterOptions>(nameof(BccTelemetryFilterOptions.MaxSocDeltaPercent)));
+        Assert.Equal(16, (int)Marshal.OffsetOf<BccTelemetryFilterOptions>(nameof(BccTelemetryFilterOptions.MaxPowerDeltaKw)));
+        Assert.Equal(24, (int)Marshal.OffsetOf<BccTelemetryFilterOptions>(nameof(BccTelemetryFilterOptions.MaxTemperatureDeltaCelsius)));
+        Assert.Equal(32, (int)Marshal.OffsetOf<BccTelemetryFilterOptions>(nameof(BccTelemetryFilterOptions.MinSamplePeriodSeconds)));
+        Assert.Equal(40, (int)Marshal.OffsetOf<BccTelemetryFilterOptions>(nameof(BccTelemetryFilterOptions.MaxSamplePeriodSeconds)));
+    }
+
+    [Fact]
+    public void BccTelemetryFilterInput_size_and_offsets_match_C_layout()
+    {
+        Assert.Equal(32, Marshal.SizeOf<BccTelemetryFilterInput>());
+        Assert.Equal(0,  (int)Marshal.OffsetOf<BccTelemetryFilterInput>(nameof(BccTelemetryFilterInput.SocPercent)));
+        Assert.Equal(8,  (int)Marshal.OffsetOf<BccTelemetryFilterInput>(nameof(BccTelemetryFilterInput.ActivePowerKw)));
+        Assert.Equal(16, (int)Marshal.OffsetOf<BccTelemetryFilterInput>(nameof(BccTelemetryFilterInput.TemperatureCelsius)));
+        Assert.Equal(24, (int)Marshal.OffsetOf<BccTelemetryFilterInput>(nameof(BccTelemetryFilterInput.DtSeconds)));
+    }
+
+    [Fact]
+    public void BccTelemetryFilterOutput_size_and_offsets_match_C_layout()
+    {
+        Assert.Equal(40, Marshal.SizeOf<BccTelemetryFilterOutput>());
+        Assert.Equal(0,  (int)Marshal.OffsetOf<BccTelemetryFilterOutput>(nameof(BccTelemetryFilterOutput.FilteredSocPercent)));
+        Assert.Equal(8,  (int)Marshal.OffsetOf<BccTelemetryFilterOutput>(nameof(BccTelemetryFilterOutput.FilteredActivePowerKw)));
+        Assert.Equal(16, (int)Marshal.OffsetOf<BccTelemetryFilterOutput>(nameof(BccTelemetryFilterOutput.FilteredTemperatureCelsius)));
+        Assert.Equal(24, (int)Marshal.OffsetOf<BccTelemetryFilterOutput>(nameof(BccTelemetryFilterOutput.Status)));
+        Assert.Equal(28, (int)Marshal.OffsetOf<BccTelemetryFilterOutput>(nameof(BccTelemetryFilterOutput.ReasonCode)));
+        Assert.Equal(32, (int)Marshal.OffsetOf<BccTelemetryFilterOutput>(nameof(BccTelemetryFilterOutput.DriftDetected)));
+        Assert.Equal(36, (int)Marshal.OffsetOf<BccTelemetryFilterOutput>(nameof(BccTelemetryFilterOutput.Initialized)));
+    }
+
+    [Fact]
+    public void BccTelemetryFilterReason_constants_match_native_header_values()
+    {
+        Assert.Equal(17, BccTelemetryFilterReason.InvalidOptions);
+        Assert.Equal(18, BccTelemetryFilterReason.SamplePeriod);
+        Assert.Equal(19, BccTelemetryFilterReason.TelemetryDrift);
+    }
+
+    [Fact]
+    public void NativeControlLoader_expected_abi_minor_matches_telemetry_filter_slice()
+    {
+        // RM-M5-03 bumped the ABI to 0.3 (additive: telemetry filter
+        // structs / export plus reason codes 17..19). The host
         // expectation must be in lockstep so the integration test
         // `Real_library_reports_packed_major_minor_patch_matching_host`
         // pins both sides.
         Assert.Equal(0u, NativeControlLoader.ExpectedAbiMajor);
-        Assert.Equal(2u, NativeControlLoader.ExpectedAbiMinor);
+        Assert.Equal(3u, NativeControlLoader.ExpectedAbiMinor);
         Assert.Equal(0u, NativeControlLoader.ExpectedAbiPatch);
     }
 }

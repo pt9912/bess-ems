@@ -12,7 +12,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(battery_control_core
-    VERSION   0.1.0
+    VERSION   0.3.0
     LANGUAGES C CXX)
 
 # RM-M3-09 follow-up: production source is C (compute.c), the test

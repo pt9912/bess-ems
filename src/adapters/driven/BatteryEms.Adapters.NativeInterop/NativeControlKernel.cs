@@ -72,6 +72,21 @@ public sealed class NativeControlKernel : IDisposable
             _handle, in state, in options, in input, out command);
     }
 
+    // RM-M5-03 telemetry filter. This stays a thin marshal-only
+    // wrapper like Compute/PidStep; policy (when to use the native
+    // filter, and how to route unhealthy MPC state) remains above
+    // the native adapter.
+    public int FilterTelemetry(
+        in BccTelemetryFilterState state,
+        in BccTelemetryFilterOptions options,
+        in BccTelemetryFilterInput input,
+        out BccTelemetryFilterOutput output)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return _gateway.CallFilterTelemetry(
+            _handle, in state, in options, in input, out output);
+    }
+
     public void Dispose()
     {
         if (_disposed) { return; }

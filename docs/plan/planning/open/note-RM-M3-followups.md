@@ -165,7 +165,7 @@ in den strukturierten Logs (`native_control_status=*`).
 - Neuer Endpoint `/health/native` in `BatteryEms.Api` (analog zu
   `/health`), der den `NativeControlLoadResult`-Status aus dem
   DI-Container ausliest und als JSON-Body emittiert
-  (`{"status": "loaded", "library_path": "...", "abi_version": "0.2.0"}`).
+  (`{"status": "loaded", "library_path": "...", "abi_version": "0.3.0"}`).
 - Status-Persistierung beim Start: `NativeControlLoadResult` als
   Singleton im Container (heute wird er in `AddBessNativeControl`
   konstruiert und nur intern für die Factory verwendet — eine

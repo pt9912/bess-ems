@@ -743,3 +743,178 @@ TEST_CASE("PID state propagation across two consecutive steps")
     CHECK(step2.output == doctest::Approx(20.0).epsilon(1e-12));
     CHECK(step2.next_integral == doctest::Approx(10.0).epsilon(1e-12));
 }
+
+// ---------------------------------------------------------------------
+// RM-M5-03 telemetry-filter tests.
+// ---------------------------------------------------------------------
+
+namespace {
+
+bcc_telemetry_filter_state_t make_filter_state(
+    double soc = 50.0,
+    double power = 10.0,
+    double temperature = 22.0,
+    int32_t initialized = 1)
+{
+    bcc_telemetry_filter_state_t s{};
+    s.filtered_soc_percent = soc;
+    s.filtered_active_power_kw = power;
+    s.filtered_temperature_celsius = temperature;
+    s.initialized = initialized;
+    return s;
+}
+
+bcc_telemetry_filter_options_t make_filter_options(double alpha = 0.25)
+{
+    bcc_telemetry_filter_options_t o{};
+    o.alpha = alpha;
+    o.max_soc_delta_percent = 20.0;
+    o.max_power_delta_kw = 50.0;
+    o.max_temperature_delta_celsius = 10.0;
+    o.min_sample_period_seconds = 0.001;
+    o.max_sample_period_seconds = 1.0;
+    return o;
+}
+
+bcc_telemetry_filter_input_t make_filter_input(
+    double soc = 54.0,
+    double power = 30.0,
+    double temperature = 24.0,
+    double dt = 0.01)
+{
+    bcc_telemetry_filter_input_t i{};
+    i.soc_percent = soc;
+    i.active_power_kw = power;
+    i.temperature_celsius = temperature;
+    i.dt_seconds = dt;
+    return i;
+}
+
+}  // namespace
+
+TEST_CASE("Telemetry filter cold boot seeds from first measurement")
+{
+    const auto state = make_filter_state(
+        std::numeric_limits<double>::quiet_NaN(),
+        std::numeric_limits<double>::quiet_NaN(),
+        std::numeric_limits<double>::quiet_NaN(),
+        /*initialized=*/0);
+    const auto opts = make_filter_options(/*alpha=*/0.25);
+    const auto in = make_filter_input(/*soc=*/55.0, /*power=*/12.0,
+                                      /*temperature=*/23.0);
+    bcc_telemetry_filter_output_t out{};
+    REQUIRE(battery_control_core_filter_telemetry(&state, &opts, &in, &out)
+            == BCC_STATUS_OK);
+
+    CHECK(out.filtered_soc_percent == doctest::Approx(55.0).epsilon(1e-12));
+    CHECK(out.filtered_active_power_kw == doctest::Approx(12.0).epsilon(1e-12));
+    CHECK(out.filtered_temperature_celsius == doctest::Approx(23.0).epsilon(1e-12));
+    CHECK(out.initialized == 1);
+    CHECK(out.drift_detected == 0);
+    CHECK(out.reason_code == static_cast<int32_t>(BCC_REASON_WITHIN_LIMITS));
+}
+
+TEST_CASE("Telemetry filter applies first-order IIR update after initialization")
+{
+    const auto state = make_filter_state(/*soc=*/50.0, /*power=*/10.0,
+                                         /*temperature=*/20.0);
+    const auto opts = make_filter_options(/*alpha=*/0.25);
+    const auto in = make_filter_input(/*soc=*/54.0, /*power=*/30.0,
+                                      /*temperature=*/24.0);
+    bcc_telemetry_filter_output_t out{};
+    REQUIRE(battery_control_core_filter_telemetry(&state, &opts, &in, &out)
+            == BCC_STATUS_OK);
+
+    CHECK(out.filtered_soc_percent == doctest::Approx(51.0).epsilon(1e-12));
+    CHECK(out.filtered_active_power_kw == doctest::Approx(15.0).epsilon(1e-12));
+    CHECK(out.filtered_temperature_celsius == doctest::Approx(21.0).epsilon(1e-12));
+}
+
+TEST_CASE("Telemetry filter alpha one is pass-through and alpha zero holds state")
+{
+    const auto state = make_filter_state(/*soc=*/50.0, /*power=*/10.0,
+                                         /*temperature=*/20.0);
+    const auto in = make_filter_input(/*soc=*/54.0, /*power=*/30.0,
+                                      /*temperature=*/24.0);
+
+    auto opts = make_filter_options(/*alpha=*/1.0);
+    bcc_telemetry_filter_output_t pass{};
+    REQUIRE(battery_control_core_filter_telemetry(&state, &opts, &in, &pass)
+            == BCC_STATUS_OK);
+    CHECK(pass.filtered_soc_percent == doctest::Approx(54.0).epsilon(1e-12));
+    CHECK(pass.filtered_active_power_kw == doctest::Approx(30.0).epsilon(1e-12));
+
+    opts.alpha = 0.0;
+    bcc_telemetry_filter_output_t held{};
+    REQUIRE(battery_control_core_filter_telemetry(&state, &opts, &in, &held)
+            == BCC_STATUS_OK);
+    CHECK(held.filtered_soc_percent == doctest::Approx(50.0).epsilon(1e-12));
+    CHECK(held.filtered_active_power_kw == doctest::Approx(10.0).epsilon(1e-12));
+}
+
+TEST_CASE("Telemetry filter rejects non-finite input")
+{
+    const auto state = make_filter_state();
+    const auto opts = make_filter_options();
+    auto in = make_filter_input();
+    in.active_power_kw = std::numeric_limits<double>::quiet_NaN();
+    bcc_telemetry_filter_output_t out{};
+    REQUIRE(battery_control_core_filter_telemetry(&state, &opts, &in, &out)
+            == BCC_STATUS_NON_FINITE);
+
+    CHECK(out.reason_code == static_cast<int32_t>(BCC_REASON_NON_FINITE_INPUT));
+    CHECK(out.initialized == 0);
+}
+
+TEST_CASE("Telemetry filter rejects invalid options")
+{
+    const auto state = make_filter_state();
+    auto opts = make_filter_options();
+    opts.alpha = 1.01;
+    const auto in = make_filter_input();
+    bcc_telemetry_filter_output_t out{};
+    REQUIRE(battery_control_core_filter_telemetry(&state, &opts, &in, &out)
+            == BCC_STATUS_INVALID_INPUT);
+
+    CHECK(out.reason_code == static_cast<int32_t>(BCC_REASON_FILTER_INVALID_OPTIONS));
+}
+
+TEST_CASE("Telemetry filter rejects sample period outside configured window")
+{
+    const auto state = make_filter_state();
+    const auto opts = make_filter_options();
+    auto in = make_filter_input();
+    in.dt_seconds = 2.0;
+    bcc_telemetry_filter_output_t out{};
+    REQUIRE(battery_control_core_filter_telemetry(&state, &opts, &in, &out)
+            == BCC_STATUS_INVALID_INPUT);
+
+    CHECK(out.reason_code == static_cast<int32_t>(BCC_REASON_FILTER_SAMPLE_PERIOD));
+}
+
+TEST_CASE("Telemetry filter rejects drift and preserves prior filtered state")
+{
+    const auto state = make_filter_state(/*soc=*/50.0, /*power=*/10.0,
+                                         /*temperature=*/20.0);
+    auto opts = make_filter_options();
+    opts.max_power_delta_kw = 5.0;
+    const auto in = make_filter_input(/*soc=*/51.0, /*power=*/30.0,
+                                      /*temperature=*/20.5);
+    bcc_telemetry_filter_output_t out{};
+    REQUIRE(battery_control_core_filter_telemetry(&state, &opts, &in, &out)
+            == BCC_STATUS_INVALID_INPUT);
+
+    CHECK(out.reason_code == static_cast<int32_t>(BCC_REASON_FILTER_TELEMETRY_DRIFT));
+    CHECK(out.drift_detected == 1);
+    CHECK(out.filtered_active_power_kw == doctest::Approx(10.0).epsilon(1e-12));
+    CHECK(out.initialized == 1);
+}
+
+TEST_CASE("Telemetry filter null pointer yields INVALID_INPUT")
+{
+    bcc_telemetry_filter_output_t out{};
+    CHECK(battery_control_core_filter_telemetry(nullptr, nullptr, nullptr, &out)
+          == BCC_STATUS_INVALID_INPUT);
+    CHECK(battery_control_core_filter_telemetry(nullptr, nullptr, nullptr, nullptr)
+          == BCC_STATUS_INVALID_INPUT);
+}

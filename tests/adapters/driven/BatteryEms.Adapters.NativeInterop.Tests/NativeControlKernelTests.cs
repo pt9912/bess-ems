@@ -57,6 +57,56 @@ public sealed class NativeControlKernelTests
     }
 
     [Fact]
+    public void FilterTelemetry_forwards_call_and_returns_gateway_result()
+    {
+        var gateway = new FakeGateway
+        {
+            FilterTelemetryReturn = BccStatus.Ok,
+            FilterTelemetryOutputToReturn = new BccTelemetryFilterOutput
+            {
+                FilteredSocPercent = 51.0,
+                FilteredActivePowerKw = 15.0,
+                FilteredTemperatureCelsius = 21.0,
+                Status = BccStatus.Ok,
+                ReasonCode = BccReason.WithinLimits,
+                Initialized = 1,
+            },
+        };
+        using var kernel = new NativeControlKernel((nint)0x1234, gateway);
+
+        var state = new BccTelemetryFilterState
+        {
+            FilteredSocPercent = 50,
+            FilteredActivePowerKw = 10,
+            FilteredTemperatureCelsius = 20,
+            Initialized = 1,
+        };
+        var options = new BccTelemetryFilterOptions
+        {
+            Alpha = 0.25,
+            MaxSocDeltaPercent = 20,
+            MaxPowerDeltaKw = 50,
+            MaxTemperatureDeltaCelsius = 10,
+            MinSamplePeriodSeconds = 0.001,
+            MaxSamplePeriodSeconds = 1,
+        };
+        var input = new BccTelemetryFilterInput
+        {
+            SocPercent = 54,
+            ActivePowerKw = 30,
+            TemperatureCelsius = 24,
+            DtSeconds = 0.01,
+        };
+
+        var status = kernel.FilterTelemetry(in state, in options, in input, out var output);
+
+        Assert.Equal(BccStatus.Ok, status);
+        Assert.Equal(51.0, output.FilteredSocPercent);
+        Assert.Equal(15.0, output.FilteredActivePowerKw);
+        Assert.Equal((nint)0x1234, gateway.LastFilterTelemetryHandle);
+    }
+
+    [Fact]
     public void Dispose_frees_handle_via_gateway()
     {
         var gateway = new FakeGateway();
@@ -100,6 +150,9 @@ public sealed class NativeControlKernelTests
         public int PidStepReturn { get; set; }
         public BccPidCommand PidStepCommandToReturn { get; set; }
         public nint LastPidStepHandle { get; private set; }
+        public int FilterTelemetryReturn { get; set; }
+        public BccTelemetryFilterOutput FilterTelemetryOutputToReturn { get; set; }
+        public nint LastFilterTelemetryHandle { get; private set; }
         public int FreeCalls { get; private set; }
         public nint LastFreeHandle { get; private set; }
 
@@ -129,6 +182,18 @@ public sealed class NativeControlKernelTests
             LastPidStepHandle = handle;
             command = PidStepCommandToReturn;
             return PidStepReturn;
+        }
+
+        public int CallFilterTelemetry(
+            nint handle,
+            in BccTelemetryFilterState state,
+            in BccTelemetryFilterOptions options,
+            in BccTelemetryFilterInput input,
+            out BccTelemetryFilterOutput output)
+        {
+            LastFilterTelemetryHandle = handle;
+            output = FilterTelemetryOutputToReturn;
+            return FilterTelemetryReturn;
         }
 
         public void Free(nint handle)

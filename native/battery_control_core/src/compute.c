@@ -37,8 +37,8 @@
 #include <stddef.h>  // NULL
 
 // RM-M3-05 review M-3: the C-ABI puts bcc_status_t / bcc_reason_t
-// values into int32_t fields on bcc_command_t. Both enums today
-// fit in [0..12], so any C ABI where int >= 32 bits stores them
+// values into int32_t fields on the ABI output structs. Both enums today
+// fit in int32_t, so any C ABI where int >= 32 bits stores them
 // safely in 4 bytes. Pin the assumption with static_assert so a
 // future enum that grows beyond int32_t would refuse to compile
 // rather than silently truncate when round-tripped through the
@@ -513,4 +513,180 @@ bcc_status_t battery_control_core_pid_step(
                      status, reason,
                      was_clamped, was_integral_frozen);
     return status;
+}
+
+/* ------------------------------------------------------------------
+ * RM-M5-03 high-frequency telemetry filter.
+ * ------------------------------------------------------------------ */
+
+static void fill_filter_output(
+    bcc_telemetry_filter_output_t *out,
+    double filtered_soc_percent,
+    double filtered_active_power_kw,
+    double filtered_temperature_celsius,
+    bcc_status_t status,
+    bcc_reason_t reason,
+    int drift_detected,
+    int initialized)
+{
+    out->filtered_soc_percent          = filtered_soc_percent;
+    out->filtered_active_power_kw      = filtered_active_power_kw;
+    out->filtered_temperature_celsius  = filtered_temperature_celsius;
+    out->status                        = (int32_t)status;
+    out->reason_code                   = (int32_t)reason;
+    out->drift_detected                = drift_detected ? 1 : 0;
+    out->initialized                   = initialized ? 1 : 0;
+}
+
+static int is_finite_filter_state(const bcc_telemetry_filter_state_t *s)
+{
+    if (s->initialized == 0) {
+        return 1;
+    }
+    return isfinite(s->filtered_soc_percent)
+        && isfinite(s->filtered_active_power_kw)
+        && isfinite(s->filtered_temperature_celsius);
+}
+
+static int is_finite_filter_options(const bcc_telemetry_filter_options_t *o)
+{
+    return isfinite(o->alpha)
+        && isfinite(o->max_soc_delta_percent)
+        && isfinite(o->max_power_delta_kw)
+        && isfinite(o->max_temperature_delta_celsius)
+        && isfinite(o->min_sample_period_seconds)
+        && isfinite(o->max_sample_period_seconds);
+}
+
+static int is_finite_filter_input(const bcc_telemetry_filter_input_t *i)
+{
+    return isfinite(i->soc_percent)
+        && isfinite(i->active_power_kw)
+        && isfinite(i->temperature_celsius)
+        && isfinite(i->dt_seconds);
+}
+
+static bcc_status_t validate_filter_inputs(
+    const bcc_telemetry_filter_state_t   *state,
+    const bcc_telemetry_filter_options_t *options,
+    const bcc_telemetry_filter_input_t   *input,
+    bcc_reason_t                         *out_reason)
+{
+    if (!is_finite_filter_state(state)
+        || !is_finite_filter_options(options)
+        || !is_finite_filter_input(input))
+    {
+        *out_reason = BCC_REASON_NON_FINITE_INPUT;
+        return BCC_STATUS_NON_FINITE;
+    }
+    if (options->alpha < 0.0
+        || options->alpha > 1.0
+        || options->max_soc_delta_percent < 0.0
+        || options->max_power_delta_kw < 0.0
+        || options->max_temperature_delta_celsius < 0.0
+        || options->min_sample_period_seconds < 0.0
+        || options->max_sample_period_seconds < options->min_sample_period_seconds)
+    {
+        *out_reason = BCC_REASON_FILTER_INVALID_OPTIONS;
+        return BCC_STATUS_INVALID_INPUT;
+    }
+    if (input->dt_seconds < options->min_sample_period_seconds
+        || input->dt_seconds > options->max_sample_period_seconds)
+    {
+        *out_reason = BCC_REASON_FILTER_SAMPLE_PERIOD;
+        return BCC_STATUS_INVALID_INPUT;
+    }
+    *out_reason = BCC_REASON_WITHIN_LIMITS;
+    return BCC_STATUS_OK;
+}
+
+static int filter_drift_detected(
+    const bcc_telemetry_filter_state_t   *state,
+    const bcc_telemetry_filter_options_t *options,
+    const bcc_telemetry_filter_input_t   *input)
+{
+    if (state->initialized == 0) {
+        return 0;
+    }
+    return fabs(input->soc_percent - state->filtered_soc_percent)
+            > options->max_soc_delta_percent
+        || fabs(input->active_power_kw - state->filtered_active_power_kw)
+            > options->max_power_delta_kw
+        || fabs(input->temperature_celsius - state->filtered_temperature_celsius)
+            > options->max_temperature_delta_celsius;
+}
+
+static double filter_step(double previous, double measurement, double alpha)
+{
+    return (alpha * measurement) + ((1.0 - alpha) * previous);
+}
+
+bcc_status_t battery_control_core_filter_telemetry(
+    const bcc_telemetry_filter_state_t   *state,
+    const bcc_telemetry_filter_options_t *options,
+    const bcc_telemetry_filter_input_t   *input,
+    bcc_telemetry_filter_output_t        *out_output)
+{
+    if (out_output == NULL) {
+        return BCC_STATUS_INVALID_INPUT;
+    }
+
+    fill_filter_output(out_output, 0.0, 0.0, 0.0,
+                       BCC_STATUS_INVALID_INPUT,
+                       BCC_REASON_NON_FINITE_INPUT,
+                       0, 0);
+
+    if (state == NULL || options == NULL || input == NULL) {
+        return BCC_STATUS_INVALID_INPUT;
+    }
+
+    bcc_reason_t guard_reason = BCC_REASON_WITHIN_LIMITS;
+    const bcc_status_t guard_status =
+        validate_filter_inputs(state, options, input, &guard_reason);
+    if (guard_status != BCC_STATUS_OK) {
+        const int preserve_state = guard_status != BCC_STATUS_NON_FINITE
+                                && state->initialized != 0;
+        fill_filter_output(out_output,
+                           preserve_state ? state->filtered_soc_percent : 0.0,
+                           preserve_state ? state->filtered_active_power_kw : 0.0,
+                           preserve_state ? state->filtered_temperature_celsius : 0.0,
+                           guard_status,
+                           guard_reason,
+                           guard_reason == BCC_REASON_FILTER_TELEMETRY_DRIFT,
+                           preserve_state);
+        return guard_status;
+    }
+
+    if (filter_drift_detected(state, options, input)) {
+        fill_filter_output(out_output,
+                           state->filtered_soc_percent,
+                           state->filtered_active_power_kw,
+                           state->filtered_temperature_celsius,
+                           BCC_STATUS_INVALID_INPUT,
+                           BCC_REASON_FILTER_TELEMETRY_DRIFT,
+                           1,
+                           state->initialized);
+        return BCC_STATUS_INVALID_INPUT;
+    }
+
+    const int was_initialized = state->initialized != 0;
+    const double previous_soc = was_initialized
+        ? state->filtered_soc_percent
+        : input->soc_percent;
+    const double previous_power = was_initialized
+        ? state->filtered_active_power_kw
+        : input->active_power_kw;
+    const double previous_temperature = was_initialized
+        ? state->filtered_temperature_celsius
+        : input->temperature_celsius;
+
+    fill_filter_output(out_output,
+                       filter_step(previous_soc, input->soc_percent, options->alpha),
+                       filter_step(previous_power, input->active_power_kw, options->alpha),
+                       filter_step(previous_temperature, input->temperature_celsius, options->alpha),
+                       BCC_STATUS_OK,
+                       BCC_REASON_WITHIN_LIMITS,
+                       0,
+                       1);
+    return BCC_STATUS_OK;
 }

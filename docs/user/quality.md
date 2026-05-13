@@ -468,15 +468,16 @@ make test-native-interop   # Layout / ABI / non-finite contract (Category!=Parit
 make test-native-parity    # Replay-basierte Native↔Managed-Parität (Category=Parity)
 ```
 
-`make test-native-interop` (RM-M3-07) deckt:
+`make test-native-interop` (RM-M3-07, erweitert durch RM-M5-03) deckt:
 
 | Prüfung                                                                     | LH-Bezug      |
 | --------------------------------------------------------------------------- | ------------- |
-| Struct-Layout (Sequential, Größen 24/56/32/24 Bytes, Offsets, Konstanten)   | LH-NATIVE-003 |
+| Struct-Layout (Sequential, Größen/Offsets/Konstanten für Compute, PID und Telemetrie-Filter) | LH-NATIVE-003 |
 | ABI-Handshake `NativeControlLoader.TryLoad` mit echter `.so`                | LH-NATIVE-005 |
 | Loader-Pfade `Disabled` / `LibraryMissing` / `Loaded` mit echtem Gateway    | LH-NATIVE-005 |
 | Native-Contract bei nicht-finiten Inputs (Snapshot/Limits/Request/Previous) | LH-NATIVE-004 |
 | Negatives `dt` mit `has_previous=1` → `BCC_STATUS_NEGATIVE_DT`              | LH-NATIVE-004 |
+| Telemetrie-Filter-Export gegen echte `.so` inkl. IIR-Update, Drift, Sample-Period und Non-Finite | LH-NATIVE-001/004 |
 
 `make test-native-parity` (RM-M3-10) deckt den replay-basierten
 Parity-Vergleich gegen den versionierten Datensatz unter
@@ -484,7 +485,7 @@ Parity-Vergleich gegen den versionierten Datensatz unter
 
 Die nativen Unit-Tests (`native/battery_control_core/tests/`,
 doctest 2.4.11 via FetchContent mit `URL_HASH SHA256`-Pinning)
-decken die Constraint/Ramp-Pfade des C-Kernels separat ab und
+decken die Constraint/Ramp-, PID- und Telemetrie-Filter-Pfade des C-Kernels separat ab und
 laufen als ctest-Eintrag im `native-build`-Stage. Verletzung
 bricht den Build.
 
@@ -709,6 +710,7 @@ Aktiv ab **M3** (LH-NATIVE-005, RM-M3-03).
 | `battery_control_core_abi_version()` exportiert                    | `native/battery_control_core/include/battery_control_core.h`        |
 | `.NET`-Startup-Check vergleicht erwartete ABI                      | `BatteryEms.Adapters.NativeInterop` (`NativeControlLoader.TryLoad`) |
 | Mismatch → .NET-Fallback, Health/Logs/Metrik nennen `abi-mismatch` | Integrationstest in M3                                              |
+| Additive ABI-Erweiterungen (aktuell `0.3.0` mit Telemetrie-Filter) | Layout- und echte `.so`-Interop-Pins in `test-native-interop`       |
 
 Der Loader liefert fünf dokumentierte Endzustände: `disabled` (Opt-in
 nicht gesetzt), `library-missing` (Pfad existiert nicht),

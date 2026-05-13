@@ -186,3 +186,67 @@ public static class BccPidReason
     public const int IntegratorOverflow = 15;
     public const int InvalidOptions     = 16;
 }
+
+// RM-M5-03 telemetry-filter slice (ABI minor 0.3). These structs mirror
+// the `bcc_telemetry_filter_*` C types and keep the filter path
+// allocation-free for high-frequency replay / MPC-adjacent callers.
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance", "CA1815",
+    Justification = "P/Invoke marshaling struct; value-equality is not part of the contract.")]
+[StructLayout(LayoutKind.Sequential)]
+public struct BccTelemetryFilterState
+{
+    public double FilteredSocPercent;          // 0
+    public double FilteredActivePowerKw;       // 8
+    public double FilteredTemperatureCelsius;  // 16
+    public int    Initialized;                 // 24 (4 bytes + 4 trailing padding → 32 total)
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance", "CA1815",
+    Justification = "P/Invoke marshaling struct; value-equality is not part of the contract.")]
+[StructLayout(LayoutKind.Sequential)]
+public struct BccTelemetryFilterOptions
+{
+    public double Alpha;                       // 0
+    public double MaxSocDeltaPercent;          // 8
+    public double MaxPowerDeltaKw;             // 16
+    public double MaxTemperatureDeltaCelsius;  // 24
+    public double MinSamplePeriodSeconds;      // 32
+    public double MaxSamplePeriodSeconds;      // 40
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance", "CA1815",
+    Justification = "P/Invoke marshaling struct; value-equality is not part of the contract.")]
+[StructLayout(LayoutKind.Sequential)]
+public struct BccTelemetryFilterInput
+{
+    public double SocPercent;          // 0
+    public double ActivePowerKw;       // 8
+    public double TemperatureCelsius;  // 16
+    public double DtSeconds;           // 24
+}
+
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance", "CA1815",
+    Justification = "P/Invoke marshaling struct; value-equality is not part of the contract.")]
+[StructLayout(LayoutKind.Sequential)]
+public struct BccTelemetryFilterOutput
+{
+    public double FilteredSocPercent;          // 0
+    public double FilteredActivePowerKw;       // 8
+    public double FilteredTemperatureCelsius;  // 16
+    public int    Status;                      // 24
+    public int    ReasonCode;                  // 28
+    public int    DriftDetected;               // 32
+    public int    Initialized;                 // 36 (40 total)
+}
+
+public static class BccTelemetryFilterReason
+{
+    public const int InvalidOptions = 17;
+    public const int SamplePeriod   = 18;
+    public const int TelemetryDrift = 19;
+}

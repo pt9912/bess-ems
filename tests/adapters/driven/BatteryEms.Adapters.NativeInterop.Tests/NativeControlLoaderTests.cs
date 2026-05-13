@@ -328,6 +328,20 @@ public sealed class NativeControlLoaderTests
                 + "FakeGateway for PidStep coverage.");
         }
 
+        public int CallFilterTelemetry(
+            nint handle,
+            in BccTelemetryFilterState state,
+            in BccTelemetryFilterOptions options,
+            in BccTelemetryFilterInput input,
+            out BccTelemetryFilterOutput output)
+        {
+            output = default;
+            throw new InvalidOperationException(
+                "NativeControlLoaderTests' FakeGateway should never see a CallFilterTelemetry "
+                + "(the loader's job ends at the ABI handshake). Use the kernel-side "
+                + "FakeGateway for FilterTelemetry coverage.");
+        }
+
         public void Free(nint handle)
         {
             FreeCalls++;

@@ -249,6 +249,20 @@ public sealed class NativeFallbackControlKernelTests
                 + "PidStep coverage.");
         }
 
+        public int CallFilterTelemetry(
+            nint handle,
+            in BccTelemetryFilterState state,
+            in BccTelemetryFilterOptions options,
+            in BccTelemetryFilterInput input,
+            out BccTelemetryFilterOutput output)
+        {
+            output = default;
+            throw new InvalidOperationException(
+                "NativeFallbackControlKernelTests' RecordingGateway should never see "
+                + "a CallFilterTelemetry — the fallback kernel only routes "
+                + "Constraint+Ramp. Use NativeControlKernelTests for filter coverage.");
+        }
+
         public void Free(nint handle) => FreeCalls++;
     }
 

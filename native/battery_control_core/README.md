@@ -1,12 +1,13 @@
 # battery_control_core (RM-M3 Native Control Core)
 
-Native C++ implementation of the safety-critical primitives that today
+Native C implementation of the safety-critical primitives that today
 live in `BatteryEms.Domain` (`ConstraintLimiter`, `RampLimiter`,
-`PidController`). The .NET path stays the production reference and the
-parity oracle; the native library is loaded only when explicitly
-configured (`NativeControl:Enabled=true`) and falls back to managed
-on ABI mismatch, missing `.so`, or any native error from a valid
-.NET context (per architecture §13.4 + LH-NATIVE-004).
+`PidController`) plus the RM-M5-03 high-frequency telemetry filter.
+The .NET path stays the production reference and the parity oracle;
+the native library is loaded only when explicitly configured
+(`NativeControl:Enabled=true`) and falls back to managed on ABI
+mismatch, missing `.so`, or any native error from a valid .NET context
+(per architecture §13.4 + LH-NATIVE-004).
 
 ## Layout
 
@@ -14,7 +15,7 @@ on ABI mismatch, missing `.so`, or any native error from a valid
 native/battery_control_core/
 ├── include/
 │   └── battery_control_core.h   (RM-M3-01: stable C-ABI)
-├── src/                          (RM-M3-02: C++ Constraint/Ramp impl)
+├── src/                          (C implementation: Constraint/Ramp, PID, filter)
 ├── tests/                        (RM-M3-08: C++ unit tests)
 └── CMakeLists.txt                (RM-M3-06 part 1: build wiring)
 ```
@@ -29,15 +30,15 @@ paths referenced by `docs/user/quality.md` §5.2 and the M3 plan
 | Slice                          | Status |
 | ------------------------------ | ------ |
 | RM-M3-01 C-ABI header          | ✅      |
-| RM-M3-02 C++ impl (Constraint+Ramp) | ✅      |
+| RM-M3-02 C impl (Constraint+Ramp) | ✅      |
 | RM-M3-06 part 1 build skeleton | ✅ (CMakeLists + Dockerfile native-build stage; `make native-build` runs cmake + ctest) |
-| RM-M3-08 C++ unit tests        | 🟡 (smoke set in src/test_compute.cpp; framework + sanitizer pending) |
-| RM-M3-13 PID                   | ⬜      |
+| RM-M3-08 C++ unit tests        | ✅ (doctest suite in tests/test_compute.cpp; sanitizer/coverage/lint gates active) |
+| RM-M3-13 PID                   | ✅      |
+| RM-M5-03 Telemetry filter      | ✅      |
 
-The header is the only artefact merged in RM-M3-01. The build,
-implementation, tests and Docker wiring follow as separate slices —
-see `docs/plan/planning/in-progress/plan-RM-M3.md` for the full
-slice/PR shape.
+The M3 plan is closed; RM-M5-03 extends the same ABI additively with
+`battery_control_core_filter_telemetry`. See
+`docs/plan/planning/done/plan-RM-M5-03.md` for the filter slice.
 
 ## ABI conventions (header summary)
 
@@ -53,9 +54,10 @@ slice/PR shape.
 - **Header includes only `<stdint.h>`.** No platform headers, no
   time-of-day, no string ownership.
 
-The current ABI version is `0.1.0`. RM-M3-13 (PID slice) is the
-expected first major bump when the Command struct gains the PID
-state extension.
+The current ABI version is `0.3.0`: `0.2.0` added PID structs and
+`battery_control_core_pid_step`; `0.3.0` added the telemetry-filter
+structs, filter reason codes and `battery_control_core_filter_telemetry`.
+All changes are additive under ABI major `0`.
 
 ## How to compile-check the header
 
@@ -68,5 +70,12 @@ g++ -xc++ -fsyntax-only -Wall -Wextra -pedantic -std=c++17 \
     native/battery_control_core/include/battery_control_core.h
 ```
 
-These checks need no toolchain beyond gcc/g++. The full library
-build lands with RM-M3-06 part 1 inside the Docker build stage.
+These checks need no toolchain beyond gcc/g++. The full library build
+and native unit tests run in the Docker build stage:
+
+```bash
+make native-build
+make native-lint
+make native-sanitizer
+make native-coverage-gate
+```

@@ -46,6 +46,16 @@ internal interface INativeLibraryGateway
         in BccPidInput input,
         out BccPidCommand command);
 
+    // RM-M5-03: invokes battery_control_core_filter_telemetry on the
+    // loaded handle. The export is additive and available on ABI
+    // minor >= 3.
+    int CallFilterTelemetry(
+        nint handle,
+        in BccTelemetryFilterState state,
+        in BccTelemetryFilterOptions options,
+        in BccTelemetryFilterInput input,
+        out BccTelemetryFilterOutput output);
+
     // RM-M3-04: releases the handle. NativeLibrary.Free is the
     // production wiring; tests can no-op.
     void Free(nint handle);

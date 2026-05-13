@@ -63,7 +63,7 @@ extern "C" {
  * extension.
  */
 #define BCC_ABI_VERSION_MAJOR 0
-#define BCC_ABI_VERSION_MINOR 2
+#define BCC_ABI_VERSION_MINOR 3
 #define BCC_ABI_VERSION_PATCH 0
 
 #define BCC_ABI_VERSION_PACK(major, minor, patch) \
@@ -97,12 +97,15 @@ typedef enum bcc_status {
  *   TEMPERATURE_OUT_OF_RANGE, SOC_AT_*, MAX_*_POWER,
  *   RAMP_NOT_PERMITTED, RAMP_DOWN_CLAMPED, RAMP_UP_CLAMPED → LIMITED
  *   NON_FINITE_INPUT, NON_FINITE_OUTPUT                    → NON_FINITE
+ *   FILTER_INVALID_OPTIONS, FILTER_SAMPLE_PERIOD,
+ *   FILTER_TELEMETRY_DRIFT                                 → INVALID_INPUT
  *   NEGATIVE_DT_REASON                                     → NEGATIVE_DT
  *   UNSUPPORTED_STATE_REASON                               → UNSUPPORTED_STATE
  *
- * INVALID_INPUT carries no reason in this slice — the managed
- * precheck (RM-M3-05) is responsible for surfacing that path before
- * the kernel runs.
+ * The original Constraint/Ramp compute path still expects managed
+ * prechecks to catch malformed context before the kernel runs; newer
+ * additive exports may use INVALID_INPUT with a concrete reason when
+ * their own option/state contract is violated.
  * ------------------------------------------------------------------ */
 typedef enum bcc_reason {
     BCC_REASON_WITHIN_LIMITS               = 0,
@@ -122,7 +125,11 @@ typedef enum bcc_reason {
     BCC_REASON_PID_OUTPUT_CLAMPED_HIGH     = 13, /* PID clamped at OutputMax. */
     BCC_REASON_PID_OUTPUT_CLAMPED_LOW      = 14, /* PID clamped at OutputMin. */
     BCC_REASON_PID_INTEGRATOR_OVERFLOW     = 15, /* Integrator state overflowed to ±Inf. */
-    BCC_REASON_PID_INVALID_OPTIONS         = 16  /* OutputMin > OutputMax or DeadbandAbsolute < 0. */
+    BCC_REASON_PID_INVALID_OPTIONS         = 16, /* OutputMin > OutputMax or DeadbandAbsolute < 0. */
+    /* RM-M5-03 telemetry-filter slice (ABI minor 0.2 → 0.3). Append-only. */
+    BCC_REASON_FILTER_INVALID_OPTIONS      = 17, /* alpha/delta/sample-window options invalid. */
+    BCC_REASON_FILTER_SAMPLE_PERIOD        = 18, /* dt_seconds outside configured sample window. */
+    BCC_REASON_FILTER_TELEMETRY_DRIFT      = 19  /* measurement drift exceeds configured bound. */
 } bcc_reason_t;
 
 /* ------------------------------------------------------------------
@@ -310,6 +317,72 @@ bcc_status_t battery_control_core_pid_step(
     const bcc_pid_options_t *options,
     const bcc_pid_input_t   *input,
     bcc_pid_command_t       *out_command);
+
+/* ------------------------------------------------------------------
+ * RM-M5-03 high-frequency telemetry filter (ABI minor 0.3).
+ *
+ * Narrow native contract for MPC-adjacent pre-filtering:
+ *
+ *   - Units mirror bcc_snapshot_t: SOC %, active power kW
+ *     (discharge positive), temperature Celsius, dt seconds.
+ *   - Filter is first-order IIR:
+ *       y_next = alpha * measurement + (1 - alpha) * previous
+ *     with alpha in [0, 1]. alpha=1 is pass-through, alpha=0 holds
+ *     the previous filtered value after initialisation.
+ *   - initialized == 0 means cold boot: previous filtered fields are
+ *     ignored and the first valid measurement seeds the filter.
+ *   - max_*_delta fields are drift guards against the previous
+ *     filtered state. Drift is not checked on cold boot. A value of
+ *     0 means no drift is tolerated for that channel.
+ *   - min/max_sample_period_seconds define the accepted sampling
+ *     window. dt_seconds must be finite and inside the inclusive
+ *     [min, max] window.
+ *
+ * .NET prechecks remain the first production line; this function
+ * exists so replay and MPC-adjacent code can run the same simple
+ * high-frequency filter through the native ABI without allocation.
+ * ------------------------------------------------------------------ */
+
+typedef struct bcc_telemetry_filter_state {
+    double  filtered_soc_percent;
+    double  filtered_active_power_kw;
+    double  filtered_temperature_celsius;
+    int32_t initialized; /* 0 = cold boot, non-zero = fields valid. */
+    /* 4-byte trailing padding to align the 32-byte struct to 8 B. */
+} bcc_telemetry_filter_state_t;
+
+typedef struct bcc_telemetry_filter_options {
+    double alpha;                         /* finite, 0..1. */
+    double max_soc_delta_percent;         /* finite, >= 0. */
+    double max_power_delta_kw;            /* finite, >= 0. */
+    double max_temperature_delta_celsius; /* finite, >= 0. */
+    double min_sample_period_seconds;     /* finite, >= 0. */
+    double max_sample_period_seconds;     /* finite, >= min. */
+} bcc_telemetry_filter_options_t;
+
+typedef struct bcc_telemetry_filter_input {
+    double soc_percent;          /* finite. */
+    double active_power_kw;      /* finite, discharge positive. */
+    double temperature_celsius;  /* finite. */
+    double dt_seconds;           /* finite, inside options sample window. */
+} bcc_telemetry_filter_input_t;
+
+typedef struct bcc_telemetry_filter_output {
+    double  filtered_soc_percent;
+    double  filtered_active_power_kw;
+    double  filtered_temperature_celsius;
+    int32_t status;         /* bcc_status_t value. */
+    int32_t reason_code;    /* bcc_reason_t value. */
+    int32_t drift_detected; /* 0/1. */
+    int32_t initialized;    /* always 1 on OK, otherwise mirrors input state. */
+    /* 40-byte struct: 3 doubles + 4 int32_t, already 8 B aligned. */
+} bcc_telemetry_filter_output_t;
+
+bcc_status_t battery_control_core_filter_telemetry(
+    const bcc_telemetry_filter_state_t   *state,
+    const bcc_telemetry_filter_options_t *options,
+    const bcc_telemetry_filter_input_t   *input,
+    bcc_telemetry_filter_output_t        *out_output);
 
 #ifdef __cplusplus
 } /* extern "C" */

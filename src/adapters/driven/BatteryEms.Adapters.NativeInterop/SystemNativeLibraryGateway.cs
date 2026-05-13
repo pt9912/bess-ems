@@ -11,6 +11,7 @@ internal sealed class SystemNativeLibraryGateway : INativeLibraryGateway
     private const string AbiVersionExport = "battery_control_core_abi_version";
     private const string ComputeExport    = "battery_control_core_compute";
     private const string PidStepExport    = "battery_control_core_pid_step";
+    private const string FilterTelemetryExport = "battery_control_core_filter_telemetry";
 
     // The cdecl delegates are cached after the first lookup so the
     // hot Compute path doesn't pay a GetExport / GetDelegate cost
@@ -18,6 +19,7 @@ internal sealed class SystemNativeLibraryGateway : INativeLibraryGateway
     private AbiVersionDelegate? _abiVersion;
     private ComputeDelegate?    _compute;
     private PidStepDelegate?    _pidStep;
+    private FilterTelemetryDelegate? _filterTelemetry;
 
     public bool FileExists(string path) => File.Exists(path);
 
@@ -57,6 +59,19 @@ internal sealed class SystemNativeLibraryGateway : INativeLibraryGateway
         return del(in state, in options, in input, out command);
     }
 
+    public int CallFilterTelemetry(
+        nint handle,
+        in BccTelemetryFilterState state,
+        in BccTelemetryFilterOptions options,
+        in BccTelemetryFilterInput input,
+        out BccTelemetryFilterOutput output)
+    {
+        var del = _filterTelemetry ??= Marshal
+            .GetDelegateForFunctionPointer<FilterTelemetryDelegate>(
+                NativeLibrary.GetExport(handle, FilterTelemetryExport));
+        return del(in state, in options, in input, out output);
+    }
+
     public void Free(nint handle) => NativeLibrary.Free(handle);
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -75,4 +90,11 @@ internal sealed class SystemNativeLibraryGateway : INativeLibraryGateway
         in BccPidOptions options,
         in BccPidInput input,
         out BccPidCommand command);
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate int FilterTelemetryDelegate(
+        in BccTelemetryFilterState state,
+        in BccTelemetryFilterOptions options,
+        in BccTelemetryFilterInput input,
+        out BccTelemetryFilterOutput output);
 }
