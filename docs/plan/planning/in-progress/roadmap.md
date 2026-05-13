@@ -515,10 +515,10 @@ Kubernetes-Deployment, Edge-Anbindung. Inhalte mit hohem Diskussionsbedarf
 | ---------- | -------------------------------------------------------------- | ------ |
 | RM-OPEN-01 | Konkrete Zeitachse / Kalenderwochen pro Meilenstein?           | Offen  |
 | RM-OPEN-02 | Welche Hersteller-Integration zuerst (siehe LH-OPEN-001)?      | Geschlossen mit LH-OPEN-001 — SunSpec/Socomec zuerst, danach Victron und SMA; Sungrow bleibt bis Rechtsklärung zurückgestellt. |
-| RM-OPEN-03 | Solver-Auswahl für M2 (HiGHS vs. OR-Tools default)?            | Offen  |
+| RM-OPEN-03 | Solver-Auswahl für M2 (HiGHS vs. OR-Tools default)?            | Geschlossen mit RM-M2/M5 — M2 nutzt OR-Tools/GLOP fuer den Schedule-Optimizer; M5 nutzt OSQP fuer MPC gemaess [ADR 0006](../../adr/0006-mpc-kernel-backend-and-solver.md). HiGHS ist kein Default. |
 | RM-OPEN-04 | Authentifizierung in M1 (API-Token, OIDC)?                     | Geschlossen mit RM-M1-16 — API-Token + Operator-Rolle live; OIDC/mTLS bleiben Folge-ADR. |
-| RM-OPEN-05 | Reihenfolge M3 vs. M4 — Native zuerst oder Markt-/RL zuerst?   | Offen  |
-| RM-OPEN-06 | Kriterien für spätere API-Extraktion nach dem MVP (siehe AR-OPEN-001)? | Offen  |
+| RM-OPEN-05 | Reihenfolge M3 vs. M4 — Native zuerst oder Markt-/RL zuerst?   | Geschlossen durch Umsetzung — M3 Native Core wurde vor M4 Regelleistung/OPC-UA abgeschlossen; beide Meilensteine sind erledigt. |
+| RM-OPEN-06 | Kriterien für spätere API-Extraktion nach dem MVP (siehe AR-OPEN-001)? | Geschlossen mit [ADR 0009](../../adr/0009-api-service-extraction-criteria.md) — kombinierter Worker/API-Host bleibt Default; API-Auskopplung ist trigger-basiert und braucht explizite Topologie-, Security-, Ownership- und Testnachweise. |
 | RM-OPEN-07 | Folge-ADR für Release-Pipeline-Gates; vor Abschluss von M1 und vor erstem Tag `v0.1.0` schließen? | Geschlossen mit ADR 0002 — `.github/workflows/release.yml` ist Gate-only vor Publishing; kein freigegebener Tag ohne grünen Release-Workflow. |
 
 ---

@@ -158,6 +158,40 @@ Roadmap, Lastenheft und Architektur sichtbar.
 
 ---
 
+## Closure-Review vom 2026-05-13
+
+**Ergebnis:** M6 ist vollstaendig innerhalb des dokumentierten Scopes
+umgesetzt. Es bleibt keine offene M6-Pflichtimplementierung. Die
+verbleibenden Punkte sind bewusst als Trigger-Watch oder Gate
+ausgelagert, weil sie externe Produkt-, Cluster-, Performance-,
+Hersteller-, TSO- oder Standortentscheidungen brauchen.
+
+| Bereich | Review-Befund |
+| ------- | ------------- |
+| RM-M6-01 Operator UI | Implementiert: `/operator/` statische Web-Shell, `/assets`, `/operator/stops/current`, bestehende Health-/Status-/Schedule-/Optimization-Run-Pfade und `POST /operator/stop` ueber vorhandenen AuthN/AuthZ-/Audit-Pfad. Tests pinnen Asset-Liste, Stop-Status und statische UI-Dateien. Frontend-Bundling/E2E bleibt bewusst Folgearbeit. |
+| RM-M6-02 Multi-Asset | Implementiert: ADR 0007, Multi-Asset-Config-Validierung inklusive leerer Liste und doppelter `asset_id`, Host-Registry-Seed, shared Worker fan-out, per-Asset Fehlerisolation, Metriken und Traces. Parallel-Fanout, per-Asset-Sidecar und Multi-Asset-MPC bleiben Trigger-Watch. |
+| RM-M6-03 Kubernetes/Helm | Implementiert: Chart unter `deploy/helm/bess-ems` mit shared Worker, Worker-pro-Asset-Rendering, Postgres, Secrets/Volumes, Probes, optionalem MQTT, optionalem optimization-core Service und HTTPS/mTLS-Werten. `replicaCount > 1` wird abgelehnt, bis Leader-Election oder verteiltes Locking definiert ist. Cluster-Smoke ist bewusst Folgearbeit. |
+| RM-M6-04 TimescaleDB | Implementiert: RunOnce-Migration `0005_timescale_telemetry_hypertable.sql` ist Plain-Postgres-kompatibel, erkennt `timescaledb`, erstellt die Extension nur wenn verfuegbar/installierbar und wandelt `telemetry` optional zur Hypertable. Continuous Aggregates, Compression und Retention-Policies bleiben Folgearbeit. |
+| RM-M6-05 Edge-Grenze | Implementiert als Architektur-/Integrationsentscheidung: ADR 0008 und `docs/user/edge-controller.md` trennen EMS, Edge/Herstellercontroller, BMS/PCS und Hardware-Schutzkette. Ein konkreter Vendor-/Edge-Adapter ist bewusst nicht Teil von M6. |
+| RM-M6-06 Zertifizierung | Implementiert als Readiness-/Trigger-Gate: M4/M5-Bausteine sind referenziert, fehlende externe Produkt-/TSO-/Anlagenpflichten sind benannt, und produktive Zertifizierungswellen bleiben Folge-Slices mit externem Regelwerk, Nachweisen, Security-Profil und Edge-/Hardwaregrenze. |
+
+Nicht als M6-Defekt bewertet:
+
+- kein Kubernetes-Cluster-Smoke in `make ci`, solange keine
+  standardisierte kind/k3d- oder Zielcluster-Umgebung existiert;
+- kein `replicaCount > 1` fuer den kombinierten Worker/API-Host, weil
+  verteiltes per-Asset-Locking oder Leader-Election nicht definiert ist;
+- kein konkreter Edge-/Vendor-Adapter ohne Produkt-, Protokoll-,
+  Latenz- oder Standorttrigger;
+- keine produktive Zertifizierungszusage ohne externes Regelwerk und
+  Safety-/Nachweispaket;
+- keine Timescale-spezifischen Aggregates/Compression ohne reale
+  Datenvolumen und Abfrageprofile;
+- keine neue Frontend-Toolchain, solange die statische API-first Shell
+  den dokumentierten UI-Scope abdeckt.
+
+---
+
 ## Risiken und Entscheidungen
 
 - **Multi-Asset-Topologie als Blocker.** Ohne `AR-OPEN-006` wuerden UI,
