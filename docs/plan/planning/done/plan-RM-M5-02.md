@@ -3,7 +3,7 @@
 **Dokumenttyp:** Slice-Plan (Detail-Plan zum Master-Arbeitspaket RM-M5-02)
 **Status:** Abgeschlossen — umgesetzt am 2026-05-12 in Sub-Slices RM-M5-02-A..D
 **Bezug:**
-[`../in-progress/plan-RM-M5.md`](../in-progress/plan-RM-M5.md) (Master-Plan, RM-M5-02-Zeile mit
+[`plan-RM-M5.md`](plan-RM-M5.md) (Master-Plan, RM-M5-02-Zeile mit
 DoD; §Sidecar-Status-Taxonomie + §Fallback-Matrix gelten unverändert
 für MPC-Pfade; §Fallback-Plan-Gueltigkeit erweitert sich um den
 MPC-State-Stempel),

@@ -3,7 +3,7 @@
 **Dokumenttyp:** Slice-Plan (Detail-Plan zum Master-Arbeitspaket RM-M5-01)
 **Status:** ✅ Abgeschlossen am 2026-05-11 — alle 4 Sub-Slices grün inkl. C-Korrektur-Pass nach externem Review
 **Bezug:**
-[`../in-progress/plan-RM-M5.md`](../in-progress/plan-RM-M5.md) (Master-Plan, RM-M5-01-Zeile mit
+[`plan-RM-M5.md`](plan-RM-M5.md) (Master-Plan, RM-M5-01-Zeile mit
 DoD plus Sidecar-Status-Taxonomie, Fallback-Matrix, Idempotenz-Vertrag,
 Contract-Versions-Vertrag),
 [`../../adr/0005-optimization-core-sidecar-transport.md`](../../adr/0005-optimization-core-sidecar-transport.md)
@@ -502,9 +502,10 @@ dokumentiert.
 ## 7. Risiken und Tradeoffs
 
 - **gRPC-Codegen-Disziplin.** `Grpc.Tools` ist Microsoft-supported
-  und stabil, aber jede Proto-Änderung bricht potentiell den Build.
-  Mitigation: `buf-lint`-CI-Hygiene-Gate als RM-M5-06-Carve-out;
-  RM-M5-01 lebt mit Hand-Disziplin.
+  und stabil, aber jede Proto-Aenderung bricht potentiell den Build.
+  Mitigation: `buf-lint`-CI-Hygiene-Gate bleibt post-M5 im
+  F-M5-03-/Drittsprach-Sidecar-Trigger-Watch; RM-M5-01 lebt mit
+  dokumentierter Hand-Disziplin.
 - **UDS auf .NET 8+.** `SocketsHttpHandler.ConnectCallback` für
   UDS-HTTP/2 ist getestetes Pattern (siehe Microsoft Docs), aber
   weniger weit verbreitet als TCP. Mitigation: B-Sub-Slice fängt

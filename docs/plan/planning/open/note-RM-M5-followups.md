@@ -1,9 +1,9 @@
 # Notiz: M5-Folgearbeiten (Trigger-Watch)
 
 **Dokumenttyp:** Vorabklärung / Trigger-Watch
-**Status:** Offen — Folgearbeiten zu aktiven M5-Slices, ohne Plan-Heimat im Master-Plan
+**Status:** Offen — post-M5 Trigger-Watch ohne Plan-Heimat im Master-Plan
 **Bezug:**
-[`../in-progress/plan-RM-M5.md`](../in-progress/plan-RM-M5.md) (Master-Slice-Plan),
+[`../done/plan-RM-M5.md`](../done/plan-RM-M5.md) (Master-Slice-Plan),
 [`../done/plan-RM-M5-01.md`](../done/plan-RM-M5-01.md) (Contract-Slice, abgeschlossen mit RM-M5-01-D),
 [`../../adr/0005-optimization-core-sidecar-transport.md`](../../adr/0005-optimization-core-sidecar-transport.md)
 (Transport-Adoption — Cert-Rotation, Multi-Tenant-Bearer-Token, Drittsprach-Sidecar erbt von §7 Phase-4-Pivot-Triggers),
@@ -13,18 +13,18 @@
 
 ## Zweck
 
-Während der M5-Umsetzung tauchen Folgearbeiten auf, die der jeweilige
-Slice **bewusst draußen lässt** — entweder weil sie nicht-trivialen
-Eigenscope haben (neuer Driven-Port, eigene PKI-Linie) oder weil ihr
-Trigger noch nicht zündet. Damit sie beim nächsten
-Trigger-Watch-Scan sichtbar bleiben — statt in Plan-Tabellen-
-Kommentaren zu versinken — sind sie hier zentral geführt.
+Nach M5-Closure bleiben Folgearbeiten sichtbar, die der jeweilige
+M5-Slice **bewusst draußen gelassen hat** — entweder weil sie
+nicht-trivialen Eigenscope haben (neuer Driven-Port, eigene PKI-Linie)
+oder weil ihr Trigger noch nicht zündet. Damit sie beim nächsten
+Trigger-Watch-Scan sichtbar bleiben — statt in abgeschlossenen
+Plan-Tabellen-Kommentaren zu versinken — sind sie hier zentral geführt.
 
 Konvention identisch zur M4-Folgearbeiten-Linie
 (`note-RM-M4-followups.md`): die Items hier werden **nicht aktiv
-abgearbeitet**, sondern bei jedem neuen M5-Slice-Plan, beim
-quartalsweisen Architektur-Review oder beim ersten produktiven
-Sidecar-Vorfall gescannt. Beim Zünden eines Triggers entsteht ein
+abgearbeitet**, sondern bei M6-Aktivierung, beim quartalsweisen
+Architektur-Review oder beim ersten produktiven Sidecar-Vorfall
+gescannt. Beim Zünden eines Triggers entsteht ein
 eigener `plan-RM-M5-01-FUP-{slug}.md` in `open/`.
 
 ---
@@ -163,7 +163,7 @@ Drei Sub-Linien, die zusammen die F-M5-03-Lieferung definieren:
 - **(b) Schwesterprojekt-Skelett**: entweder `bess-optimization-
   core/` als Schwester-Repo oder `optimization-core/sidecar/` als
   Subverzeichnis. Buf-Lint-Gate für die Proto-Vertrag-Disziplin
-  (RM-M5-06-Carve-out aus plan-RM-M5-01 §7 Risiken).
+  als Teil dieses post-M5 Trigger-Watch-Scope.
 - **(c) Production-Smoke-Linie**: `tests/hil/compose.yml`-
   Erweiterung um einen Sidecar-Container-Service. Smoke-Pin in
   einem neuen `BatteryEms.OptimizationCore.E2ETests`-Projekt (oder

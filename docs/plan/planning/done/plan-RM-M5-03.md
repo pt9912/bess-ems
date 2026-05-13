@@ -2,7 +2,7 @@
 
 **Dokumenttyp:** Abschlussnotiz / M5 Detail-Slice  
 **Status:** Abgeschlossen am 2026-05-13  
-**Bezug:** [`../in-progress/plan-RM-M5.md`](../in-progress/plan-RM-M5.md),
+**Bezug:** [`plan-RM-M5.md`](plan-RM-M5.md),
 [`../in-progress/roadmap.md`](../in-progress/roadmap.md),
 [`../../adr/0003-native-kernel-language.md`](../../adr/0003-native-kernel-language.md),
 [`../../../user/quality.md`](../../../user/quality.md),

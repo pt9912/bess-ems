@@ -6,7 +6,7 @@ für den `optimization-core` (Phase 3 gemäß
 §13.1). Schließt `AR-OPEN-002`
 ([`../../../spec/architecture.md`](../../../spec/architecture.md)
 §18). Voraussetzung für die Aktivierung von
-[`../planning/open/plan-RM-M5.md`](../planning/open/plan-RM-M5.md)
+[`../planning/done/plan-RM-M5.md`](../planning/done/plan-RM-M5.md)
 (RM-M5-01 Sidecar-Vertrag).
 **Datum:** 2026-05-11
 **Bezug:**
@@ -16,7 +16,7 @@ für den `optimization-core` (Phase 3 gemäß
 [ADR 0004 — Native Control Kernel: Process Isolation](0004-native-kernel-process-isolation.md)
 (§3 Alternativen-Vergleich gRPC vs Unix-Socket/Shared-Mem/REST/fork+pipe,
 §4 Trigger 2 = Phase-3-Komponenten),
-[`../planning/open/plan-RM-M5.md`](../planning/open/plan-RM-M5.md)
+[`../planning/done/plan-RM-M5.md`](../planning/done/plan-RM-M5.md)
 (§Aktivierungsbedingungen, §Sidecar-Status-Taxonomie,
 §Contract-Versionen Und Rollout),
 [`../../user/quality.md`](../../user/quality.md) §2.6 (Container-
@@ -42,7 +42,7 @@ entscheidet.
 **AR-OPEN-002 — gRPC vs. REST-only für externe Optimierungs-
 Sidecars in Phase 3? — Offen** seit M2.
 
-`plan-RM-M5.md` (Status: Offen, Aktivierungsbedingungen) macht die
+`plan-RM-M5.md` machte in den Aktivierungsbedingungen die
 Schließung von AR-OPEN-002 zum **harten Blocker** vor RM-M5-01-
 Implementierung (Tabellen-Zeile „Transportentscheidung" in
 §Aktivierungsbedingungen, plus §Sequenz Schritt 1: „ADR 0004 oder
@@ -296,15 +296,15 @@ Docker/CI. Diese ADR konkretisiert den Test-Pfad:
 
 ### CI-Gate
 
-- **Neuer Makefile-Target:** `make test-hil-optimization-core`
-  (vorgeschlagen für RM-M5-06; verbindlicher Name folgt im
-  Detail-Slice). Pflicht-Gate in `make gates` und `make ci`,
-  analog zu `make test-hil-opcua` (RM-M4-04 / RM-M4-08).
+- **Makefile-Target:** `make test-hil-optimization-core` ist das
+  Pflicht-Gate in `make gates` und `make ci`, analog zu
+  `make test-hil-opcua` (RM-M4-04 / RM-M4-08).
 - **Dockerfile-Stage:** eigener Test-Stage analog zur
   `test-hil-opcua`-Linie.
-- **`buf` / Proto-Lint:** Codegen-Hygiene-Gate als Folge-Slice
-  (RM-M5-06 oder eigener Carve-out); blockiert nicht den ersten
-  RM-M5-01-Contract-Slice, ist aber Pflicht vor M5-Closure.
+- **`buf` / Proto-Lint:** Codegen-Hygiene-Gate bleibt post-M5 als
+  Trigger-Watch im F-M5-03-/Drittsprach-Sidecar-Pfad; RM-M5-01 und
+  RM-M5-06 wurden ohne eigenes Buf-Gate abgeschlossen und leben mit
+  dokumentierter Proto-Hand-Disziplin.
 
 ### Container-Orchestrierungstest
 
@@ -350,9 +350,10 @@ eigene Folge-ADR mit Migrations-Plan.
 
 ### Positiv
 
-- **AR-OPEN-002 ist geschlossen.** Plan-RM-M5 kann von `open/`
-  nach `in-progress/` migrieren; RM-M5-01-Detail-Slice kann
-  Code beginnen.
+- **AR-OPEN-002 ist geschlossen.** Plan-RM-M5 konnte von `open/`
+  nach `in-progress/` migrieren; RM-M5-01-Detail-Slice konnte
+  Code beginnen. M5 ist seit 2026-05-13 abgeschlossen und der
+  Masterplan liegt in `planning/done/`.
 - **Sidecar-Status-Taxonomie ist mappbar.** Plan-RM-M5
   §Sidecar-Status-Taxonomie listet `success`/`deadline_exceeded`/
   `unavailable`/`cancelled`/`invalid_request`/`internal_error`
@@ -414,15 +415,15 @@ eigene Folge-ADR mit Migrations-Plan.
 
 ---
 
-## 9. Sequenz und Aktivierung
+## 9. Sequenz und Abschlussstand
 
-1. **AR-OPEN-002 in `spec/architecture.md` §18 schließen:**
-   Status-Zelle auf „Geschlossen mit ADR 0005" (im selben Commit
-   wie diese ADR).
-2. **`plan-RM-M5.md` von `open/` nach `in-progress/`** verschieben
-   (Roadmap-Status-Update synchron).
-3. **RM-M5-01 Detail-Slice anlegen** (`plan-RM-M5-01.md` in
-   `in-progress/`) mit Sub-Slice-Schnitt analog zu RM-M4-05
+1. **AR-OPEN-002 in `spec/architecture.md` §18 geschlossen:**
+   Status-Zelle auf „Geschlossen mit ADR 0005".
+2. **`plan-RM-M5.md` abgeschlossen:** Der Plan wurde zur Aktivierung von
+   `open/` nach `in-progress/` verschoben und liegt seit M5-Closure
+   2026-05-13 in `planning/done/`.
+3. **RM-M5-01 Detail-Slice abgeschlossen** (`plan-RM-M5-01.md` in
+   `planning/done/`) mit Sub-Slice-Schnitt analog zu RM-M4-05
    (A: Proto-Vertrag + .NET-Adapter; B: Test-Sidecar + Mocking-
    Pattern; C: Security-Pfad (UDS + mTLS) + Negativ-Pins;
    D: Contract-Version-Mixed-Tests + Idempotency-Store + Master-
