@@ -106,6 +106,38 @@ public sealed class MqttAdapterOptionsTests
         Assert.Same(options, options.EnsureValid(NullLogger.Instance));
     }
 
+    [Fact]
+    public void ExactlyOnce_requires_explicit_acknowledgement()
+    {
+        var options = BaseOptions() with
+        {
+            RuntimeProfile = MqttRuntimeProfile.HilSimulator,
+            AllowPlaintext = true,
+            AllowPlaintextReason = "local simulator",
+            QoS = new MqttQosOptions(CommandPublish: MqttQualityOfService.ExactlyOnce),
+        };
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            options.EnsureValid(NullLogger.Instance));
+        Assert.Contains("mqtt-exactly-once-not-acknowledged", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ExactlyOnce_accepts_explicit_acknowledgement_with_reason()
+    {
+        var options = BaseOptions() with
+        {
+            RuntimeProfile = MqttRuntimeProfile.HilSimulator,
+            AllowPlaintext = true,
+            AllowPlaintextReason = "local simulator",
+            QoS = new MqttQosOptions(CommandAckSubscribe: MqttQualityOfService.ExactlyOnce),
+            AllowExactlyOnce = true,
+            AllowExactlyOnceReason = "broker compliance test",
+        };
+
+        Assert.Same(options, options.EnsureValid(NullLogger.Instance));
+    }
+
     private static MqttAdapterOptions BaseOptions() => MqttAdapterOptions.Defaults(
         brokerHost: "broker",
         brokerPort: 1883,

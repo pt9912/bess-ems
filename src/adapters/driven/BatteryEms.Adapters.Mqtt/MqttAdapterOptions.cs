@@ -15,7 +15,9 @@ public sealed record MqttAdapterOptions(
     MqttTlsOptions? Tls = null,
     MqttCredentialOptions? Credentials = null,
     bool AllowPlaintext = false,
-    string? AllowPlaintextReason = null)
+    string? AllowPlaintextReason = null,
+    bool AllowExactlyOnce = false,
+    string? AllowExactlyOnceReason = null)
 {
     public MqttQosOptions QoSOrDefault => QoS ?? MqttQosOptions.Defaults;
 
@@ -36,6 +38,7 @@ public sealed record MqttAdapterOptions(
     {
         ArgumentNullException.ThrowIfNull(logger);
         ValidateBasicFields();
+        ValidateExactlyOnceGate();
 
         if (!TlsOrDefault.Enabled)
         {
@@ -75,6 +78,30 @@ public sealed record MqttAdapterOptions(
         {
             throw new InvalidOperationException($"Mqtt CommandAckTimeout must be positive (got {CommandAckTimeout}).");
         }
+    }
+
+    private void ValidateExactlyOnceGate()
+    {
+        if (!UsesExactlyOnce())
+        {
+            return;
+        }
+        if (AllowExactlyOnce && !string.IsNullOrWhiteSpace(AllowExactlyOnceReason))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            "mqtt-exactly-once-not-acknowledged: QoS ExactlyOnce requires "
+            + "AllowExactlyOnce=true plus a non-empty AllowExactlyOnceReason.");
+    }
+
+    private bool UsesExactlyOnce()
+    {
+        var qos = QoSOrDefault;
+        return qos.CommandPublish == MqttQualityOfService.ExactlyOnce
+            || qos.CommandAckSubscribe == MqttQualityOfService.ExactlyOnce
+            || qos.TelemetrySubscribe == MqttQualityOfService.ExactlyOnce;
     }
 
     private void ValidatePlaintextProfile()

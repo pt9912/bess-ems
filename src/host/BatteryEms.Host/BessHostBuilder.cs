@@ -437,10 +437,20 @@ public static class BessHostBuilder
                 Username: hostOptions.MqttUsername,
                 Password: hostOptions.MqttPassword,
                 PasswordPath: hostOptions.MqttPasswordPath),
+            QoS = BuildMqttQosOptions(hostOptions, defaults.QoSOrDefault),
             AllowPlaintext = hostOptions.MqttAllowPlaintext,
             AllowPlaintextReason = hostOptions.MqttAllowPlaintextReason,
+            AllowExactlyOnce = hostOptions.MqttAllowExactlyOnce,
+            AllowExactlyOnceReason = hostOptions.MqttAllowExactlyOnceReason,
         };
     }
+
+    private static MqttQosOptions BuildMqttQosOptions(
+        BessHostOptions hostOptions,
+        MqttQosOptions defaults) => new(
+            CommandPublish: hostOptions.MqttCommandPublishQos ?? defaults.CommandPublish,
+            CommandAckSubscribe: hostOptions.MqttCommandAckSubscribeQos ?? defaults.CommandAckSubscribe,
+            TelemetrySubscribe: hostOptions.MqttTelemetrySubscribeQos ?? defaults.TelemetrySubscribe);
 
     // M4-05: BessHostOptions kennt jetzt RuntimeProfile/SecurityMode/
     // SecurityPolicy + Cert-Subject/TrustedStore-Slots. Helper baut die

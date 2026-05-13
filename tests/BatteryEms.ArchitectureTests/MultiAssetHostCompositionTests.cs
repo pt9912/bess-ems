@@ -79,6 +79,50 @@ public sealed class MultiAssetHostCompositionTests
         Assert.Contains("mqtt-security-not-hardened-in-production", ex.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Host_build_rejects_mqtt_exactly_once_without_acknowledgement()
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            BessHostBuilder.BuildApp(
+            [
+                $"--Bess:SchemaDirectory={RepoPath("config", "schema")}",
+                $"--Bess:AssetConfigPath={RepoPath("config", "examples", "asset.single-bess.json")}",
+                $"--Bess:MqttMappingPath={RepoPath("config", "examples", "adapters", "mqtt.simulator.json")}",
+                "--Bess:MqttBrokerHost=127.0.0.1",
+                "--Bess:MqttBrokerPort=1883",
+                "--Bess:MqttClientId=test-host",
+                "--Bess:MqttRuntimeProfile=HilSimulator",
+                "--Bess:MqttAllowPlaintext=true",
+                "--Bess:MqttAllowPlaintextReason=architecture-test",
+                "--Bess:MqttCommandPublishQos=ExactlyOnce",
+            ]));
+
+        Assert.Contains("mqtt-exactly-once-not-acknowledged", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Host_build_accepts_mqtt_exactly_once_with_acknowledgement()
+    {
+        await using var app = BessHostBuilder.BuildApp(
+        [
+            $"--Bess:SchemaDirectory={RepoPath("config", "schema")}",
+            $"--Bess:AssetConfigPath={RepoPath("config", "examples", "asset.single-bess.json")}",
+            $"--Bess:MqttMappingPath={RepoPath("config", "examples", "adapters", "mqtt.simulator.json")}",
+            "--Bess:MqttBrokerHost=127.0.0.1",
+            "--Bess:MqttBrokerPort=1883",
+            "--Bess:MqttClientId=test-host",
+            "--Bess:MqttRuntimeProfile=HilSimulator",
+            "--Bess:MqttAllowPlaintext=true",
+            "--Bess:MqttAllowPlaintextReason=architecture-test",
+            "--Bess:MqttCommandAckSubscribeQos=ExactlyOnce",
+            "--Bess:MqttAllowExactlyOnce=true",
+            "--Bess:MqttAllowExactlyOnceReason=architecture-test",
+        ]);
+
+        var registry = app.Services.GetRequiredService<IBatteryAssetRegistry>();
+        Assert.NotNull(registry.Find("single-bess-1"));
+    }
+
     private static string RepoPath(params string[] parts) =>
         Path.Combine([RepoRoot(), .. parts]);
 

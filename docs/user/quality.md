@@ -262,6 +262,9 @@ Der MQTT-Adapter ist ab F-04 production-fail-closed:
 - Plaintext ist nur in `Development` oder `HilSimulator` erlaubt und
   braucht `MqttAllowPlaintext=true` plus
   `MqttAllowPlaintextReason`.
+- MQTT QoS 2 (`ExactlyOnce`) braucht `MqttAllowExactlyOnce=true` plus
+  `MqttAllowExactlyOnceReason`; ohne explizite Bestaetigung bricht der
+  Start mit `mqtt-exactly-once-not-acknowledged` ab.
 
 Die lokalen Compose-/Helm-Mosquitto-Pfade setzen deshalb explizit
 `MqttRuntimeProfile=HilSimulator` und dokumentieren ihren

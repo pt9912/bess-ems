@@ -65,6 +65,11 @@ public sealed class BessHostOptions
     public string? MqttPasswordPath { get; set; }
     public bool MqttAllowPlaintext { get; set; }
     public string? MqttAllowPlaintextReason { get; set; }
+    public BatteryEms.Adapters.Mqtt.MqttQualityOfService? MqttCommandPublishQos { get; set; }
+    public BatteryEms.Adapters.Mqtt.MqttQualityOfService? MqttCommandAckSubscribeQos { get; set; }
+    public BatteryEms.Adapters.Mqtt.MqttQualityOfService? MqttTelemetrySubscribeQos { get; set; }
+    public bool MqttAllowExactlyOnce { get; set; }
+    public string? MqttAllowExactlyOnceReason { get; set; }
 
     // RM-M4-04 (plan §4 Sub-Slice C) + RM-M4-05: optionales OPC-UA-
     // Adapter-Wiring. OpcUaMappingPath + OpcUaEndpointUrl müssen

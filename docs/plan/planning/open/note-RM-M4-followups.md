@@ -235,10 +235,13 @@ mit RM-M4-05) bündelt.
 
 ## Item F-06: Explizite ExactlyOnce-Acknowledgement-Gate
 
+**Status:** Abgeschlossen am 2026-05-13 — siehe
+[`../done/plan-RM-M4-06-FUP-exactly-once-gate.md`](../done/plan-RM-M4-06-FUP-exactly-once-gate.md).
+
 **Quelle:** RM-M4-06 Design-Entscheidung D-03 — `ExactlyOnce` (QoS 2)
-ist heute voll konfigurierbar via `MqttAdapterOptions.QoS`, aber es
-gibt keine Startup-Validierung. „Warn-don't-block" ist die heutige
-Politik; wer ExactlyOnce will, kann es ohne Hindernis setzen.
+war per `MqttAdapterOptions.QoS` konfigurierbar ohne Startup-
+Validierung. F-06 ersetzt diese alte „Warn-don't-block"-Politik durch
+ein explizites `AllowExactlyOnce`/`AllowExactlyOnceReason`-Gate.
 
 **Trigger** (eines reicht):
 
@@ -268,9 +271,8 @@ Politik; wer ExactlyOnce will, kann es ohne Hindernis setzen.
 
 **Aufwandsschätzung:** ~30-50 LOC inkl. Tests.
 
-**Aktivierungs-Pfad:** möglicherweise Carve-out im RM-M4-05-OPC-UA-
-Security-Slice (gleiches Pattern); sonst eigener kleiner
-`plan-RM-M4-06-FUP-exactly-once-gate.md`.
+**Aktivierungs-Pfad:** geschlossen in
+[`../done/plan-RM-M4-06-FUP-exactly-once-gate.md`](../done/plan-RM-M4-06-FUP-exactly-once-gate.md).
 
 ---
 

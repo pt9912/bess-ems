@@ -15,7 +15,8 @@ Für BESS-EMS nutzen wir OPC UA, um Batteriesteuerung und -telemetrie adapterbas
 Der OPC-UA-Adapter verbindet die Domänenports mit:
 
 - `IBatteryTelemetrySource` (Lesen + Push-Updates)
-- `IBatteryTelemetrySource` (nur Lese-/Abonnement-Pfad; `IBatteryCommandSink` ist erst nach vollständiger OPC-UA-Write-Integration aktiv)
+- `IBatteryCommandSink` (Befehlswrites auf als `write`/`writable`
+  gemappte Nodes)
 
 Die zentrale Idee ist ein Mapping:
 
@@ -28,8 +29,15 @@ Der OPC-UA-Adapter deckt bewusst nur die Kernfunktionen ab:
 
 - ✅ `Read` (Polling konfigurierter `read`-Nodes)
 - ✅ `Subscribe` (Push über `subscribe`-Nodes)
-- ⏳ `Write` (Befehlswrites auf `write`/`writable` Nodes) – im aktuellen Host-Compose-Wiring noch nicht verdrahtet
+- ✅ `Write` (Befehlswrites auf `write`/`writable` Nodes)
 - ✅ `StatusCode`-Abbildung auf interne Qualitätsinformationen
+
+Der Adapter und der kombinierte Host können den Write-Pfad registrieren,
+wenn `Bess:OpcUaMappingPath` und `Bess:OpcUaEndpointUrl` gesetzt sind.
+Die aktuellen Referenz-Compose-Stacks aktivieren OPC-UA jedoch nicht als
+produktiven Compose-Pfad; sie bleiben auf die bestehenden Simulator-/
+Mosquitto-Pfade ausgelegt. Kurz: **Adapter kann schreiben, produktives
+Compose-Wiring für OPC-UA ist nicht der aktive Referenzpfad.**
 
 Nicht Gegenstand dieses Adapter-Scope:
 
@@ -56,16 +64,16 @@ Pro Telemetrie-Sample gilt: eine schlechte Qualität dominiert.
 Ein einzelner `Bad`-Status macht die Probe ungültig (`ProtocolError`), bei `Uncertain` ohne `Bad` wird `Stale` verwendet.
 
 ## Sicherheit in diesem Scope
-Im aktuellen Adapter-Scope ist das Basisverhalten funktional, aber explizit nicht die End-to-end-Härtung.
+Seit RM-M4-05 ist OPC-UA production-fail-closed gehärtet:
 
-- `SecurityMode=None` ist als Basismodell im Slice vorgesehen (Simulator-/Test-Kontext).
-  Der dazugehörige Startup-Guard steckt in `OpcUaAdapterOptions`; die aktuellen Host-Optionen (`Bess`-Konfig) besitzen noch keine eigenen `OpcUa*`-Felder zum direkten Weiterreichen.
-
-- Während direkter Konstruktion des `OpcUaAdapterOptions` verlangt der Guard bei ungesicherter Verbindung ein explizites Opt-in:
-  - `AllowUnsecured = true`
-  - `AllowUnsecuredReason` nicht leer
-- Ohne dieses Opt-in schlägt die Konfiguration bewusst fehl (`opcua-security-not-hardened`), statt still weiterzulaufen.
-- Vollständige Security-Härtung (Policies, Zertifikate etc.) erfolgt in RM-M4-05.
+- Default ist `RuntimeProfile=Production` mit
+  `SecurityMode=SignAndEncrypt` und allowlisteter Security-Policy.
+- `SecurityMode=None` ist nur für `HilSimulator`/`Development` mit
+  explizitem `OpcUaAllowUnsecured=true` plus
+  `OpcUaAllowUnsecuredReason` zulässig.
+- Die Host-Konfiguration reicht die `Bess:OpcUa*`-Security-Felder in
+  `OpcUaAdapterOptions` durch; eine unsichere Production-Konfiguration
+  schlägt beim Start bewusst fehl.
 
 ## Weiterführend
 - Mapping-Konzept: `OpcUaMappingConfiguration` (aus der Mapping-Konfigurationsarbeit)
