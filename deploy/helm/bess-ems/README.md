@@ -142,6 +142,6 @@ The target runs `helm lint` and renders:
 - optimization-core external HTTPS/mTLS
 - MQTT enabled in worker-pro-asset mode
 
-It is intentionally not part of `make ci` yet. A later RM-M6-03 pass must
+It is intentionally not part of `make ci` yet. A later M6 follow-up must
 define a reproducible kind/k3d or cluster smoke before Kubernetes joins
 the mandatory CI gate set.

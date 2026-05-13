@@ -6,6 +6,8 @@ Implementierungsscope
 **Bezug:**
 [`../done/plan-RM-M6-02.md`](../done/plan-RM-M6-02.md)
 (Multi-Asset-Hosting-Slice, abgeschlossen am 2026-05-13),
+[`../done/plan-RM-M6-03.md`](../done/plan-RM-M6-03.md)
+(Kubernetes-/Helm-Slice, abgeschlossen am 2026-05-13),
 [`../in-progress/plan-RM-M6.md`](../in-progress/plan-RM-M6.md)
 (M6-Masterplan),
 [`../../adr/0007-multi-asset-hosting-strategy.md`](../../adr/0007-multi-asset-hosting-strategy.md)
@@ -23,9 +25,11 @@ Hosting-Slice mit spekulativer Implementierung zu ueberladen.
 
 Die Items hier werden beim Start von RM-M6-01 (Operator UI), RM-M6-03
 (Kubernetes/Helm), beim Architektur-Review oder beim ersten produktiven
-Multi-Asset-Engpass gescannt. Wenn ein Trigger zuendet, entsteht ein
-eigener Slice-Plan in `open/` oder ein klar abgegrenztes Unterpaket im
-ausloesenden M6-Plan.
+Multi-Asset-Engpass gescannt. Nach Abschluss von RM-M6-03 bleibt diese
+Notiz auch der Sammelpunkt fuer Kubernetes-Folgehaertung, solange noch
+kein eigenes Cluster-Smoke-Slice aktiv ist. Wenn ein Trigger zuendet,
+entsteht ein eigener Slice-Plan in `open/` oder ein klar abgegrenztes
+Unterpaket im ausloesenden M6-Plan.
 
 ---
 
@@ -95,6 +99,39 @@ Domain-Modell.
 
 **Aktivierungs-Pfad:** bevorzugt direkt in RM-M6-03, weil Helm der
 natuerliche Lieferort ist.
+
+---
+
+## Item F-M6-03-01: Kubernetes Cluster-Smoke / CI-Gate
+
+**Quelle:** RM-M6-03 "Cluster-Smoke" und `make helm-lint`.
+Der Helm-Chart rendert reproduzierbar ohne Clusterzugriff. Ein echtes
+Kubernetes-Gate ist bewusst nicht Teil des RM-M6-03-Abschlusses, solange
+keine standardisierte kind-/k3d- oder Zielcluster-Umgebung definiert ist.
+
+**Trigger** (eines reicht):
+
+- CI oder Release-Prozess stellt reproduzierbar kind, k3d oder einen
+  dedizierten Test-Cluster bereit.
+- Kubernetes wird vom reinen Deployment-Artefakt zum verpflichtenden
+  Release-Pfad.
+- Ein Helm-Render-Fehler kann nicht mehr durch `helm lint` und
+  `helm template` abgedeckt werden, z. B. wegen Admission Policies,
+  StorageClass-/Ingress-Vorgaben oder Secret-/ServiceAccount-Grenzen.
+
+**Scope-Skizze** (wenn der Trigger zuendet):
+
+- `make helm-cluster-smoke` oder analoges Target mit klarer
+  Cluster-Auswahl und Timeout-Grenze.
+- Install/upgrade in isoliertem Namespace, Rollout-Wait fuer bess-ems,
+  Postgres und optionale Sidecars, danach sauberes Uninstall.
+- Mindestens shared Worker und worker-pro-asset rendern/installieren;
+  optionaler mTLS-Pfad nur mit Test-Secrets.
+- Dokumentierte Abgrenzung zwischen lokal optionalem Smoke und
+  CI-pflichtigem Gate.
+
+**Aktivierungs-Pfad:** eigener RM-M6-Folgeplan, bevor Kubernetes in
+`make ci` oder Release-Gates aufgenommen wird.
 
 ---
 

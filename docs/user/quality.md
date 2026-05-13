@@ -559,8 +559,9 @@ ADR-0007-Default `topology.mode=shared`, `topology.mode=workerPerAsset`
 sowie die optionalen MQTT-, optimization-core- und
 optimization-core-HTTPS/mTLS-Pfade. Das Chart lehnt `replicaCount > 1`
 ab, bis Leader-Election oder verteiltes per-Asset-Locking definiert ist.
-Erst ein späterer RM-M6-03-Pass darf dieses Gate in `make ci` aufnehmen,
-wenn ein reproduzierbarer kind/k3d- oder Cluster-Smoke definiert ist.
+Erst ein späterer M6-Folge-Slice darf dieses Gate in `make ci`
+aufnehmen, wenn ein reproduzierbarer kind/k3d- oder Cluster-Smoke
+definiert ist.
 Bis dahin bleibt `make runtime` der production-shaped Compose-
 Referenzpfad.
 

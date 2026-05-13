@@ -1,11 +1,12 @@
 # Plan RM-M6-03 Kubernetes-Deployment + Helm Charts
 
 **Dokumenttyp:** Slice-Plan (Detail-Plan zum Master-Arbeitspaket RM-M6-03)
-**Status:** In Arbeit - aktiviert am 2026-05-13 nach Abschluss von
-RM-M6-02.
+**Status:** Abgeschlossen am 2026-05-13. Aktiviert am 2026-05-13 nach
+Abschluss von RM-M6-02.
 **Bezug:**
-[`plan-RM-M6.md`](plan-RM-M6.md) (M6-Masterplan),
-[`../done/plan-RM-M6-02.md`](../done/plan-RM-M6-02.md)
+[`../in-progress/plan-RM-M6.md`](../in-progress/plan-RM-M6.md)
+(M6-Masterplan),
+[`plan-RM-M6-02.md`](plan-RM-M6-02.md)
 (Multi-Asset-Hosting-Default),
 [`../../adr/0007-multi-asset-hosting-strategy.md`](../../adr/0007-multi-asset-hosting-strategy.md)
 (shared Worker als Default),
@@ -32,7 +33,7 @@ neues Domain-Modell.
 | ✅ | RM-M6-03-B | Optionale Sidecars | Chart kann optional Mosquitto und ein optimization-core Sidecar-Service rendern. UDS-/mTLS-Werte sind explizit sichtbar; mTLS wird nur mit vollständigen Secrets und HTTPS-Endpoint gerendert. |
 | ✅ | RM-M6-03-C | Helm-Gate | `make helm-lint` fuehrt `helm lint` und Render-Smokes fuer shared Worker, Worker-pro-Asset, optimization-core, optimization-core HTTPS/mTLS und MQTT aus. Das Target ist bewusst noch nicht in `make ci`, bis das Kubernetes-Gate stabil ist. |
 | ✅ | RM-M6-03-D | Deployment-Dokumentation | [`deploy/helm/bess-ems/README.md`](../../../../deploy/helm/bess-ems/README.md) dokumentiert Values, Secrets, Probe-/Rollout-Verhalten, UDS-/mTLS-Optionen und Compose-vs-Helm-Grenze. |
-| ⬜ | RM-M6-03-E | Cluster-Smoke | Optionaler Kubernetes-Smoke gegen kind/k3d oder vorhandenen Cluster; erst aktivieren, wenn das lokale Helm-Gate stabil und reproduzierbar ist. |
+| ➡️ | RM-M6-03-E | Cluster-Smoke | Bewusst als Follow-up nach [`../open/note-RM-M6-followups.md`](../open/note-RM-M6-followups.md) ausgelagert. RM-M6-03 bleibt ein clusterlos reproduzierbarer Helm-Slice; ein kind/k3d- oder Cluster-Smoke wird erst aktiviert, wenn die Umgebung normiert ist. |
 
 ---
 
@@ -77,3 +78,17 @@ neues Domain-Modell.
   Secrets werden abgelehnt.
 - Compose bleibt dokumentierter Runtime-Smoke und wird durch Helm nicht
   ersetzt.
+
+---
+
+## Closure
+
+RM-M6-03 ist abgeschlossen: Der Helm-Chart rendert den shared-Worker-
+Default, Worker-pro-Asset, Postgres, Mosquitto, optimization-core und
+den externen HTTPS/mTLS-Pfad. `make helm-lint` ist das reproduzierbare
+clusterlose Gate; GitHub CI ist fuer den Abschluss-Commit gruen.
+
+Der Cluster-Smoke bleibt bewusst ausserhalb dieses Abschlusses, weil
+noch keine kind/k3d- oder Cluster-Standardumgebung festgelegt ist. Das
+Follow-up ist in der M6-Trigger-Watch dokumentiert und darf erst in ein
+Pflichtgate wandern, wenn die Umgebung reproduzierbar ist.
