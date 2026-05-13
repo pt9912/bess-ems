@@ -190,9 +190,9 @@ unter `in-progress/`.
 > per-Asset-Sidecar, Worker-pro-Asset-Hardening und Multi-Asset-MPC
 > bleiben trigger-getrieben in
 > [`../open/note-RM-M6-followups.md`](../open/note-RM-M6-followups.md).
-> Operator-UI, TimescaleDB, Edge und zertifizierungsnahe
-> Regelleistungsintegration bleiben als nachgelagerte M6-Slices
-> eingeplant.
+> RM-M6-01 (Operator UI) ist abgeschlossen; TimescaleDB, Edge und
+> zertifizierungsnahe Regelleistungsintegration bleiben als
+> nachgelagerte M6-Slices eingeplant.
 >
 > **M2-Welle 1 (Optimization-Slice, abgeschlossen):**
 > [`../done/plan-RM-M2-optimization.md`](../done/plan-RM-M2-optimization.md)
@@ -491,7 +491,7 @@ Kubernetes-Deployment, Edge-Anbindung. Inhalte mit hohem Diskussionsbedarf
 
 | Status | ID         | Inhalt                                                              | LH-Bezug             |
 | ------ | ---------- | ------------------------------------------------------------------- | -------------------- |
-| ⬜     | RM-M6-01   | Operator UI (Web) — optionaler Ausbau; Kernsystem bleibt API-first  | LH-OPEN-005          |
+| ✅     | RM-M6-01   | Operator UI (Web) — abgeschlossen in [`../done/plan-RM-M6-01.md`](../done/plan-RM-M6-01.md); statische API-first Web-Shell unter `/operator/` mit Health, Asset-Status, Fahrplaenen, Optimization-Run-Lookup und Operator-Stop-Pfad. | LH-OPEN-005          |
 | ✅     | RM-M6-02   | Multi-Asset-Flottensteuerung / Hosting-Strategie — abgeschlossen in [`../done/plan-RM-M6-02.md`](../done/plan-RM-M6-02.md); [ADR 0007](../../adr/0007-multi-asset-hosting-strategy.md) schliesst `AR-OPEN-006` mit shared Worker als Default und Worker-pro-Asset als Deployment-/Isolation-Pattern. Folgearbeiten sind trigger-getrieben in [`../open/note-RM-M6-followups.md`](../open/note-RM-M6-followups.md). | §28.3                |
 | ✅     | RM-M6-03   | Kubernetes-Deployment + Helm Charts — abgeschlossen in [`../done/plan-RM-M6-03.md`](../done/plan-RM-M6-03.md); erster Helm-Pfad unter `deploy/helm/bess-ems` mit shared-Worker-Default, optionalem Worker-pro-Asset-Rendering, Postgres, optionalen Sidecars, HTTPS/mTLS-Secret-Mounts, `replicaCount`-Schutz und `make helm-lint`. | §28.3                |
 | ⬜     | RM-M6-04   | TimescaleDB-Integration als Persistenz-Erweiterung bei Zeitreihen-/Retention-Bedarf | LH-PERSIST-005, LH-OPEN-006 |

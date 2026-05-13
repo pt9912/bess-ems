@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BESS EMS Operator</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="./operator-mark.svg" alt="" width="36" height="36">
+      <div>
+        <h1>BESS EMS</h1>
+        <p>Operator console</p>
+      </div>
+    </div>
+    <div class="connection">
+      <span id="api-state" class="state state-unknown">API</span>
+      <button id="refresh" type="button">Refresh</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar" aria-label="Operator controls">
+      <label for="asset">Asset</label>
+      <select id="asset"></select>
+      <input id="manual-asset" type="text" autocomplete="off" placeholder="asset_id">
+
+      <label for="token">Operator token</label>
+      <input id="token" type="password" autocomplete="off" placeholder="Bearer token">
+
+      <label for="run-id">Run lookup</label>
+      <div class="inline">
+        <input id="run-id" type="text" autocomplete="off" placeholder="optimization run id">
+        <button id="load-run" type="button" title="Load run">Load</button>
+      </div>
+    </aside>
+
+    <section class="surface" aria-label="Operator overview">
+      <section class="band status-band">
+        <div>
+          <span class="label">System</span>
+          <strong id="health-status">unknown</strong>
+          <small id="health-at">-</small>
+        </div>
+        <div>
+          <span class="label">Regelleistung</span>
+          <strong id="regelleistung-status">unknown</strong>
+          <small id="regelleistung-at">-</small>
+        </div>
+        <div>
+          <span class="label">Asset</span>
+          <strong id="asset-title">-</strong>
+          <small id="asset-capacity">-</small>
+        </div>
+        <div>
+          <span class="label">Operator stop</span>
+          <strong id="stop-state">inactive</strong>
+          <small id="stop-detail">-</small>
+        </div>
+      </section>
+
+      <section class="grid">
+        <article class="panel">
+          <header>
+            <h2>Status</h2>
+          </header>
+          <dl class="facts" id="status-facts"></dl>
+        </article>
+
+        <article class="panel">
+          <header>
+            <h2>Command</h2>
+          </header>
+          <dl class="facts" id="command-facts"></dl>
+        </article>
+
+        <article class="panel panel-wide">
+          <header>
+            <h2>Schedules</h2>
+          </header>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Version</th>
+                  <th>Horizon</th>
+                  <th>Windows</th>
+                </tr>
+              </thead>
+              <tbody id="schedules"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="panel">
+          <header>
+            <h2>Run</h2>
+          </header>
+          <dl class="facts" id="run-facts"></dl>
+        </article>
+
+        <article class="panel action-panel">
+          <header>
+            <h2>Stop</h2>
+          </header>
+          <textarea id="stop-reason" rows="4" placeholder="reason"></textarea>
+          <button id="stop" type="button" class="danger">Activate stop</button>
+          <p id="action-result" class="action-result"></p>
+        </article>
+      </section>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>

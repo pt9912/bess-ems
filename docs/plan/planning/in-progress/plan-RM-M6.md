@@ -2,7 +2,7 @@
 
 **Dokumenttyp:** Detailplan / M6 (aktiv)
 **Status:** In Arbeit - aktiviert am 2026-05-13 nach Abschluss von M5.
-Die Arbeitspakete RM-M6-02 und RM-M6-03 sind abgeschlossen;
+Die Arbeitspakete RM-M6-01, RM-M6-02 und RM-M6-03 sind abgeschlossen;
 `AR-OPEN-006` ist mit ADR 0007 geschlossen (shared Worker als Default,
 Worker-pro-Asset als Deployment-/Isolation-Pattern).
 **Bezug:**
@@ -20,6 +20,8 @@ LH-OPEN-005, LH-OPEN-006),
 (Sidecar-/MPC-Trigger-Watch),
 [`../../adr/0007-multi-asset-hosting-strategy.md`](../../adr/0007-multi-asset-hosting-strategy.md)
 (Multi-Asset-Hosting-Strategie),
+[`../done/plan-RM-M6-01.md`](../done/plan-RM-M6-01.md)
+(abgeschlossener Operator-UI-Slice),
 [`../done/plan-RM-M6-02.md`](../done/plan-RM-M6-02.md)
 (abgeschlossener Multi-Asset-Hosting-Slice),
 [`../done/plan-RM-M6-03.md`](../done/plan-RM-M6-03.md)
@@ -95,7 +97,7 @@ Roadmap, Lastenheft und Architektur sichtbar.
 
 | Status | ID | Paket | DoD |
 | ------ | -- | ----- | --- |
-| ⬜ | RM-M6-01 | Operator UI (Web) | API-first Web-Shell fuer vorhandene Operator-Funktionen. Nutzt bestehende AuthN/AuthZ-/Audit- und HTTP-Pfade; keine fachliche Bypass-Logik. Erste Views: Health/Status, aktive Fahrplaene, Optimierungs-/Replay-Run-Liste und Emergency-/Operator-Stop-Status. Start erst nach RM-M6-02-Entscheidung, damit Asset-Auswahl und Mandanten-/Flottenmodell nicht im UI erfunden werden. |
+| ✅ | RM-M6-01 | Operator UI (Web) | Abgeschlossen: [`../done/plan-RM-M6-01.md`](../done/plan-RM-M6-01.md). API-first Web-Shell unter `/operator/` fuer vorhandene Operator-Funktionen. Nutzt bestehende AuthN/AuthZ-/Audit- und HTTP-Pfade; keine fachliche Bypass-Logik. Erste Views: Health/Status, aktive Fahrplaene, Optimierungs-Run-Lookup und Operator-Stop-Status. |
 | ✅ | RM-M6-02 | Multi-Asset-Flottensteuerung / Hosting-Strategie | Abgeschlossen: [`../done/plan-RM-M6-02.md`](../done/plan-RM-M6-02.md). ADR 0007 schliesst `AR-OPEN-006`: shared Worker mit per-Asset fan-out ist Default; Worker-pro-Asset bleibt Deployment-/Isolation-Pattern. Trigger-Watch fuer Parallel-Fanout, Worker-pro-Asset, per-Asset-Sidecar und Multi-Asset-MPC: [`../open/note-RM-M6-followups.md`](../open/note-RM-M6-followups.md). |
 | ✅ | RM-M6-03 | Kubernetes-Deployment + Helm Charts | Abgeschlossen: [`../done/plan-RM-M6-03.md`](../done/plan-RM-M6-03.md). Helm-Chart fuer Worker/API, Postgres, optionale Sidecars und Secrets/Volumes mit shared-Worker-Default, Worker-pro-Asset-Rendering, UDS-/mTLS-Werten, `replicaCount`-Schutz und `make helm-lint`. Compose bleibt Referenzpfad bis ein Cluster-Gate stabil ist. |
 | ⬜ | RM-M6-04 | TimescaleDB-Erweiterung | Nur aktivieren, wenn Zeitreihenvolumen, Retention-Abfragen oder Aggregationsbedarf den PostgreSQL-Default operativ begrenzen. Fachliche Persistenzmodelle bleiben unveraendert; Timescale-Hypertables/Continuous-Aggregates sind Adapter-/Migrationsdetail. |
@@ -110,8 +112,8 @@ Roadmap, Lastenheft und Architektur sichtbar.
    `AR-OPEN-006` ist mit ADR 0007 geschlossen.
 2. RM-M6-03 ist abgeschlossen: Kubernetes/Helm ist auf der entschiedenen
    Hosting-Topologie geschnitten; Cluster-Smoke bleibt Follow-up.
-3. RM-M6-01 als naechster Produkt-Schnitt auf stabiler
-   Asset-/Operator-API-Sicht aktivieren.
+3. RM-M6-01 ist abgeschlossen: Operator-Web-Shell auf stabiler
+   Asset-/Operator-API-Sicht ist als API-first statische Shell geliefert.
 4. RM-M6-04 bleibt trigger-getrieben; PostgreSQL ist weiter Default.
 5. RM-M6-05 und RM-M6-06 nur mit konkretem Edge-/Produkttrigger
    aktivieren; beide duerfen keine harte Echtzeitfaehigkeit des

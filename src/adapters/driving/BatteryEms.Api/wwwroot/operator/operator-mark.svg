@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="BESS EMS">
+  <rect width="64" height="64" rx="12" fill="#146c63"/>
+  <path d="M16 22h24a4 4 0 0 1 4 4v12a4 4 0 0 1-4 4H16a4 4 0 0 1-4-4V26a4 4 0 0 1 4-4Z" fill="#fff"/>
+  <path d="M46 28h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-4v-8Z" fill="#fff"/>
+  <path d="M18 36h20M18 30h13" stroke="#146c63" stroke-width="4" stroke-linecap="round"/>
+  <path d="M21 49h28M49 49l-6-6M49 49l-6 6" stroke="#d5f2ec" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

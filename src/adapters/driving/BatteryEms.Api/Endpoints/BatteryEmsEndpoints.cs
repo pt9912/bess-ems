@@ -21,6 +21,7 @@ public static class BatteryEmsEndpoints
         ArgumentNullException.ThrowIfNull(routes);
         MapHealth(routes);
         MapRegelleistungHealth(routes);
+        routes.MapOperatorUiSupport();
         MapBatteryStatus(routes);
         MapCurrentCommand(routes);
         MapCurrentSchedules(routes);

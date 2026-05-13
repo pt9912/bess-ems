@@ -61,6 +61,7 @@ public class Program
 
         app.UseAuthentication();
         app.UseAuthorization();
+        app.UseOperatorUiStaticShell();
         app.MapOpenApi();
         app.MapBatteryEms();
         // LH-MON-002: Prometheus scrape endpoint. M1 exposes the default

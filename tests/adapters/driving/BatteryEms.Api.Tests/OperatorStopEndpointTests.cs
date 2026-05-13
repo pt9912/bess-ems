@@ -51,6 +51,55 @@ public sealed class OperatorStopEndpointTests : IClassFixture<BatteryEmsApiFacto
             && e.Outcome == "accepted");
     }
 
+    [Fact]
+    public async Task Operator_stop_status_returns_active_stop_for_asset()
+    {
+        var registry = _factory.Services.GetRequiredService<IOperatorStopRegistry>();
+        registry.Activate(new OperatorStopState(
+            AssetId: "asset-stop-status",
+            Operator: "operator-status",
+            Reason: "maintenance",
+            ActivatedAt: new DateTimeOffset(2026, 5, 13, 8, 0, 0, TimeSpan.Zero)));
+
+        using var client = _factory.CreateClient();
+        var response = await client.GetAsync("/operator/stops/current?assetId=asset-stop-status");
+
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadFromJsonAsync<OperatorStopStatusDto>(TestJson.Options);
+
+        Assert.NotNull(body);
+        Assert.Equal("asset-stop-status", body!.AssetId);
+        Assert.NotNull(body.Stop);
+        Assert.Equal("operator-status", body.Stop!.Operator);
+        Assert.Equal("maintenance", body.Stop.Reason);
+    }
+
+    [Fact]
+    public async Task Operator_stop_status_returns_null_stop_when_asset_is_not_stopped()
+    {
+        using var client = _factory.CreateClient();
+        var response = await client.GetAsync("/operator/stops/current?assetId=asset-not-stopped");
+
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadFromJsonAsync<OperatorStopStatusDto>(TestJson.Options);
+
+        Assert.NotNull(body);
+        Assert.Equal("asset-not-stopped", body!.AssetId);
+        Assert.Null(body.Stop);
+    }
+
+    [Fact]
+    public async Task Operator_stop_status_returns_400_when_assetId_is_missing()
+    {
+        using var client = _factory.CreateClient();
+        var response = await client.GetAsync("/operator/stops/current");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ErrorDto>(TestJson.Options);
+        Assert.NotNull(body);
+        Assert.Equal("missing-asset-id", body!.Error);
+    }
+
     [Theory]
     [InlineData("", "reason")]
     [InlineData("asset", "")]
@@ -130,4 +179,10 @@ public sealed class OperatorStopEndpointTests : IClassFixture<BatteryEmsApiFacto
     }
 
     private sealed record OperatorStopDto(string AssetId, string Operator, string Reason, DateTimeOffset ActivatedAt);
+
+    private sealed record OperatorStopStatusDto(string AssetId, OperatorStopViewDto? Stop);
+
+    private sealed record OperatorStopViewDto(string Operator, string Reason, DateTimeOffset ActivatedAt);
+
+    private sealed record ErrorDto(string Error);
 }

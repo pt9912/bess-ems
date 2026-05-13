@@ -22,6 +22,31 @@ public sealed record BatteryStatusResponse(
     CommandView? LastCommand);
 
 [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+public sealed record AssetsResponse(IReadOnlyList<AssetView> Assets);
+
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+public sealed record AssetView(
+    string AssetId,
+    double CapacityKwh,
+    double MaxChargePowerKw,
+    double MaxDischargePowerKw,
+    double MinSocPercent,
+    double MaxSocPercent)
+{
+    public static AssetView From(BatteryAsset asset)
+    {
+        ArgumentNullException.ThrowIfNull(asset);
+        return new(
+            AssetId: asset.AssetId,
+            CapacityKwh: asset.CapacityKwh,
+            MaxChargePowerKw: asset.MaxChargePowerKw,
+            MaxDischargePowerKw: asset.MaxDischargePowerKw,
+            MinSocPercent: asset.MinSocPercent,
+            MaxSocPercent: asset.MaxSocPercent);
+    }
+}
+
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
 public sealed record CommandResponse(string AssetId, CommandView? Command);
 
 [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
@@ -137,6 +162,25 @@ public sealed record OperatorStopResponse(
     string Operator,
     string Reason,
     DateTimeOffset ActivatedAt);
+
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+public sealed record OperatorStopStatusResponse(string AssetId, OperatorStopView? Stop);
+
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+public sealed record OperatorStopView(
+    string Operator,
+    string Reason,
+    DateTimeOffset ActivatedAt)
+{
+    public static OperatorStopView From(BatteryEms.Application.Control.OperatorStopState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        return new(
+            Operator: state.Operator,
+            Reason: state.Reason,
+            ActivatedAt: state.ActivatedAt);
+    }
+}
 
 // Body for POST /markets/day-ahead/optimize. TimeStepSeconds keeps the
 // wire shape JSON-friendly (TimeSpan would force ISO-8601 round-trip);
