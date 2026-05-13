@@ -1,0 +1,22 @@
+bess-ems has been rendered in {{ .Values.topology.mode }} topology.
+
+Shared worker is the ADR 0007 default. workerPerAsset renders one
+Deployment and one Service per configured asset so the API surface does
+not load-balance across pods with disjoint asset registries.
+
+The chart defaults to NoOp IO for multi-asset safety. Enable MQTT only for
+single-asset deployments until per-asset adapter mappings are implemented.
+
+Probe endpoints:
+  readiness/liveness: /health on port 8080
+  metrics: /metrics on port 8080
+
+Optimization-core:
+{{- if or .Values.optimizationCore.enabled .Values.optimizationCore.externalEndpoint }}
+  endpoint: {{ include "bess-ems.optimizationCoreEndpoint" . }}
+{{- else }}
+  disabled
+{{- end }}
+
+UDS and mTLS values are intentionally explicit. Production cross-host
+optimization-core deployments should use https+mTLS or UDS per ADR 0005.

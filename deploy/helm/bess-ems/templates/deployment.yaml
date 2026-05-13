@@ -1,0 +1,161 @@
+{{- $root := . -}}
+{{- if eq .Values.topology.mode "shared" }}
+{{- include "bess-ems.appDeployment" (dict "root" $root "name" (include "bess-ems.fullname" $root) "asset" nil "assetConfigName" (include "bess-ems.assetConfigName" $root) "assetConfigFile" "assets.json") }}
+{{- else }}
+{{- range .Values.assets }}
+---
+{{- include "bess-ems.appDeployment" (dict "root" $root "name" (printf "%s-%s" (include "bess-ems.fullname" $root) (.asset_id | replace "_" "-" | lower | trunc 32 | trimSuffix "-")) "asset" . "assetConfigName" (printf "%s-asset-%s" (include "bess-ems.fullname" $root) (.asset_id | replace "_" "-" | lower | trunc 32 | trimSuffix "-")) "assetConfigFile" "asset.json") }}
+{{- end }}
+{{- end }}
+
+{{- define "bess-ems.appDeployment" -}}
+{{- $root := .root -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "bess-ems.labels" $root | nindent 4 }}
+    bess-ems.io/component: app
+    {{- if .asset }}
+    bess-ems.io/asset-id: {{ .asset.asset_id | quote }}
+    {{- end }}
+spec:
+  replicas: {{ $root.Values.replicaCount }}
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      {{- include "bess-ems.selectorLabels" $root | nindent 6 }}
+      bess-ems.io/component: app
+      {{- if .asset }}
+      bess-ems.io/asset-id: {{ .asset.asset_id | quote }}
+      {{- end }}
+  template:
+    metadata:
+      labels:
+        {{- include "bess-ems.selectorLabels" $root | nindent 8 }}
+        bess-ems.io/component: app
+        {{- if .asset }}
+        bess-ems.io/asset-id: {{ .asset.asset_id | quote }}
+        {{- end }}
+      annotations:
+        checksum/assets: {{ include (print $root.Template.BasePath "/asset-configmap.yaml") $root | sha256sum }}
+    spec:
+      securityContext:
+        {{- toYaml $root.Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: bess-ems
+          image: {{ include "bess-ems.image" $root | quote }}
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml $root.Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: ASPNETCORE_URLS
+              value: http://0.0.0.0:8080
+            - name: ASPNETCORE_ENVIRONMENT
+              value: {{ $root.Values.environment.aspnetCoreEnvironment | quote }}
+            - name: Bess__SchemaDirectory
+              value: /app/config/schema
+            - name: Bess__AssetConfigPath
+              value: /etc/bess-ems/assets/{{ .assetConfigFile }}
+            {{- if $root.Values.postgres.enabled }}
+            - name: Bess__PersistenceConnectionString
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bess-ems.secretName" $root }}
+                  key: persistence-connection-string
+            {{- end }}
+            {{- if not (or $root.Values.optimizationCore.enabled $root.Values.optimizationCore.externalEndpoint) }}
+            - name: Bess__ScheduleSolver__Backend
+              value: {{ $root.Values.scheduleSolver.backend | quote }}
+            {{- end }}
+            {{- with $root.Values.scheduleSolver.timeLimitSeconds }}
+            - name: Bess__ScheduleSolver__TimeLimitSeconds
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with $root.Values.scheduleSolver.gapTolerance }}
+            - name: Bess__ScheduleSolver__GapTolerance
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with $root.Values.scheduleSolver.initialSocPercent }}
+            - name: Bess__ScheduleSolver__InitialSocPercent
+              value: {{ . | quote }}
+            {{- end }}
+            {{- if $root.Values.mqtt.enabled }}
+            - name: Bess__MqttMappingPath
+              value: {{ $root.Values.mqtt.mappingPath | quote }}
+            - name: Bess__MqttBrokerHost
+              value: {{ include "bess-ems.mqttName" $root | quote }}
+            - name: Bess__MqttBrokerPort
+              value: {{ $root.Values.mqtt.brokerPort | quote }}
+            - name: Bess__MqttClientId
+              value: {{ if .asset }}{{ printf "%s-%s" $root.Values.mqtt.clientId .asset.asset_id | quote }}{{ else }}{{ $root.Values.mqtt.clientId | quote }}{{ end }}
+            {{- end }}
+            {{- if or $root.Values.optimizationCore.enabled $root.Values.optimizationCore.externalEndpoint }}
+            - name: Bess__ScheduleSolver__Backend
+              value: optimization_core
+            - name: Bess__OptimizationCoreSidecarEndpoint
+              value: {{ include "bess-ems.optimizationCoreEndpoint" $root | quote }}
+            - name: Bess__OptimizationCoreRuntimeProfile
+              value: {{ $root.Values.optimizationCore.runtimeProfile | quote }}
+            - name: Bess__OptimizationCoreExpectedContractVersion
+              value: {{ $root.Values.optimizationCore.expectedContractVersion | quote }}
+            - name: Bess__OptimizationCoreFallbackBackend
+              value: {{ $root.Values.optimizationCore.fallbackBackend | quote }}
+            {{- end }}
+            - name: Worker__CycleInterval
+              value: {{ $root.Values.environment.workerCycleInterval | quote }}
+            - name: ApiTokens__Tokens__0__Token
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bess-ems.secretName" $root }}
+                  key: api-token
+            - name: ApiTokens__Tokens__0__Operator
+              value: {{ $root.Values.apiToken.operator | quote }}
+            - name: ApiTokens__Tokens__0__Role
+              value: {{ $root.Values.apiToken.role | quote }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            {{- toYaml $root.Values.probes.readiness | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            {{- toYaml $root.Values.probes.liveness | nindent 12 }}
+          volumeMounts:
+            - name: asset-config
+              mountPath: /etc/bess-ems/assets
+              readOnly: true
+            {{- if $root.Values.optimizationCore.transport.uds.enabled }}
+            - name: optimization-core-socket
+              mountPath: {{ $root.Values.optimizationCore.transport.uds.mountPath }}
+            {{- end }}
+          resources:
+            {{- toYaml $root.Values.resources | nindent 12 }}
+      volumes:
+        - name: asset-config
+          configMap:
+            name: {{ .assetConfigName }}
+        {{- if $root.Values.optimizationCore.transport.uds.enabled }}
+        - name: optimization-core-socket
+          emptyDir: {}
+        {{- end }}
+      {{- with $root.Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $root.Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $root.Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end -}}

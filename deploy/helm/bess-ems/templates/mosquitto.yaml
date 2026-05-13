@@ -1,0 +1,75 @@
+{{- if .Values.mqtt.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "bess-ems.mqttName" . }}-config
+  labels:
+    {{- include "bess-ems.labels" . | nindent 4 }}
+    bess-ems.io/component: mqtt
+data:
+  mosquitto.conf: |
+    listener {{ .Values.mqtt.brokerPort }} 0.0.0.0
+    allow_anonymous true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bess-ems.mqttName" . }}
+  labels:
+    {{- include "bess-ems.labels" . | nindent 4 }}
+    bess-ems.io/component: mqtt
+spec:
+  ports:
+    - name: mqtt
+      port: {{ .Values.mqtt.brokerPort }}
+      targetPort: mqtt
+  selector:
+    {{- include "bess-ems.selectorLabels" . | nindent 4 }}
+    bess-ems.io/component: mqtt
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bess-ems.mqttName" . }}
+  labels:
+    {{- include "bess-ems.labels" . | nindent 4 }}
+    bess-ems.io/component: mqtt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "bess-ems.selectorLabels" . | nindent 6 }}
+      bess-ems.io/component: mqtt
+  template:
+    metadata:
+      labels:
+        {{- include "bess-ems.selectorLabels" . | nindent 8 }}
+        bess-ems.io/component: mqtt
+    spec:
+      containers:
+        - name: mosquitto
+          image: {{ printf "%s:%s" .Values.mqtt.image.repository .Values.mqtt.image.tag | quote }}
+          imagePullPolicy: {{ .Values.mqtt.image.pullPolicy }}
+          ports:
+            - name: mqtt
+              containerPort: {{ .Values.mqtt.brokerPort }}
+          readinessProbe:
+            tcpSocket:
+              port: mqtt
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: mqtt
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          volumeMounts:
+            - name: config
+              mountPath: /mosquitto/config/mosquitto.conf
+              subPath: mosquitto.conf
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "bess-ems.mqttName" . }}-config
+{{- end }}

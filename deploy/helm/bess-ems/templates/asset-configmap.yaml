@@ -1,0 +1,26 @@
+{{- if eq .Values.topology.mode "shared" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "bess-ems.assetConfigName" . }}
+  labels:
+    {{- include "bess-ems.labels" . | nindent 4 }}
+data:
+  assets.json: |
+    {{- dict "assets" .Values.assets | toPrettyJson | nindent 4 }}
+{{- else }}
+{{- $root := . -}}
+{{- range .Values.assets }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "bess-ems.fullname" $root }}-asset-{{ .asset_id | replace "_" "-" | lower | trunc 32 | trimSuffix "-" }}
+  labels:
+    {{- include "bess-ems.labels" $root | nindent 4 }}
+    bess-ems.io/asset-id: {{ .asset_id | quote }}
+data:
+  asset.json: |
+    {{- . | toPrettyJson | nindent 4 }}
+{{- end }}
+{{- end }}

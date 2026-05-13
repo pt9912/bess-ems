@@ -10,6 +10,8 @@ BUILD_CONTEXT ?= .
 IMAGE_PREFIX ?= bess-ems
 BUILD_CONFIGURATION ?= Release
 DOCKER_BUILD_ARGS ?=
+HELM ?= helm
+HELM_CHART ?= deploy/helm/bess-ems
 
 DOCKER_BUILD = $(DOCKER) build $(BUILD_CONTEXT) \
 	-f $(DOCKERFILE) \
@@ -25,7 +27,8 @@ DOCKER_BUILD = $(DOCKER) build $(BUILD_CONTEXT) \
 	native-lint native-sanitizer native-coverage-report native-coverage-gate native-coverage-exclusions \
 	simulator-test simulator-race simulator-lint simulator-coverage-gate \
 	build ci runtime fullbuild lock-refresh \
-	schema-validate schema-generate schema-drift-check
+	schema-validate schema-generate schema-drift-check \
+	helm-lint
 
 help:
 	@echo "bess-ems Makefile (RM-M1-21)"
@@ -79,6 +82,7 @@ help:
 	@echo "  make lock-refresh    Refresh packages.lock.json files in Docker (per docs/user/quality.md §1.4)"
 	@echo "  make schema-validate      Validate schema/schema.yaml via d-migrate (RM-M2-MIG-02)"
 	@echo "  make schema-generate      Generate ?001_initial.sql from schema/schema.yaml (RM-M2-MIG-02)"
+	@echo "  make helm-lint            Lint/render Kubernetes Helm chart (RM-M6-03)"
 	@echo ""
 	@echo "Welle 5 (Closure, active):"
 	@echo "  make build           Multi-stage runtime image (non-root, /health HEALTHCHECK)"
@@ -145,6 +149,19 @@ schema-generate:
 schema-drift-check: schema-generate
 	@git diff --exit-code -- $(GENERATED_SQL) \
 		|| (echo "[drift] schema/schema.yaml and $(GENERATED_SQL) have drifted — re-run 'make schema-generate' and commit, or fix the YAML" >&2; exit 1)
+
+# --- RM-M6-03: Kubernetes / Helm ------------------------------------------
+
+helm-lint:
+	$(HELM) lint $(HELM_CHART)
+	$(HELM) template bess-ems $(HELM_CHART) >/tmp/bess-ems-helm-shared.yaml
+	$(HELM) template bess-ems-worker-per-asset $(HELM_CHART) \
+		--set topology.mode=workerPerAsset >/tmp/bess-ems-helm-worker-per-asset.yaml
+	$(HELM) template bess-ems-optimization-core $(HELM_CHART) \
+		--set optimizationCore.enabled=true >/tmp/bess-ems-helm-optimization-core.yaml
+	$(HELM) template bess-ems-mqtt $(HELM_CHART) \
+		--set topology.mode=workerPerAsset \
+		--set mqtt.enabled=true >/tmp/bess-ems-helm-mqtt.yaml
 
 # --- Welle 1 (active) ------------------------------------------------------
 

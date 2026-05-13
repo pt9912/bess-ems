@@ -22,6 +22,8 @@ LH-OPEN-005, LH-OPEN-006),
 (Multi-Asset-Hosting-Strategie),
 [`../done/plan-RM-M6-02.md`](../done/plan-RM-M6-02.md)
 (abgeschlossener Multi-Asset-Hosting-Slice),
+[`plan-RM-M6-03.md`](plan-RM-M6-03.md)
+(Kubernetes-/Helm-Slice),
 [`../open/note-RM-M6-followups.md`](../open/note-RM-M6-followups.md)
 (M6-Trigger-Watch)
 
@@ -95,7 +97,7 @@ Roadmap, Lastenheft und Architektur sichtbar.
 | ------ | -- | ----- | --- |
 | ⬜ | RM-M6-01 | Operator UI (Web) | API-first Web-Shell fuer vorhandene Operator-Funktionen. Nutzt bestehende AuthN/AuthZ-/Audit- und HTTP-Pfade; keine fachliche Bypass-Logik. Erste Views: Health/Status, aktive Fahrplaene, Optimierungs-/Replay-Run-Liste und Emergency-/Operator-Stop-Status. Start erst nach RM-M6-02-Entscheidung, damit Asset-Auswahl und Mandanten-/Flottenmodell nicht im UI erfunden werden. |
 | ✅ | RM-M6-02 | Multi-Asset-Flottensteuerung / Hosting-Strategie | Abgeschlossen: [`../done/plan-RM-M6-02.md`](../done/plan-RM-M6-02.md). ADR 0007 schliesst `AR-OPEN-006`: shared Worker mit per-Asset fan-out ist Default; Worker-pro-Asset bleibt Deployment-/Isolation-Pattern. Trigger-Watch fuer Parallel-Fanout, Worker-pro-Asset, per-Asset-Sidecar und Multi-Asset-MPC: [`../open/note-RM-M6-followups.md`](../open/note-RM-M6-followups.md). |
-| ⬜ | RM-M6-03 | Kubernetes-Deployment + Helm Charts | Helm-Chart fuer Worker/API, Postgres, optionale Sidecars und Secrets/Volumes. Muss Health-/Readiness-/Liveness-Probes, UDS-/mTLS-Optionen und Rollout-/Restart-Verhalten dokumentieren. Compose bleibt Referenzpfad bis Kubernetes-Gate stabil ist. |
+| 🟡 | RM-M6-03 | Kubernetes-Deployment + Helm Charts | Slice-Plan: [`plan-RM-M6-03.md`](plan-RM-M6-03.md). Helm-Chart fuer Worker/API, Postgres, optionale Sidecars und Secrets/Volumes. Muss Health-/Readiness-/Liveness-Probes, UDS-/mTLS-Optionen und Rollout-/Restart-Verhalten dokumentieren. Compose bleibt Referenzpfad bis Kubernetes-Gate stabil ist. |
 | ⬜ | RM-M6-04 | TimescaleDB-Erweiterung | Nur aktivieren, wenn Zeitreihenvolumen, Retention-Abfragen oder Aggregationsbedarf den PostgreSQL-Default operativ begrenzen. Fachliche Persistenzmodelle bleiben unveraendert; Timescale-Hypertables/Continuous-Aggregates sind Adapter-/Migrationsdetail. |
 | ⬜ | RM-M6-05 | Edge-Controller-Integration | Abgrenzungs- und Integrationspfad fuer harte Echtzeitkomponenten. Liefert klare Verantwortung zwischen EMS, Edge/Herstellersteuerung, BMS/PCS und hardwareseitiger Schutzkette; kein impliziter Ersatz fuer zertifizierte Schutzfunktionen. |
 | ⬜ | RM-M6-06 | Zertifizierungsnahe Regelleistungsintegration | Aktivierung erst mit konkretem Produkt-/TSO-/Anlagenkonzept. Vertieft M4-Regelleistung um Produktregeln, Nachweise, Audit/Replay und externe Schnittstellen; harte Echtzeit bleibt Edge-/Hardware-Thema, wenn das Produkt es verlangt. |

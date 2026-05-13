@@ -1,0 +1,35 @@
+{{- $root := . -}}
+{{- if eq .Values.topology.mode "shared" }}
+{{- include "bess-ems.appService" (dict "root" $root "name" (include "bess-ems.fullname" $root) "asset" nil) }}
+{{- else }}
+{{- range .Values.assets }}
+---
+{{- include "bess-ems.appService" (dict "root" $root "name" (printf "%s-%s" (include "bess-ems.fullname" $root) (.asset_id | replace "_" "-" | lower | trunc 32 | trimSuffix "-")) "asset" .) }}
+{{- end }}
+{{- end }}
+
+{{- define "bess-ems.appService" -}}
+{{- $root := .root -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "bess-ems.labels" $root | nindent 4 }}
+    bess-ems.io/component: app
+    {{- if .asset }}
+    bess-ems.io/asset-id: {{ .asset.asset_id | quote }}
+    {{- end }}
+spec:
+  type: {{ $root.Values.service.type }}
+  ports:
+    - name: http
+      port: {{ $root.Values.service.port }}
+      targetPort: http
+  selector:
+    {{- include "bess-ems.selectorLabels" $root | nindent 4 }}
+    bess-ems.io/component: app
+    {{- if .asset }}
+    bess-ems.io/asset-id: {{ .asset.asset_id | quote }}
+    {{- end }}
+{{- end -}}

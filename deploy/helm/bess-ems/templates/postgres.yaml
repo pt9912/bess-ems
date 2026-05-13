@@ -1,0 +1,79 @@
+{{- if .Values.postgres.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bess-ems.postgresName" . }}
+  labels:
+    {{- include "bess-ems.labels" . | nindent 4 }}
+    bess-ems.io/component: postgres
+spec:
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+  selector:
+    {{- include "bess-ems.selectorLabels" . | nindent 4 }}
+    bess-ems.io/component: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "bess-ems.postgresName" . }}
+  labels:
+    {{- include "bess-ems.labels" . | nindent 4 }}
+    bess-ems.io/component: postgres
+spec:
+  serviceName: {{ include "bess-ems.postgresName" . }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "bess-ems.selectorLabels" . | nindent 6 }}
+      bess-ems.io/component: postgres
+  template:
+    metadata:
+      labels:
+        {{- include "bess-ems.selectorLabels" . | nindent 8 }}
+        bess-ems.io/component: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: {{ printf "%s:%s" .Values.postgres.image.repository .Values.postgres.image.tag | quote }}
+          imagePullPolicy: {{ .Values.postgres.image.pullPolicy }}
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: {{ .Values.postgres.database | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.postgres.username | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bess-ems.secretName" . }}
+                  key: postgres-password
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", {{ .Values.postgres.username | quote }}, "-d", {{ .Values.postgres.database | quote }}]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", {{ .Values.postgres.username | quote }}, "-d", {{ .Values.postgres.database | quote }}]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.postgres.storage.storageClassName }}
+        storageClassName: {{ .Values.postgres.storage.storageClassName | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.postgres.storage.size | quote }}
+{{- end }}

@@ -492,7 +492,7 @@ Kubernetes-Deployment, Edge-Anbindung. Inhalte mit hohem Diskussionsbedarf
 | ------ | ---------- | ------------------------------------------------------------------- | -------------------- |
 | ⬜     | RM-M6-01   | Operator UI (Web) — optionaler Ausbau; Kernsystem bleibt API-first  | LH-OPEN-005          |
 | ✅     | RM-M6-02   | Multi-Asset-Flottensteuerung / Hosting-Strategie — abgeschlossen in [`../done/plan-RM-M6-02.md`](../done/plan-RM-M6-02.md); [ADR 0007](../../adr/0007-multi-asset-hosting-strategy.md) schliesst `AR-OPEN-006` mit shared Worker als Default und Worker-pro-Asset als Deployment-/Isolation-Pattern. Folgearbeiten sind trigger-getrieben in [`../open/note-RM-M6-followups.md`](../open/note-RM-M6-followups.md). | §28.3                |
-| ⬜     | RM-M6-03   | Kubernetes-Deployment + Helm Charts                                 | §28.3                |
+| 🟡     | RM-M6-03   | Kubernetes-Deployment + Helm Charts — Slice-Plan [`plan-RM-M6-03.md`](plan-RM-M6-03.md); erster Helm-Pfad unter `deploy/helm/bess-ems` mit shared-Worker-Default, optionalem Worker-pro-Asset-Rendering, Postgres, optionalen Sidecars und `make helm-lint`. | §28.3                |
 | ⬜     | RM-M6-04   | TimescaleDB-Integration als Persistenz-Erweiterung bei Zeitreihen-/Retention-Bedarf | LH-PERSIST-005, LH-OPEN-006 |
 | ⬜     | RM-M6-05   | Edge-Controller-Integration für harte Echtzeitkomponenten           | LH-RISK-001          |
 | ⬜     | RM-M6-06   | Zertifizierungsnahe Regelleistungsintegration                       | §28.3                |

@@ -1,0 +1,131 @@
+replicaCount: 1
+
+image:
+  repository: bess-ems-runtime
+  tag: latest
+  pullPolicy: IfNotPresent
+
+topology:
+  # shared is the ADR 0007 default. workerPerAsset renders one Deployment
+  # per configured asset while keeping the same asset_id-centered app model.
+  mode: shared
+
+assets:
+  - asset_id: bess-a
+    capacity_kwh: 100
+    max_charge_power_kw: 50
+    max_discharge_power_kw: 50
+    min_soc_percent: 10
+    max_soc_percent: 90
+    charge_efficiency: 0.95
+    discharge_efficiency: 0.95
+    max_ramp_kw_per_second: 25
+    min_operating_temperature_celsius: -20
+    max_operating_temperature_celsius: 55
+  - asset_id: bess-b
+    capacity_kwh: 80
+    max_charge_power_kw: 40
+    max_discharge_power_kw: 40
+    min_soc_percent: 15
+    max_soc_percent: 85
+    charge_efficiency: 0.94
+    discharge_efficiency: 0.94
+    max_ramp_kw_per_second: 20
+    min_operating_temperature_celsius: -20
+    max_operating_temperature_celsius: 55
+
+service:
+  type: ClusterIP
+  port: 8080
+
+environment:
+  aspnetCoreEnvironment: Production
+  workerCycleInterval: "00:00:01"
+
+apiToken:
+  token: dev-operator-token
+  operator: operator-1
+  role: operator
+
+postgres:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "16"
+    pullPolicy: IfNotPresent
+  database: bessems
+  username: bessems
+  password: bessems
+  storage:
+    size: 8Gi
+    storageClassName: ""
+
+persistence:
+  includeErrorDetail: true
+
+scheduleSolver:
+  backend: noop
+  timeLimitSeconds: null
+  gapTolerance: null
+  initialSocPercent: null
+
+mqtt:
+  enabled: false
+  image:
+    repository: eclipse-mosquitto
+    tag: "2"
+    pullPolicy: IfNotPresent
+  brokerPort: 1883
+  clientId: bess-ems-host
+  mappingPath: /app/config/examples/adapters/mqtt.simulator.json
+
+optimizationCore:
+  enabled: false
+  image:
+    repository: bess-ems-optimization-core-test-sidecar
+    tag: latest
+    pullPolicy: IfNotPresent
+  grpcPort: 8081
+  healthPort: 8082
+  runtimeProfile: Development
+  expectedContractVersion: "1.0.0"
+  fallbackBackend: or_tools
+  externalEndpoint: ""
+  transport:
+    uds:
+      enabled: false
+      mountPath: /var/run/bess-ems
+    mtls:
+      enabled: false
+      clientCertificateSecret: ""
+      trustedServerCertificatesSecret: ""
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1654
+  runAsGroup: 1654
+  fsGroup: 1654
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop: ["ALL"]
+
+resources: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+probes:
+  readiness:
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 3
+  liveness:
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 5

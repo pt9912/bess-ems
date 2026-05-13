@@ -1,0 +1,71 @@
+{{- if and .Values.optimizationCore.enabled (not .Values.optimizationCore.externalEndpoint) }}
+{{- if .Values.optimizationCore.transport.uds.enabled }}
+{{- fail "optimizationCore.transport.uds.enabled requires optimizationCore.externalEndpoint until same-pod UDS sidecars are modeled" }}
+{{- end }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bess-ems.optimizationCoreName" . }}
+  labels:
+    {{- include "bess-ems.labels" . | nindent 4 }}
+    bess-ems.io/component: optimization-core
+spec:
+  ports:
+    - name: grpc
+      port: {{ .Values.optimizationCore.grpcPort }}
+      targetPort: grpc
+    - name: health
+      port: {{ .Values.optimizationCore.healthPort }}
+      targetPort: health
+  selector:
+    {{- include "bess-ems.selectorLabels" . | nindent 4 }}
+    bess-ems.io/component: optimization-core
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bess-ems.optimizationCoreName" . }}
+  labels:
+    {{- include "bess-ems.labels" . | nindent 4 }}
+    bess-ems.io/component: optimization-core
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "bess-ems.selectorLabels" . | nindent 6 }}
+      bess-ems.io/component: optimization-core
+  template:
+    metadata:
+      labels:
+        {{- include "bess-ems.selectorLabels" . | nindent 8 }}
+        bess-ems.io/component: optimization-core
+    spec:
+      containers:
+        - name: optimization-core
+          image: {{ printf "%s:%s" .Values.optimizationCore.image.repository .Values.optimizationCore.image.tag | quote }}
+          imagePullPolicy: {{ .Values.optimizationCore.image.pullPolicy }}
+          ports:
+            - name: grpc
+              containerPort: {{ .Values.optimizationCore.grpcPort }}
+            - name: health
+              containerPort: {{ .Values.optimizationCore.healthPort }}
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: {{ .Values.optimizationCore.runtimeProfile | quote }}
+            - name: BESS_TEST_SIDECAR_GRPC_PORT
+              value: {{ .Values.optimizationCore.grpcPort | quote }}
+            - name: BESS_TEST_SIDECAR_HEALTH_PORT
+              value: {{ .Values.optimizationCore.healthPort | quote }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 10
+{{- end }}

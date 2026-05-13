@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "replicaCount": { "type": "integer", "minimum": 1 },
+    "topology": {
+      "type": "object",
+      "properties": {
+        "mode": { "type": "string", "enum": ["shared", "workerPerAsset"] }
+      },
+      "required": ["mode"]
+    },
+    "assets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "asset_id",
+          "capacity_kwh",
+          "max_charge_power_kw",
+          "max_discharge_power_kw",
+          "min_soc_percent",
+          "max_soc_percent",
+          "charge_efficiency",
+          "discharge_efficiency",
+          "max_ramp_kw_per_second",
+          "min_operating_temperature_celsius",
+          "max_operating_temperature_celsius"
+        ],
+        "properties": {
+          "asset_id": { "type": "string", "minLength": 1 },
+          "capacity_kwh": { "type": "number" },
+          "max_charge_power_kw": { "type": "number" },
+          "max_discharge_power_kw": { "type": "number" },
+          "min_soc_percent": { "type": "number" },
+          "max_soc_percent": { "type": "number" },
+          "charge_efficiency": { "type": "number" },
+          "discharge_efficiency": { "type": "number" },
+          "max_ramp_kw_per_second": { "type": "number" },
+          "min_operating_temperature_celsius": { "type": "number" },
+          "max_operating_temperature_celsius": { "type": "number" }
+        }
+      }
+    },
+    "postgres": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "database": { "type": "string", "minLength": 1 },
+        "username": { "type": "string", "minLength": 1 },
+        "password": { "type": "string" }
+      }
+    },
+    "mqtt": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "brokerPort": { "type": "integer", "minimum": 1, "maximum": 65535 }
+      }
+    },
+    "optimizationCore": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "grpcPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "healthPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "runtimeProfile": { "type": "string", "enum": ["Development", "HilSimulator", "Production"] },
+        "externalEndpoint": { "type": "string" }
+      }
+    }
+  }
+}
