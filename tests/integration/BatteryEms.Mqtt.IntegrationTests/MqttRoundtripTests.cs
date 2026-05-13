@@ -41,7 +41,10 @@ public sealed class MqttRoundtripTests
             ClientId: $"integration-telemetry-{Guid.NewGuid():N}",
             AssetId: AssetId,
             ConnectTimeout: TimeSpan.FromSeconds(5),
-            CommandAckTimeout: TimeSpan.FromSeconds(2));
+            CommandAckTimeout: TimeSpan.FromSeconds(2),
+            RuntimeProfile: MqttRuntimeProfile.HilSimulator,
+            AllowPlaintext: true,
+            AllowPlaintextReason: "integration test mosquitto broker");
 
         await using var client = new MqttNetClient(options);
         var source = new MqttTelemetrySource(client, mapping, options, new SystemClock());
@@ -82,7 +85,10 @@ public sealed class MqttRoundtripTests
             // Generous ACK timeout — the simulator echoes synchronously after
             // it receives the command, but compose can take a moment to wire
             // up the broker subscriptions on cold start.
-            CommandAckTimeout: TimeSpan.FromSeconds(10));
+            CommandAckTimeout: TimeSpan.FromSeconds(10),
+            RuntimeProfile: MqttRuntimeProfile.HilSimulator,
+            AllowPlaintext: true,
+            AllowPlaintextReason: "integration test mosquitto broker");
 
         var asset = loader.LoadAsset(AssetPath);
 

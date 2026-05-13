@@ -182,6 +182,9 @@ eine reine in-memory-mit-Reconcile-on-Reconnect-Variante.
 
 ## Item F-04: TLS und Broker-Auth-Härtung
 
+**Status:** Abgeschlossen am 2026-05-13 — siehe
+[`../done/plan-RM-M4-06-FUP-tls-auth.md`](../done/plan-RM-M4-06-FUP-tls-auth.md).
+
 **Quelle:** RM-M4-06 Design-Entscheidung D-01 — `MqttNetClient`
 spricht plaintext-TCP zum Broker. **Pflicht-Slice bevor der Adapter
 in Production gegen einen echten Broker zeigt.** Dieser Slice ist
@@ -225,9 +228,8 @@ Möglicherweise eigene Welle „Production-Hardening / Security",
 die TLS/Auth-Härtung für **alle** Adapter (Modbus, MQTT, OPC-UA
 mit RM-M4-05) bündelt.
 
-**Aktivierungs-Pfad:** eigener `plan-RM-M4-06-FUP-tls-auth.md`,
-oder als Pflicht-Bestandteil eines übergreifenden
-Production-Hardening-Slice.
+**Aktivierungs-Pfad:** geschlossen in
+[`../done/plan-RM-M4-06-FUP-tls-auth.md`](../done/plan-RM-M4-06-FUP-tls-auth.md).
 
 ---
 
@@ -462,7 +464,7 @@ neue Pins und Doku.
 - (c) Embedded TestServer-Fixture um die Policy erweitern
   (`AddPolicy(SecurityMode, Policy)` analog zur heutigen
   `AddSignAndEncryptPolicies`-Linie).
-- (d) Quality-Doku §2.2.2 dokumentiert die erweiterte Allowlist.
+- (d) Quality-Doku §2.2.3 dokumentiert die erweiterte Allowlist.
 - (e) Ein neuer Integration-Pin in `OpcUaSecurityTests.cs`, der
   einen sicheren Handshake mit der neuen Policy gegen den
   Embedded TestServer fährt (Trust-Bridge gilt unverändert).

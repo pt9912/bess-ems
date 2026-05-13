@@ -1,6 +1,7 @@
 using BatteryEms.Application.Configuration;
 using BatteryEms.Application.IO;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BatteryEms.Adapters.Mqtt;
 
@@ -19,6 +20,7 @@ public static class MqttRegistration
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(mapping);
         ArgumentNullException.ThrowIfNull(options);
+        options.EnsureValid(NullLogger.Instance);
 
         services.AddSingleton(mapping);
         services.AddSingleton(options);

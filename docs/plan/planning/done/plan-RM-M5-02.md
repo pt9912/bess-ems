@@ -238,7 +238,7 @@ einzelne ist im §9 Folgearbeiten-Block dokumentiert.
   Kalman-Covariance-Footprint müssen matchen) damit ein gespeicherter
   MPC-Plan nicht mit einem Plan aus einem anderen Estimator-Stand
   verwechselt wird.
-- **Quality-Doku** §2.2.3 + neue §2.5 (`make test-mpc-property`)
+- **Quality-Doku** §2.2.4 + neue §2.5 (`make test-mpc-property`)
   für die randomisierten Property-Pins. CI-Gate
   `make test-hil-optimization-core` deckt die Wire-Linie weiter.
 - **Master-Plan-Cleanup**: bei Closure flippt RM-M5-02-Zeile in
@@ -772,7 +772,7 @@ ist die saubere Trennung.
   `BessHostOptions.MpcBackend != null` + `RuntimeProfile=Production`
   ohne registrierten `IFallbackMpcOptimizer` ⇒ Startup-Fehler
   `mpc-production-without-fallback-pathway`. Pin in Sub-Slice D
-  + Doku-Hinweis in Quality-Doku §2.2.3.
+  + Doku-Hinweis in Quality-Doku §2.2.4.
 - **Worker-Control-Cycle-Wiring**: `ControlCycleHostedService` (oder
   der RM-M1-19-Worker-Pfad-Äquivalent in der aktuellen Codebase)
   ruft `IMpcDispatchOptimizer.NextStepAsync` pro Control-Cycle-Tick
@@ -849,7 +849,7 @@ ist die saubere Trennung.
   (Solver-Konfig + `P_0`-Canonical) + Schedule-Points innerhalb der
   in D-04 kalibrierten Toleranz.
 - **`FallbackPlanValidator`** trägt eine MPC-Stempel-Achse.
-- **Quality-Doku** §2.2.3 + neue §2.5 listet alle neuen Pins und das
+- **Quality-Doku** §2.2.4 + neue §2.5 listet alle neuen Pins und das
   neue Property-Gate `make test-mpc-property`.
 - **`make test-hil-optimization-core`** erweitert um die MPC-Pins
   (LP-Linie bleibt unverändert; Pin-Count steigt monoton).

@@ -56,7 +56,26 @@
       "type": "object",
       "properties": {
         "enabled": { "type": "boolean" },
-        "brokerPort": { "type": "integer", "minimum": 1, "maximum": 65535 }
+        "brokerPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "runtimeProfile": { "type": "string", "enum": ["Development", "HilSimulator", "Production"] },
+        "allowPlaintext": { "type": "boolean" },
+        "allowPlaintextReason": { "type": "string" },
+        "tls": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "trustedCaCertificatePath": { "type": "string" },
+            "clientCertificatePath": { "type": "string" },
+            "clientCertificatePasswordPath": { "type": "string" }
+          }
+        },
+        "credentials": {
+          "type": "object",
+          "properties": {
+            "username": { "type": "string" },
+            "passwordPath": { "type": "string" }
+          }
+        }
       }
     },
     "optimizationCore": {

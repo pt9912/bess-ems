@@ -62,6 +62,9 @@ services:
       Bess__MqttBrokerHost: mosquitto
       Bess__MqttBrokerPort: "1883"
       Bess__MqttClientId: bess-ems-host
+      Bess__MqttRuntimeProfile: HilSimulator
+      Bess__MqttAllowPlaintext: "true"
+      Bess__MqttAllowPlaintextReason: HIL compose mosquitto broker
       Worker__CycleInterval: "00:00:01"
       # No baked-in token — `compose up` fails fast unless the
       # operator sets BESS_HIL_OPERATOR_TOKEN explicitly. Even for

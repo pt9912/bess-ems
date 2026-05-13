@@ -1,5 +1,8 @@
 using System.Buffers;
 using System.Collections.Concurrent;
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
+using Microsoft.Extensions.Logging.Abstractions;
 using MQTTnet;
 using MQTTnet.Protocol;
 
@@ -9,12 +12,9 @@ namespace BatteryEms.Adapters.Mqtt;
 // process: each topic registers once at the broker and any number of
 // adapter-side handlers fan-out from ApplicationMessageReceivedAsync.
 //
-// SECURITY: this client speaks anonymous plaintext TCP to the broker.
-// TLS, broker credentials and certificate validation are intentionally
-// out of the RM-M4-06 slice (D-01). The Production-readiness slice is
-// tracked as F-04 in note-RM-M4-followups.md and is mandatory before
-// pointing this client at a real broker; until F-04 fires, restrict
-// usage to local simulators and CI/HIL test brokers.
+// RM-M4-06-FUP-F04: Production MQTT is fail-closed unless TLS plus
+// broker authentication is configured. Development/HIL simulators may
+// opt into plaintext explicitly via MqttAdapterOptions.AllowPlaintext.
 public sealed class MqttNetClient : IMqttClient
 {
     private readonly MQTTnet.IMqttClient _inner;
@@ -26,16 +26,40 @@ public sealed class MqttNetClient : IMqttClient
     public MqttNetClient(MqttAdapterOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
+        options.EnsureValid(NullLogger.Instance);
 
         // MQTTnet 5.0 split MqttFactory into client / server factories;
         // we only need the client side.
         var factory = new MqttClientFactory();
         _inner = factory.CreateMqttClient();
-        _connectOptions = new MqttClientOptionsBuilder()
+        var builder = new MqttClientOptionsBuilder()
             .WithTcpServer(options.BrokerHost, options.BrokerPort)
             .WithClientId(options.ClientId)
-            .WithCleanSession(true)
-            .Build();
+            .WithCleanSession(true);
+
+        var password = ReadSecret(options.CredentialsOrDefault.Password, options.CredentialsOrDefault.PasswordPath);
+        if (!string.IsNullOrWhiteSpace(options.CredentialsOrDefault.Username))
+        {
+            builder.WithCredentials(options.CredentialsOrDefault.Username, password ?? string.Empty);
+        }
+
+        var tls = options.TlsOrDefault;
+        if (tls.Enabled)
+        {
+            var roots = LoadTrustedCaCertificates(tls.TrustedCaCertificatePath!);
+            var clientCertificate = LoadClientCertificate(tls);
+            builder.WithTlsOptions(tlsBuilder =>
+            {
+                tlsBuilder.UseTls(true);
+                tlsBuilder.WithCertificateValidationHandler(args => ValidateBrokerCertificate(args, roots));
+                if (clientCertificate is not null)
+                {
+                    tlsBuilder.WithClientCertificates([clientCertificate]);
+                }
+            });
+        }
+
+        _connectOptions = builder.Build();
         _connectTimeout = options.ConnectTimeout;
 
         _inner.ApplicationMessageReceivedAsync += OnApplicationMessageReceivedAsync;
@@ -127,6 +151,71 @@ public sealed class MqttNetClient : IMqttClient
         MqttQualityOfService.ExactlyOnce => MqttQualityOfServiceLevel.ExactlyOnce,
         _ => throw new ArgumentOutOfRangeException(nameof(qos), qos, "Unknown MqttQualityOfService."),
     };
+
+    private static string? ReadSecret(string? inlineSecret, string? secretPath)
+    {
+        if (!string.IsNullOrWhiteSpace(secretPath))
+        {
+            return File.ReadAllText(secretPath).TrimEnd('\r', '\n');
+        }
+
+        return inlineSecret;
+    }
+
+    private static X509Certificate2Collection LoadTrustedCaCertificates(string path)
+    {
+        var roots = new X509Certificate2Collection();
+        roots.ImportFromPemFile(path);
+        if (roots.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"mqtt-trusted-ca-empty: '{path}' did not contain a PEM certificate.");
+        }
+
+        return roots;
+    }
+
+    private static X509Certificate2? LoadClientCertificate(MqttTlsOptions tls)
+    {
+        if (string.IsNullOrWhiteSpace(tls.ClientCertificatePath))
+        {
+            return null;
+        }
+
+        var password = ReadSecret(tls.ClientCertificatePassword, tls.ClientCertificatePasswordPath);
+        return X509CertificateLoader.LoadPkcs12FromFile(
+            tls.ClientCertificatePath,
+            password,
+            X509KeyStorageFlags.EphemeralKeySet);
+    }
+
+    private static bool ValidateBrokerCertificate(
+        MqttClientCertificateValidationEventArgs args,
+        X509Certificate2Collection trustedRoots)
+    {
+        if (args.Certificate is null)
+        {
+            return false;
+        }
+        if ((args.SslPolicyErrors & SslPolicyErrors.RemoteCertificateNameMismatch) != 0
+            || (args.SslPolicyErrors & SslPolicyErrors.RemoteCertificateNotAvailable) != 0)
+        {
+            return false;
+        }
+
+        using var serverCertificate = args.Certificate is X509Certificate2 certificate
+            ? X509CertificateLoader.LoadCertificate(certificate.RawData)
+            : X509CertificateLoader.LoadCertificate(args.Certificate.Export(X509ContentType.Cert));
+        using var chain = new X509Chain();
+        chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+        foreach (var root in trustedRoots)
+        {
+            chain.ChainPolicy.CustomTrustStore.Add(root);
+        }
+
+        return chain.Build(serverCertificate);
+    }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031", Justification = "Handlers must not propagate exceptions back into MQTTnet's dispatcher loop; per-handler errors are isolated.")]
     private async Task OnApplicationMessageReceivedAsync(MqttApplicationMessageReceivedEventArgs e)

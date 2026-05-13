@@ -42,6 +42,43 @@ public sealed class MultiAssetHostCompositionTests
         Assert.Contains("Multi-asset configs", ex.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Host_build_accepts_mqtt_plaintext_only_with_test_profile_ack()
+    {
+        await using var app = BessHostBuilder.BuildApp(
+        [
+            $"--Bess:SchemaDirectory={RepoPath("config", "schema")}",
+            $"--Bess:AssetConfigPath={RepoPath("config", "examples", "asset.single-bess.json")}",
+            $"--Bess:MqttMappingPath={RepoPath("config", "examples", "adapters", "mqtt.simulator.json")}",
+            "--Bess:MqttBrokerHost=127.0.0.1",
+            "--Bess:MqttBrokerPort=1883",
+            "--Bess:MqttClientId=test-host",
+            "--Bess:MqttRuntimeProfile=HilSimulator",
+            "--Bess:MqttAllowPlaintext=true",
+            "--Bess:MqttAllowPlaintextReason=architecture-test",
+        ]);
+
+        var registry = app.Services.GetRequiredService<IBatteryAssetRegistry>();
+        Assert.NotNull(registry.Find("single-bess-1"));
+    }
+
+    [Fact]
+    public void Host_build_rejects_default_production_mqtt_plaintext()
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            BessHostBuilder.BuildApp(
+            [
+                $"--Bess:SchemaDirectory={RepoPath("config", "schema")}",
+                $"--Bess:AssetConfigPath={RepoPath("config", "examples", "asset.single-bess.json")}",
+                $"--Bess:MqttMappingPath={RepoPath("config", "examples", "adapters", "mqtt.simulator.json")}",
+                "--Bess:MqttBrokerHost=127.0.0.1",
+                "--Bess:MqttBrokerPort=1883",
+                "--Bess:MqttClientId=test-host",
+            ]));
+
+        Assert.Contains("mqtt-security-not-hardened-in-production", ex.Message, StringComparison.Ordinal);
+    }
+
     private static string RepoPath(params string[] parts) =>
         Path.Combine([RepoRoot(), .. parts]);
 

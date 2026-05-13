@@ -113,7 +113,7 @@ einzige Auth-Achse. Multi-Tenant-/Per-Operator-Bearer-Token-Auth
 - (d) Pin-Test gegen Test-Sidecar mit Token-Validierungs-Interceptor:
   korrektes Token → Optimize-Success; fehlendes Token →
   `unauthorized_client`-Outcome (existierender Mapper-Eintrag).
-- (e) Doku-Update in `docs/user/quality.md` §2.2.3 zum neuen
+- (e) Doku-Update in `docs/user/quality.md` §2.2.4 zum neuen
   Auth-Pfad plus `note-RM-M5-followups.md`-Verweis bei Closure.
 
 **Aufwandsschätzung:** ~1 Woche für den Adapter-Pfad inkl. Tests.

@@ -73,6 +73,13 @@ per-asset adapter bindings exist. In worker-pro-asset mode the chart
 suffixes `Bess__MqttClientId` with the `asset_id` to avoid MQTT session
 collisions.
 
+The built-in Mosquitto path is a test/simulator topology. It renders
+`Bess__MqttRuntimeProfile=HilSimulator` plus an explicit plaintext
+acknowledgement. Production MQTT must override the profile to
+`Production`, enable TLS, provide `Bess__MqttTlsTrustedCaCertificatePath`
+from a mounted CA bundle, and configure broker authentication via
+`Bess__MqttUsername` + `Bess__MqttPasswordPath` or a client certificate.
+
 Optimization-core:
 
 ```bash

@@ -2,6 +2,17 @@
 {{- if gt (int $root.Values.replicaCount) 1 }}
 {{- fail "replicaCount > 1 is not supported until RM-M6-03 defines leader election or distributed per-asset locking" }}
 {{- end }}
+{{- if and $root.Values.mqtt.enabled (eq $root.Values.mqtt.runtimeProfile "Production") }}
+{{- if not $root.Values.mqtt.tls.enabled }}
+{{- fail "mqtt.runtimeProfile=Production requires mqtt.tls.enabled=true" }}
+{{- end }}
+{{- if not $root.Values.mqtt.tls.trustedCaCertificatePath }}
+{{- fail "mqtt.runtimeProfile=Production requires mqtt.tls.trustedCaCertificatePath" }}
+{{- end }}
+{{- if and (not $root.Values.mqtt.tls.clientCertificatePath) (not (and $root.Values.mqtt.credentials.username $root.Values.mqtt.credentials.passwordPath)) }}
+{{- fail "mqtt.runtimeProfile=Production requires mqtt.credentials.username + mqtt.credentials.passwordPath or mqtt.tls.clientCertificatePath" }}
+{{- end }}
+{{- end }}
 {{- if $root.Values.optimizationCore.transport.mtls.enabled }}
 {{- if not $root.Values.optimizationCore.transport.mtls.clientCertificateSecret }}
 {{- fail "optimizationCore.transport.mtls.clientCertificateSecret is required when optimizationCore.transport.mtls.enabled=true" }}
@@ -108,6 +119,34 @@ spec:
               value: {{ $root.Values.mqtt.brokerPort | quote }}
             - name: Bess__MqttClientId
               value: {{ if .asset }}{{ printf "%s-%s" $root.Values.mqtt.clientId .asset.asset_id | quote }}{{ else }}{{ $root.Values.mqtt.clientId | quote }}{{ end }}
+            - name: Bess__MqttRuntimeProfile
+              value: {{ $root.Values.mqtt.runtimeProfile | quote }}
+            - name: Bess__MqttAllowPlaintext
+              value: {{ $root.Values.mqtt.allowPlaintext | quote }}
+            - name: Bess__MqttAllowPlaintextReason
+              value: {{ $root.Values.mqtt.allowPlaintextReason | quote }}
+            - name: Bess__MqttTlsEnabled
+              value: {{ $root.Values.mqtt.tls.enabled | quote }}
+            {{- with $root.Values.mqtt.tls.trustedCaCertificatePath }}
+            - name: Bess__MqttTlsTrustedCaCertificatePath
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with $root.Values.mqtt.tls.clientCertificatePath }}
+            - name: Bess__MqttTlsClientCertificatePath
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with $root.Values.mqtt.tls.clientCertificatePasswordPath }}
+            - name: Bess__MqttTlsClientCertificatePasswordPath
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with $root.Values.mqtt.credentials.username }}
+            - name: Bess__MqttUsername
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with $root.Values.mqtt.credentials.passwordPath }}
+            - name: Bess__MqttPasswordPath
+              value: {{ . | quote }}
+            {{- end }}
             {{- end }}
             {{- if or $root.Values.optimizationCore.enabled $root.Values.optimizationCore.externalEndpoint }}
             - name: Bess__ScheduleSolver__Backend

@@ -29,6 +29,9 @@ services:
       Bess__MqttBrokerHost: mosquitto
       Bess__MqttBrokerPort: "1883"
       Bess__MqttClientId: bess-ems-host
+      Bess__MqttRuntimeProfile: HilSimulator
+      Bess__MqttAllowPlaintext: "true"
+      Bess__MqttAllowPlaintextReason: local compose mosquitto broker
       Worker__CycleInterval: "00:00:01"
       ApiTokens__Tokens__0__Token: dev-operator-token
       ApiTokens__Tokens__0__Operator: operator-1

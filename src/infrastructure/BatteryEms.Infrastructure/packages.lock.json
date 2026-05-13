@@ -218,7 +218,8 @@
           "BatteryEms.Application": "[1.0.0, )",
           "BatteryEms.Domain": "[1.0.0, )",
           "MQTTnet": "[5.1.0.1559, )",
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.7, )"
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.7, )",
+          "Microsoft.Extensions.Logging.Abstractions": "[10.0.7, )"
         }
       },
       "batteryems.adapters.optimization": {

@@ -246,7 +246,29 @@ werden mit M4 aktiv.
 | OPC-UA gegen Simulator            | M4       | LH-OPCUA-001..005             |
 | Optimization-Sidecar (gRPC)       | M5       | LH-OPT-006                    |
 
-#### 2.2.1 HIL-Pfad (optional, RM-M2-HIL-Welle)
+#### 2.2.1 MQTT-Security-Profil (RM-M4-06-FUP-F04)
+
+Der MQTT-Adapter ist ab F-04 production-fail-closed:
+
+- `RuntimeProfile=Production` verlangt `MqttTlsEnabled=true`.
+- TLS verlangt `MqttTlsTrustedCaCertificatePath`; der Adapter nutzt
+  einen konfigurierten CA-Bundle statt still auf das System-Root-Set zu
+  fallen.
+- Production verlangt Broker-Auth: entweder `MqttUsername` +
+  `MqttPasswordPath` oder ein Client-Zertifikat.
+- Inline-Passwörter (`MqttPassword`,
+  `MqttTlsClientCertificatePassword`) sind in Production verboten;
+  Secrets müssen über Datei-/Secret-Mounts kommen.
+- Plaintext ist nur in `Development` oder `HilSimulator` erlaubt und
+  braucht `MqttAllowPlaintext=true` plus
+  `MqttAllowPlaintextReason`.
+
+Die lokalen Compose-/Helm-Mosquitto-Pfade setzen deshalb explizit
+`MqttRuntimeProfile=HilSimulator` und dokumentieren ihren
+Plaintext-Grund. Ein echter Broker darf diese Test-Profile nicht
+übernehmen.
+
+#### 2.2.2 HIL-Pfad (optional, RM-M2-HIL-Welle)
 
 ```bash
 make test-hil-modbus   # = docker compose -f tests/hil/compose.yml up
@@ -261,7 +283,7 @@ P-Sprungantwort: 25 kW Setpoint via `ModbusCommandSink` →
 Konvergenz-Read via `ModbusTelemetrySource` mit ±5 kW Toleranz
 (PCS-Dynamik braucht ~1 s).
 
-#### 2.2.2 OPC-UA-Roundtrip-Pfad (Mandatory, RM-M4-04 + RM-M4-08 + RM-M4-05)
+#### 2.2.3 OPC-UA-Roundtrip-Pfad (Mandatory, RM-M4-04 + RM-M4-08 + RM-M4-05)
 
 ```bash
 make test-hil-opcua   # process-internal Embedded TestServer
@@ -328,7 +350,7 @@ Release, der dynamisches PCS/PQ-Verhalten gegen ein realistischeres
 Modell sanity-prüfen soll. Der Go-Simulator deckt deterministische
 Fixtures, der HIL-Simulator deckt PCS-Antwort und PQ-Capability.
 
-#### 2.2.3 Optimization-Core-Sidecar-Pfad (Mandatory, RM-M5-01)
+#### 2.2.4 Optimization-Core-Sidecar-Pfad (Mandatory, RM-M5-01)
 
 ```bash
 make test-hil-optimization-core   # in-process gRPC TestSidecar

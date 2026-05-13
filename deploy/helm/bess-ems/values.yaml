@@ -80,6 +80,17 @@ mqtt:
   brokerPort: 1883
   clientId: bess-ems-host
   mappingPath: /app/config/examples/adapters/mqtt.simulator.json
+  runtimeProfile: HilSimulator
+  allowPlaintext: true
+  allowPlaintextReason: helm optional mosquitto test broker
+  tls:
+    enabled: false
+    trustedCaCertificatePath: ""
+    clientCertificatePath: ""
+    clientCertificatePasswordPath: ""
+  credentials:
+    username: ""
+    passwordPath: ""
 
 optimizationCore:
   enabled: false

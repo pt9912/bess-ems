@@ -121,7 +121,7 @@ public static class BessHostBuilder
             case IoAdapterTriage.Family.Mqtt:
                 services.AddBessMqtt(
                     runtimeConfig.MqttMapping!,
-                    MqttAdapterOptions.Defaults(hostOptions.MqttBrokerHost!, hostOptions.MqttBrokerPort, hostOptions.MqttClientId!, runtimeConfig.SingleAsset.AssetId));
+                    BuildMqttAdapterOptions(hostOptions, runtimeConfig.SingleAsset.AssetId));
                 break;
             case IoAdapterTriage.Family.OpcUa:
                 services.AddBessOpcUa(
@@ -412,6 +412,33 @@ public static class BessHostBuilder
                     : hostOptions.OptimizationCoreBearerTokenPath!,
             MaxFallbackScheduleAge = hostOptions.OptimizationCoreMaxFallbackScheduleAge
                 ?? defaults.MaxFallbackScheduleAge,
+        };
+    }
+
+    private static MqttAdapterOptions BuildMqttAdapterOptions(
+        BessHostOptions hostOptions,
+        string assetId)
+    {
+        var defaults = MqttAdapterOptions.Defaults(
+            hostOptions.MqttBrokerHost!,
+            hostOptions.MqttBrokerPort,
+            hostOptions.MqttClientId!,
+            assetId);
+        return defaults with
+        {
+            RuntimeProfile = hostOptions.MqttRuntimeProfile ?? defaults.RuntimeProfile,
+            Tls = new MqttTlsOptions(
+                Enabled: hostOptions.MqttTlsEnabled,
+                TrustedCaCertificatePath: hostOptions.MqttTlsTrustedCaCertificatePath,
+                ClientCertificatePath: hostOptions.MqttTlsClientCertificatePath,
+                ClientCertificatePassword: hostOptions.MqttTlsClientCertificatePassword,
+                ClientCertificatePasswordPath: hostOptions.MqttTlsClientCertificatePasswordPath),
+            Credentials = new MqttCredentialOptions(
+                Username: hostOptions.MqttUsername,
+                Password: hostOptions.MqttPassword,
+                PasswordPath: hostOptions.MqttPasswordPath),
+            AllowPlaintext = hostOptions.MqttAllowPlaintext,
+            AllowPlaintextReason = hostOptions.MqttAllowPlaintextReason,
         };
     }
 

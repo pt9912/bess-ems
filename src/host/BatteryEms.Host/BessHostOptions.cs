@@ -47,11 +47,24 @@ public sealed class BessHostOptions
 
     // Optional MQTT driven-adapter wiring. Same semantics as the Modbus
     // block — all four fields must be set or the host falls back to the
-    // NoOp adapters.
+    // NoOp adapters. RM-M4-06-FUP-F04 adds Production security slots:
+    // Production requires TLS plus broker auth; Development/HIL
+    // simulator deployments must explicitly acknowledge plaintext.
     public string? MqttMappingPath { get; set; }
     public string? MqttBrokerHost { get; set; }
     public int MqttBrokerPort { get; set; }
     public string? MqttClientId { get; set; }
+    public BatteryEms.Adapters.Mqtt.MqttRuntimeProfile? MqttRuntimeProfile { get; set; }
+    public bool MqttTlsEnabled { get; set; }
+    public string? MqttTlsTrustedCaCertificatePath { get; set; }
+    public string? MqttTlsClientCertificatePath { get; set; }
+    public string? MqttTlsClientCertificatePassword { get; set; }
+    public string? MqttTlsClientCertificatePasswordPath { get; set; }
+    public string? MqttUsername { get; set; }
+    public string? MqttPassword { get; set; }
+    public string? MqttPasswordPath { get; set; }
+    public bool MqttAllowPlaintext { get; set; }
+    public string? MqttAllowPlaintextReason { get; set; }
 
     // RM-M4-04 (plan §4 Sub-Slice C) + RM-M4-05: optionales OPC-UA-
     // Adapter-Wiring. OpcUaMappingPath + OpcUaEndpointUrl müssen

@@ -39,7 +39,10 @@ internal static class MqttFixtures
         ClientId: "test-client",
         AssetId: assetId,
         ConnectTimeout: TimeSpan.FromSeconds(1),
-        CommandAckTimeout: TimeSpan.FromMilliseconds(200));
+        CommandAckTimeout: TimeSpan.FromMilliseconds(200),
+        RuntimeProfile: MqttRuntimeProfile.HilSimulator,
+        AllowPlaintext: true,
+        AllowPlaintextReason: "unit-test fake MQTT client");
 
     public sealed class FixedClock : IClock
     {
