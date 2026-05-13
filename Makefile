@@ -159,6 +159,12 @@ helm-lint:
 		--set topology.mode=workerPerAsset >/tmp/bess-ems-helm-worker-per-asset.yaml
 	$(HELM) template bess-ems-optimization-core $(HELM_CHART) \
 		--set optimizationCore.enabled=true >/tmp/bess-ems-helm-optimization-core.yaml
+	$(HELM) template bess-ems-optimization-core-mtls $(HELM_CHART) \
+		--set optimizationCore.externalEndpoint=https://optimization-core.example:8443 \
+		--set optimizationCore.transport.mtls.enabled=true \
+		--set optimizationCore.transport.mtls.clientCertificateSecret=bess-ems-optimization-core-client \
+		--set optimizationCore.transport.mtls.trustedServerCertificatesSecret=bess-ems-optimization-core-ca \
+		>/tmp/bess-ems-helm-optimization-core-mtls.yaml
 	$(HELM) template bess-ems-mqtt $(HELM_CHART) \
 		--set topology.mode=workerPerAsset \
 		--set mqtt.enabled=true >/tmp/bess-ems-helm-mqtt.yaml

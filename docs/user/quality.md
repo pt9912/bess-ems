@@ -556,10 +556,13 @@ make helm-lint
 
 Das Target führt `helm lint deploy/helm/bess-ems` aus und rendert den
 ADR-0007-Default `topology.mode=shared`, `topology.mode=workerPerAsset`
-sowie die optionalen MQTT- und optimization-core-Pfade. Erst ein
-späterer RM-M6-03-Pass darf dieses Gate in `make ci` aufnehmen, wenn
-ein reproduzierbarer kind/k3d- oder Cluster-Smoke definiert ist. Bis
-dahin bleibt `make runtime` der production-shaped Compose-Referenzpfad.
+sowie die optionalen MQTT-, optimization-core- und
+optimization-core-HTTPS/mTLS-Pfade. Das Chart lehnt `replicaCount > 1`
+ab, bis Leader-Election oder verteiltes per-Asset-Locking definiert ist.
+Erst ein späterer RM-M6-03-Pass darf dieses Gate in `make ci` aufnehmen,
+wenn ein reproduzierbarer kind/k3d- oder Cluster-Smoke definiert ist.
+Bis dahin bleibt `make runtime` der production-shaped Compose-
+Referenzpfad.
 
 ### 2.7 Tag-Steuerung
 
@@ -572,7 +575,7 @@ dahin bleibt `make runtime` der production-shaped Compose-Referenzpfad.
 | OPC-UA-Roundtrip          | `make test-hil-opcua`                 | `Category=Integration` im OPC-UA-IntegrationTests-Projekt                                                    |
 | Optimization-Core         | `make test-hil-optimization-core`     | `Category=Integration` im OptimizationCore-IntegrationTests-Projekt inkl. RM-M5-04-E Sidecar-Manifest-Replay |
 | Optimization-Core Compose | `make test-optimization-core-compose` | RM-M5-06 Worker+Sidecar-Compose-Gate                                                                         |
-| Helm Render               | `make helm-lint`                      | RM-M6-03 Helm-Lint und Render-Smokes fuer shared Worker, Worker-pro-Asset, MQTT und optimization-core         |
+| Helm Render               | `make helm-lint`                      | RM-M6-03 Helm-Lint und Render-Smokes fuer shared Worker, Worker-pro-Asset, MQTT, optimization-core und optimization-core HTTPS/mTLS |
 | MPC Property              | `make test-mpc-property`              | RM-M5-02 Unit-Pins plus RM-M5-04-E lokaler MPC-Engine-Vergleich                                              |
 | Native Interop            | `make test-native-interop`            | `Category!=Parity` im NativeInterop-IntegrationTests-Projekt                                                 |
 | Native Parity             | `make test-native-parity`             | `Category=Parity` im NativeInterop-IntegrationTests-Projekt                                                  |

@@ -1,3 +1,5 @@
+# bess-ems has no leader election or distributed per-asset locking yet.
+# Keep this at 1 until RM-M6 defines a safe active-active control model.
 replicaCount: 1
 
 image:

@@ -16,6 +16,10 @@ helm template bess-ems deploy/helm/bess-ems
 The asset config is mounted as `assets.json`, matching ADR 0007's shared
 Worker default.
 
+`replicaCount` is fixed at `1`. bess-ems does not yet provide leader
+election or distributed per-asset locking, so rendering more than one
+replica is rejected to avoid duplicate control cycles.
+
 Worker-pro-Asset:
 
 ```bash
@@ -82,6 +86,26 @@ solver image. Production cross-host optimization-core deployments should
 use `optimizationCore.externalEndpoint` with `https://` and mTLS, or a
 future same-pod UDS sidecar pattern.
 
+For HTTPS/mTLS external endpoints, provide Kubernetes Secrets containing
+the client certificate and trusted server certificates:
+
+```bash
+helm template bess-ems deploy/helm/bess-ems \
+  --set optimizationCore.externalEndpoint=https://optimization-core.example:8443 \
+  --set optimizationCore.transport.mtls.enabled=true \
+  --set optimizationCore.transport.mtls.clientCertificateSecret=bess-ems-optimization-core-client \
+  --set optimizationCore.transport.mtls.trustedServerCertificatesSecret=bess-ems-optimization-core-ca
+```
+
+The client certificate Secret is mounted at
+`/etc/bess-ems/optimization-core/client` and the trusted server
+certificates Secret at `/etc/bess-ems/optimization-core/server`. The
+chart sets `Bess__OptimizationCoreClientCertificatePath` to the mounted
+`tls.crt` file and `Bess__OptimizationCoreTrustedServerCertificatesPath`
+to the server certificate directory. Rendering is rejected when mTLS is
+enabled without both Secret names or without an `https://`
+`optimizationCore.externalEndpoint`.
+
 UDS values are visible under `optimizationCore.transport.uds`. Rendering
 a separate optimization-core Deployment with UDS is rejected because
 separate pods cannot share an `emptyDir` Unix socket. Use
@@ -115,6 +139,7 @@ The target runs `helm lint` and renders:
 - shared Worker default
 - worker-pro-asset
 - optimization-core enabled
+- optimization-core external HTTPS/mTLS
 - MQTT enabled in worker-pro-asset mode
 
 It is intentionally not part of `make ci` yet. A later RM-M6-03 pass must

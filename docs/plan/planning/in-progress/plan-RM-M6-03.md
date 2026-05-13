@@ -29,8 +29,8 @@ neues Domain-Modell.
 | Status | ID | Paket | DoD |
 | ------ | -- | ----- | --- |
 | ✅ | RM-M6-03-A | Helm-Chart-Skelett | `deploy/helm/bess-ems` rendert den bess-ems Worker/API-Host, Service, Asset-Konfiguration, Secrets, Postgres-StatefulSet und Probes. Shared Worker ist Default; `workerPerAsset` rendert je Asset eine Deployment- und Service-Instanz. |
-| ✅ | RM-M6-03-B | Optionale Sidecars | Chart kann optional Mosquitto und ein optimization-core Sidecar-Service rendern. UDS-/mTLS-Werte sind explizit sichtbar, aber Production-Hardening bleibt operator-/environment-spezifisch. |
-| ✅ | RM-M6-03-C | Helm-Gate | `make helm-lint` fuehrt `helm lint` und Render-Smokes fuer shared Worker, Worker-pro-Asset, optimization-core und MQTT aus. Das Target ist bewusst noch nicht in `make ci`, bis das Kubernetes-Gate stabil ist. |
+| ✅ | RM-M6-03-B | Optionale Sidecars | Chart kann optional Mosquitto und ein optimization-core Sidecar-Service rendern. UDS-/mTLS-Werte sind explizit sichtbar; mTLS wird nur mit vollständigen Secrets und HTTPS-Endpoint gerendert. |
+| ✅ | RM-M6-03-C | Helm-Gate | `make helm-lint` fuehrt `helm lint` und Render-Smokes fuer shared Worker, Worker-pro-Asset, optimization-core, optimization-core HTTPS/mTLS und MQTT aus. Das Target ist bewusst noch nicht in `make ci`, bis das Kubernetes-Gate stabil ist. |
 | ✅ | RM-M6-03-D | Deployment-Dokumentation | [`deploy/helm/bess-ems/README.md`](../../../../deploy/helm/bess-ems/README.md) dokumentiert Values, Secrets, Probe-/Rollout-Verhalten, UDS-/mTLS-Optionen und Compose-vs-Helm-Grenze. |
 | ⬜ | RM-M6-03-E | Cluster-Smoke | Optionaler Kubernetes-Smoke gegen kind/k3d oder vorhandenen Cluster; erst aktivieren, wenn das lokale Helm-Gate stabil und reproduzierbar ist. |
 
@@ -45,6 +45,9 @@ neues Domain-Modell.
   eine eigene Deployment- und Service-Instanz mit einzelner `asset.json`,
   damit die API nicht ueber Pods mit disjunkten Asset-Registries
   load-balanced.
+- **Replica-Schutz:** `replicaCount` ist auf `1` fixiert, bis RM-M6
+  Leader-Election oder verteiltes per-Asset-Locking definiert. Mehrere
+  Replikas wuerden sonst parallele Control-Zyklen ausfuehren.
 - **IO-Default:** NoOp IO bleibt Default. MQTT ist optional und fuer
   Single-Asset-Topologien gedacht, bis per-Asset Adapter-Zuordnung als
   eigener Trigger zündet.
@@ -54,6 +57,10 @@ neues Domain-Modell.
 - **Sidecar:** optimization-core kann als Service gerendert oder ueber
   `externalEndpoint` angebunden werden. Production muss ADR 0005
   beachten: UDS oder HTTPS/mTLS statt plaintext HTTP.
+- **mTLS:** `optimizationCore.transport.mtls.enabled=true` verlangt
+  `https://` in `optimizationCore.externalEndpoint` sowie Secrets fuer
+  Client-Zertifikat und vertrauenswuerdige Server-Zertifikate. Der Chart
+  mountet diese Secrets und setzt die Host-Options-Pfade.
 
 ---
 
@@ -64,5 +71,9 @@ neues Domain-Modell.
 - Postgres nutzt Secret fuer Passwort/Connection-String und ein PVC fuer
   Daten.
 - Asset-Konfiguration liegt als ConfigMap/Volume vor und bleibt explizit.
+- `replicaCount > 1` wird vom Chart abgelehnt.
+- HTTPS/mTLS fuer externe optimization-core Endpoints rendert Secret-
+  Mounts und die zugehoerigen Host-Options-Umgebungsvariablen; fehlende
+  Secrets werden abgelehnt.
 - Compose bleibt dokumentierter Runtime-Smoke und wird durch Helm nicht
   ersetzt.

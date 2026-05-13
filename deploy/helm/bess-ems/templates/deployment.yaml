@@ -1,4 +1,18 @@
 {{- $root := . -}}
+{{- if gt (int $root.Values.replicaCount) 1 }}
+{{- fail "replicaCount > 1 is not supported until RM-M6-03 defines leader election or distributed per-asset locking" }}
+{{- end }}
+{{- if $root.Values.optimizationCore.transport.mtls.enabled }}
+{{- if not $root.Values.optimizationCore.transport.mtls.clientCertificateSecret }}
+{{- fail "optimizationCore.transport.mtls.clientCertificateSecret is required when optimizationCore.transport.mtls.enabled=true" }}
+{{- end }}
+{{- if not $root.Values.optimizationCore.transport.mtls.trustedServerCertificatesSecret }}
+{{- fail "optimizationCore.transport.mtls.trustedServerCertificatesSecret is required when optimizationCore.transport.mtls.enabled=true" }}
+{{- end }}
+{{- if not (hasPrefix "https://" $root.Values.optimizationCore.externalEndpoint) }}
+{{- fail "optimizationCore.transport.mtls.enabled requires optimizationCore.externalEndpoint to use https://" }}
+{{- end }}
+{{- end }}
 {{- if eq .Values.topology.mode "shared" }}
 {{- include "bess-ems.appDeployment" (dict "root" $root "name" (include "bess-ems.fullname" $root) "asset" nil "assetConfigName" (include "bess-ems.assetConfigName" $root) "assetConfigFile" "assets.json") }}
 {{- else }}
@@ -106,6 +120,12 @@ spec:
               value: {{ $root.Values.optimizationCore.expectedContractVersion | quote }}
             - name: Bess__OptimizationCoreFallbackBackend
               value: {{ $root.Values.optimizationCore.fallbackBackend | quote }}
+            {{- if $root.Values.optimizationCore.transport.mtls.enabled }}
+            - name: Bess__OptimizationCoreClientCertificatePath
+              value: /etc/bess-ems/optimization-core/client/tls.crt
+            - name: Bess__OptimizationCoreTrustedServerCertificatesPath
+              value: /etc/bess-ems/optimization-core/server
+            {{- end }}
             {{- end }}
             - name: Worker__CycleInterval
               value: {{ $root.Values.environment.workerCycleInterval | quote }}
@@ -136,6 +156,14 @@ spec:
             - name: optimization-core-socket
               mountPath: {{ $root.Values.optimizationCore.transport.uds.mountPath }}
             {{- end }}
+            {{- if $root.Values.optimizationCore.transport.mtls.enabled }}
+            - name: optimization-core-client-cert
+              mountPath: /etc/bess-ems/optimization-core/client
+              readOnly: true
+            - name: optimization-core-server-ca
+              mountPath: /etc/bess-ems/optimization-core/server
+              readOnly: true
+            {{- end }}
           resources:
             {{- toYaml $root.Values.resources | nindent 12 }}
       volumes:
@@ -145,6 +173,14 @@ spec:
         {{- if $root.Values.optimizationCore.transport.uds.enabled }}
         - name: optimization-core-socket
           emptyDir: {}
+        {{- end }}
+        {{- if $root.Values.optimizationCore.transport.mtls.enabled }}
+        - name: optimization-core-client-cert
+          secret:
+            secretName: {{ $root.Values.optimizationCore.transport.mtls.clientCertificateSecret | quote }}
+        - name: optimization-core-server-ca
+          secret:
+            secretName: {{ $root.Values.optimizationCore.transport.mtls.trustedServerCertificatesSecret | quote }}
         {{- end }}
       {{- with $root.Values.nodeSelector }}
       nodeSelector:

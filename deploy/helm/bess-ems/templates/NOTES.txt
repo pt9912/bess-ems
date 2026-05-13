@@ -20,3 +20,5 @@ Optimization-core:
 
 UDS and mTLS values are intentionally explicit. Production cross-host
 optimization-core deployments should use https+mTLS or UDS per ADR 0005.
+mTLS rendering requires an https:// externalEndpoint plus client and
+trusted-server certificate Secrets.
