@@ -76,7 +76,7 @@ help:
 	@echo "  make native-sanitizer           ASan + UBSan run on native test suite (RM-M3-09)"
 	@echo "  make native-coverage-report     Build gcovr report and print it (RM-M3-09)"
 	@echo "  make native-coverage-gate       100% line coverage gate, override BCC_COVERAGE_THRESHOLD (RM-M3-09)"
-	@echo "  make native-coverage-exclusions Audit GCOVR_EXCL blocks for Why: justifications (RM-M3-09)"
+	@echo "  make native-coverage-exclusions Reject GCOVR exclusion markers in native src/ (RM-M3-09)"
 	@echo ""
 	@echo "Maintenance:"
 	@echo "  make lock-refresh    Refresh packages.lock.json files in Docker (per docs/user/quality.md §1.4)"
@@ -332,36 +332,21 @@ native-coverage-gate:
 		--build-arg BCC_COVERAGE_THRESHOLD=$(BCC_COVERAGE_THRESHOLD) \
 		-t $(IMAGE_PREFIX)-native-coverage-gate:latest
 
-# native-coverage-exclusions: enumerate every GCOVR_EXCL_START block
-# in native/battery_control_core/src/ together with its mandatory
-# `// Why:` justification. Every exclusion MUST contain a Why: line
-# inside the START..STOP block; the audit script fails non-zero if
-# any block is missing it. Operators run this manually or as part
-# of a review checklist; RM-M3-11 wires it into the aggregated gate.
+# native-coverage-exclusions: reject every gcovr exclusion marker in
+# native/battery_control_core/src/. The native core keeps 100 % line
+# coverage without denominator carve-outs.
 native-coverage-exclusions:
-	@echo "[native-coverage-exclusions] auditing native/battery_control_core/src/ for GCOVR_EXCL blocks..."
+	@echo "[native-coverage-exclusions] auditing native/battery_control_core/src/ for gcovr exclusion markers..."
 	@awk ' \
-		FNR == 1 { in_block = 0; has_why = 0; block_start = 0 } \
-		/GCOVR_EXCL_START/ { in_block = 1; has_why = 0; block_start = FNR; printf "\n--- %s:%d  GCOVR_EXCL_START\n", FILENAME, FNR; next } \
-		/GCOVR_EXCL_STOP/ { \
-			if (in_block) { \
-				printf "--- %s:%d  GCOVR_EXCL_STOP\n", FILENAME, FNR; \
-				if (!has_why) { \
-					printf "ERROR: GCOVR_EXCL_START at %s:%d has no `// Why:` justification\n", FILENAME, block_start > "/dev/stderr"; \
-					err = 1; \
-				} \
-			} \
-			in_block = 0; next \
-		} \
-		in_block { \
-			print "    " $$0; \
-			if ($$0 ~ /\/\/[[:space:]]*Why:/) { has_why = 1 } \
+		BEGIN { marker = "GCOVR_EXCL_"; err = 0 } \
+		index($$0, marker "START") || index($$0, marker "STOP") { \
+			printf "ERROR: coverage exclusion marker is not allowed: %s:%d: %s\n", FILENAME, FNR, $$0 > "/dev/stderr"; \
+			err = 1; \
 		} \
 		END { exit err }' \
 		native/battery_control_core/src/*.c \
-		|| (echo "[native-coverage-exclusions] FAIL — at least one excluded region lacks a Why: justification" >&2; exit 1)
-	@echo ""
-	@echo "[native-coverage-exclusions] OK — every excluded region has a Why: justification"
+		|| (echo "[native-coverage-exclusions] FAIL — coverage exclusion markers are not allowed" >&2; exit 1)
+	@echo "[native-coverage-exclusions] OK — no coverage exclusion markers in native src/"
 
 # --- Welle 5 (partially active) --------------------------------------------
 

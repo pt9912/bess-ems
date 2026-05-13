@@ -90,9 +90,9 @@ dem vorherigen C++-Stand:
 - **Keine Exception-Maschinerie.** Der `try`/`catch (...)`-Wrapper
   als Defense-in-Depth gegen UB an der `extern "C"`-Grenze entfällt
   vollständig — C kann gar keine Exception werfen. Damit verschwindet
-  auch der `GCOVR_EXCL_START`/`STOP`-Block aus dem Coverage-Report;
+  auch der `GCOVR_EXCL`-Block aus dem Coverage-Report;
   RM-M3-09 erreicht 100 % Line-Coverage **ohne** Exclusion (vor dem
-  Pivot 96 % mit einem Why-pflichtigen Block).
+  Pivot 96 % mit einem Exclusion-Block).
 - **Keine libstdc++-Linkage.** Die `.so` ist auf 15 KB geschrumpft
   und hat **null `NEEDED`**-Einträge (`readelf -d`). Damit ist die
   ABI-Diskussion über glibc-Versionen / Debian-Releases / Ubuntu-
