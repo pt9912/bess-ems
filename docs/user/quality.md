@@ -683,12 +683,7 @@ Make-Target:
 make native-coverage-exclusions
 ```
 
-Es enumeriert jeden Block und versagt non-zero, wenn ein Block
-keinen `Why:`-Kommentar enthält. Zur RM-M3-09-Closure ist die
-Anzahl der Exclusions im `src/`-Tree gleich **null** (der frühere
-C++-`catch (...)`-Defense-in-Depth-Block wurde mit dem C-Pivot
-entfernt; ein zukünftiger PID-Slice (RM-M3-13) darf eine neue
-Ausnahme nur mit `Why:`-Kommentar einführen).
+Es gibt keine Coverage-Ausnahmen.
 
 ### 3.3 Monorepo-Gate
 
