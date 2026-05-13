@@ -43,7 +43,7 @@ nicht der Default. Der bestehende Code stuetzt diese Linie bereits:
 | Status | ID | Paket | DoD |
 | ------ | -- | ----- | --- |
 | ✅ | RM-M6-02-A | Hosting-ADR | ADR 0007 ist akzeptiert und schliesst `AR-OPEN-006`: shared Worker als Default, Worker-pro-Asset als Trigger-/Deployment-Pattern. |
-| 🟡 | RM-M6-02-B | Architektur-/Roadmap-Sync | `spec/architecture.md` §18 wird auf "Geschlossen mit ADR 0007" gesetzt; M6-Masterplan und Roadmap verweisen auf den Slice. |
+| ✅ | RM-M6-02-B | Architektur-/Roadmap-Sync | `spec/architecture.md` §18 ist auf "Geschlossen mit ADR 0007" gesetzt; M6-Masterplan und Roadmap verweisen auf den Slice. |
 | ⬜ | RM-M6-02-C | Multi-Asset-Konfigurationsvalidierung | Host-/Config-Pfad validiert mehrere Assets: eindeutige `asset_id`, nicht-leere Asset-Liste, klare Adapter-/Command-Sink-Zuordnung, keine stillen Duplikate. |
 | ⬜ | RM-M6-02-D | Orchestrierungs-Pins | Tests belegen shared-Worker-Default: ein Tick fan-outet ueber mehrere Assets, isoliert per-Asset Fehler und setzt `asset_id` in Metriken/Traces/Persistenz. Bestehende Pins duerfen genutzt, aber die M6-DoD muss explizit sichtbar sein. |
 | ⬜ | RM-M6-02-E | Folgearbeiten / Trigger | Parallel-Fanout, Worker-pro-Asset-Deployment, per-Asset-Sidecar und Multi-Asset-MPC werden als Trigger-Watch dokumentiert, falls sie nicht direkt implementiert werden. |
