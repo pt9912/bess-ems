@@ -73,10 +73,10 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
         var rawNode = LoadJson(filePath);
-        if (rawNode["assets"] is not null)
+        if (rawNode is JsonObject root && root.ContainsKey("assets"))
         {
             var node = ValidateNode(filePath, rawNode, _assetsSchema);
-            if (node["assets"] is not JsonArray assetsNode)
+            if (node is not JsonObject validatedRoot || validatedRoot["assets"] is not JsonArray assetsNode)
             {
                 throw new ConfigurationValidationException($"{filePath} has no asset list.");
             }

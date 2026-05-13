@@ -131,6 +131,22 @@ public sealed class JsonFileConfigurationLoaderTests
     }
 
     [Fact]
+    public void LoadAssets_rejects_non_object_root_as_configuration_validation()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson("""[]""");
+        try
+        {
+            var ex = Assert.Throws<ConfigurationValidationException>(() => loader.LoadAssets(path));
+            Assert.Contains("Schema validation failed", ex.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void Loads_vendor_neutral_modbus_profile()
     {
         var loader = new JsonFileConfigurationLoader(SchemaDirectory);
