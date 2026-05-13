@@ -3,7 +3,7 @@
 **Dokumenttyp:** Slice-Plan (Detail-Plan zum Master-Arbeitspaket RM-M6-04)
 **Status:** Abgeschlossen am 2026-05-13.
 **Bezug:**
-[`../in-progress/plan-RM-M6.md`](../in-progress/plan-RM-M6.md)
+[`plan-RM-M6.md`](plan-RM-M6.md)
 (M6-Masterplan),
 [`../done/plan-RM-M6-01.md`](../done/plan-RM-M6-01.md)
 (Operator-UI-Slice),

@@ -1,17 +1,19 @@
 # Notiz: M6-Folgearbeiten (Trigger-Watch)
 
 **Dokumenttyp:** Vorabklaerung / Trigger-Watch
-**Status:** Offen - Folgearbeiten aus RM-M6-02/RM-M6-05 ohne aktiven
-Implementierungsscope
+**Status:** Offen - Folgearbeiten aus RM-M6-02/RM-M6-05/RM-M6-06 ohne
+aktiven Implementierungsscope
 **Bezug:**
+[`../done/plan-RM-M6.md`](../done/plan-RM-M6.md)
+(M6-Masterplan, abgeschlossen am 2026-05-13),
 [`../done/plan-RM-M6-02.md`](../done/plan-RM-M6-02.md)
 (Multi-Asset-Hosting-Slice, abgeschlossen am 2026-05-13),
 [`../done/plan-RM-M6-03.md`](../done/plan-RM-M6-03.md)
 (Kubernetes-/Helm-Slice, abgeschlossen am 2026-05-13),
 [`../done/plan-RM-M6-05.md`](../done/plan-RM-M6-05.md)
 (Edge-Controller-Boundary-Slice, abgeschlossen am 2026-05-13),
-[`../in-progress/plan-RM-M6.md`](../in-progress/plan-RM-M6.md)
-(M6-Masterplan),
+[`../done/plan-RM-M6-06.md`](../done/plan-RM-M6-06.md)
+(Regelleistungs-Zertifizierungsgate, abgeschlossen am 2026-05-13),
 [`../../adr/0007-multi-asset-hosting-strategy.md`](../../adr/0007-multi-asset-hosting-strategy.md)
 (shared Worker als M6-Default),
 [`../../adr/0008-edge-controller-boundary.md`](../../adr/0008-edge-controller-boundary.md)
@@ -24,11 +26,13 @@ Implementierungsscope
 RM-M6-02 hat den Multi-Asset-Default festgelegt und gepinnt: shared
 Worker mit per-Asset fan-out. RM-M6-05 hat die Edge-Controller-Grenze
 festgelegt: harte Echtzeit, zertifizierungsnahe Schutzlogik und finale
-Aktorensperren bleiben ausserhalb des Docker-EMS. Einige Folgearbeiten
-bleiben bewusst trigger-getrieben, weil sie eigene Topologie-,
-Performance-, Produkt- oder Herstellerentscheidungen brauchen. Diese
-Notiz haelt sie sichtbar, ohne die abgeschlossenen Slices mit
-spekulativer Implementierung zu ueberladen.
+Aktorensperren bleiben ausserhalb des Docker-EMS. RM-M6-06 hat die
+zertifizierungsnahe Regelleistungsintegration als Readiness- und
+Trigger-Gate geschlossen. Einige Folgearbeiten bleiben bewusst
+trigger-getrieben, weil sie eigene Topologie-, Performance-, Produkt-,
+TSO-, Compliance- oder Herstellerentscheidungen brauchen. Diese Notiz
+haelt sie sichtbar, ohne die abgeschlossenen Slices mit spekulativer
+Implementierung zu ueberladen.
 
 Die Items hier werden beim Start von RM-M6-01 (Operator UI), RM-M6-03
 (Kubernetes/Helm), beim Architektur-Review oder beim ersten produktiven
@@ -247,3 +251,45 @@ Protokoll- oder Standortvertrag ist aktiv.
 **Aktivierungs-Pfad:** eigener
 `plan-RM-M6-05-FUP-edge-adapter.md` oder Teil von RM-M6-06, falls die
 zertifizierungsnahe Regelleistungsintegration den Edge-Trigger ausloest.
+
+---
+
+## Item F-M6-06-01: Produktive zertifizierungsnahe Regelleistungswelle
+
+**Quelle:** RM-M6-06, ADR 0008 und M4-Folgearbeiten F-08..F-12. Die
+Regelleistungsbasis existiert, aber es gibt kein konkretes Produkt-,
+TSO-/DSO-, Aggregator-, Vendor- oder Anlagenkonzept fuer eine
+zertifizierungsnahe Aktivierung.
+
+**Trigger** (alle Pflicht):
+
+- Konkretes Produkt und Marktrolle sind benannt, z. B. FCR, aFRR,
+  mFRR, Reservekapazitaet, Aktivierungsenergie, Aggregator- oder
+  Direktvermarktungsrolle.
+- Externe Spezifikation liegt vor: Protokoll, Authentisierung,
+  Payload, Zeitbasis, Quittung/Reporting, Retry- und
+  Failover-Verhalten.
+- Nachweisumfang ist definiert: Praequalifikation, Audit, Replay, HIL,
+  Failover-/Reconnect-Nachweis, Zeitstempel- und Dedupe-Anforderung.
+- Security-Profile ist materialisierbar: TLS/AuthN/AuthZ,
+  Zertifikate/Secrets, Rotation, Netzwerksegmentierung und
+  Production-Gate-Signal.
+- Echtzeit- und Schutzgrenze ist entschieden: EMS-only,
+  Edge-/Herstellercontroller, BMS/PCS oder Hardware-Schutzkette.
+
+**Scope-Skizze** (wenn der Trigger zuendet):
+
+- Product-rule-Matrix fuer Aktivierung, Reservierung, Abrufdauer,
+  Toleranzen, Rampen, Vorzeichen, Nachweisfenster und Sanktionen.
+- Konkreter Source-Wire-Adapter oder Adapter-Erweiterung, z. B. aus
+  M4 F-09 fuer OPC-UA/MQTT/HTTP-Aktivierungssignale.
+- TSO-/Aggregator-Quittung und Reporting, ggf. M4 F-10.
+- Security-/RuntimeProfile-Gate, ggf. M4 F-12.
+- HIL-/Replay-Paket mit Failover, Reconnect, Dedupe, Clock-Skew,
+  Timebase-Degraded und Edge-/Hardware-Fallbacks.
+- Operator-Runbook fuer Aktivierung, Sperre, Rollback, Incident und
+  Verantwortlichkeiten zwischen Betreiber, EMS und Herstellersteuerung.
+
+**Aktivierungs-Pfad:** eigener
+`plan-RM-M6-06-FUP-regelleistung-certification.md` oder ein Produktplan,
+der die relevanten M4-Folgearbeiten explizit zieht.

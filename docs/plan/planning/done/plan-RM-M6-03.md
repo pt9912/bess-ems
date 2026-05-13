@@ -4,7 +4,7 @@
 **Status:** Abgeschlossen am 2026-05-13. Aktiviert am 2026-05-13 nach
 Abschluss von RM-M6-02.
 **Bezug:**
-[`../in-progress/plan-RM-M6.md`](../in-progress/plan-RM-M6.md)
+[`plan-RM-M6.md`](plan-RM-M6.md)
 (M6-Masterplan),
 [`plan-RM-M6-02.md`](plan-RM-M6-02.md)
 (Multi-Asset-Hosting-Default),

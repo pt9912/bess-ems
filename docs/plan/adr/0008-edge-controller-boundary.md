@@ -10,10 +10,12 @@ Echtzeitfaehigkeit.
 §10.3 (Hardware-Schutzgrenze),
 [`../../../spec/lastenheft.md`](../../../spec/lastenheft.md)
 LH-SAFE-001, LH-RT-004 und LH-RISK-001,
-[`../planning/in-progress/plan-RM-M6.md`](../planning/in-progress/plan-RM-M6.md)
+[`../planning/done/plan-RM-M6.md`](../planning/done/plan-RM-M6.md)
 (RM-M6-05),
 [`../planning/done/plan-RM-M6-05.md`](../planning/done/plan-RM-M6-05.md)
 (Detail-Slice),
+[`../planning/done/plan-RM-M6-06.md`](../planning/done/plan-RM-M6-06.md)
+(Regelleistungs-Zertifizierungsgate),
 [`0005-optimization-core-sidecar-transport.md`](0005-optimization-core-sidecar-transport.md)
 (Sidecar-/Transportgrenze),
 [`0007-multi-asset-hosting-strategy.md`](0007-multi-asset-hosting-strategy.md)
@@ -119,9 +121,10 @@ Herstellerkontext untergeordnet.
   konkreter Edge-Contract und Health-Status vorhanden sind.
 - Worker-pro-Asset aus ADR 0007 bleibt ein moegliches Deployment-Pattern,
   aber keine automatische Edge-Implementierung.
-- RM-M6-06 darf zertifizierungsnahe Regelleistung nur mit konkretem
-  Produkt-/TSO-/Anlagenkonzept starten. Falls harte Echtzeit betroffen
-  ist, muss RM-M6-06 auf diesen Edge-Boundary verweisen.
+- RM-M6-06 ist als Readiness-Gate geschlossen. Eine produktive
+  zertifizierungsnahe Regelleistungswelle darf nur mit konkretem
+  Produkt-/TSO-/Anlagenkonzept starten und muss auf diesen
+  Edge-Boundary verweisen, sobald harte Echtzeit betroffen ist.
 - Folgearbeiten werden als Trigger-Watch gefuehrt, bis ein Vendor-,
   Protokoll- oder Standorttrigger vorliegt.
 

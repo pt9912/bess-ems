@@ -4,7 +4,7 @@
 **Status:** Abgeschlossen am 2026-05-13. Aktiviert am 2026-05-13 als
 erster M6-Slice.
 **Bezug:**
-[`../in-progress/plan-RM-M6.md`](../in-progress/plan-RM-M6.md)
+[`plan-RM-M6.md`](plan-RM-M6.md)
 (Master-Plan),
 [`../../adr/0007-multi-asset-hosting-strategy.md`](../../adr/0007-multi-asset-hosting-strategy.md)
 (Hosting-ADR),

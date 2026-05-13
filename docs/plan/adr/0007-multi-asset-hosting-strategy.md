@@ -8,7 +8,7 @@ Schliesst `AR-OPEN-006`.
 **Bezug:**
 [`../../../spec/architecture.md`](../../../spec/architecture.md)
 §18 (`AR-OPEN-006`),
-[`../planning/in-progress/plan-RM-M6.md`](../planning/in-progress/plan-RM-M6.md)
+[`../planning/done/plan-RM-M6.md`](../planning/done/plan-RM-M6.md)
 (RM-M6-02),
 [`../planning/done/plan-RM-M6-02.md`](../planning/done/plan-RM-M6-02.md)
 (Detail-Slice),

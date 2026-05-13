@@ -722,7 +722,8 @@ Phase 2 (M3)         : Native Library via P/Invoke
                        (Constraint, Ramp, PID, schnelle Plausi)
 Phase 3 (M5)         : Native/externes Sidecar via gRPC
                        (MPC, State-Space, Solver-Anbindung)
-Phase 4 (optional)   : Shared Memory / CPU Pinning / Edge Controller
+Phase 4 (M6)         : Multi-Asset, UI, Kubernetes, Timescale-Option,
+                       Edge-/Zertifizierungsgates ohne harte RT-Zusage
 ```
 
 ### 13.2 Bibliothek vs. Sidecar — Entscheidungskriterien

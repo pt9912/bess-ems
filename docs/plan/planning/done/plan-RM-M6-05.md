@@ -3,7 +3,7 @@
 **Dokumenttyp:** Slice-Plan (Detail-Plan zum Master-Arbeitspaket RM-M6-05)
 **Status:** Abgeschlossen am 2026-05-13.
 **Bezug:**
-[`../in-progress/plan-RM-M6.md`](../in-progress/plan-RM-M6.md)
+[`plan-RM-M6.md`](plan-RM-M6.md)
 (M6-Masterplan),
 [`../../adr/0008-edge-controller-boundary.md`](../../adr/0008-edge-controller-boundary.md)
 (Edge-Controller-Boundary),
