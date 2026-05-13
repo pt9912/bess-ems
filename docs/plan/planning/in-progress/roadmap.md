@@ -181,17 +181,18 @@ unter `in-progress/`.
 > Gate und source-neutralen Preisreihen-Port. Folgearbeiten F-M5-01..05
 > bleiben trigger-getrieben in
 > [`../open/note-RM-M5-followups.md`](../open/note-RM-M5-followups.md).
-> **M6 aktiviert** ([`plan-RM-M6.md`](plan-RM-M6.md)): erster Slice
-> RM-M6-02 ist abgeschlossen
-> ([`../done/plan-RM-M6-02.md`](../done/plan-RM-M6-02.md)). ADR 0007
-> schliesst `AR-OPEN-006`: shared Worker mit per-Asset fan-out ist der
-> Default, Worker-pro-Asset bleibt Deployment-/Isolation-Pattern.
-> Parallel-Fanout, Worker-pro-Asset-Helm, per-Asset-Sidecar und
-> Multi-Asset-MPC bleiben trigger-getrieben in
+> **M6 aktiviert** ([`plan-RM-M6.md`](plan-RM-M6.md)): RM-M6-02
+> ([`../done/plan-RM-M6-02.md`](../done/plan-RM-M6-02.md)) und RM-M6-03
+> ([`../done/plan-RM-M6-03.md`](../done/plan-RM-M6-03.md)) sind
+> abgeschlossen. ADR 0007 schliesst `AR-OPEN-006`: shared Worker mit
+> per-Asset fan-out ist der Default, Worker-pro-Asset bleibt
+> Deployment-/Isolation-Pattern. Parallel-Fanout, Cluster-Smoke,
+> per-Asset-Sidecar, Worker-pro-Asset-Hardening und Multi-Asset-MPC
+> bleiben trigger-getrieben in
 > [`../open/note-RM-M6-followups.md`](../open/note-RM-M6-followups.md).
-> Operator-UI, Kubernetes/Helm, TimescaleDB, Edge und
-> zertifizierungsnahe Regelleistungsintegration bleiben als
-> nachgelagerte M6-Slices eingeplant.
+> Operator-UI, TimescaleDB, Edge und zertifizierungsnahe
+> Regelleistungsintegration bleiben als nachgelagerte M6-Slices
+> eingeplant.
 >
 > **M2-Welle 1 (Optimization-Slice, abgeschlossen):**
 > [`../done/plan-RM-M2-optimization.md`](../done/plan-RM-M2-optimization.md)

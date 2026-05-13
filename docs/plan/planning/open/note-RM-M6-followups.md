@@ -78,8 +78,8 @@ Domain-Modell.
 
 **Trigger** (eines reicht):
 
-- RM-M6-03 verlangt getrennte Pods, ServiceAccounts, Secrets,
-  PersistentVolumes oder Restart-Domaenen pro Asset.
+- Ein Kubernetes-Folge-Slice verlangt getrennte Pods, ServiceAccounts,
+  Secrets, PersistentVolumes oder Restart-Domaenen pro Asset.
 - Mandanten-, Betreiber-, Audit- oder Zertifizierungsgrenzen verbieten
   gemeinsame Prozess-/Secret-Domaenen.
 - Ein Asset-Fehler stoert trotz lokaler Fehlerbehandlung andere Assets
@@ -97,8 +97,10 @@ Domain-Modell.
 - CI-/Smoke-Pin fuer mindestens zwei Worker-Instanzen mit getrennten
   Asset-Konfigurationen.
 
-**Aktivierungs-Pfad:** bevorzugt direkt in RM-M6-03, weil Helm der
-natuerliche Lieferort ist.
+**Aktivierungs-Pfad:** eigener RM-M6-Folgeplan oder Teil eines
+Kubernetes-Hardening-/Cluster-Smoke-Slices. RM-M6-03 liefert bereits das
+grundlegende Worker-pro-Asset-Rendering; weitere Trennung von Secrets,
+ServiceAccounts oder Fault-Domains ist Folgehaertung.
 
 ---
 
