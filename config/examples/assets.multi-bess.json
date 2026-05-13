@@ -1,0 +1,30 @@
+{
+  "assets": [
+    {
+      "asset_id": "bess-a",
+      "capacity_kwh": 100,
+      "max_charge_power_kw": 50,
+      "max_discharge_power_kw": 50,
+      "min_soc_percent": 10,
+      "max_soc_percent": 90,
+      "charge_efficiency": 0.95,
+      "discharge_efficiency": 0.95,
+      "max_ramp_kw_per_second": 25,
+      "min_operating_temperature_celsius": -20,
+      "max_operating_temperature_celsius": 55
+    },
+    {
+      "asset_id": "bess-b",
+      "capacity_kwh": 80,
+      "max_charge_power_kw": 40,
+      "max_discharge_power_kw": 40,
+      "min_soc_percent": 15,
+      "max_soc_percent": 85,
+      "charge_efficiency": 0.94,
+      "discharge_efficiency": 0.94,
+      "max_ramp_kw_per_second": 20,
+      "min_operating_temperature_celsius": -20,
+      "max_operating_temperature_celsius": 55
+    }
+  ]
+}

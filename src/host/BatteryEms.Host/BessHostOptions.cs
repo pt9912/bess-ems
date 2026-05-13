@@ -13,7 +13,8 @@ public sealed class BessHostOptions
     public string SchemaDirectory { get; set; } = string.Empty;
 
     // Absolute or relative path to the asset configuration JSON. The
-    // file must validate against asset.schema.json. Required.
+    // file may be a single asset (asset.schema.json) or an asset list
+    // (assets.schema.json). Required.
     public string AssetConfigPath { get; set; } = string.Empty;
 
     // Optional path to a schedule JSON. When set, the schedule is

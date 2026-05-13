@@ -47,6 +47,90 @@ public sealed class JsonFileConfigurationLoaderTests
     }
 
     [Fact]
+    public void LoadAssets_accepts_single_asset_config_for_backward_compatibility()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var assets = loader.LoadAssets(Path.Combine(ExamplesDirectory, "asset.single-bess.json"));
+
+        var asset = Assert.Single(assets);
+        Assert.Equal("single-bess-1", asset.AssetId);
+    }
+
+    [Fact]
+    public void LoadAssets_loads_multi_asset_config()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var assets = loader.LoadAssets(Path.Combine(ExamplesDirectory, "assets.multi-bess.json"));
+
+        Assert.Equal(["bess-a", "bess-b"], assets.Select(a => a.AssetId).ToArray());
+    }
+
+    [Fact]
+    public void LoadAssets_rejects_duplicate_asset_ids()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson(
+            """
+            {
+              "assets": [
+                {
+                  "asset_id": "duplicate-bess",
+                  "capacity_kwh": 100,
+                  "max_charge_power_kw": 50,
+                  "max_discharge_power_kw": 50,
+                  "min_soc_percent": 10,
+                  "max_soc_percent": 90,
+                  "charge_efficiency": 0.95,
+                  "discharge_efficiency": 0.95,
+                  "max_ramp_kw_per_second": 25,
+                  "min_operating_temperature_celsius": -20,
+                  "max_operating_temperature_celsius": 55
+                },
+                {
+                  "asset_id": "duplicate-bess",
+                  "capacity_kwh": 120,
+                  "max_charge_power_kw": 60,
+                  "max_discharge_power_kw": 60,
+                  "min_soc_percent": 15,
+                  "max_soc_percent": 85,
+                  "charge_efficiency": 0.94,
+                  "discharge_efficiency": 0.94,
+                  "max_ramp_kw_per_second": 30,
+                  "min_operating_temperature_celsius": -20,
+                  "max_operating_temperature_celsius": 55
+                }
+              ]
+            }
+            """);
+        try
+        {
+            var ex = Assert.Throws<ConfigurationValidationException>(() => loader.LoadAssets(path));
+            Assert.Contains("duplicate asset_id", ex.Message, StringComparison.Ordinal);
+            Assert.Contains("duplicate-bess", ex.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void LoadAssets_rejects_empty_asset_list()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson("""{ "assets": [] }""");
+        try
+        {
+            var ex = Assert.Throws<ConfigurationValidationException>(() => loader.LoadAssets(path));
+            Assert.Contains("Schema validation failed", ex.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void Loads_vendor_neutral_modbus_profile()
     {
         var loader = new JsonFileConfigurationLoader(SchemaDirectory);

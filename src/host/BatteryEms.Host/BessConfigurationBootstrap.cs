@@ -25,7 +25,11 @@ internal static class BessConfigurationBootstrap
         }
 
         var loader = new JsonFileConfigurationLoader(options.SchemaDirectory);
-        var asset = loader.LoadAsset(options.AssetConfigPath);
+        var assets = loader.LoadAssets(options.AssetConfigPath);
+        if (assets.Count == 0)
+        {
+            throw new InvalidOperationException("Bess:AssetConfigPath must define at least one asset.");
+        }
 
         Schedule? schedule = null;
         if (!string.IsNullOrWhiteSpace(options.ScheduleConfigPath))
@@ -57,16 +61,19 @@ internal static class BessConfigurationBootstrap
             opcua = loader.LoadOpcUaMapping(options.OpcUaMappingPath);
         }
 
-        return new BessRuntimeConfiguration(asset, schedule, retention, modbus, mqtt, opcua);
+        return new BessRuntimeConfiguration(assets, schedule, retention, modbus, mqtt, opcua);
     }
 
-    public static void SeedAssetRegistry(IBatteryAssetRegistry registry, BatteryAsset asset)
+    public static void SeedAssetRegistry(IBatteryAssetRegistry registry, IReadOnlyList<BatteryAsset> assets)
     {
         ArgumentNullException.ThrowIfNull(registry);
-        ArgumentNullException.ThrowIfNull(asset);
+        ArgumentNullException.ThrowIfNull(assets);
         if (registry is InMemoryBatteryAssetRegistry inMemory)
         {
-            inMemory.Register(asset);
+            foreach (var asset in assets)
+            {
+                inMemory.Register(asset);
+            }
             return;
         }
         throw new InvalidOperationException(
@@ -109,9 +116,16 @@ internal static class BessConfigurationBootstrap
 }
 
 internal sealed record BessRuntimeConfiguration(
-    BatteryAsset Asset,
+    IReadOnlyList<BatteryAsset> Assets,
     Schedule? Schedule,
     RetentionPolicy? Retention,
     ModbusMappingConfiguration? ModbusMapping,
     MqttMappingConfiguration? MqttMapping,
-    OpcUaMappingConfiguration? OpcUaMapping);
+    OpcUaMappingConfiguration? OpcUaMapping)
+{
+    public BatteryAsset SingleAsset =>
+        Assets.Count == 1
+            ? Assets[0]
+            : throw new InvalidOperationException(
+                $"Configuration contains {Assets.Count} assets; this path requires exactly one asset.");
+}

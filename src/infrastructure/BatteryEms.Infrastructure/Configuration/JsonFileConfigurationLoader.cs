@@ -19,6 +19,7 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
     private static readonly string[] SupportedOpcUaSchemaVersions = ["v1"];
 
     private readonly JsonSchema _assetSchema;
+    private readonly JsonSchema _assetsSchema;
     private readonly JsonSchema _modbusSchema;
     private readonly JsonSchema _mqttSchema;
     private readonly JsonSchema _opcuaSchema;
@@ -47,6 +48,7 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
         _ = LoadSchema(schemaDirectory, "device-point.schema.json");
 
         _assetSchema = LoadSchema(schemaDirectory, "asset.schema.json");
+        _assetsSchema = LoadSchema(schemaDirectory, "assets.schema.json");
         _modbusSchema = LoadSchema(schemaDirectory, "modbus-mapping.schema.json");
         _mqttSchema = LoadSchema(schemaDirectory, "mqtt-mapping.schema.json");
         _opcuaSchema = LoadSchema(schemaDirectory, "opcua-mapping.schema.json");
@@ -64,7 +66,50 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
     public BatteryAsset LoadAsset(string filePath)
     {
         var node = LoadAndValidate(filePath, _assetSchema);
+        return BuildAsset(filePath, node);
+    }
 
+    public IReadOnlyList<BatteryAsset> LoadAssets(string filePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+        var rawNode = LoadJson(filePath);
+        if (rawNode["assets"] is not null)
+        {
+            var node = ValidateNode(filePath, rawNode, _assetsSchema);
+            if (node["assets"] is not JsonArray assetsNode)
+            {
+                throw new ConfigurationValidationException($"{filePath} has no asset list.");
+            }
+
+            var assets = new List<BatteryAsset>(assetsNode.Count);
+            foreach (var item in assetsNode)
+            {
+                if (item is null)
+                {
+                    throw new ConfigurationValidationException($"{filePath} contains an empty asset entry.");
+                }
+                assets.Add(BuildAsset(filePath, item));
+            }
+
+            var duplicates = assets
+                .GroupBy(a => a.AssetId, StringComparer.Ordinal)
+                .Where(g => g.Count() > 1)
+                .Select(g => g.Key)
+                .ToArray();
+            if (duplicates.Length > 0)
+            {
+                throw new ConfigurationValidationException(
+                    $"{filePath} contains duplicate asset_id values: {string.Join(", ", duplicates)}.");
+            }
+
+            return assets;
+        }
+
+        return [BuildAsset(filePath, ValidateNode(filePath, rawNode, _assetSchema))];
+    }
+
+    private static BatteryAsset BuildAsset(string filePath, JsonNode node)
+    {
         try
         {
             return new BatteryAsset(
@@ -372,6 +417,12 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
     private static JsonNode LoadAndValidate(string filePath, JsonSchema schema)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+        return ValidateNode(filePath, LoadJson(filePath), schema);
+    }
+
+    private static JsonNode LoadJson(string filePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
         if (!File.Exists(filePath))
         {
             throw new ConfigurationValidationException($"Configuration file not found: {filePath}");
@@ -392,6 +443,11 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
             throw new ConfigurationValidationException($"Configuration file is empty: {filePath}");
         }
 
+        return node;
+    }
+
+    private static JsonNode ValidateNode(string filePath, JsonNode node, JsonSchema schema)
+    {
         // JsonSchema.Net 8.0 broke the JsonNode-based Evaluate signature
         // in favour of JsonElement (cuts allocations, matches the
         // System.Text.Json zero-copy idiom). Deserialize<JsonElement>

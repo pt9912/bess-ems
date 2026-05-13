@@ -6,6 +6,8 @@ public interface IConfigurationLoader
 {
     BatteryAsset LoadAsset(string filePath);
 
+    IReadOnlyList<BatteryAsset> LoadAssets(string filePath);
+
     ModbusMappingConfiguration LoadModbusMapping(string filePath);
 
     MqttMappingConfiguration LoadMqttMapping(string filePath);

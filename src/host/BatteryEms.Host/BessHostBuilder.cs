@@ -67,7 +67,10 @@ public static class BessHostBuilder
         ConfigureOptimization(builder.Services, hostOptions);
         builder.Services.AddBessTelemetry();
         builder.Services.AddBessTracing();
-        builder.Services.AddSingleton(runtimeConfig.Asset);
+        if (runtimeConfig.Assets.Count == 1)
+        {
+            builder.Services.AddSingleton(runtimeConfig.SingleAsset);
+        }
         ConfigureIoAdapters(builder.Services, hostOptions, runtimeConfig);
         builder.Services.AddBessWorker(builder.Configuration);
         builder.Services.AddApiTokenAuth(builder.Configuration);
@@ -107,17 +110,18 @@ public static class BessHostBuilder
         BessRuntimeConfiguration runtimeConfig)
     {
         var family = SelectIoAdapterFamily(hostOptions, runtimeConfig);
+        EnsureIoAdapterAssetCardinality(family, runtimeConfig);
         switch (family)
         {
             case IoAdapterTriage.Family.Modbus:
                 services.AddBessModbus(
                     runtimeConfig.ModbusMapping!,
-                    ModbusAdapterOptions.Defaults(hostOptions.ModbusHost!, hostOptions.ModbusPort, runtimeConfig.Asset.AssetId));
+                    ModbusAdapterOptions.Defaults(hostOptions.ModbusHost!, hostOptions.ModbusPort, runtimeConfig.SingleAsset.AssetId));
                 break;
             case IoAdapterTriage.Family.Mqtt:
                 services.AddBessMqtt(
                     runtimeConfig.MqttMapping!,
-                    MqttAdapterOptions.Defaults(hostOptions.MqttBrokerHost!, hostOptions.MqttBrokerPort, hostOptions.MqttClientId!, runtimeConfig.Asset.AssetId));
+                    MqttAdapterOptions.Defaults(hostOptions.MqttBrokerHost!, hostOptions.MqttBrokerPort, hostOptions.MqttClientId!, runtimeConfig.SingleAsset.AssetId));
                 break;
             case IoAdapterTriage.Family.OpcUa:
                 services.AddBessOpcUa(
@@ -130,6 +134,22 @@ public static class BessHostBuilder
                 services.AddSingleton<IBatteryCommandSink, NoOpBatteryCommandSink>();
                 break;
         }
+    }
+
+    private static void EnsureIoAdapterAssetCardinality(
+        IoAdapterTriage.Family family,
+        BessRuntimeConfiguration runtimeConfig)
+    {
+        if (family == IoAdapterTriage.Family.None || runtimeConfig.Assets.Count == 1)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Configured IO adapter family '{family}' requires exactly one asset, "
+            + $"but Bess:AssetConfigPath contains {runtimeConfig.Assets.Count} assets. "
+            + "Multi-asset configs are currently supported only with NoOp IO until "
+            + "per-asset adapter and command-sink mapping is configured.");
     }
 
     private static IoAdapterTriage.Family SelectIoAdapterFamily(
@@ -176,7 +196,7 @@ public static class BessHostBuilder
     private static void SeedRuntimeState(WebApplication app, BessRuntimeConfiguration runtimeConfig)
     {
         var assets = app.Services.GetRequiredService<IBatteryAssetRegistry>();
-        BessConfigurationBootstrap.SeedAssetRegistry(assets, runtimeConfig.Asset);
+        BessConfigurationBootstrap.SeedAssetRegistry(assets, runtimeConfig.Assets);
         if (runtimeConfig.Schedule is not null)
         {
             var schedules = app.Services.GetRequiredService<IScheduleRepository>();
