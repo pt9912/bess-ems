@@ -2032,7 +2032,7 @@ Wärtsilä, BYD, CATL, LG Energy Solution, Samsung SDI und Saft bleiben
 bis zur Verfügbarkeit öffentlicher oder projektvertraglich nutzbarer
 Schnittstellendokumentation unpriorisiert.
 
-**Begründungsquelle:** [`docs/plan/planning/open/note-vendor-shortlist.md`](../docs/plan/planning/open/note-vendor-shortlist.md).
+**Begründungsquelle:** [`docs/plan/planning/done/note-vendor-shortlist.md`](../docs/plan/planning/done/note-vendor-shortlist.md).
 
 ### Arbeitsstand zu LH-OPEN-003 — Marktpreisquellen
 
