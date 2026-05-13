@@ -849,7 +849,7 @@ zu finden.
 | AR-OPEN-003 | Persistenz-Stack: EF Core, Dapper oder Mischung?                  | Offen  |
 | AR-OPEN-004 | Fahrplanimport-Format (CSV, JSON, ENTSO-E, proprietär)?           | Offen  |
 | AR-OPEN-005 | Konkrete Topic-/Registerprofile für die ersten Hersteller?        | Geschlossen mit LH-OPEN-001 — Reihenfolge: SunSpec/Socomec, Victron, SMA; Sungrow nur nach Rechtsklärung. |
-| AR-OPEN-006 | Strategie für Multi-Asset-Hosting (Worker-pro-Asset vs. shared)?  | Offen  |
+| AR-OPEN-006 | Strategie für Multi-Asset-Hosting (Worker-pro-Asset vs. shared)?  | Geschlossen mit [ADR 0007](../docs/plan/adr/0007-multi-asset-hosting-strategy.md) — shared Worker mit per-Asset fan-out ist der M6-Default; Worker-pro-Asset bleibt ein Deployment-/Isolation-Pattern fuer harte Fault-Domain-, Mandanten- oder Edge-Anforderungen. |
 | AR-OPEN-007 | Authentifizierungsverfahren (API-Token, OIDC, mTLS)?              | Offen  |
 | AR-OPEN-008 | Wann wird `BatteryEms.Application` in eigene Projekte (Realtime, Control, Markets, Optimization) gesplittet, oder bleibt es ein Modul mit Namespaces? | Offen  |
 | AR-OPEN-009 | Boundary-Test-Tooling: NetArchTest oder ArchUnitNET?              | Offen  |

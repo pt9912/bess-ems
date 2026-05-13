@@ -507,7 +507,7 @@ F-M5-12 in `note-RM-M5-followups.md`.
 5. **F-M5-12-Trigger-Watch.** Sub-Slice-D-Closure-Checkliste
    ergänzt einen Punkt „Hat einer der ADR-0006 §6-Trigger gezündet
    während M5-02-Lieferung?". Wenn ja, F-M5-12-Aktivierung anstoßen
-   (eigene ADR 0007).
+   (eigene Folge-ADR im naechsten freien ADR-Slot).
 
 Bis ein Trigger zündet bleibt diese ADR `Accepted` und Local-First
 mit OSQP ist die produktive Backend-Linie für die MPC-Surface.

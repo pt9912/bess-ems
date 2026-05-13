@@ -2,8 +2,9 @@
 
 **Dokumenttyp:** Detailplan / M6 (aktiv)
 **Status:** In Arbeit - aktiviert am 2026-05-13 nach Abschluss von M5.
-Erstes Arbeitspaket ist RM-M6-02 als Architektur-/Hosting-Slice zur
-Schliessung von `AR-OPEN-006` (Worker-pro-Asset vs. shared Worker).
+Erstes Arbeitspaket ist RM-M6-02 als Architektur-/Hosting-Slice;
+`AR-OPEN-006` ist mit ADR 0007 geschlossen (shared Worker als Default,
+Worker-pro-Asset als Deployment-/Isolation-Pattern).
 **Bezug:**
 [`roadmap.md`](roadmap.md) (M6),
 [`../../../../spec/architecture.md`](../../../../spec/architecture.md)
@@ -16,7 +17,9 @@ LH-OPEN-005, LH-OPEN-006),
 [`../done/plan-RM-M5.md`](../done/plan-RM-M5.md)
 (M5-Closure und post-M5-Grenzen),
 [`../open/note-RM-M5-followups.md`](../open/note-RM-M5-followups.md)
-(Sidecar-/MPC-Trigger-Watch)
+(Sidecar-/MPC-Trigger-Watch),
+[`../../adr/0007-multi-asset-hosting-strategy.md`](../../adr/0007-multi-asset-hosting-strategy.md)
+(Multi-Asset-Hosting-Strategie)
 
 ---
 
@@ -76,7 +79,7 @@ Roadmap, Lastenheft und Architektur sichtbar.
 | ----- | --------- |
 | M5-Closure | ✅ `../done/plan-RM-M5.md` ist geschlossen; RM-M5-01..07 sind gruen. |
 | API-first | Operator-Funktionen bleiben bis zur UI ueber HTTP-API, AuthN/AuthZ und Audit nutzbar. |
-| Multi-Asset-Blocker | `AR-OPEN-006` ist offen und blockiert konkrete Flotten-, UI- und Kubernetes-Topologieentscheidungen. |
+| Multi-Asset-Blocker | ✅ `AR-OPEN-006` ist mit ADR 0007 geschlossen; konkrete Flotten-, UI- und Kubernetes-Slices referenzieren den shared-Worker-Default. |
 | Timescale-Grenze | PostgreSQL bleibt Default; TimescaleDB darf nur kompatible Erweiterung sein. |
 | Edge-Grenze | Harte Echtzeit und zertifizierungsrelevante Schutzfunktionen bleiben ausserhalb des Docker-Regelkreises oder brauchen eigenen Edge-/Herstellerpfad. |
 
@@ -87,7 +90,7 @@ Roadmap, Lastenheft und Architektur sichtbar.
 | Status | ID | Paket | DoD |
 | ------ | -- | ----- | --- |
 | ⬜ | RM-M6-01 | Operator UI (Web) | API-first Web-Shell fuer vorhandene Operator-Funktionen. Nutzt bestehende AuthN/AuthZ-/Audit- und HTTP-Pfade; keine fachliche Bypass-Logik. Erste Views: Health/Status, aktive Fahrplaene, Optimierungs-/Replay-Run-Liste und Emergency-/Operator-Stop-Status. Start erst nach RM-M6-02-Entscheidung, damit Asset-Auswahl und Mandanten-/Flottenmodell nicht im UI erfunden werden. |
-| 🟡 | RM-M6-02 | Multi-Asset-Flottensteuerung / Hosting-Strategie | Erstes M6-Arbeitspaket. Schliesst `AR-OPEN-006` mit ADR: Worker-pro-Asset vs. shared Worker, Asset-Isolation, per-Asset Locking/Clocking, Konfigurationsschema, Persistenz-/Metrik-Labels, Fehlerisolation, Sidecar-Topologie und Rollout-Folgen. Mindestnachweise: Architektur-/ADR-Update, Roadmap-/Plan-Sync, Tests fuer Konfigurationsvalidierung und mindestens ein Multi-Asset-Orchestrierungs-Pin ohne MPC-Coupling. |
+| 🟡 | RM-M6-02 | Multi-Asset-Flottensteuerung / Hosting-Strategie | Slice-Plan: [`plan-RM-M6-02.md`](plan-RM-M6-02.md). ADR 0007 schliesst `AR-OPEN-006`: shared Worker mit per-Asset fan-out ist Default; Worker-pro-Asset bleibt Deployment-/Isolation-Pattern. Naechste Nachweise: Architektur-/Roadmap-Sync, Konfigurationsvalidierung und mindestens ein Multi-Asset-Orchestrierungs-Pin ohne MPC-Coupling. |
 | ⬜ | RM-M6-03 | Kubernetes-Deployment + Helm Charts | Helm-Chart fuer Worker/API, Postgres, optionale Sidecars und Secrets/Volumes. Muss Health-/Readiness-/Liveness-Probes, UDS-/mTLS-Optionen und Rollout-/Restart-Verhalten dokumentieren. Compose bleibt Referenzpfad bis Kubernetes-Gate stabil ist. |
 | ⬜ | RM-M6-04 | TimescaleDB-Erweiterung | Nur aktivieren, wenn Zeitreihenvolumen, Retention-Abfragen oder Aggregationsbedarf den PostgreSQL-Default operativ begrenzen. Fachliche Persistenzmodelle bleiben unveraendert; Timescale-Hypertables/Continuous-Aggregates sind Adapter-/Migrationsdetail. |
 | ⬜ | RM-M6-05 | Edge-Controller-Integration | Abgrenzungs- und Integrationspfad fuer harte Echtzeitkomponenten. Liefert klare Verantwortung zwischen EMS, Edge/Herstellersteuerung, BMS/PCS und hardwareseitiger Schutzkette; kein impliziter Ersatz fuer zertifizierte Schutzfunktionen. |
@@ -97,8 +100,8 @@ Roadmap, Lastenheft und Architektur sichtbar.
 
 ## Sequenz
 
-1. RM-M6-02 zuerst: `AR-OPEN-006` schliessen und Multi-Asset-Hosting
-   normativ entscheiden.
+1. RM-M6-02 zuerst: Multi-Asset-Hosting haerten; `AR-OPEN-006` ist mit
+   ADR 0007 geschlossen.
 2. RM-M6-03 danach: Kubernetes/Helm auf der entschiedenen
    Hosting-Topologie schneiden.
 3. RM-M6-01 erst auf stabiler Asset-/Operator-API-Sicht aktivieren.
@@ -111,8 +114,7 @@ Roadmap, Lastenheft und Architektur sichtbar.
 
 ## Akzeptanzkriterien
 
-- `AR-OPEN-006` ist geschlossen oder explizit in einen kleineren
-  Folge-ADR-Scope zerlegt.
+- `AR-OPEN-006` ist geschlossen und in ADR 0007 normativ entschieden.
 - Multi-Asset-Betrieb hat ein klares Isolation-, Locking-, Clocking-,
   Persistenz- und Observability-Modell.
 - UI-, Kubernetes-, Timescale-, Edge- und Zertifizierungs-Slices koennen
