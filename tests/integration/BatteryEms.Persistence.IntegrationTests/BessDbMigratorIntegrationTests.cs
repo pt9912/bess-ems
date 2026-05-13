@@ -1,5 +1,6 @@
 using System.Globalization;
 using BatteryEms.Adapters.Persistence;
+using BatteryEms.Domain;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using Xunit;
@@ -87,6 +88,38 @@ public sealed class BessDbMigratorIntegrationTests : IAsyncLifetime
 
         Assert.Equal(1, firstCount);
         Assert.Equal(1, secondCount);
+    }
+
+    [Fact]
+    public async Task Timescale_migration_is_recorded_and_keeps_plain_postgres_schema_usable()
+    {
+        await ResetSchemaAsync(_dataSource!);
+        var migrator = new BessDbMigrator(_dataSource!, _connectionString!, NullLogger<BessDbMigrator>.Instance);
+
+        await migrator.MigrateAsync(CancellationToken.None);
+
+        var journalRows = await CountJournalEntriesAsync(_dataSource!, "%0005_timescale_telemetry_hypertable.sql");
+        Assert.Equal(1, journalRows);
+        Assert.True(await TableExistsAsync(_dataSource!, "telemetry"));
+
+        var telemetry = new DapperTelemetryRepository(_dataSource!);
+        await telemetry.AppendAsync(new BatteryTelemetry(
+            Timestamp: new DateTimeOffset(2026, 5, 13, 12, 0, 0, TimeSpan.Zero),
+            AssetId: "timescale-plain-postgres",
+            SocPercent: 50,
+            SohPercent: 99,
+            ActivePowerKw: 0,
+            ReactivePowerKvar: 0,
+            DcVoltage: 800,
+            DcCurrent: 0,
+            TemperatureCelsius: 22,
+            Available: true,
+            FaultStatus: "ok",
+            DataQuality: DataQuality.Valid),
+            CancellationToken.None);
+
+        var latest = await telemetry.FindLatestAsync("timescale-plain-postgres", CancellationToken.None);
+        Assert.NotNull(latest);
     }
 
     [Fact]

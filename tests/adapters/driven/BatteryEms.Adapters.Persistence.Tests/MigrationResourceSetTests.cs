@@ -24,6 +24,21 @@ public sealed class MigrationResourceSetTests
             .ToArray();
         Assert.NotEmpty(runOnce);
         Assert.Contains(runOnce, r => r.EndsWith(".0001_initial.sql", StringComparison.Ordinal));
+        Assert.Contains(runOnce, r => r.EndsWith(".0005_timescale_telemetry_hypertable.sql", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Timescale_migration_is_guarded_for_plain_postgres()
+    {
+        var sql = ReadRunOnceScript("0005_timescale_telemetry_hypertable.sql");
+
+        Assert.Contains("pg_available_extensions", sql, StringComparison.Ordinal);
+        Assert.Contains("TimescaleDB extension is not available", sql, StringComparison.Ordinal);
+        Assert.Contains("CREATE EXTENSION IF NOT EXISTS timescaledb", sql, StringComparison.Ordinal);
+        Assert.Contains("insufficient_privilege", sql, StringComparison.Ordinal);
+        Assert.Contains("create_hypertable", sql, StringComparison.Ordinal);
+        Assert.Contains("PRIMARY KEY (\"id\", \"recorded_at\")", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("$bess_timescale$", sql, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -71,5 +86,16 @@ public sealed class MigrationResourceSetTests
             "Unexpected manifest resources detected (every embedded resource must "
             + "be a RunOnce/????_*.sql script or appear on the allowlist): "
             + string.Join(", ", unexpected));
+    }
+
+    private static string ReadRunOnceScript(string fileName)
+    {
+        var assembly = typeof(BessDbMigrator).Assembly;
+        var resource = assembly.GetManifestResourceNames()
+            .Single(name => name.EndsWith("." + fileName, StringComparison.Ordinal));
+        using var stream = assembly.GetManifestResourceStream(resource)
+            ?? throw new InvalidOperationException($"Embedded migration not found: {fileName}");
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
     }
 }

@@ -88,6 +88,23 @@ hält den Tabellenumfang stabil bei 30 Tagen Hochfrequenz-Daten.
 Archivierung in ein zweites Backend (z. B. TimescaleDB-Continuous
 Aggregates) ist explizit Nach-MVP (LH-PERSIST-005, Roadmap M6).
 
+### TimescaleDB-Erweiterung (RM-M6-04)
+
+PostgreSQL bleibt der Default. Ab RM-M6-04 enthält die
+RunOnce-Migration `0005_timescale_telemetry_hypertable.sql` einen
+optionalen TimescaleDB-Pfad:
+
+- Wenn `timescaledb` in `pg_available_extensions` nicht sichtbar ist,
+  bleibt `telemetry` eine normale PostgreSQL-Tabelle. Die Migration wird
+  trotzdem im DbUp-Journal vermerkt.
+- Wenn `timescaledb` verfügbar und durch den Datenbank-User installierbar
+  ist, wird `telemetry` auf `recorded_at` zur Hypertable.
+- Die fachlichen Persistenz-Ports und `DapperTelemetryRepository` bleiben
+  unverändert. Timescale ist ein Schema-/Adapterdetail.
+- Continuous Aggregates, Compression Policies und Timescale-native
+  Retention sind bewusst nicht Default; sie brauchen reale
+  Datenvolumen-/Abfrageprofile und folgen als eigener Hardening-Slice.
+
 ---
 
 ## 3. Verhalten bei Persistenzfehlern

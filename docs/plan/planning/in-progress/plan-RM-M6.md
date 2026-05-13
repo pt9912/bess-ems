@@ -26,6 +26,8 @@ LH-OPEN-005, LH-OPEN-006),
 (abgeschlossener Multi-Asset-Hosting-Slice),
 [`../done/plan-RM-M6-03.md`](../done/plan-RM-M6-03.md)
 (abgeschlossener Kubernetes-/Helm-Slice),
+[`../done/plan-RM-M6-04.md`](../done/plan-RM-M6-04.md)
+(abgeschlossener TimescaleDB-Erweiterungs-Slice),
 [`../open/note-RM-M6-followups.md`](../open/note-RM-M6-followups.md)
 (M6-Trigger-Watch)
 
@@ -100,7 +102,7 @@ Roadmap, Lastenheft und Architektur sichtbar.
 | ✅ | RM-M6-01 | Operator UI (Web) | Abgeschlossen: [`../done/plan-RM-M6-01.md`](../done/plan-RM-M6-01.md). API-first Web-Shell unter `/operator/` fuer vorhandene Operator-Funktionen. Nutzt bestehende AuthN/AuthZ-/Audit- und HTTP-Pfade; keine fachliche Bypass-Logik. Erste Views: Health/Status, aktive Fahrplaene, Optimierungs-Run-Lookup und Operator-Stop-Status. |
 | ✅ | RM-M6-02 | Multi-Asset-Flottensteuerung / Hosting-Strategie | Abgeschlossen: [`../done/plan-RM-M6-02.md`](../done/plan-RM-M6-02.md). ADR 0007 schliesst `AR-OPEN-006`: shared Worker mit per-Asset fan-out ist Default; Worker-pro-Asset bleibt Deployment-/Isolation-Pattern. Trigger-Watch fuer Parallel-Fanout, Worker-pro-Asset, per-Asset-Sidecar und Multi-Asset-MPC: [`../open/note-RM-M6-followups.md`](../open/note-RM-M6-followups.md). |
 | ✅ | RM-M6-03 | Kubernetes-Deployment + Helm Charts | Abgeschlossen: [`../done/plan-RM-M6-03.md`](../done/plan-RM-M6-03.md). Helm-Chart fuer Worker/API, Postgres, optionale Sidecars und Secrets/Volumes mit shared-Worker-Default, Worker-pro-Asset-Rendering, UDS-/mTLS-Werten, `replicaCount`-Schutz und `make helm-lint`. Compose bleibt Referenzpfad bis ein Cluster-Gate stabil ist. |
-| ⬜ | RM-M6-04 | TimescaleDB-Erweiterung | Nur aktivieren, wenn Zeitreihenvolumen, Retention-Abfragen oder Aggregationsbedarf den PostgreSQL-Default operativ begrenzen. Fachliche Persistenzmodelle bleiben unveraendert; Timescale-Hypertables/Continuous-Aggregates sind Adapter-/Migrationsdetail. |
+| ✅ | RM-M6-04 | TimescaleDB-Erweiterung | Abgeschlossen: [`../done/plan-RM-M6-04.md`](../done/plan-RM-M6-04.md). Erster kompatibler Adapter-/Migrationspfad: `telemetry` wird nur bei verfuegbarer TimescaleDB-Extension zur Hypertable; Plain-Postgres bleibt Default und No-op-Pfad. Continuous Aggregates/Compression bleiben Folge-Slice. |
 | ⬜ | RM-M6-05 | Edge-Controller-Integration | Abgrenzungs- und Integrationspfad fuer harte Echtzeitkomponenten. Liefert klare Verantwortung zwischen EMS, Edge/Herstellersteuerung, BMS/PCS und hardwareseitiger Schutzkette; kein impliziter Ersatz fuer zertifizierte Schutzfunktionen. |
 | ⬜ | RM-M6-06 | Zertifizierungsnahe Regelleistungsintegration | Aktivierung erst mit konkretem Produkt-/TSO-/Anlagenkonzept. Vertieft M4-Regelleistung um Produktregeln, Nachweise, Audit/Replay und externe Schnittstellen; harte Echtzeit bleibt Edge-/Hardware-Thema, wenn das Produkt es verlangt. |
 
@@ -114,7 +116,8 @@ Roadmap, Lastenheft und Architektur sichtbar.
    Hosting-Topologie geschnitten; Cluster-Smoke bleibt Follow-up.
 3. RM-M6-01 ist abgeschlossen: Operator-Web-Shell auf stabiler
    Asset-/Operator-API-Sicht ist als API-first statische Shell geliefert.
-4. RM-M6-04 bleibt trigger-getrieben; PostgreSQL ist weiter Default.
+4. RM-M6-04 ist abgeschlossen: TimescaleDB als kompatibler
+   Telemetrie-Migrationspfad; PostgreSQL bleibt weiter Default.
 5. RM-M6-05 und RM-M6-06 nur mit konkretem Edge-/Produkttrigger
    aktivieren; beide duerfen keine harte Echtzeitfaehigkeit des
    Docker-Regelkreises behaupten.

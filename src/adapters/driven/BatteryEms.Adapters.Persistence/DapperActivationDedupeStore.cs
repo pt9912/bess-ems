@@ -46,7 +46,12 @@ public sealed partial class DapperActivationDedupeStore : IActivationDedupeStore
     // regelleistung_activations nicht; das Bumpen verhindert nur
     // false-positive incompatible-checkpoint-fail-closed-Treffer wenn
     // beide Migrations bereits angewendet sind.
-    private const int LatestKnownMigrationNumber = 4;
+    //
+    // 5 ⇐ RM-M6-04: 0005_timescale_telemetry_hypertable.sql is an
+    // optional telemetry-only migration. It does not change the
+    // dedupe table, but the compatibility ceiling still tracks every
+    // applied RunOnce migration.
+    private const int LatestKnownMigrationNumber = 5;
 
     private const string InsertSql = """
         INSERT INTO regelleistung_activations
