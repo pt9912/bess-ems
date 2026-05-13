@@ -19,17 +19,33 @@ public sealed class ControlCycleHostedServiceTests
         new(2026, 5, 6, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task Tick_runs_cycle_for_every_registered_asset_and_persists_command()
+    public async Task Multi_asset_tick_fans_out_and_persists_one_command_per_asset()
     {
         var (service, harness) = Build("asset-1", "asset-2");
         await service.StartAsync(CancellationToken.None);
         await harness.WaitForTicksAsync(2);
         await service.StopAsync(CancellationToken.None);
 
-        Assert.Contains("asset-1", harness.Cycle.Calls);
-        Assert.Contains("asset-2", harness.Cycle.Calls);
-        Assert.NotEmpty(harness.Sink.Writes);
-        Assert.NotEmpty(harness.Repository.Appended);
+        Assert.Equal(["asset-1", "asset-2"], Sorted(harness.Cycle.Calls.Take(2)));
+        Assert.Equal(["asset-1", "asset-2"], Sorted(harness.Sink.Writes.Take(2).Select(c => c.AssetId)));
+        Assert.Equal(["asset-1", "asset-2"], Sorted(harness.Repository.Appended.Take(2).Select(c => c.AssetId)));
+    }
+
+    [Fact]
+    public async Task Multi_asset_tick_isolates_per_asset_failure_and_continues_fanout()
+    {
+        var (service, harness) = Build("asset-ok-1", "asset-fails", "asset-ok-2");
+        harness.Cycle.ThrowForAssetIds.Add("asset-fails");
+
+        await service.StartAsync(CancellationToken.None);
+        await harness.WaitForTicksAsync(3);
+        await service.StopAsync(CancellationToken.None);
+
+        Assert.Equal(["asset-fails", "asset-ok-1", "asset-ok-2"], Sorted(harness.Cycle.Calls.Take(3)));
+        Assert.Equal(["asset-ok-1", "asset-ok-2"], Sorted(harness.Sink.Writes.Take(2).Select(c => c.AssetId)));
+        Assert.Equal(["asset-ok-1", "asset-ok-2"], Sorted(harness.Repository.Appended.Take(2).Select(c => c.AssetId)));
+        Assert.Contains(harness.Metrics.CommunicationErrors,
+            e => e.AssetId == "asset-fails" && e.Component == "control-cycle");
     }
 
     [Fact]
@@ -80,6 +96,9 @@ public sealed class ControlCycleHostedServiceTests
 
     private static (ControlCycleHostedService Service, Harness Harness) Build(params string[] assetIds) =>
         BuildWithMpc(null, assetIds);
+
+    private static string[] Sorted(IEnumerable<string> assetIds) =>
+        assetIds.Order(StringComparer.Ordinal).ToArray();
 
     private static (ControlCycleHostedService Service, Harness Harness) BuildWithMpc(
         IMpcDispatchOptimizer? mpcOptimizer,
@@ -172,11 +191,12 @@ public sealed class ControlCycleHostedServiceTests
     {
         public List<string> Calls { get; } = new();
         public bool Throw { get; set; }
+        public HashSet<string> ThrowForAssetIds { get; } = new(StringComparer.Ordinal);
 
         public Task<BatteryCommand> ExecuteAsync(string assetId, CancellationToken cancellationToken)
         {
             Calls.Add(assetId);
-            if (Throw)
+            if (Throw || ThrowForAssetIds.Contains(assetId))
             {
                 throw new InvalidOperationException("simulated control-cycle failure");
             }

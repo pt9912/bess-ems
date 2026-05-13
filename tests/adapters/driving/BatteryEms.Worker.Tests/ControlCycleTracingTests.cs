@@ -60,6 +60,33 @@ public sealed class ControlCycleTracingTests
     }
 
     [Fact]
+    public async Task Multi_asset_cycle_emits_one_control_and_dispatch_span_per_asset()
+    {
+        var captured = new List<Activity>();
+        var assetIds = new[] { "tracing-multi-asset-a", "tracing-multi-asset-b" };
+        using var listener = CaptureBoth(assetIds, captured);
+
+        var (service, harness) = Build(assetIds);
+        await service.StartAsync(CancellationToken.None);
+        await harness.WaitForTicksAsync(assetIds.Length);
+        await service.StopAsync(CancellationToken.None);
+
+        var cycleAssetIds = captured
+            .Where(a => a.Source.Name == BessActivitySources.ControlCycleName)
+            .Select(a => GetTag(a, BessActivityTags.AssetId))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        var dispatchAssetIds = captured
+            .Where(a => a.Source.Name == BessActivitySources.CommandDispatchName)
+            .Select(a => GetTag(a, BessActivityTags.AssetId))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(assetIds, cycleAssetIds);
+        Assert.Equal(assetIds, dispatchAssetIds);
+    }
+
+    [Fact]
     public async Task Failed_dispatch_marks_command_dispatch_span_as_error()
     {
         const string assetId = "tracing-asset-dispatch-fail";
@@ -106,6 +133,11 @@ public sealed class ControlCycleTracingTests
 
     private static ActivityListener CaptureBoth(string assetIdFilter, List<Activity> sink)
     {
+        return CaptureBoth([assetIdFilter], sink);
+    }
+
+    private static ActivityListener CaptureBoth(IReadOnlyCollection<string> assetIdFilter, List<Activity> sink)
+    {
         var listener = new ActivityListener
         {
             ShouldListenTo = source =>
@@ -115,7 +147,7 @@ public sealed class ControlCycleTracingTests
             ActivityStopped = activity =>
             {
                 var assetTag = GetTagObject(activity, BessActivityTags.AssetId)?.ToString();
-                if (assetTag == assetIdFilter)
+                if (assetTag is not null && assetIdFilter.Contains(assetTag))
                 {
                     sink.Add(activity);
                 }

@@ -45,7 +45,7 @@ nicht der Default. Der bestehende Code stuetzt diese Linie bereits:
 | ✅ | RM-M6-02-A | Hosting-ADR | ADR 0007 ist akzeptiert und schliesst `AR-OPEN-006`: shared Worker als Default, Worker-pro-Asset als Trigger-/Deployment-Pattern. |
 | ✅ | RM-M6-02-B | Architektur-/Roadmap-Sync | `spec/architecture.md` §18 ist auf "Geschlossen mit ADR 0007" gesetzt; M6-Masterplan und Roadmap verweisen auf den Slice. |
 | ✅ | RM-M6-02-C | Multi-Asset-Konfigurationsvalidierung | Host-/Config-Pfad validiert mehrere Assets: `assets.schema.json` verlangt eine nicht-leere Asset-Liste, `JsonFileConfigurationLoader.LoadAssets` erhaelt Single-Asset-Kompatibilitaet und rejected doppelte `asset_id`, der Host seeded alle Assets in die Registry und verweigert konkrete IO-Adapter bei Multi-Asset-Konfig bis per-Asset Adapter-/Command-Sink-Zuordnung existiert. |
-| ⬜ | RM-M6-02-D | Orchestrierungs-Pins | Tests belegen shared-Worker-Default: ein Tick fan-outet ueber mehrere Assets, isoliert per-Asset Fehler und setzt `asset_id` in Metriken/Traces/Persistenz. Bestehende Pins duerfen genutzt, aber die M6-DoD muss explizit sichtbar sein. |
+| ✅ | RM-M6-02-D | Orchestrierungs-Pins | Worker-Tests pinnen den shared-Worker-Default explizit: ein Tick fan-outet ueber mehrere Assets, persistiert pro Asset eigene Commands, isoliert per-Asset Fehler mit `asset_id`-Metrik und emittiert pro Asset Control-/Dispatch-Spans mit `asset_id`. |
 | ⬜ | RM-M6-02-E | Folgearbeiten / Trigger | Parallel-Fanout, Worker-pro-Asset-Deployment, per-Asset-Sidecar und Multi-Asset-MPC werden als Trigger-Watch dokumentiert, falls sie nicht direkt implementiert werden. |
 
 ---
