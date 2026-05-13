@@ -34,6 +34,8 @@ public sealed class MigrationResourceSetTests
 
         Assert.Contains("pg_available_extensions", sql, StringComparison.Ordinal);
         Assert.Contains("TimescaleDB extension is not available", sql, StringComparison.Ordinal);
+        Assert.Contains("shared_preload_libraries", sql, StringComparison.Ordinal);
+        Assert.Contains("TimescaleDB extension is available but is not preloaded", sql, StringComparison.Ordinal);
         Assert.Contains("CREATE EXTENSION IF NOT EXISTS timescaledb", sql, StringComparison.Ordinal);
         Assert.Contains("insufficient_privilege", sql, StringComparison.Ordinal);
         Assert.Contains("create_hypertable", sql, StringComparison.Ordinal);

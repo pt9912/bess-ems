@@ -97,6 +97,11 @@ optionalen TimescaleDB-Pfad:
 - Wenn `timescaledb` in `pg_available_extensions` nicht sichtbar ist,
   bleibt `telemetry` eine normale PostgreSQL-Tabelle. Die Migration wird
   trotzdem im DbUp-Journal vermerkt.
+- Wenn `timescaledb` installiert, aber nicht via
+  `shared_preload_libraries` vorgeladen ist, bleibt die Migration
+  ebenfalls ein No-op. TimescaleDB muss auf dem Postgres-Server
+  vorgeladen und der Server danach neu gestartet sein, bevor der
+  Hypertable-Pfad aktiv wird.
 - Wenn `timescaledb` verfügbar und durch den Datenbank-User installierbar
   ist, wird `telemetry` auf `recorded_at` zur Hypertable.
 - Die fachlichen Persistenz-Ports und `DapperTelemetryRepository` bleiben

@@ -2,8 +2,9 @@
 --
 -- PostgreSQL remains the default persistence backend. This migration is
 -- deliberately safe on a plain Postgres image: when the TimescaleDB
--- extension is not available, it records a NOTICE and leaves the table as
--- the regular row store created by 0001_initial.sql.
+-- extension is not available or the library is not preloaded, it records a
+-- NOTICE and leaves the table as the regular row store created by
+-- 0001_initial.sql.
 --
 -- When the extension is available and creatable/installed, telemetry is
 -- converted to a hypertable on recorded_at. Timescale requires every
@@ -15,6 +16,7 @@
 DO $$
 DECLARE
     timescale_available BOOLEAN;
+    timescale_preloaded BOOLEAN;
     telemetry_is_hypertable BOOLEAN;
 BEGIN
     SELECT EXISTS (
@@ -26,6 +28,20 @@ BEGIN
 
     IF NOT timescale_available THEN
         RAISE NOTICE 'TimescaleDB extension is not available; telemetry remains a regular PostgreSQL table.';
+        RETURN;
+    END IF;
+
+    SELECT EXISTS (
+        SELECT 1
+        FROM regexp_split_to_table(
+            COALESCE(current_setting('shared_preload_libraries', TRUE), ''),
+            ',') AS preload_library(name)
+        WHERE lower(btrim(name)) = 'timescaledb'
+    )
+    INTO timescale_preloaded;
+
+    IF NOT timescale_preloaded THEN
+        RAISE NOTICE 'TimescaleDB extension is available but is not preloaded via shared_preload_libraries; telemetry remains a regular PostgreSQL table.';
         RETURN;
     END IF;
 
