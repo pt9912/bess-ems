@@ -859,7 +859,7 @@ zu finden.
 | AR-OPEN-004 | Fahrplanimport-Format (CSV, JSON, ENTSO-E, proprietär)?           | Offen  |
 | AR-OPEN-005 | Konkrete Topic-/Registerprofile für die ersten Hersteller?        | Geschlossen mit LH-OPEN-001 — Reihenfolge: SunSpec/Socomec, Victron, SMA; Sungrow nur nach Rechtsklärung. |
 | AR-OPEN-006 | Strategie für Multi-Asset-Hosting (Worker-pro-Asset vs. shared)?  | Geschlossen mit [ADR 0007](../docs/plan/adr/0007-multi-asset-hosting-strategy.md) — shared Worker mit per-Asset fan-out ist der M6-Default; Worker-pro-Asset bleibt ein Deployment-/Isolation-Pattern fuer harte Fault-Domain-, Mandanten- oder Edge-Anforderungen. |
-| AR-OPEN-007 | Authentifizierungsverfahren (API-Token, OIDC, mTLS)?              | Offen  |
+| AR-OPEN-007 | Authentifizierungsverfahren (API-Token, OIDC, mTLS)?              | Teilweise geschlossen — API-Token + Operator-Rolle sind mit RM-M1-16 live; OIDC und mTLS sind Folge-ADR-Trigger (konsistent mit RM-OPEN-04 in der Roadmap). |
 | AR-OPEN-008 | Wann wird `BatteryEms.Application` in eigene Projekte (Realtime, Control, Markets, Optimization) gesplittet, oder bleibt es ein Modul mit Namespaces? | Offen  |
 | AR-OPEN-009 | Boundary-Test-Tooling: NetArchTest oder ArchUnitNET?              | Offen  |
 | AR-OPEN-010 | Welche Marktprodukte werden in M2 fachlich zuerst umgesetzt: Day-Ahead-only oder Day-Ahead + Tarifmodell? | Geschlossen mit RM-M2/RM-M4 — M2 lieferte Day-Ahead-Energiekosten und Market-Commitments als erste Marktlinie; Regelleistung/OPC-UA folgte in M4. Tarif- und externe Preisadapter bleiben trigger-basierte Folgearbeit. |

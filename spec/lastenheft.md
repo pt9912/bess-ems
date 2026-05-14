@@ -82,7 +82,7 @@ Das System muss mit folgenden externen Systemen interagieren können:
 - PV-Erzeugungsmessung
 - Marktpreisquellen
 - Fahrplanquellen
-- Regelleistungs-Aktivierungssignale nach MVP
+- Regelleistungs-Aktivierungssignale
 - Datenbank
 - Monitoring-System
 - Operator-UI oder API-Client
@@ -94,11 +94,11 @@ Das System muss mit folgenden externen Systemen interagieren können:
 
 ### LH-KTX-002 — Kommunikationsprotokolle
 
-Das System muss Batteriesysteme und zugehörige Feldgeräte im MVP über Modbus TCP und MQTT anbinden können. OPC-UA soll als nachgelagerter Adapter vorbereitet werden.
+Das System bindet Batteriesysteme und zugehörige Feldgeräte über Modbus TCP, MQTT und OPC-UA an.
 
 - Modbus TCP
 - MQTT
-- OPC-UA nach MVP
+- OPC-UA
 
 **Priorität:** Muss  
 **Abnahmekriterium:** Für Modbus TCP und MQTT existieren Adapterkonzepte mit Lese- und Schreibpfad. Für OPC-UA ist die spätere Integration über dasselbe interne Adapterinterface dokumentiert.
@@ -387,7 +387,7 @@ Das System soll Batteriesysteme nicht nur als generischen Speicher, sondern übe
 Das System muss Day-Ahead-Fahrpläne verarbeiten können.
 
 **Priorität:** Muss  
-**Beschreibung:** Das System muss im MVP Day-Ahead-Fahrpläne importieren und im Regelkreis verwenden können. Die automatische Erzeugung von Day-Ahead-Fahrplänen auf Basis von Preisen, Prognosen und technischen Grenzen folgt mit dem Optimierungsmodul nach dem MVP.
+**Beschreibung:** Das System importiert Day-Ahead-Fahrpläne und verwendet sie im Regelkreis. Die automatische Erzeugung von Day-Ahead-Fahrplänen auf Basis von Preisen, Prognosen und technischen Grenzen erfolgt über das Optimierungsmodul.
 
 **Abnahmekriterium:** Ein Day-Ahead-Fahrplan kann gespeichert, gelesen und im Regelkreis verwendet werden.
 
@@ -395,7 +395,7 @@ Das System muss Day-Ahead-Fahrpläne verarbeiten können.
 
 ### LH-MKT-002 — Intraday-Reoptimierung
 
-Das System soll Intraday-Anpassungen nach dem MVP unterstützen.
+Das System unterstützt Intraday-Anpassungen.
 
 **Priorität:** Soll  
 **Beschreibung:** Das System soll bei Preis-, Prognose- oder Zustandsänderungen eine Korrektur bestehender Fahrpläne ermöglichen.  
@@ -423,7 +423,7 @@ Das System muss verbindliche Marktverpflichtungen abbilden können.
 
 ### LH-MKT-004 — Regelleistungsreservierung
 
-Das System soll reservierte Leistung für Regelleistung nach dem MVP verwalten können.
+Das System verwaltet reservierte Leistung für Regelleistung.
 
 **Priorität:** Soll  
 **Beschreibung:** Reservierte Lade- und Entladeleistung muss für andere Märkte blockiert werden können.  
@@ -433,7 +433,7 @@ Das System soll reservierte Leistung für Regelleistung nach dem MVP verwalten k
 
 ### LH-MKT-005 — Regelleistungsaktivierung
 
-Das System soll Aktivierungssignale für Regelleistung nach dem MVP verarbeiten können.
+Das System verarbeitet Aktivierungssignale für Regelleistung.
 
 **Priorität:** Soll  
 **Beschreibung:** Aktivierungssignale müssen priorisiert in den Regelkreis eingehen.  
@@ -549,7 +549,7 @@ Für die Produktplanung werden konkret die im deutschen Regelreservemarkt releva
 
 ### LH-OPT-001 — Fahrplanoptimierung
 
-Das System soll nach dem MVP Fahrpläne für Lade- und Entladeleistung über einen definierten Horizont optimieren können.
+Das System optimiert Fahrpläne für Lade- und Entladeleistung über einen definierten Horizont.
 
 **Priorität:** Soll
 
@@ -831,7 +831,7 @@ Fehlerzustände dürfen nur nach definierter Quittierung oder Wiederherstellungs
 
 ## 12. Sicherheitsanforderungen
 
-Für dieses Lastenheft bedeutet sicherer Zustand im MVP:
+Für dieses Lastenheft bedeutet sicherer Zustand:
 
 - kein aktiver Lade- oder Entladebefehl
 - keine Weiterleitung veralteter oder ungültiger Commands
@@ -1080,7 +1080,7 @@ Modbus-Kommunikation muss Timeouts unterstützen.
 
 ### LH-OPCUA-001 — OPC-UA Lesen
 
-Das System soll nach dem MVP OPC-UA Nodes lesen können.
+Das System liest OPC-UA Nodes.
 
 **Priorität:** Soll  
 **Abnahmekriterium:** Node-Werte können gelesen und in interne Telemetrie umgewandelt werden.
@@ -1089,7 +1089,7 @@ Das System soll nach dem MVP OPC-UA Nodes lesen können.
 
 ### LH-OPCUA-002 — OPC-UA Schreiben
 
-Das System soll nach dem MVP OPC-UA Nodes schreiben können.
+Das System schreibt OPC-UA Nodes.
 
 **Priorität:** Soll  
 **Abnahmekriterium:** Leistungssollwerte können über konfigurierte NodeIds geschrieben werden.
@@ -1107,7 +1107,7 @@ Das System soll OPC-UA Subscriptions unterstützen.
 
 ### LH-OPCUA-004 — OPC-UA StatusCode
 
-Das System soll nach dem MVP OPC-UA StatusCodes auswerten.
+Das System wertet OPC-UA StatusCodes aus.
 
 **Priorität:** Soll  
 **Abnahmekriterium:** Werte mit schlechtem StatusCode werden als ungültig markiert.
@@ -1116,7 +1116,7 @@ Das System soll nach dem MVP OPC-UA StatusCodes auswerten.
 
 ### LH-OPCUA-005 — OPC-UA Security
 
-Das System soll nach dem MVP OPC-UA Security Modes unterstützen.
+Das System unterstützt OPC-UA Security Modes.
 
 **Priorität:** Soll  
 **Abnahmekriterium:** Zertifikate, Security Mode und Security Policy können konfiguriert werden.
@@ -1279,7 +1279,7 @@ Das System muss erzeugte Commands speichern können.
 Das System muss die im jeweiligen Release unterstützten Fahrpläne speichern können.
 
 **Priorität:** Muss  
-**Abnahmekriterium:** Day-Ahead-Fahrpläne sind im MVP versioniert ablegbar. Intraday- und Regelleistungs-Fahrpläne sind versioniert ablegbar, sobald diese Funktionen umgesetzt werden.
+**Abnahmekriterium:** Day-Ahead-, Intraday- und Regelleistungs-Fahrpläne sind versioniert ablegbar.
 
 ---
 
@@ -1294,11 +1294,11 @@ Das System muss manuelle Eingriffe speichern können.
 
 ### LH-PERSIST-005 — Datenbank
 
-Das System muss im MVP PostgreSQL verwenden. TimescaleDB darf nach dem MVP als kompatible Erweiterung für Zeitreihendaten eingesetzt werden.
+Das System verwendet PostgreSQL. TimescaleDB darf als kompatible Erweiterung für Zeitreihendaten eingesetzt werden.
 
 **Priorität:** Muss
 
-**Abnahmekriterium:** Datenbankzugriff ist konfigurierbar und im MVP mit PostgreSQL containerisiert betreibbar. Eine spätere TimescaleDB-Nutzung erfordert keine Änderung der fachlichen Persistenzmodelle.
+**Abnahmekriterium:** Datenbankzugriff ist konfigurierbar und mit PostgreSQL containerisiert betreibbar. TimescaleDB-Nutzung erfordert keine Änderung der fachlichen Persistenzmodelle.
 
 ---
 
@@ -1342,7 +1342,7 @@ Das System soll Optimierungsläufe und deren Ergebnisse speichern können, sobal
 
 ## 20. API-Anforderungen
 
-Im MVP müssen mindestens Health, Batterie-Status, aktueller Command, Fahrplanabfrage und Operator Stop über API verfügbar sein. Schreibende Endpunkte müssen bereits im MVP authentifiziert, autorisiert und auditierbar sein. API-Endpunkte zur Optimierungsauslösung folgen mit dem Optimierungsmodul nach dem MVP.
+Mindestens Health, Batterie-Status, aktueller Command, Fahrplanabfrage und Operator Stop sind über API verfügbar. Schreibende Endpunkte sind authentifiziert, autorisiert und auditierbar. Endpunkte zur Optimierungsauslösung sind über das Optimierungsmodul verfügbar.
 
 ### LH-API-001 — Health Endpoint
 
@@ -1528,7 +1528,7 @@ Das System muss Konfiguration beim Start validieren.
 
 ### LH-CONF-004 — Export- und Northbound-Konfiguration
 
-Das System soll nach dem MVP externe Datenexporte konfigurierbar bereitstellen können.
+Das System stellt externe Datenexporte konfigurierbar bereit.
 
 **Priorität:** Soll
 
@@ -1737,7 +1737,7 @@ Das System muss Unit Tests für Regelungskomponenten besitzen.
 Das System muss Unit Tests für Markt- und Fahrplanlogik besitzen.
 
 **Priorität:** Muss  
-**Abnahmekriterium:** Day-Ahead- und statische Fahrplanlogik sind im MVP testbar. Intraday- und Regelleistungslogik sind testbar, sobald diese Funktionen umgesetzt werden.
+**Abnahmekriterium:** Day-Ahead-, statische Fahrplan-, Intraday- und Regelleistungslogik sind testbar.
 
 ---
 
@@ -1746,7 +1746,7 @@ Das System muss Unit Tests für Markt- und Fahrplanlogik besitzen.
 Das System muss Integrationstests für Protokolladapter besitzen.
 
 **Priorität:** Muss
-**Abnahmekriterium:** Modbus- und MQTT-Adapter können im MVP gegen Simulatoren getestet werden. OPC-UA-Adapter sind gegen Simulatoren testbar, sobald OPC-UA umgesetzt wird.
+**Abnahmekriterium:** Modbus-, MQTT- und OPC-UA-Adapter sind gegen Simulatoren testbar.
 
 ---
 
@@ -1801,115 +1801,128 @@ Das System muss im Container getestet werden.
 
 ### 27.1 Anforderung zu Design
 
-| Lastenheft-Kennung | Design-Artefakt                      | Geltung                    |
-| ------------------ | ------------------------------------ | -------------------------- |
-| LH-ARCH-001        | Systemarchitektur                    | MVP                        |
-| LH-DOM-001         | Domain Model                         | MVP                        |
-| LH-DOM-005         | Device Point Model                   | MVP                        |
-| LH-DOM-006         | Capability Model                     | nach MVP                   |
-| LH-MKT-001         | Market Module                        | MVP                        |
-| LH-MKT-003         | Market Commitment Model              | MVP                        |
-| LH-MKT-008         | Tariff/Price Model                   | nach MVP                   |
-| LH-MKT-009         | Market Product Model                 | nach MVP                   |
-| LH-OPT-001         | Optimization Interface Design        | MVP als Interface          |
-| LH-OPT-007         | Schedule vs Dispatch Boundary Design | MVP als Architekturgrenze  |
-| LH-OPT-008         | Optimization Unit Convention         | nach MVP                   |
-| LH-OPT-009         | Optimization Result Model            | nach MVP                   |
-| LH-CTRL-001        | Control Loop Design                  | MVP                        |
-| LH-SM-001          | State Machine Design                 | MVP                        |
-| LH-PROT-001        | Adapter Interface Design             | MVP                        |
-| LH-NATIVE-001      | Native Core Design                   | nach MVP / falls eingesetzt |
-| LH-PERSIST-001     | Database Schema                      | MVP                        |
-| LH-PERSIST-006     | Retention- und Datenvolumenkonzept   | MVP                        |
-| LH-PERSIST-007     | Optimization Run Persistence Design  | nach MVP                   |
-| LH-API-001         | API Specification                    | MVP                        |
-| LH-API-007         | Authentifizierungs- und Autorisierungskonzept | MVP             |
-| LH-MON-001         | Observability Design                 | MVP                        |
-| LH-MON-002         | Metrics Design                       | MVP                        |
-| LH-CONF-001        | Configuration Design                 | MVP                        |
-| LH-CONF-002        | Device Mapping Design                | MVP                        |
-| LH-CONF-003        | Configuration Validation Design      | MVP                        |
-| LH-CONF-004        | Northbound Export Configuration Design | nach MVP                 |
+| Lastenheft-Kennung | Design-Artefakt                                |
+| ------------------ | ---------------------------------------------- |
+| LH-ARCH-001        | Systemarchitektur                              |
+| LH-DOM-001         | Domain Model                                   |
+| LH-DOM-005         | Device Point Model                             |
+| LH-DOM-006         | Capability Model                               |
+| LH-MKT-001         | Market Module                                  |
+| LH-MKT-003         | Market Commitment Model                        |
+| LH-MKT-008         | Tariff/Price Model                             |
+| LH-MKT-009         | Market Product Model                           |
+| LH-OPT-001         | Optimization Interface Design                  |
+| LH-OPT-007         | Schedule vs Dispatch Boundary Design           |
+| LH-OPT-008         | Optimization Unit Convention                   |
+| LH-OPT-009         | Optimization Result Model                      |
+| LH-CTRL-001        | Control Loop Design                            |
+| LH-SM-001          | State Machine Design                           |
+| LH-PROT-001        | Adapter Interface Design                       |
+| LH-NATIVE-001      | Native Core Design                             |
+| LH-PERSIST-001     | Database Schema                                |
+| LH-PERSIST-006     | Retention- und Datenvolumenkonzept             |
+| LH-PERSIST-007     | Optimization Run Persistence Design            |
+| LH-API-001         | API Specification                              |
+| LH-API-007         | Authentifizierungs- und Autorisierungskonzept  |
+| LH-MON-001         | Observability Design                           |
+| LH-MON-002         | Metrics Design                                 |
+| LH-CONF-001        | Configuration Design                           |
+| LH-CONF-002        | Device Mapping Design                          |
+| LH-CONF-003        | Configuration Validation Design                |
+| LH-CONF-004        | Northbound Export Configuration Design         |
 
 ---
 
 ### 27.2 Anforderung zu Implementierung
 
-| Lastenheft-Kennung | Implementierung                | Geltung                    |
-| ------------------ | ------------------------------ | -------------------------- |
-| LH-DOM-001         | `BatteryAsset`                 | MVP                        |
-| LH-DOM-002         | `BatteryTelemetry`             | MVP                        |
-| LH-DOM-003         | `BatteryCommand`               | MVP                        |
-| LH-DOM-005         | `DevicePointDefinition`        | MVP                        |
-| LH-DOM-006         | `AssetCapability`              | nach MVP                   |
-| LH-MKT-003         | `MarketCommitment`             | MVP                        |
-| LH-MKT-008         | `TariffRule` / `MarketPrice`   | nach MVP                   |
-| LH-MKT-009         | `MarketProduct`                | nach MVP                   |
-| LH-OPT-007         | `IScheduleOptimizer` + `IDispatchOptimizer` Abgrenzung | MVP als Architekturgrenze; konkrete Schedule-Optimizer-Implementierung nach MVP |
-| LH-OPT-009         | `OptimizationRunResult`        | nach MVP                   |
-| LH-CTRL-002        | `ConstraintLimiter`            | MVP                        |
-| LH-CTRL-003        | `RampLimiter`                  | MVP                        |
-| LH-SM-001          | `BatteryStateMachine`          | MVP                        |
-| LH-RT-001          | `RealtimeSnapshotStore`        | MVP                        |
-| LH-MODB-001        | `ModbusBatteryTelemetrySource` | MVP                        |
-| LH-MQTT-001        | `MqttBatteryTelemetryStream`   | MVP                        |
-| LH-OPCUA-001       | `OpcUaBatteryTelemetrySource`  | nach MVP                   |
-| LH-NATIVE-001      | `battery_control_core`         | nach MVP / falls eingesetzt |
-| LH-PERSIST-006     | `RetentionPolicy`              | MVP                        |
-| LH-PERSIST-007     | `OptimizationRunRepository`    | nach MVP                   |
-| LH-API-001         | `/health` Endpoint             | MVP                        |
-| LH-API-002         | `/battery/{assetId}/status`    | MVP                        |
-| LH-API-003         | `/battery/{assetId}/command/current` | MVP                  |
-| LH-API-004         | `/markets/schedules/current`   | MVP                        |
-| LH-API-006         | `/operator/stop`               | MVP                        |
-| LH-API-007         | Schreibschutz für Operator-Endpunkte | MVP                    |
-| LH-MON-001         | `StructuredLogger`             | MVP                        |
-| LH-MON-002         | `MetricsExporter`              | MVP                        |
-| LH-CONF-001        | `ConfigurationSource`          | MVP                        |
-| LH-CONF-002        | `DeviceMappingRepository`      | MVP                        |
-| LH-CONF-003        | `ConfigurationValidator`       | MVP                        |
-| LH-CONF-004        | `NorthboundExportConfiguration` | nach MVP                  |
+Status-Marker:
+- ✓ `M[N]` — implementiert (Liefergegenstand des angegebenen Meilensteins; bei späteren Refinements ist der Erst-Meilenstein angegeben)
+- 🔲 — nicht implementiert (mit Verweis auf offene Frage oder Folgearbeit)
+
+| Lastenheft-Kennung | Implementierung                                        | Status                                          |
+| ------------------ | ------------------------------------------------------ | ----------------------------------------------- |
+| LH-DOM-001         | `BatteryAsset`                                         | ✓ M1                                            |
+| LH-DOM-002         | `BatteryTelemetry`                                     | ✓ M1                                            |
+| LH-DOM-003         | `BatteryCommand`                                       | ✓ M1                                            |
+| LH-DOM-005         | `DevicePointDefinition`                                | ✓ M1                                            |
+| LH-DOM-006         | `AssetCapability`                                      | 🔲 nicht implementiert                          |
+| LH-MKT-003         | `MarketCommitment`                                     | ✓ M1 (Priorisierung erweitert in M2 / RM-M2-01) |
+| LH-MKT-008         | `TariffRule` / `MarketPrice`                           | ✓ M2 (Preisreihen-Port in M5 / RM-M5-07)        |
+| LH-MKT-009         | `MarketProduct`                                        | ✓ M2 (Reserve-Produkte in M4 / RM-M4-02)        |
+| LH-OPT-007         | `IScheduleOptimizer` + `IDispatchOptimizer` Abgrenzung | ✓ M2                                            |
+| LH-OPT-009         | `OptimizationRunResult`                                | ✓ M2                                            |
+| LH-CTRL-002        | `ConstraintLimiter`                                    | ✓ M1                                            |
+| LH-CTRL-003        | `RampLimiter`                                          | ✓ M1                                            |
+| LH-SM-001          | `BatteryStateMachine`                                  | ✓ M1                                            |
+| LH-RT-001          | `RealtimeSnapshotStore`                                | ✓ M1                                            |
+| LH-MODB-001        | `ModbusBatteryTelemetrySource`                         | ✓ M1                                            |
+| LH-MQTT-001        | `MqttBatteryTelemetryStream`                           | ✓ M1                                            |
+| LH-OPCUA-001       | `OpcUaBatteryTelemetrySource`                          | ✓ M4 (RM-M4-04)                                 |
+| LH-NATIVE-001      | `battery_control_core`                                 | ✓ M3 (ABI 0.3.0 via M5 / RM-M5-03)              |
+| LH-PERSIST-006     | `RetentionPolicy`                                      | ✓ M1                                            |
+| LH-PERSIST-007     | `OptimizationRunRepository`                            | ✓ M2                                            |
+| LH-API-001         | `/health` Endpoint                                     | ✓ M1                                            |
+| LH-API-002         | `/battery/{assetId}/status`                            | ✓ M1                                            |
+| LH-API-003         | `/battery/{assetId}/command/current`                   | ✓ M1                                            |
+| LH-API-004         | `/markets/schedules/current`                           | ✓ M1                                            |
+| LH-API-006         | `/operator/stop`                                       | ✓ M1                                            |
+| LH-API-007         | Schreibschutz für Operator-Endpunkte                   | ✓ M1 (RM-M1-16; OIDC/mTLS sind AR-OPEN-007)     |
+| LH-MON-001         | `StructuredLogger`                                     | ✓ M1                                            |
+| LH-MON-002         | `MetricsExporter`                                      | ✓ M1                                            |
+| LH-CONF-001        | `ConfigurationSource`                                  | ✓ M1                                            |
+| LH-CONF-002        | `DeviceMappingRepository`                              | ✓ M1                                            |
+| LH-CONF-003        | `ConfigurationValidator`                               | ✓ M1                                            |
+| LH-CONF-004        | `NorthboundExportConfiguration`                        | 🔲 AR-OPEN-011 (Northbound-Export-Struktur)     |
 
 ---
 
 ### 27.3 Anforderung zu Test
 
-| Lastenheft-Kennung | Testtyp          | Geltung                    |
-| ------------------ | ---------------- | -------------------------- |
-| LH-CTRL-002        | Unit Test        | MVP                        |
-| LH-CTRL-003        | Unit Test        | MVP                        |
-| LH-MKT-003         | Unit Test        | MVP                        |
-| LH-MKT-007         | Unit/Integration Test | MVP                   |
-| LH-MKT-008         | Unit Test        | nach MVP                   |
-| LH-OPT-008         | Unit/Model Test  | nach MVP                   |
-| LH-OPT-009         | Integration Test | nach MVP                   |
-| LH-SAFE-001        | Safety Test      | MVP                        |
-| LH-SAFE-004        | Integration Test | MVP                        |
-| LH-API-006         | API/Control Integration Test | MVP              |
-| LH-API-007         | API Security Test | MVP                       |
-| LH-API-001         | API Contract Test | MVP                       |
-| LH-API-002         | API Contract Test | MVP                       |
-| LH-API-003         | API Contract Test | MVP                       |
-| LH-API-004         | API Contract Test | MVP                       |
-| LH-PERSIST-006     | Persistence/Retention Test | MVP                  |
-| LH-MON-001         | Logging Test      | MVP                        |
-| LH-MON-002         | Metrics Export Test | MVP                      |
-| LH-CONF-001        | Configuration Loading Test | MVP                  |
-| LH-CONF-002        | Device Mapping Test | MVP                       |
-| LH-CONF-003        | Startup Configuration Test | MVP                  |
-| LH-CONF-004        | Integration Test | nach MVP                   |
-| LH-RT-003          | Unit Test        | MVP                        |
-| LH-MODB-005        | Integration Test | MVP                        |
-| LH-MQTT-005        | Integration Test | MVP                        |
-| LH-OPCUA-004       | Integration Test | nach MVP                   |
-| LH-NATIVE-002      | Interop Test     | nach MVP / falls eingesetzt |
-| LH-DEPLOY-001      | Container Test   | MVP                        |
+| Lastenheft-Kennung | Testtyp                       |
+| ------------------ | ----------------------------- |
+| LH-CTRL-002        | Unit Test                     |
+| LH-CTRL-003        | Unit Test                     |
+| LH-MKT-003         | Unit Test                     |
+| LH-MKT-007         | Unit/Integration Test         |
+| LH-MKT-008         | Unit Test                     |
+| LH-OPT-008         | Unit/Model Test               |
+| LH-OPT-009         | Integration Test              |
+| LH-SAFE-001        | Safety Test                   |
+| LH-SAFE-004        | Integration Test              |
+| LH-API-006         | API/Control Integration Test  |
+| LH-API-007         | API Security Test             |
+| LH-API-001         | API Contract Test             |
+| LH-API-002         | API Contract Test             |
+| LH-API-003         | API Contract Test             |
+| LH-API-004         | API Contract Test             |
+| LH-PERSIST-006     | Persistence/Retention Test    |
+| LH-MON-001         | Logging Test                  |
+| LH-MON-002         | Metrics Export Test           |
+| LH-CONF-001        | Configuration Loading Test    |
+| LH-CONF-002        | Device Mapping Test           |
+| LH-CONF-003        | Startup Configuration Test    |
+| LH-CONF-004        | Integration Test              |
+| LH-RT-003          | Unit Test                     |
+| LH-MODB-005        | Integration Test              |
+| LH-MQTT-005        | Integration Test              |
+| LH-OPCUA-004       | Integration Test              |
+| LH-NATIVE-002      | Interop Test                  |
+| LH-DEPLOY-001      | Container Test                |
 
 ---
 
-## 28. MVP-Abgrenzung
+## 28. Anhang A — MVP-Scope (historisch)
 
-### 28.1 Muss im MVP enthalten sein
+> **Hinweis:** Dieser Abschnitt dokumentiert die **ursprüngliche
+> MVP-Scope-Entscheidung** aus der Projekt-Startphase. Er bleibt zur
+> Nachvollziehbarkeit der ersten Iteration erhalten, ist aber **kein
+> aktiver Steuerungsinput** mehr. Der aktuelle Implementierungsstand
+> jeder Anforderung lebt in [§27.2](#272-anforderung-zu-implementierung)
+> (Spalte „Status"). Was in welcher Version freigegeben wurde, steht im
+> [CHANGELOG](../CHANGELOG.md); die Meilensteinhistorie M1–M6 in der
+> [Roadmap](../docs/plan/planning/in-progress/roadmap.md).
+
+### 28.1 MVP-Scope (Muss-Set zum Start)
 
 - C#/.NET Worker Service
 - Domain-Modell
@@ -1942,7 +1955,7 @@ Das System muss im Container getestet werden.
 
 ---
 
-### 28.2 Soll nach MVP folgen
+### 28.2 Nach-MVP-Scope (Soll-Set, ursprünglich für M2–M4 geplant)
 
 - OPC-UA Adapter
 - Intraday-Reoptimierung
@@ -1959,7 +1972,7 @@ Das System muss im Container getestet werden.
 
 ---
 
-### 28.3 Spätere Erweiterungen
+### 28.3 Langfristige Erweiterungen (ursprünglich für M5–M6 geplant)
 
 - MPC
 - State-Space-Modelle
