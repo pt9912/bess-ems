@@ -8,7 +8,10 @@ Sicherheitsanforderungen. Das System ist modular aufgebaut, containerisiert und
 so konzipiert, dass Marktoptimierung und technische Regelung strikt getrennt
 sind.
 
-> **Status:** M1, M2 und M3 sind abgeschlossen ([docs/plan/planning/in-progress/roadmap.md](docs/plan/planning/in-progress/roadmap.md))
+> **Status:** M1–M6 sind abgeschlossen; `v1.0.0` ist veröffentlicht
+> ([Release](https://github.com/pt9912/bess-ems/releases/tag/v1.0.0),
+> [Roadmap](docs/plan/planning/in-progress/roadmap.md),
+> [Release-Prozess](docs/user/releasing.md))
 
 ---
 
@@ -172,6 +175,32 @@ Einstiegspunkte im Repository sind:
 
 ---
 
+## Installation
+
+Container-Image (signiert via Cosign keyless, SBOM-attestiert):
+
+```bash
+docker pull ghcr.io/pt9912/bess-ems:v1.0.0
+# oder :1.0.0 / :latest
+```
+
+Helm-Chart, Source-Tarball, native `libbattery_control_core.so` plus
+Header, SBOM und `SHA256SUMS` liegen als Release-Assets:
+[Release v1.0.0](https://github.com/pt9912/bess-ems/releases/tag/v1.0.0).
+
+Verifikation der Image-Signatur:
+
+```bash
+cosign verify ghcr.io/pt9912/bess-ems:v1.0.0 \
+  --certificate-identity-regexp '^https://github.com/pt9912/bess-ems/.*' \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
+```
+
+Vollständige Release-Prozess-Doku in
+[`docs/user/releasing.md`](docs/user/releasing.md).
+
+---
+
 ## Lokale Gates
 
 Die aktiven Gate-Ziele sind im `Makefile` sichtbar:
@@ -206,6 +235,8 @@ referenzierbar.
   Schichten, Module, Datenfluss, Native-Core-Strategie, Rückverfolgbarkeit
 - [`docs/plan/planning/in-progress/roadmap.md`](docs/plan/planning/in-progress/roadmap.md) —
   Meilensteine M1–M6 mit Liefergegenständen und LH-Rückverfolgbarkeit
+- [`docs/user/releasing.md`](docs/user/releasing.md) — Release-Prozess,
+  Tag-Vertrag, Workflow-Schritte, Rollback
 - [`docs/user/quality.md`](docs/user/quality.md) — verbindliche
   Qualitäts- und Messpfade (statische Analyse C#/.NET + C/C++, Tests,
   Coverage, Vertrags-Gates, Native-Parity, CI/Release)

@@ -14,7 +14,10 @@ letzte Version war*.
 Bezug:
 - [`CHANGELOG.md`](../../CHANGELOG.md) (Keep-a-Changelog 1.1.0)
 - [`docs/user/quality.md`](quality.md) §1 (Lint/Restore-Lock-Disziplin),
-  §6 (Native-Quality-Gates)
+  §6 (Native-Quality-Gates), §8 (Release-Pipeline-Gates — ausführliche
+  Gate-Spezifikation, dieses Dokument ist die prozedurale Sicht)
+- [`docs/plan/adr/0002-release-pipeline-gates.md`](../plan/adr/0002-release-pipeline-gates.md)
+  (architektonische Entscheidung mit v1.0.0-Implementierungs-Update)
 - [`.github/workflows/release.yml`](../../.github/workflows/release.yml)
   (Tag-getriebene Release-Pipeline)
 - [`.github/workflows/build.yml`](../../.github/workflows/build.yml)

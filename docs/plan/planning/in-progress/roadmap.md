@@ -39,7 +39,14 @@ unter `in-progress/`.
 
 ## Aktueller Stand
 
-> **Stand:** 2026-05-13
+> **Stand:** 2026-05-14
+> **Release:** `v1.0.0` veröffentlicht 2026-05-14 — Container
+> (`ghcr.io/pt9912/bess-ems:v1.0.0`, Cosign keyless signiert, SBOM-
+> attestiert) plus 7 Release-Assets (Helm-Chart, Source-Tarball, native
+> `.so`+Header, image-inspect, SBOM, `SHA256SUMS`) auf
+> [github.com/pt9912/bess-ems/releases/tag/v1.0.0](https://github.com/pt9912/bess-ems/releases/tag/v1.0.0).
+> Release-Prozess in [`../../../user/releasing.md`](../../../user/releasing.md),
+> Gate-Definitionen in [`../../../user/quality.md`](../../../user/quality.md) §8.
 > **Abgeschlossen:** M1 (alle 24 Liefergegenstände grün) und M2 (alle
 > 10 Liefergegenstände RM-M2-01..10 grün). `make fullbuild`
 > reproduzierbar grün, Compose-Stack (bess-ems + Postgres + Mosquitto
@@ -522,7 +529,7 @@ Kubernetes-Deployment, Edge-Anbindung. Inhalte mit hohem Diskussionsbedarf
 | RM-OPEN-04 | Authentifizierung in M1 (API-Token, OIDC)?                     | Geschlossen mit RM-M1-16 — API-Token + Operator-Rolle live; OIDC/mTLS bleiben Folge-ADR. |
 | RM-OPEN-05 | Reihenfolge M3 vs. M4 — Native zuerst oder Markt-/RL zuerst?   | Geschlossen durch Umsetzung — M3 Native Core wurde vor M4 Regelleistung/OPC-UA abgeschlossen; beide Meilensteine sind erledigt. |
 | RM-OPEN-06 | Kriterien für spätere API-Extraktion nach dem MVP (siehe AR-OPEN-001)? | Geschlossen mit [ADR 0009](../../adr/0009-api-service-extraction-criteria.md) — kombinierter Worker/API-Host bleibt Default; API-Auskopplung ist trigger-basiert und braucht explizite Topologie-, Security-, Ownership- und Testnachweise. |
-| RM-OPEN-07 | Folge-ADR für Release-Pipeline-Gates; vor Abschluss von M1 und vor erstem Tag `v0.1.0` schließen? | Geschlossen mit ADR 0002 — `.github/workflows/release.yml` ist Gate-only vor Publishing; kein freigegebener Tag ohne grünen Release-Workflow. |
+| RM-OPEN-07 | Folge-ADR für Release-Pipeline-Gates; vor Abschluss von M1 und vor erstem Tag `v0.1.0` schließen? | Geschlossen mit ADR 0002 — `.github/workflows/release.yml` ist Gate-only vor Publishing; kein freigegebener Tag ohne grünen Release-Workflow. **Publishing-Schicht mit `v1.0.0` (2026-05-14) nachgezogen** (GHCR, Cosign keyless, GitHub Release, Helm/Source/Native-Assets — siehe ADR 0002 §5, `docs/user/releasing.md`, `docs/user/quality.md` §8). v0.x wurde übersprungen, erstes Release ist `v1.0.0`. |
 
 ---
 
@@ -531,6 +538,10 @@ Kubernetes-Deployment, Edge-Anbindung. Inhalte mit hohem Diskussionsbedarf
 - Lastenheft-Anforderungen: [`spec/lastenheft.md`](../../../../spec/lastenheft.md)
 - Architekturentwurf: [`spec/architecture.md`](../../../../spec/architecture.md)
 - Qualitäts- und Messpfade: [`docs/user/quality.md`](../../../user/quality.md)
+- Release-Prozess: [`docs/user/releasing.md`](../../../user/releasing.md)
+- Post-v1.0.0-Planung: [`../next/`](../next/) (konkret geplante v1.x/v2.x-Arbeit
+  vor Slice-Aktivierung), [`../open/`](../open/) (trigger-getriebene
+  Follow-up-Items aus M3–M6)
 - Archivierte Native-Core-Ideenskizze: [`docs/archive/idea.md`](../../../archive/idea.md)
 
 ---

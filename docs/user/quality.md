@@ -945,25 +945,67 @@ zu verwerfen.
 
 Release-Gates sind in
 [`docs/plan/adr/0002-release-pipeline-gates.md`](../plan/adr/0002-release-pipeline-gates.md)
-entschieden. Workflow `.github/workflows/release.yml` läuft auf Tags
-`v*.*.*` und ist vor dem ersten Tag `v0.1.0` verbindlich.
+entschieden und mit `v1.0.0` (2026-05-14) vollständig produktiv
+geschaltet (inkl. Publishing). Workflow
+`.github/workflows/release.yml` läuft auf Tags `v*.*.*`. Vollständige
+Prozess-Beschreibung mit Voraussetzungen, Tag-Verfahren und Rollback in
+[`docs/user/releasing.md`](releasing.md).
 
-Verbindliche Gates:
+### 8.1 Pre-Build-Validierungs-Gates (fail-fast)
 
-- Tag-Validator: semver `vMAJOR.MINOR.PATCH[-PRERELEASE]`, kein
-  Build-Metadata-Suffix.
-- `make fullbuild`: alle CI-Gates plus Runtime-Image und Compose-Smoke.
-- Runtime-Image-Build mit `SOURCE_DATE_EPOCH` aus dem getaggten Commit.
-- OCI-Labels für Version, Revision und Source.
-- Versionscheck: Tag-Version ↔ OCI-Label
-  `org.opencontainers.image.version`; Revision ↔ `GITHUB_SHA`.
-- Native-Library-Check: `/app/native/libbattery_control_core.so`
+Alle vier laufen **vor** Build/Push/Sign, damit ein invalider Tag in
+Sekunden failt statt nach ~90 min mit verwaisten Registry-Tags:
+
+- **Tag-Format:** `vMAJOR.MINOR.PATCH[-PRERELEASE]`, kein Build-Metadata-
+  Suffix, keine leeren Prerelease-Identifier. Shared Validator
+  [`scripts/validate-release-version.sh`](../../scripts/validate-release-version.sh)
+  — gleicher Pfad für Workflow und lokales `make release-assets`.
+- **Annotierter Tag:** `git cat-file -t refs/tags/$tag` muss `tag`
+  liefern; Lightweight-Tags werden abgewiesen.
+- **Tag auf `origin/main`:** `git merge-base --is-ancestor` blockt
+  Tags auf Side-Branches oder umgeschriebener Historie.
+- **CHANGELOG-Block:** `## [X.Y.Z]`-Sektion muss existieren und nicht
+  leer sein; Release-Notes werden daraus extrahiert.
+
+### 8.2 Build- und Verifikations-Gates
+
+- **`make fullbuild`** mit `SOURCE_DATE_EPOCH` aus dem Tag-Commit —
+  alle CI-Gates plus Runtime-Image und Compose-Smoke.
+- **Runtime-Image-Build** mit OCI-Labels (`org.opencontainers.image.version`,
+  `.revision`, `.source`).
+- **Label-Check:** Tag-Version ↔ Image-Label, Revision ↔ `GITHUB_SHA`.
+- **Native-Library-Check:** `/app/native/libbattery_control_core.so`
   existiert und `ldd` enthält kein `not found`.
-- SBOM als Pflicht-Artefakt ab Major-Release (`v1.0.0` und höher).
 
-Der Workflow ist Gate-only: Er veröffentlicht kein Image und signiert
-noch nicht. Registry-Push und Cosign-Signatur werden erst aktiviert,
-wenn Registry, Namensschema und Signatur-/OIDC-Policy entschieden sind.
+### 8.3 Asset-Erzeugung
+
+- **SBOM** (SPDX-JSON via Anchore Syft) — Pflicht-Artefakt für jedes
+  Release.
+- **Helm-Chart-Tarball** via `helm package` mit `--version`/`--app-version`
+  aus dem Tag.
+- **Source-Tarball** via `git archive --prefix=bess-ems-X.Y.Z/`.
+- **Native `.so` + Header** aus dem fertigen Runtime-Image extrahiert.
+- **`SHA256SUMS`** über alle Release-Assets (strukturell nur Dateien
+  unter `artifacts/release/`, keine Workflow-Internas).
+
+### 8.4 Publishing-Gates
+
+- **GHCR-Push** nach `ghcr.io/pt9912/bess-ems` mit drei Tags: `:vX.Y.Z`,
+  `:X.Y.Z` und — nur bei stabiler Version — `:latest`.
+- **Cosign keyless Sign** des Images über sigstore-OIDC
+  (Permission `id-token: write`, kein Secret).
+- **SBOM-Attestation** an das Image gebunden (cosign attest).
+- **GitHub Release** mit den 7 Assets, Notes aus dem CHANGELOG-Block,
+  `prerelease: true` bei `-PRERELEASE`-Suffix.
+
+### 8.5 Lokale Trockenübung
+
+`make release-assets VERSION=vX.Y.Z` produziert die gleichen Datei-
+Assets unter `artifacts/release-local/`, ohne Push/Sign/Release. Schutz-
+Checks: Working-Tree-Sauberkeit (Opt-out `ALLOW_DIRTY=1`),
+RELEASE_DIR-Whitelist auf `artifacts/`-Subtree. Pflicht vor einem
+ersten Tag in einem neuen Major-/Minor-Zweig
+(siehe [`releasing.md`](releasing.md) §7).
 
 ---
 
