@@ -47,27 +47,66 @@ Diese Notiz fixiert pro Kandidat:
 **Pflicht-Kandidat, klein, trigger-frei rechtfertigbar.**
 
 - **Quelle:** [`note-RM-M3-followups.md` Item 7](../open/note-RM-M3-followups.md).
-- **Stand heute:** `DefaultScheduleOptimizationUseCase` hält
-  `_locks`-Dictionary ohne Eviction. Bei langlebigen Hosts mit
-  vielen Asset-ID-Variationen (Multi-Tenant, ephemere Test-IDs)
-  wächst die Hashtabelle unbeschränkt.
-- **Nach v1.1.0:** LRU/TTL-Eviction mit konfigurierbarer Schwelle
-  plus Metrik `bess_optimization_lock_table_size`.
+- **Stand heute:** **Zwei** Use Cases halten unbounded
+  `_locks`-Dictionaries, beide Singleton-registriert in
+  `ApplicationServiceRegistration`:
+  1. `DefaultScheduleOptimizationUseCase` —
+     `ConcurrentDictionary<(AssetId, ScheduleType), SemaphoreSlim>`
+     für die `read-optimise-write`-Serialisierung des Day-Ahead-/
+     Intraday-Schedule-Schreibpfads
+     (`src/hexagon/BatteryEms.Application/Api/DefaultScheduleOptimizationUseCase.cs:70`).
+  2. `DefaultIntradayReoptimizationUseCase` —
+     `ConcurrentDictionary<string, SemaphoreSlim>` (per Asset)
+     für die Resthorizont-Reoptimierung
+     (`src/hexagon/BatteryEms.Application/Api/DefaultIntradayReoptimizationUseCase.cs:51`).
+
+  Bei langlebigen Hosts mit vielen Asset-ID-Variationen (Multi-
+  Tenant, ephemere Test-IDs) wachsen beide Hashtabellen
+  unbeschränkt. **v1.1.0 schließt beide oder ist kein FUP-03-Closure.**
+- **Nach v1.1.0:** Geteilter Eviction-Mechanismus (LRU oder TTL)
+  mit konfigurierbarer Schwelle plus Metrik
+  `bess_optimization_lock_table_size{use_case="..."}` (Label
+  unterscheidet die zwei Pfade). Implementiert entweder als eigener
+  Helper-Type oder als zwei separate Eviction-Policies mit
+  gemeinsamem Vertrag.
 - **Begründung trotz fehlendem externen Trigger:** Präventive
   Hardening-Maßnahme; das Risiko-Profil verschlechtert sich mit
   jeder produktiven Stunde stillschweigend (Memory-Leak-Klasse),
   während der Fix klein und reversibel ist.
-- **Aufwand:** ~2 PT (Slice + Metrik + Unit-Test + Dokumentation in
+- **Vertrags-Erhalt (Pflicht-DoD):** Die Serialisierungs-Garantie
+  („zwei parallele Aufrufe für denselben Key dürfen nicht denselben
+  Base-Stand lesen und gegenseitig überschreiben") darf durch
+  Eviction **nicht gebrochen werden**. Konkret:
+  - **Idle-only-Eviction:** Ein `SemaphoreSlim`, an dem ein
+    Aufrufer aktiv hält oder wartet (`CurrentCount == 0` oder
+    Waiter-Count > 0), darf **nicht** evicted werden.
+  - **Refcount- oder Waiter-aware Tracking:** Eviction-Kandidaten
+    werden anhand „seit X Sekunden idle, kein aktiver Wait" gewählt,
+    nicht anhand reinem LRU-Alter.
+  - **Race-sicheres Re-Add:** Falls ein Aufrufer für einen
+    just-evicted Key kommt, muss der `GetOrAdd`-Pfad einen neuen
+    Semaphore liefern ohne dass ein paralleler Aufrufer den
+    bereits-gelöschten Semaphore nochmal sieht.
+  - **Concurrency-Test über die Eviction-Grenze:** Pflicht-Unit-
+    Test, der zwei parallele Aufrufer auf denselben Key während
+    eines Eviction-Sweeps fährt und beweist, dass sie weiterhin
+    seriell ausgeführt werden.
+- **Aufwand:** ~3-4 PT (Slice + gemeinsame Eviction-Logik +
+  Metrik mit Label + Concurrency-Test + Dokumentation in
   `quality.md` §6 oder Persistenz-Doku).
 - **Slice-Plan:** `plan-RM-M3-FUP-03.md` (entsteht in `open/` →
   `in-progress/` → `done/`).
-- **Offene Entscheidungen:** Default-Schwelle (Vorschlag: TTL 24h
-  und/oder LRU-Capacity 1000). Default sollte in der Slice-Diskussion
-  fixiert werden.
+- **Offene Entscheidungen:**
+  - Default-Schwelle: TTL-basiert (z. B. 24h idle) oder
+    LRU-Capacity (z. B. 1000) — beide?
+  - Gemeinsamer Helper-Type für beide Use Cases vs. zwei separate
+    Implementierungen mit dupliziertem Pattern.
+  - Metrik-Labelstrategie (`use_case="schedule"|"intraday"` vs.
+    zwei getrennte Metriken).
 
 ---
 
-### Kandidat B: F-M6-03-01 — Kubernetes Cluster-Smoke / CI-Gate
+### Kandidat B: F-M6-03-01 — Kubernetes Cluster-Smoke
 
 **Pflicht-Kandidat, klein, trigger-frei rechtfertigbar.**
 
@@ -76,24 +115,34 @@ Diese Notiz fixiert pro Kandidat:
 - **Stand heute:** Helm-Chart `deploy/helm/bess-ems` ist mit
   RM-M6-03 geliefert (✓), `make helm-lint` rendert fünf Topologie-
   Varianten (shared, worker-per-asset, optimization-core,
-  optimization-core-mtls, mqtt) — aber **kein** Cluster-Smoke-Test
-  fährt das Chart tatsächlich gegen einen Cluster (k3d/kind/minikube),
+  optimization-core-mtls, mqtt) — aber **kein** Smoke-Lauf fährt
+  das Chart tatsächlich gegen einen Cluster (k3d/kind/minikube),
   prüft Pod-Health und tear-down.
 - **Nach v1.1.0:** Neuer Make-Target `make helm-cluster-smoke`
-  (k3d-basiert, Compose-Smoke-Vorbild), als optionaler CI-Job in
-  `.github/workflows/build.yml` ohne PR-Blocking-Pflicht (analog
-  HIL-Gates die nur auf bestimmte Pfade triggern).
+  (k3d-basiert, Compose-Smoke-Vorbild). Workflow-Integration
+  bewusst **nicht als blockierendes Gate**, sondern als
+  **path-filtered optionaler PR-Check** auf Änderungen unter
+  `deploy/helm/**` plus `nightly`-Schedule auf `main`. Der
+  „Gate"-Charakter (Pflicht-Lauf, PR-blocking, Release-Vorbedingung)
+  wird **bewusst aufgeschoben** bis stabile Lauf-Serie nachgewiesen ist.
 - **Begründung trotz fehlendem externen Trigger:** Helm-Lint-Render
   ohne Cluster-Apply ist kein Vertrag — der erste Operator, der
   `helm install` macht, könnte heute auf YAML-aber-nicht-Kubernetes-
   konforme Manifeste stoßen. Smoke kompensiert.
 - **Aufwand:** ~3-4 PT (k3d-Setup im Workflow, Pod-Wait, Health-
-  Probe, Tear-Down).
+  Probe, Tear-Down, Path-Filter + Nightly-Schedule).
 - **Slice-Plan:** `plan-RM-M6-FUP-03-01.md`.
+- **Promotion-Pfad** (explizit, damit „optional" nicht „dauerhaft
+  optional" wird):
+  1. **v1.1.0:** Path-filtered optional + nightly. Failures werden
+     im Issue-Tracker erfasst, blocken aber keine PRs.
+  2. **Nach 4 Wochen ununterbrochen grünem Nightly:** Job wird
+     `required` für alle PRs (PR-blocking-Gate).
+  3. **Nach weiteren 4 Wochen grünem PR-Gate:** Aufnahme in
+     `make ci` und damit Voraussetzung für `make fullbuild` und
+     Release-Workflow.
 - **Offene Entscheidungen:** k3d vs. kind vs. minikube
-  (Vorschlag: k3d, weil leichtester Footprint im CI). PR-Blocking
-  oder optional? (Vorschlag: optional zunächst, mit der Option auf
-  PR-Blocking nach erster grüner Lauf-Serie).
+  (Vorschlag: k3d, weil leichtester Footprint im CI).
 
 ---
 
@@ -158,17 +207,18 @@ Aktivierung.**
 
 | Item | Kandidat | Entscheidung |
 | ---- | -------- | ------------ |
-| RM-M3-FUP-03 Lock-Eviction      | A | **In Scope** — klein, präventiv |
-| F-M6-03-01 Cluster-Smoke        | B | **In Scope** — klein, deckt Lücke ab |
+| RM-M3-FUP-03 Lock-Eviction (beide Use Cases) | A | **In Scope** — präventiv, deckt beide unbounded `_locks`-Tabellen ab |
+| F-M6-03-01 Cluster-Smoke (path-filtered + nightly, kein Gate) | B | **In Scope** — klein, deckt Lücke ab; Promotion zu Gate über mehrere Releases |
 | M3-D3 PID-Routing               | C | **Aus Scope** — braucht Konsumenten-Entscheidung; v1.2+ |
 | M3-FUP-04 Replay-Carve-outs     | D | **Aus Scope** — alle Varianten trigger-getrieben |
 
-**Geschätzte Größe v1.1.0:** ~1 Woche (2 Slices à 2-4 PT, plus
+**Geschätzte Größe v1.1.0:** ~1-2 Wochen (2 Slices à 3-4 PT, plus
 Release-Vorbereitung gemäß `releasing.md` §2).
 
 **SemVer-Begründung:** Minor (v1.0.x → v1.1.0), weil zwei neue
-Capabilities kommen (Lock-Eviction-Konfiguration + Cluster-Smoke-
-Gate). Keine Breaking Changes; keine API-Aenderungen.
+Capabilities kommen (Lock-Eviction-Konfiguration in beiden
+Optimization-Use-Cases + optionaler Cluster-Smoke). Keine Breaking
+Changes; keine API-Änderungen.
 
 ---
 
@@ -215,8 +265,13 @@ Drift in v1.1.0 wäre Anti-Muster:
    bestehen. Pattern siehe [`docs/user/releasing.md`](../../../user/releasing.md)
    §2 Punkt 3 und der `[1.0.0]`-Eintrag in
    [CHANGELOG](../../../../CHANGELOG.md) als Vorbild.
-5. **Helm-Chart-Version** in `Chart.yaml` auf `1.1.0`/`1.1.0` bumpen
-   (gemäß `releasing.md` §2 Punkt 4).
+5. **Helm-Chart-Version** in `Chart.yaml`: `appVersion` auf `1.1.0`
+   (folgt der App-Version), `version` konsistent erhöhen
+   (voraussichtlich ebenfalls `1.1.0`, weil das Chart keine
+   eigenen Änderungen unabhängig von der App hat). Per
+   `releasing.md` §1 dürfen `version` und `appVersion` ab v1.1.0
+   divergieren — für diese spezifische Minor ist Synchronisierung
+   aber die naheliegende Wahl.
 6. **Pflicht-Voraussetzungen vor Tag** durchgehen
    (`releasing.md` §2 — jede Verletzung ist ein **Stop**):
    - `git status` ist leer (main clean).
@@ -244,8 +299,12 @@ Drift in v1.1.0 wäre Anti-Muster:
 ## Offene Entscheidungen vor Slice-Start
 
 1. **Bestätigung Scope-Wahl A + B** (nicht A + B + C, nicht A + B + D).
-2. **Lock-Eviction-Default-Schwelle** für RM-M3-FUP-03 (Vorschlag:
-   TTL 24h + LRU-Capacity 1000).
-3. **Cluster-Smoke-Tool** für F-M6-03-01 (Vorschlag: k3d).
-4. **Cluster-Smoke-PR-Blocking** (Vorschlag: optional zuerst,
-   blocking nach grüner Lauf-Serie).
+2. **Lock-Eviction-Strategie** für RM-M3-FUP-03 (Vorschlag:
+   gemeinsame TTL 24h + LRU 1000, idle-only mit Waiter-Awareness,
+   Pflicht-Concurrency-Test über Eviction-Grenze).
+3. **Lock-Eviction-Coverage:** Schedule + Intraday gemeinsam
+   (Vorschlag) oder Intraday als separater Folge-FUP?
+4. **Cluster-Smoke-Tool** für F-M6-03-01 (Vorschlag: k3d).
+5. **Cluster-Smoke-Promotion-Pfad** bestätigen: path-filtered
+   optional + nightly in v1.1.0 → PR-required nach 4 Wochen grün
+   → `make ci`-Aufnahme nach weiteren 4 Wochen.
