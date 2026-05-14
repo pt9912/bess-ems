@@ -127,12 +127,21 @@ test -f "${native_header}"
 test -s "${image_inspect}"
 
 echo "[build-release-assets] generating SBOM via ${SYFT_IMAGE}"
+# Capture syft's SPDX-JSON on stdout and let the HOST shell redirect
+# to the file. Earlier versions bind-mounted an output directory and
+# let syft write the file inside the container, which produced
+# root-owned output that the developer could no longer `chown`. The
+# pipe pattern sidesteps the UID/GID dance entirely — the resulting
+# file is owned by the user running `make release-assets`. `-q`
+# suppresses syft's progress logs on stderr from cluttering the
+# terminal; real errors still appear because we do not redirect stderr.
 "${DOCKER}" run --rm \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  -v "${repo_root}/${RELEASE_DIR}:/out" \
   "${SYFT_IMAGE}" \
+  -q \
   "docker:${image}" \
-  -o "spdx-json=/out/sbom.spdx.json"
+  -o spdx-json \
+  > "${sbom_file}"
 test -s "${sbom_file}"
 
 echo "[build-release-assets] SHA256SUMS"
