@@ -102,6 +102,20 @@ Diese Notiz fixiert pro Kandidat:
     `GetOrAdd` neu laden. Nur ein im selben Schritt verifizierter
     Lease darf auf `WaitAsync` gehen. Release dekrementiert
     `leaseCount` nach `semaphore.Release`.
+  - **Cancellation-Pflicht (`WaitAsync` mit `CancellationToken`):**
+    Wenn `WaitAsync(cancellationToken)` per
+    `OperationCanceledException` abbricht, **wurde der Semaphore
+    nicht gehalten** — `Release()` darf nicht aufgerufen werden
+    (würde `SemaphoreFullException` werfen), aber der bereits
+    reservierte `leaseCount` muss via `Interlocked.Decrement`
+    zurückgenommen werden. Sonst bleiben abgebrochene Aufrufer
+    als künstlich aktive Leases hängen und Eviction wird dauerhaft
+    blockiert. Standard-Muster: separater `try/catch` um
+    `WaitAsync` für Lease-Rollback bei Cancellation, dann separater
+    `try/finally` für `Release` + Lease-Decrement im Happy-Path.
+    Pflicht-Unit-Test: Caller, dessen `CancellationToken` zwischen
+    Lease-Reservierung und Semaphore-Akquise gefeuert wird, hinter­
+    lässt `leaseCount == 0`.
   - **Idle-only mit Tombstone-Pattern:** Eviction-Kandidaten
     werden anhand „seit X Sekunden ohne Acquire/Release" gewählt.
     Eviction setzt zuerst `tombstoned = true` (per
@@ -115,6 +129,15 @@ Diese Notiz fixiert pro Kandidat:
     `TryRemove(KeyValuePair)`-Overload) ist Slice-Plan-
     Entscheidung — der Vertrag ist die Instanz-bedingte
     Entfernung, nicht eine spezifische BCL-Methode.
+  - **Dispose der entfernten Semaphore:** Nach erfolgreicher
+    Entfernung aus dem Dictionary **und** finaler Bestätigung
+    `leaseCount == 0` muss die `SemaphoreSlim`-Instanz disposed
+    werden (sie hält intern unmanaged-Ressourcen, insbesondere
+    ein lazy `AvailableWaitHandle`). Ein vergessener Dispose
+    reduziert den Dictionary-Leak, lässt aber Semaphore-Ressourcen
+    unnötig liegen. Falls beim Tombstone-Check `leaseCount > 0`
+    festgestellt wird, **kein** Remove durchführen — Eintrag
+    bleibt aktiv. Eintrag wird beim nächsten Sweep neu evaluiert.
   - **Race-sicheres Re-Add:** Wenn `TryAcquireLease` einen
     Tombstone oder Generations-Mismatch entdeckt, läuft
     `GetOrAdd` mit einer frischen Instanz (neue `generation`).
@@ -168,10 +191,20 @@ Diese Notiz fixiert pro Kandidat:
 - **Nach v1.1.0:** Neuer Make-Target `make helm-cluster-smoke`
   (k3d-basiert, Compose-Smoke-Vorbild). Workflow-Integration
   bewusst **nicht als blockierendes Gate**, sondern als
-  **path-filtered optionaler PR-Check** auf Änderungen unter
-  `deploy/helm/**` plus `nightly`-Schedule auf `main`. Der
-  „Gate"-Charakter (Pflicht-Lauf, PR-blocking, Release-Vorbedingung)
-  wird **bewusst aufgeschoben** bis stabile Lauf-Serie nachgewiesen ist.
+  **path-filtered optionaler PR-Check** plus `nightly`-Schedule
+  auf `main`. Path-Filter muss **alle Inputs des Smoke-Laufs**
+  abdecken, nicht nur das Chart selbst — sonst brechen Änderungen
+  am Smoke unentdeckt durch:
+  - `deploy/helm/**` (das Chart)
+  - `Makefile` (Target-Definition)
+  - `.github/workflows/cluster-smoke.yml` (oder wie immer der
+    Workflow heißt — Job-Spec und Skip-Sentinel)
+  - `scripts/helm-cluster-smoke*` (falls Helper-Skripte unter
+    `scripts/` entstehen)
+
+  Der „Gate"-Charakter (Pflicht-Lauf, PR-blocking, Release-
+  Vorbedingung) wird **bewusst aufgeschoben** bis stabile Lauf-
+  Serie nachgewiesen ist.
 - **Begründung trotz fehlendem externen Trigger:** Helm-Lint-Render
   ohne Cluster-Apply ist kein Vertrag — der erste Operator, der
   `helm install` macht, könnte heute auf YAML-aber-nicht-Kubernetes-
