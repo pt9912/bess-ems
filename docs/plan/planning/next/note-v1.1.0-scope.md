@@ -62,7 +62,15 @@ Diese Notiz fixiert pro Kandidat:
 
   Bei langlebigen Hosts mit vielen Asset-ID-Variationen (Multi-
   Tenant, ephemere Test-IDs) wachsen beide Hashtabellen
-  unbeschränkt. **v1.1.0 schließt beide oder ist kein FUP-03-Closure.**
+  unbeschränkt. **Scope-Erweiterung gegenüber Ursprungs-Notiz:**
+  Die Originalformulierung in
+  [`note-RM-M3-followups.md` Item 7](../open/note-RM-M3-followups.md)
+  nennt nur `DefaultScheduleOptimizationUseCase`. v1.1.0 zieht den
+  Intraday-Use-Case mit hinein, weil er dieselbe Klasse von
+  Memory-Leak hat und die Closure-Definition sonst die Hälfte des
+  Problems übrig lässt. Die Ursprungs-Notiz wird in derselben
+  Slice-Welle nachgezogen, damit FUP-03-Closure und Followup-Note
+  konsistent bleiben.
 - **Nach v1.1.0:** Geteilter Eviction-Mechanismus (LRU oder TTL)
   mit konfigurierbarer Schwelle plus Metrik
   `bess_optimization_lock_table_size{use_case="..."}` (Label
@@ -76,27 +84,54 @@ Diese Notiz fixiert pro Kandidat:
 - **Vertrags-Erhalt (Pflicht-DoD):** Die Serialisierungs-Garantie
   („zwei parallele Aufrufe für denselben Key dürfen nicht denselben
   Base-Stand lesen und gegenseitig überschreiben") darf durch
-  Eviction **nicht gebrochen werden**. Konkret:
-  - **Idle-only-Eviction:** Ein `SemaphoreSlim`, an dem ein
-    Aufrufer aktiv hält oder wartet (`CurrentCount == 0` oder
-    Waiter-Count > 0), darf **nicht** evicted werden.
-  - **Refcount- oder Waiter-aware Tracking:** Eviction-Kandidaten
-    werden anhand „seit X Sekunden idle, kein aktiver Wait" gewählt,
-    nicht anhand reinem LRU-Alter.
+  Eviction **nicht gebrochen werden**. `SemaphoreSlim` exponiert
+  keinen öffentlichen Waiter-Count und ein blosses
+  `ConcurrentDictionary.TryRemove(key)` kann ein Lock entfernen,
+  während ein paralleler Aufrufer die alte Instanz schon
+  referenziert hat aber `WaitAsync` noch nicht aufgerufen ist.
+  Daher konkrete Pflichten:
+  - **Lease/Refcount um den Lock-Zugriff:** Pro Key wird ein
+    Eintrag mit `(SemaphoreSlim semaphore, int leaseCount)`
+    geführt. `Acquire` inkrementiert `leaseCount` (Interlocked),
+    bevor es auf `WaitAsync` geht; `Release` dekrementiert nach
+    `semaphore.Release`. Eviction prüft `leaseCount == 0` als
+    Pflichtbedingung.
+  - **Idle-only mit Tombstone-Pattern:** Eviction-Kandidaten
+    werden anhand „seit X Sekunden ohne Acquire/Release" gewählt.
+    Entfernung erfolgt via `ConcurrentDictionary.TryRemove(
+    KeyValuePair)`-Overload (conditional remove auf gleiche
+    Instanz), nicht via `TryRemove(key)`. Damit kann ein parallel
+    angekommener Acquirer keinen Tombstoned-Eintrag fälschlich
+    benutzen.
   - **Race-sicheres Re-Add:** Falls ein Aufrufer für einen
-    just-evicted Key kommt, muss der `GetOrAdd`-Pfad einen neuen
-    Semaphore liefern ohne dass ein paralleler Aufrufer den
-    bereits-gelöschten Semaphore nochmal sieht.
-  - **Concurrency-Test über die Eviction-Grenze:** Pflicht-Unit-
-    Test, der zwei parallele Aufrufer auf denselben Key während
-    eines Eviction-Sweeps fährt und beweist, dass sie weiterhin
-    seriell ausgeführt werden.
-- **Aufwand:** ~3-4 PT (Slice + gemeinsame Eviction-Logik +
-  Metrik mit Label + Concurrency-Test + Dokumentation in
-  `quality.md` §6 oder Persistenz-Doku).
+    just-evicted Key kommt, läuft `GetOrAdd` mit einer frischen
+    Instanz. Aufrufer, die noch die alte Instanz halten,
+    erkennen über den Lease-Pfad dass sie die letzte Generation
+    benutzen und schliessen sauber ab.
+  - **Concurrency-Test "Acquire racing with Eviction-Remove":**
+    Pflicht-Unit-Test, der genau die Race-Sequenz „Caller hat
+    Instanz-Referenz, Eviction führt `TryRemove` aus, Caller ruft
+    `WaitAsync` auf" trifft und beweist, dass entweder
+    (a) Eviction wegen Lease nicht stattfindet oder
+    (b) der Caller mit einer neuen Instanz weitermacht und
+    Serialisierung nicht aufweicht.
+  - **Concurrency-Test "Sweep während paralleler Calls":**
+    Zweiter Pflicht-Test, der einen Eviction-Sweep parallel zu
+    zwei aktiv haltenden Callern fährt und beweist, dass kein
+    aktives Lock entfernt wird.
+- **Aufwand:** ~4-5 PT (Slice + gemeinsame Eviction-Logik +
+  Lease/Refcount-Wrapper + Metrik mit Label + zwei Concurrency-
+  Tests + Aktualisierung der Ursprungs-Followup-Notiz +
+  Dokumentation). **Doku-Ort:** wird im Slice-Plan festgelegt;
+  `quality.md` §6 ist Native-/.NET-Parity (nicht passend),
+  Persistenz-Doku ist ebenfalls fachfremd — vermutlich neuer
+  Operations-/Metrik-Abschnitt in `quality.md` oder kurze
+  Betriebsnotiz im Application-User-Doc.
 - **Slice-Plan:** `plan-RM-M3-FUP-03.md` (entsteht in `open/` →
   `in-progress/` → `done/`).
-- **Offene Entscheidungen:**
+- **Offene Entscheidungen** (Coverage **nicht** mehr offen —
+  beide Use Cases sind harter Closure-Bestandteil, siehe Stand-
+  heute-Block):
   - Default-Schwelle: TTL-basiert (z. B. 24h idle) oder
     LRU-Capacity (z. B. 1000) — beide?
   - Gemeinsamer Helper-Type für beide Use Cases vs. zwei separate
@@ -134,10 +169,17 @@ Diese Notiz fixiert pro Kandidat:
 - **Slice-Plan:** `plan-RM-M6-FUP-03-01.md`.
 - **Promotion-Pfad** (explizit, damit „optional" nicht „dauerhaft
   optional" wird):
-  1. **v1.1.0:** Path-filtered optional + nightly. Failures werden
-     im Issue-Tracker erfasst, blocken aber keine PRs.
-  2. **Nach 4 Wochen ununterbrochen grünem Nightly:** Job wird
-     `required` für alle PRs (PR-blocking-Gate).
+  1. **v1.1.0:** Path-filtered PR-Check auf `deploy/helm/**` +
+     nightly auf `main`. Failures werden im Issue-Tracker erfasst,
+     blocken aber keine PRs.
+  2. **Nach 4 Wochen ununterbrochen grünem Nightly:** Promotion
+     zu `required`. **Pflicht-Begleitänderung:** Trigger wird auf
+     `pull_request` ohne `paths`-Filter umgestellt und der Job
+     bekommt einen frühen Skip-Check (z. B. `git diff --name-only`
+     gegen `deploy/helm/**`), der bei Nicht-Helm-PRs sauber als
+     **Success** zurückkehrt. Ohne dieses Sentinel-Pattern blockt
+     ein `required`-Job mit `paths`-Filter alle Nicht-Helm-PRs,
+     weil GitHub ihn dann nie startet.
   3. **Nach weiteren 4 Wochen grünem PR-Gate:** Aufnahme in
      `make ci` und damit Voraussetzung für `make fullbuild` und
      Release-Workflow.
