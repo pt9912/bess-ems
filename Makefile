@@ -26,7 +26,7 @@ DOCKER_BUILD = $(DOCKER) build $(BUILD_CONTEXT) \
 	native-build test-native-interop test-native-parity \
 	native-lint native-sanitizer native-coverage-report native-coverage-gate native-coverage-exclusions \
 	simulator-test simulator-race simulator-lint simulator-coverage-gate \
-	build ci runtime fullbuild lock-refresh \
+	build ci runtime fullbuild lock-refresh release-assets \
 	schema-validate schema-generate schema-drift-check \
 	helm-lint
 
@@ -90,6 +90,7 @@ help:
 	@echo "  make test-container  Runtime smoke (alias for make runtime)"
 	@echo "  make ci              Sequential CI run of every M1 mandatory gate"
 	@echo "  make fullbuild       make ci + make build + make runtime (M1 closure)"
+	@echo "  make release-assets VERSION=vX.Y.Z   Local dry-run of release artefacts (no push)"
 
 # --- Maintenance -----------------------------------------------------------
 
@@ -403,3 +404,26 @@ ci: lint arch-check test test-safety test-mpc-property test-replay coverage-gate
 # Compose-Smoke. Letzte Stufe vor einem M1-Tag (RM-M1-20).
 fullbuild: ci build runtime
 	@echo "[fullbuild] M1 closure: all gates + runtime image + compose smoke green"
+
+# --- Release-Trockenübung (docs/user/releasing.md §7) ----------------------
+#
+# Produziert lokal die gleichen Release-Assets wie der CI-Workflow, OHNE
+# Push und ohne GitHub-Release. Pflicht-Schritt vor einem ersten Tag in
+# einem neuen Major-/Minor-Zweig. Setzt voraus, dass `make build`
+# (Runtime-Image $(IMAGE_PREFIX)-runtime:latest) bereits gelaufen ist;
+# der Target ruft `build` selbst auf, um die .so-Extraktion deterministisch
+# zu halten.
+#
+# Aufruf: `make release-assets VERSION=v1.0.0`
+RELEASE_DIR ?= artifacts/release-local
+SYFT_IMAGE ?= anchore/syft:v1.17.0
+.PHONY: release-assets
+release-assets: build
+	@VERSION="$(VERSION)" \
+	 RELEASE_DIR="$(RELEASE_DIR)" \
+	 IMAGE_PREFIX="$(IMAGE_PREFIX)" \
+	 HELM_CHART="$(HELM_CHART)" \
+	 HELM="$(HELM)" \
+	 DOCKER="$(DOCKER)" \
+	 SYFT_IMAGE="$(SYFT_IMAGE)" \
+	 scripts/build-release-assets.sh

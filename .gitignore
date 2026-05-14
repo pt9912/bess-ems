@@ -41,3 +41,8 @@ src/adapters/driven/BatteryEms.Adapters.Persistence/Migrations/**/*.report.yaml
 
 # Claude Code harness state (per-session lock files, transcripts, etc.).
 .claude/
+
+# Release / CI artefact outputs (docs/user/releasing.md §7). Produced
+# locally by `make release-assets` and in CI by the release/build
+# workflows under artifacts/release(-local)/ and artifacts/ci/.
+artifacts/
