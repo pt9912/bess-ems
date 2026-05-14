@@ -1845,7 +1845,7 @@ Status-Marker:
 | LH-DOM-002         | `BatteryTelemetry`                                     | ✓ M1                                            |
 | LH-DOM-003         | `BatteryCommand`                                       | ✓ M1                                            |
 | LH-DOM-005         | `DevicePointDefinition`                                | ✓ M1                                            |
-| LH-DOM-006         | `AssetCapability`                                      | 🔲 nicht implementiert                          |
+| LH-DOM-006         | `AssetCapability`                                      | 🔲 nicht implementiert — kein aktiver Trigger (erster Anwendungsfall, der per-Asset-Capability braucht, z. B. asymmetrische Inverter oder Hybrid-Mode-Switch, zündet den Slice) |
 | LH-MKT-003         | `MarketCommitment`                                     | ✓ M1 (Priorisierung erweitert in M2 / RM-M2-01) |
 | LH-MKT-008         | `TariffRule` / `MarketPrice`                           | ✓ M2 (Preisreihen-Port in M5 / RM-M5-07)        |
 | LH-MKT-009         | `MarketProduct`                                        | ✓ M2 (Reserve-Produkte in M4 / RM-M4-02)        |
@@ -1872,7 +1872,7 @@ Status-Marker:
 | LH-CONF-001        | `ConfigurationSource`                                  | ✓ M1                                            |
 | LH-CONF-002        | `DeviceMappingRepository`                              | ✓ M1                                            |
 | LH-CONF-003        | `ConfigurationValidator`                               | ✓ M1                                            |
-| LH-CONF-004        | `NorthboundExportConfiguration`                        | 🔲 AR-OPEN-011 (Northbound-Export-Struktur)     |
+| LH-CONF-004        | `NorthboundExportConfiguration`                        | 🔲 [ADR 0012](../docs/plan/adr/0012-northbound-export-adapter-structure.md) — Slice trigger-basiert beim ersten Konsumenten |
 
 ---
 
