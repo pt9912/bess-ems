@@ -85,40 +85,52 @@ Diese Notiz fixiert pro Kandidat:
   („zwei parallele Aufrufe für denselben Key dürfen nicht denselben
   Base-Stand lesen und gegenseitig überschreiben") darf durch
   Eviction **nicht gebrochen werden**. `SemaphoreSlim` exponiert
-  keinen öffentlichen Waiter-Count und ein blosses
-  `ConcurrentDictionary.TryRemove(key)` kann ein Lock entfernen,
-  während ein paralleler Aufrufer die alte Instanz schon
-  referenziert hat aber `WaitAsync` noch nicht aufgerufen ist.
-  Daher konkrete Pflichten:
-  - **Lease/Refcount um den Lock-Zugriff:** Pro Key wird ein
-    Eintrag mit `(SemaphoreSlim semaphore, int leaseCount)`
-    geführt. `Acquire` inkrementiert `leaseCount` (Interlocked),
-    bevor es auf `WaitAsync` geht; `Release` dekrementiert nach
-    `semaphore.Release`. Eviction prüft `leaseCount == 0` als
-    Pflichtbedingung.
+  keinen öffentlichen Waiter-Count, und das naive
+  Dictionary-Lookup-dann-Increment-Pattern hat eine Race: Eviction
+  kann zwischen Lookup und Lease-Increment dieselbe Instanz
+  entfernen. Daher konkrete Pflichten:
+  - **Lease-Reservierung als atomar-verifizierte Operation
+    (`TryAcquireLease`):** Pro Key wird ein Eintrag mit
+    `(SemaphoreSlim semaphore, int leaseCount, int generation,
+    bool tombstoned)` geführt. Acquire läuft als Schleife:
+    (1) Eintrag lookup, (2) `tombstoned`-Flag prüfen,
+    (3) `leaseCount` via `Interlocked.Increment` reservieren,
+    (4) **nach** der Reservierung verifizieren, dass der
+    Dictionary-Eintrag noch dieselbe aktive Generation hat
+    (Instanz-Identität oder `generation`-Vergleich) — wenn nicht,
+    Lease via `Interlocked.Decrement` zurücknehmen und mit
+    `GetOrAdd` neu laden. Nur ein im selben Schritt verifizierter
+    Lease darf auf `WaitAsync` gehen. Release dekrementiert
+    `leaseCount` nach `semaphore.Release`.
   - **Idle-only mit Tombstone-Pattern:** Eviction-Kandidaten
     werden anhand „seit X Sekunden ohne Acquire/Release" gewählt.
-    Entfernung erfolgt via `ConcurrentDictionary.TryRemove(
-    KeyValuePair)`-Overload (conditional remove auf gleiche
-    Instanz), nicht via `TryRemove(key)`. Damit kann ein parallel
-    angekommener Acquirer keinen Tombstoned-Eintrag fälschlich
-    benutzen.
-  - **Race-sicheres Re-Add:** Falls ein Aufrufer für einen
-    just-evicted Key kommt, läuft `GetOrAdd` mit einer frischen
-    Instanz. Aufrufer, die noch die alte Instanz halten,
-    erkennen über den Lease-Pfad dass sie die letzte Generation
-    benutzen und schliessen sauber ab.
+    Eviction setzt zuerst `tombstoned = true` (per
+    `Interlocked.CompareExchange` auf einen Status-Slot), prüft
+    dann `leaseCount == 0`, und entfernt erst danach den Eintrag
+    via **conditional remove mit Instanz-Identität** (semantisch:
+    „entferne diesen Eintrag nur, wenn er noch genau diese
+    Instanz ist"). Die exakte API-Form (Cast auf
+    `ICollection<KeyValuePair<,>>` und `Remove(pair)`, eigene
+    Tombstone-CAS, oder ein verfügbarer
+    `TryRemove(KeyValuePair)`-Overload) ist Slice-Plan-
+    Entscheidung — der Vertrag ist die Instanz-bedingte
+    Entfernung, nicht eine spezifische BCL-Methode.
+  - **Race-sicheres Re-Add:** Wenn `TryAcquireLease` einen
+    Tombstone oder Generations-Mismatch entdeckt, läuft
+    `GetOrAdd` mit einer frischen Instanz (neue `generation`).
+    Aufrufer, die noch die alte Instanz halten, erkennen das
+    beim Verify-Schritt und reservieren neu.
   - **Concurrency-Test "Acquire racing with Eviction-Remove":**
     Pflicht-Unit-Test, der genau die Race-Sequenz „Caller hat
-    Instanz-Referenz, Eviction führt `TryRemove` aus, Caller ruft
-    `WaitAsync` auf" trifft und beweist, dass entweder
-    (a) Eviction wegen Lease nicht stattfindet oder
-    (b) der Caller mit einer neuen Instanz weitermacht und
-    Serialisierung nicht aufweicht.
+    Instanz-Referenz, Eviction setzt Tombstone und entfernt,
+    Caller ruft Lease-Reservierung auf" trifft und beweist, dass
+    der Caller entweder (a) auf die neue Generation springt oder
+    (b) seinen Lease beim Verify-Schritt zurücknimmt und
+    sauber neu lädt.
   - **Concurrency-Test "Sweep während paralleler Calls":**
     Zweiter Pflicht-Test, der einen Eviction-Sweep parallel zu
     zwei aktiv haltenden Callern fährt und beweist, dass kein
-    aktives Lock entfernt wird.
+    Eintrag mit `leaseCount > 0` entfernt wird.
 - **Aufwand:** ~4-5 PT (Slice + gemeinsame Eviction-Logik +
   Lease/Refcount-Wrapper + Metrik mit Label + zwei Concurrency-
   Tests + Aktualisierung der Ursprungs-Followup-Notiz +
@@ -342,11 +354,14 @@ Drift in v1.1.0 wäre Anti-Muster:
 
 1. **Bestätigung Scope-Wahl A + B** (nicht A + B + C, nicht A + B + D).
 2. **Lock-Eviction-Strategie** für RM-M3-FUP-03 (Vorschlag:
-   gemeinsame TTL 24h + LRU 1000, idle-only mit Waiter-Awareness,
-   Pflicht-Concurrency-Test über Eviction-Grenze).
-3. **Lock-Eviction-Coverage:** Schedule + Intraday gemeinsam
-   (Vorschlag) oder Intraday als separater Folge-FUP?
-4. **Cluster-Smoke-Tool** für F-M6-03-01 (Vorschlag: k3d).
-5. **Cluster-Smoke-Promotion-Pfad** bestätigen: path-filtered
-   optional + nightly in v1.1.0 → PR-required nach 4 Wochen grün
-   → `make ci`-Aufnahme nach weiteren 4 Wochen.
+   gemeinsame TTL 24h + LRU 1000, idle-only mit `TryAcquireLease`-
+   Pattern (Lease-Reservierung + Generations-Verify + Rollback bei
+   Mismatch), Tombstone-Eviction mit conditional remove auf
+   Instanz-Identität, **zwei** Pflicht-Concurrency-Tests
+   („Acquire racing with Eviction-Remove" + „Sweep während
+   paralleler Calls") — Details im DoD von Kandidat A).
+3. **Cluster-Smoke-Tool** für F-M6-03-01 (Vorschlag: k3d).
+4. **Cluster-Smoke-Promotion-Pfad** bestätigen: path-filtered
+   optional + nightly in v1.1.0 → PR-required (mit Sentinel-Skip-
+   Check und Trigger-Wechsel zu allen PRs) nach 4 Wochen grün →
+   `make ci`-Aufnahme nach weiteren 4 Wochen.
