@@ -1957,32 +1957,36 @@ Status-Marker:
 
 ### 28.2 Nach-MVP-Scope (Soll-Set, ursprünglich für M2–M4 geplant)
 
-- OPC-UA Adapter
-- Intraday-Reoptimierung
-- Regelleistungsreservierung
-- Regelleistungsaktivierung
-- Tarif- und Preiszeitfenster
-- differenzierte Marktprodukte für Reserve- und Aktivierungsenergie
-- MILP-Optimierung
-- Horizon-Optimierer mit gespeicherten Optimierungsläufen
-- Northbound-Exportdienste mit Runtime-Reload
-- Native C/C++ Control Core
-- OpenTelemetry Tracing
-- Replay-Testumgebung
+| Item                                                                | Status                                                                                                                                                                                                          |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OPC-UA Adapter                                                      | ✓ M4 (RM-M4-04)                                                                                                                                                                                                 |
+| Intraday-Reoptimierung                                              | ✓ M4 (RM-M4-01)                                                                                                                                                                                                 |
+| Regelleistungsreservierung                                          | ✓ M4 (RM-M4-02 — Reserve-Modell mit `ReserveProduct`/`ReserveDirection`/`ReserveBand`)                                                                                                                          |
+| Regelleistungsaktivierung                                           | ✓ M4 (RM-M4-03)                                                                                                                                                                                                 |
+| Tarif- und Preiszeitfenster                                         | ✓ M2 (Preisreihen-Port erweitert in M5 / RM-M5-07)                                                                                                                                                              |
+| differenzierte Marktprodukte für Reserve- und Aktivierungsenergie   | ✓ M4 (RM-M4-02 — FCR-symmetrisch, AFRR Up/Down)                                                                                                                                                                  |
+| MILP-Optimierung                                                    | 🔲 bewusst zurückgestellt — produktiv läuft GLOP-LP (Schedule) + OSQP-QP (MPC); MILP-Backend ist im `OrToolsResultMapper` als „future second backend (HiGHS / CBC)" angelegt, kein aktiver Trigger             |
+| Horizon-Optimierer mit gespeicherten Optimierungsläufen             | ✓ M2 (`OptimizationRunRepository` + `OptimizationRunResult`)                                                                                                                                                    |
+| Northbound-Exportdienste mit Runtime-Reload                         | 🔲 [ADR 0012](../docs/plan/adr/0012-northbound-export-adapter-structure.md) — Slice trigger-basiert beim ersten konkreten Konsumenten                                                                           |
+| Native C/C++ Control Core                                           | ✓ M3 (C-Pivot, ABI 0.3.0 via M5 / RM-M5-03)                                                                                                                                                                     |
+| OpenTelemetry Tracing                                               | ✓ M2 (RM-M2-06 — `bess.control_cycle.execute`, `.command_dispatch.write`, `.schedule_optimization.run`)                                                                                                          |
+| Replay-Testumgebung                                                 | ✓ M2 (RM-M2-10 Replay-Harness) + M5 (RM-M5-04 Golden-Replay-Plattform)                                                                                                                                          |
 
 ---
 
 ### 28.3 Langfristige Erweiterungen (ursprünglich für M5–M6 geplant)
 
-- MPC
-- State-Space-Modelle
-- Kalman-Filter
-- native Solver-Sidecar
-- TimescaleDB
-- Operator UI
-- Multi-Asset-Flottensteuerung
-- Kubernetes Deployment
-- Zertifizierungsnahe Regelleistungsintegration
+| Item                                       | Status                                                                                                                                                                                                                                                       |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| MPC                                        | ✓ M5 (RM-M5-02 — MPC-Kernel mit Local-OSQP/Kalman/Replay-Stempeln)                                                                                                                                                                                            |
+| State-Space-Modelle                        | ✓ M5 (Bestandteil RM-M5-02)                                                                                                                                                                                                                                   |
+| Kalman-Filter                              | ✓ M5 (Bestandteil RM-M5-02)                                                                                                                                                                                                                                   |
+| native Solver-Sidecar                      | 🔶 Teil — gRPC-Vertrag M5-01 ✓; produktives Backend ist local-first OSQP per [ADR 0006](../docs/plan/adr/0006-mpc-kernel-backend-and-solver.md). Sidecar-First-Aktivierung = `F-M5-12` (siehe `docs/plan/planning/open/note-RM-M5-followups.md`)               |
+| TimescaleDB                                | ✓ M6 (RM-M6-04)                                                                                                                                                                                                                                               |
+| Operator UI                                | ✓ M6 (RM-M6-01)                                                                                                                                                                                                                                               |
+| Multi-Asset-Flottensteuerung               | 🔶 Teil — Multi-Asset-Hosting (shared Worker mit per-Asset-Fanout) M6-02 ✓ per [ADR 0007](../docs/plan/adr/0007-multi-asset-hosting-strategy.md); gekoppelte Flotten-MPC = `F-M6-02-04` (siehe `docs/plan/planning/open/note-RM-M6-followups.md`)              |
+| Kubernetes Deployment                      | ✓ M6 (RM-M6-03 — Helm-Chart `deploy/helm/bess-ems`)                                                                                                                                                                                                            |
+| Zertifizierungsnahe Regelleistungsintegration | 🔶 Teil — M6-06 als Compliance-/Zertifizierungs-Gate ✓; produktive zertifizierungsnahe Regelleistungswelle mit TSO-Anbindung und HIL-Nachweisen = `F-M6-06-01` (siehe `docs/plan/planning/open/note-RM-M6-followups.md`)                                       |
 
 ---
 
