@@ -152,19 +152,24 @@ Diese Notiz fixiert pro Kandidat:
     Acquire das Lease hochgezogen hat, **darf** der tombstoned
     Eintrag nicht im Dictionary verharren. Sonst spinnt jeder
     neue Acquirer im Re-Load-Pfad (`GetOrAdd` ersetzt einen
-    existierenden Eintrag nicht). Daher Pflicht: bei abgebrochenem
-    Remove **muss** entweder
-    (a) das `tombstoned`-Flag per CAS auf `false` zurückgesetzt
-    werden (Eintrag wird wieder normal nutzbar) oder
-    (b) der Eintrag per `TryUpdate`/conditional-replace durch
-    eine frische Generation ersetzt werden (alte
-    Instanz-Referenzen erkennen das beim Verify-Schritt).
-    Die Wahl ist Slice-Plan-Entscheidung; der Vertrag ist
-    **„kein Dictionary-Eintrag bleibt dauerhaft tombstoned"**.
-    Pflicht-Unit-Test: „Tombstone gesetzt während aktive Lease
-    hält; neuer Acquire kommt **vor** finalem Remove" — beweist
-    dass weder Spin noch Deadlock entsteht und der neue Acquire
-    sauber durchkommt.
+    existierenden Eintrag nicht). Bei abgebrochenem Remove **muss**
+    das `tombstoned`-Flag per CAS auf `false` zurückgesetzt
+    werden (selbe Instanz wird wieder normal nutzbar — alte
+    Acquirer-Referenzen und der gerade hochgezogene neue
+    Acquirer benutzen denselben Semaphore und bleiben
+    serialisiert). **Replacement durch eine frische Generation
+    ist hier explizit verboten**, weil das die Per-Key-
+    Serialisierung bricht: alte Caller auf der alten Semaphore
+    und neue Caller auf der neuen Semaphore würden parallel in
+    denselben Critical Section eintreten. Replacement passiert
+    ausschließlich auf dem normalen Eviction-Pfad **nachdem**
+    `leaseCount == 0` final bestätigt und der Eintrag entfernt
+    wurde — der nächste `GetOrAdd` legt dann eine frische
+    Generation an. Pflicht-Unit-Test: „Tombstone gesetzt während
+    aktive Lease hält; neuer Acquire kommt **vor** finalem
+    Remove" — beweist dass weder Spin noch Deadlock entsteht,
+    der neue Acquire auf demselben Semaphore landet, und
+    Serialisierung erhalten bleibt.
   - **Dispose der entfernten Semaphore:** Nach erfolgreicher
     Entfernung aus dem Dictionary **und** finaler Bestätigung
     `leaseCount == 0` muss die `SemaphoreSlim`-Instanz disposed
@@ -228,6 +233,14 @@ Diese Notiz fixiert pro Kandidat:
   **path-filtered optionaler PR-Check** plus `nightly`-Schedule
   auf `main`.
 
+  **Topologie-Coverage (Pflicht-DoD per F-M6-03-01-Source-Spec):**
+  Der Smoke installiert mindestens **shared Worker UND
+  worker-pro-asset** (`topology.mode=shared` plus
+  `topology.mode=workerPerAsset`), jeweils Rollout-Wait,
+  Health-Probe und sauberes Uninstall. Ohne beide Topologien
+  schließt v1.1.0 F-M6-03-01 nur partiell. Optionaler mTLS-
+  Pfad nur mit Test-Secrets, falls Slice das einschließt.
+
   **Image-Strategie (Pflicht-Slice-Entscheidung):** Das Chart
   referenziert per Default lokale, nicht-publizierte Images
   (`bess-ems-runtime:latest`, optional `bess-ems-optimization-core-test-sidecar:latest`).
@@ -253,12 +266,24 @@ Diese Notiz fixiert pro Kandidat:
 
   **Empfehlung für v1.1.0:** Strategie **(2)** Published Image,
   weil der PR-Smoke explizit nur Chart-Installierbarkeit
-  validieren soll, nicht Code-vs-Chart-Kompatibilität (das macht
-  der Release-Workflow). Strategie (1) ist v1.2+-Erweiterung,
-  wenn Bedarf entsteht.
+  validieren soll. Strategie (1) ist v1.2+-Erweiterung, wenn
+  Bedarf entsteht.
+
+  **Bewusste Lücke:** Code-vs-Chart-Kompatibilität (frisch
+  gebautes Image gegen frisch gerendertes Chart) wird **heute
+  nirgendwo** automatisiert validiert — der aktuelle
+  Release-Workflow baut zwar das Image, fährt aber kein
+  `helm install` gegen den frisch gebauten Tag. Diese Lücke ist
+  ein separates Folge-Item (vermutlich „Release-time chart-smoke
+  gate" als neuer F-M6-03-Folge-Slice nach v1.1.0); der v1.1.0-
+  Smoke schließt sie nicht und beansprucht das auch nicht. Wer
+  in v1.1.0 Code-vs-Chart-Drift einführt, sieht es erst beim
+  Operator-`helm install` — derselbe Stand wie heute.
 
   Mit Strategie (2) deckt der Path-Filter alle Inputs des
-  Smoke-Laufs ab:
+  Smoke-Laufs ab. Der **gleiche Filter gilt in allen drei
+  Promotion-Stufen** (siehe unten); Inkonsistenz zwischen v1.1.0-
+  PR-Check und der späteren Required-Stufe wäre Anti-Muster:
   - `deploy/helm/**` (das Chart)
   - `Makefile` (Target-Definition)
   - `.github/workflows/cluster-smoke.yml` (oder wie immer der
@@ -284,7 +309,9 @@ Diese Notiz fixiert pro Kandidat:
 - **Slice-Plan:** `plan-RM-M6-FUP-03-01.md`.
 - **Promotion-Pfad** (explizit, damit „optional" nicht „dauerhaft
   optional" wird):
-  1. **v1.1.0:** Path-filtered PR-Check auf `deploy/helm/**` +
+  1. **v1.1.0:** Path-filtered PR-Check mit dem oben genannten
+     vollständigen Filter (`deploy/helm/**` + `Makefile` +
+     Workflow-Datei + ggf. `scripts/helm-cluster-smoke*`) plus
      nightly auf `main`. Failures werden im Issue-Tracker erfasst,
      blocken aber keine PRs.
   2. **Nach 4 Wochen ununterbrochen grünem Nightly:** Promotion
@@ -337,26 +364,32 @@ Aktivierung.**
 
 ### Kandidat D: M3-FUP-04 — Replay-Carve-outs nach RM-M2-10
 
-**Carve-out-Kandidat — braucht Sub-Slice-Auswahl vor Aktivierung.**
+**Carve-out-Kandidat — Source-Note ist stale, vor Scope-Entscheid
+zuerst Follow-up-Note bereinigen.**
 
 - **Quelle:** [`note-RM-M3-followups.md` Item 8](../open/note-RM-M3-followups.md).
-- **Stand heute:** Telemetrie-Replay-Harness aus RM-M2-10 plus
-  Solver-Replay aus M2 ✓. Vier konkrete Carve-out-Varianten sind
-  als Folgearbeit dokumentiert:
-  1. JSON-File-Loader für externe Replay-Datensätze
-  2. Operator-Replay-CLI (Make-Target plus minimaler Wrapper)
-  3. Multi-Asset-Replay-Koordination
-  4. Compare-against-Production-Replay
-- **Blocker (= offene Entscheidung für v1.1.0):** Welche der vier
-  Varianten kommt in v1.1.0? Alle vier sind trigger-getrieben
-  (externe Fixtures / Operator-Bedarf / Multi-Asset-Setup /
-  Production-Vergleich).
-- **Empfehlung:** **Keine** der vier in v1.1.0, weil keiner der
-  Trigger heute aktiv ist. Wenn ein Sub-Slice in v1.1.0 wäre, dann
-  am ehesten **(2) Operator-Replay-CLI** als „Quality-of-Life"-
-  Maßnahme ohne externen Trigger — aber das verändert den
-  v1.1.0-Charakter von „Internal Refinement" zu „neue Operator-
-  Capability". Lieber separat triggern.
+- **Source-Drift (wichtig):** Die Ursprungs-Notiz listet vier
+  Carve-out-Varianten als „offen", aber **RM-M5-04** hat
+  mindestens den ersten Punkt bereits geliefert:
+  - **JSON-File-Loader für externe Replay-Datensätze ✓** —
+    `TelemetryReplayJsonLoader` + `ReplayManifestLoader`
+    (`replay-manifest.v1`, `telemetry-replay-fixture.v1`,
+    `telemetry-replay-golden.v1`) plus `replay-diff-report.v1`-
+    JSON-Report (siehe
+    [`../done/plan-RM-M5-04.md`](../done/plan-RM-M5-04.md)
+    RM-M5-04-A/D).
+  Die übrigen drei Carve-outs (Operator-Replay-CLI, Multi-Asset-
+  Replay-Koordination, Compare-against-Production-Replay) sind
+  vermutlich noch offen, müssen aber gegen RM-M5-04-Output
+  gegengeprüft werden, bevor sie als „v1.1.0-Kandidat" oder
+  „weiterhin offen" qualifiziert werden können.
+- **Empfehlung für v1.1.0:** **Aus Scope**, plus vorgelagerter
+  Mini-Task: **Followup-Note `note-RM-M3-followups.md` Item 8
+  vor jeder weiteren Scope-Entscheidung an den RM-M5-04-Lieferstand
+  anpassen** (was bleibt offen, was ist geschlossen). Diese
+  Bereinigung passt eher in eine separate „Source-Note-Refresh"-
+  Welle als in den v1.1.0-Slice-Strang; sie ist die Voraussetzung,
+  damit Kandidat D in v1.2+ überhaupt sauber bewertet werden kann.
 
 ---
 
