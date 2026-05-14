@@ -155,11 +155,14 @@ Vertrags-Anteil, nicht eine breite Feature-Fläche.
        (Sweep erfolgreich + neuer GetOrAdd)). Hartes Timeout nach N
        Iterationen wirft, damit pathologische Sweep-Bugs sichtbar
        werden.
-     - `Removed`: alte Referenz; `GetOrAdd` in Schritt 1 hat
-       bereits die frische Instanz geliefert (Endzustand-Caller
-       sind selten — entstehen nur, wenn ein Acquirer eine
-       Referenz über die Removed-Transition hinweg festhält).
-       Mit der frischen Instanz weitermachen.
+     - `Removed`: Caller hält eine alte Referenz auf einen
+       bereits aus dem Dictionary entfernten Eintrag (der
+       `GetOrAdd` in Schritt 1 lief, bevor Eviction den Eintrag
+       entfernte). Retry **ab Schritt 1** — der neue `GetOrAdd`
+       legt eine frische `Live`-Instanz an (oder findet eine,
+       die in der Zwischenzeit ein anderer Caller angelegt hat).
+       Endzustand-Caller sind selten, aber möglich; der Retry
+       ist die korrekte Auflösung.
   3. `leaseCount` per `Interlocked.Increment` reservieren.
   4. **Post-Reserve-Verify**: `state` erneut lesen. Wenn nicht mehr
      `Live` (Eviction war seit Schritt 2 schneller), Lease per
@@ -176,8 +179,20 @@ Vertrags-Anteil, nicht eine breite Feature-Fläche.
   abgebrochene Caller als künstlich aktive Leases hängen und
   Eviction wird dauerhaft blockiert. Standard-Muster: separater
   `try/catch (OperationCanceledException)` um `WaitAsync` für
-  Lease-Rollback, dann separater `try/finally` für `Release` +
-  Lease-Decrement im Happy-Path.
+  Lease-Rollback, dann separater `try/finally` für Happy-Path.
+
+  **Happy-Path Release/Decrement-Reihenfolge (Pflicht):** Im
+  Happy-Path `finally`-Block gilt **`semaphore.Release()` zuerst,
+  dann `Interlocked.Decrement(leaseCount)`** — nicht umgekehrt.
+  Die umgekehrte Reihenfolge öffnet ein Fenster, in dem
+  `leaseCount == 0` ist, der Semaphore aber noch gehalten wird:
+  Ein paralleler Sweep könnte CAS `Live → Tombstoning`,
+  Final-Check `leaseCount == 0`, conditional remove und
+  `Dispose()` durchführen, bevor der Happy-Path-Caller seinen
+  `Release()` aufruft — `ObjectDisposedException` wäre die Folge.
+  Mit der korrekten Reihenfolge bleibt `leaseCount > 0` so lange
+  bestehen, wie der Semaphore noch existiert und potenziell
+  benutzt wird.
 
   **Eviction-Sweep-Algorithmus:**
   1. Eintrag als idle-Kandidat identifiziert (TTL/LRU-Kriterium).
@@ -372,10 +387,17 @@ Vertrags-Anteil, nicht eine breite Feature-Fläche.
     sonst alle Nicht-Helm-PRs, weil der Job nie startet).
     Trigger wird auf `pull_request` ohne `paths` umgestellt, und
     der Skip-Sentinel innerhalb des Jobs (`git diff --name-only`
-    gegen denselben Pfad-Set) gibt bei Nicht-Helm-PRs **Success**
-    zurück. Die *logische* Pfad-Liste bleibt also gleich; nur
-    der Mechanismus wechselt von Workflow-Filter zu Job-internem
-    Skip.
+    **gegen exakt dieselbe vollständige Pfadliste** wie der
+    PR-`paths`-Filter in Stufe 1 — `deploy/helm/**`, `Makefile`,
+    Workflow-Datei, ggf. `scripts/helm-cluster-smoke*` — siehe
+    Image-Strategie-Block oben) gibt bei Nicht-Helm-PRs
+    **Success** zurück. Die *logische* Pfad-Liste bleibt also
+    identisch über alle Stufen; nur der Mechanismus wechselt
+    von Workflow-Filter zu Job-internem Skip. **Drift
+    zwischen `paths`-Filter und Skip-Sentinel-Pfadliste wäre
+    ein Bug** — der required-Job würde dann schmaler triggern
+    als der optionale PR-Check und Inputs durchlassen, die
+    den Smoke brechen.
 
   Die logische Pfad-Liste für beide Mechanismen:
   - `deploy/helm/**` (das Chart)
@@ -508,10 +530,20 @@ zuerst Follow-up-Note bereinigen.**
 3-4 PT) plus Release-Vorbereitung gemäß `releasing.md` §2 — knapp
 zwei Arbeitswochen Brutto.
 
-**SemVer-Begründung:** Minor (v1.0.x → v1.1.0), weil zwei neue
-Capabilities kommen (Lock-Eviction-Konfiguration in beiden
-Optimization-Use-Cases + optionaler Cluster-Smoke). Keine Breaking
-Changes; keine API-Änderungen.
+**SemVer-Begründung:** Minor (v1.0.x → v1.1.0), weil **drei**
+additive Änderungen kommen:
+- Lock-Eviction-Konfiguration in beiden Optimization-Use-Cases.
+- Optionaler Cluster-Smoke (CI/Workflow-Erweiterung).
+- Neuer Application-Observability-Port `IOptimizationLockMetrics`
+  mit `NoOp`-Default und Prometheus-Adapter.
+
+Keine Breaking Changes. Keine HTTP-/REST-/externen API-Änderungen.
+Der neue Application-Port ist **additiv** — bestehende Konsumenten
+des Application-Layers brechen nicht, weil sie die neue Interface-
+Implementierung nicht referenzieren müssen (NoOp-Default wird per
+DI eingehängt). Konsumenten, die ihren eigenen `IOptimizationLockMetrics`
+implementieren wollen, müssen ein neues Interface implementieren —
+das ist die Definition von additiv.
 
 ---
 
