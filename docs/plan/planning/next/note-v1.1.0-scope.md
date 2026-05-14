@@ -44,7 +44,14 @@ Diese Notiz fixiert pro Kandidat:
 
 ### Kandidat A: RM-M3-FUP-03 — Optimization-Lock-Eviction (OP-OPEN-06)
 
-**Pflicht-Kandidat, klein, trigger-frei rechtfertigbar.**
+**Pflicht-Kandidat, concurrency-kritisch, scope-mässig
+komplexitätsarm, trigger-frei rechtfertigbar.** Der Slice ist
+**inhaltlich klein** (gemeinsamer Lease-Helper für zwei Use Cases,
+neuer Observability-Port, präventive Hardening-Maßnahme), aber
+**concurrency-technisch nicht trivial**: er führt eine Lease-/
+Tombstone-State-Machine ein, die unter Eviction-Race-Bedingungen
+korrekt sein muss. Aufwand 4-5 PT spiegelt den Test- und
+Vertrags-Anteil, nicht eine breite Feature-Fläche.
 
 - **Quelle:** [`note-RM-M3-followups.md` Item 7](../open/note-RM-M3-followups.md).
 - **Stand heute:** **Zwei** Use Cases halten unbounded
@@ -109,123 +116,135 @@ Diese Notiz fixiert pro Kandidat:
   Hardening-Maßnahme; das Risiko-Profil verschlechtert sich mit
   jeder produktiven Stunde stillschweigend (Memory-Leak-Klasse),
   während der Fix klein und reversibel ist.
-- **Vertrags-Erhalt (Pflicht-DoD):** Die Serialisierungs-Garantie
-  („zwei parallele Aufrufe für denselben Key dürfen nicht denselben
-  Base-Stand lesen und gegenseitig überschreiben") darf durch
-  Eviction **nicht gebrochen werden**. `SemaphoreSlim` exponiert
-  keinen öffentlichen Waiter-Count, und das naive
-  Dictionary-Lookup-dann-Increment-Pattern hat eine Race: Eviction
-  kann zwischen Lookup und Lease-Increment dieselbe Instanz
-  entfernen. Daher konkrete Pflichten:
-  - **Lease-Reservierung als atomar-verifizierte Operation
-    (`TryAcquireLease`):** Pro Key wird ein Eintrag mit
-    `(SemaphoreSlim semaphore, int leaseCount, int generation,
-    bool tombstoned)` geführt. Acquire läuft als Schleife:
-    (1) Eintrag lookup, (2) `tombstoned`-Flag prüfen,
-    (3) `leaseCount` via `Interlocked.Increment` reservieren,
-    (4) **nach** der Reservierung verifizieren, dass der
-    Dictionary-Eintrag noch dieselbe aktive Generation hat
-    (Instanz-Identität oder `generation`-Vergleich) — wenn nicht,
-    Lease via `Interlocked.Decrement` zurücknehmen und mit
-    `GetOrAdd` neu laden. Nur ein im selben Schritt verifizierter
-    Lease darf auf `WaitAsync` gehen. Release dekrementiert
-    `leaseCount` nach `semaphore.Release`.
-  - **Cancellation-Pflicht (`WaitAsync` mit `CancellationToken`):**
-    Wenn `WaitAsync(cancellationToken)` per
-    `OperationCanceledException` abbricht, **wurde der Semaphore
-    nicht gehalten** — `Release()` darf nicht aufgerufen werden
-    (würde `SemaphoreFullException` werfen), aber der bereits
-    reservierte `leaseCount` muss via `Interlocked.Decrement`
-    zurückgenommen werden. Sonst bleiben abgebrochene Aufrufer
-    als künstlich aktive Leases hängen und Eviction wird dauerhaft
-    blockiert. Standard-Muster: separater `try/catch` um
-    `WaitAsync` für Lease-Rollback bei Cancellation, dann separater
-    `try/finally` für `Release` + Lease-Decrement im Happy-Path.
-    Pflicht-Unit-Test: Caller, dessen `CancellationToken` zwischen
-    Lease-Reservierung und Semaphore-Akquise gefeuert wird, hinter­
-    lässt `leaseCount == 0`.
-  - **Idle-only mit Tombstone-Pattern:** Eviction-Kandidaten
-    werden anhand „seit X Sekunden ohne Acquire/Release" gewählt.
-    Eviction setzt zuerst `tombstoned = true` (per
-    `Interlocked.CompareExchange` auf einen Status-Slot), prüft
-    dann `leaseCount == 0`, und entfernt erst danach den Eintrag
-    via **conditional remove mit Instanz-Identität** (semantisch:
-    „entferne diesen Eintrag nur, wenn er noch genau diese
-    Instanz ist"). Die exakte API-Form (Cast auf
-    `ICollection<KeyValuePair<,>>` und `Remove(pair)`, eigene
-    Tombstone-CAS, oder ein verfügbarer
-    `TryRemove(KeyValuePair)`-Overload) ist Slice-Plan-
-    Entscheidung — der Vertrag ist die Instanz-bedingte
-    Entfernung, nicht eine spezifische BCL-Methode.
-  - **Abgebrochener Remove (Tombstone bleibt, Eintrag bleibt
-    aktiv):** Wenn der Final-Check `leaseCount == 0` scheitert,
-    weil zwischen Tombstone-Setzen und Final-Check ein neuer
-    Acquire das Lease hochgezogen hat, **darf** der tombstoned
-    Eintrag nicht im Dictionary verharren. Sonst spinnt jeder
-    neue Acquirer im Re-Load-Pfad (`GetOrAdd` ersetzt einen
-    existierenden Eintrag nicht). Bei abgebrochenem Remove **muss**
-    das `tombstoned`-Flag per CAS auf `false` zurückgesetzt
-    werden (selbe Instanz wird wieder normal nutzbar — alte
-    Acquirer-Referenzen und der gerade hochgezogene neue
-    Acquirer benutzen denselben Semaphore und bleiben
-    serialisiert). **Replacement durch eine frische Generation
-    ist hier explizit verboten**, weil das die Per-Key-
-    Serialisierung bricht: alte Caller auf der alten Semaphore
-    und neue Caller auf der neuen Semaphore würden parallel in
-    denselben Critical Section eintreten. Replacement passiert
-    ausschließlich auf dem normalen Eviction-Pfad **nachdem**
-    `leaseCount == 0` final bestätigt und der Eintrag entfernt
-    wurde — der nächste `GetOrAdd` legt dann eine frische
-    Generation an. Pflicht-Unit-Test: „Tombstone gesetzt während
-    aktive Lease hält; neuer Acquire kommt **vor** finalem
-    Remove" — beweist dass weder Spin noch Deadlock entsteht,
-    der neue Acquire auf demselben Semaphore landet, und
-    Serialisierung erhalten bleibt.
-  - **Dispose der entfernten Semaphore:** Nach erfolgreicher
-    Entfernung aus dem Dictionary **und** finaler Bestätigung
-    `leaseCount == 0` muss die `SemaphoreSlim`-Instanz disposed
-    werden (sie hält intern unmanaged-Ressourcen, insbesondere
-    ein lazy `AvailableWaitHandle`). Ein vergessener Dispose
-    reduziert den Dictionary-Leak, lässt aber Semaphore-Ressourcen
-    unnötig liegen.
-  - **Race-sicheres Re-Add:** Wenn `TryAcquireLease` einen
-    Tombstone oder Generations-Mismatch entdeckt, läuft
-    `GetOrAdd` **nicht** sofort — dieser würde den noch nicht
-    entfernten tombstoned Eintrag zurückliefern und der Caller
-    spinnt. Stattdessen retry-Schleife mit drei möglichen
-    Auflösungen:
-    (a) **Tombstone wurde zurückgesetzt** (CAS auf `false`,
-    siehe Eviction-Abandoned-Pfad unten) — Caller liest den
-    Eintrag erneut und reserviert auf derselben Instanz.
-    (b) **Tombstone-Eintrag ist inzwischen entfernt** (Eviction
-    hat den conditional remove erfolgreich abgeschlossen) —
-    `GetOrAdd` legt eine frische Instanz an.
-    (c) **Eviction-Sweep ist noch in der Tombstone→Remove-
-    Phase** — Caller wartet kurz (bounded backoff, z. B. einige
-    `SpinWait`/`Thread.Yield` und bei Erfolglosigkeit
-    `await Task.Yield()`) und versucht erneut. Hartes Timeout
-    nach N Iterationen (Slice-Plan: konkreter Wert) wirft, damit
-    pathologische Sweep-Bugs nicht unbegrenzt blockieren statt
-    sichtbar zu failen.
-  - **Concurrency-Test "Acquire racing with Eviction-Remove":**
-    Pflicht-Unit-Test, der genau die Race-Sequenz „Caller hat
-    Instanz-Referenz, Eviction setzt Tombstone und entfernt,
-    Caller ruft Lease-Reservierung auf" trifft und beweist, dass
-    der Caller entweder (a) auf die neue Generation springt oder
-    (b) seinen Lease beim Verify-Schritt zurücknimmt und
-    sauber neu lädt.
-  - **Concurrency-Test "Sweep während paralleler Calls":**
-    Zweiter Pflicht-Test, der einen Eviction-Sweep parallel zu
-    zwei aktiv haltenden Callern fährt und beweist, dass kein
-    Eintrag mit `leaseCount > 0` entfernt wird.
-- **Aufwand:** ~4-5 PT (Slice + gemeinsame Eviction-Logik +
-  Lease/Refcount-Wrapper + Metrik mit Label + zwei Concurrency-
-  Tests + Aktualisierung der Ursprungs-Followup-Notiz +
-  Dokumentation). **Doku-Ort:** wird im Slice-Plan festgelegt;
-  `quality.md` §6 ist Native-/.NET-Parity (nicht passend),
-  Persistenz-Doku ist ebenfalls fachfremd — vermutlich neuer
-  Operations-/Metrik-Abschnitt in `quality.md` oder kurze
-  Betriebsnotiz im Application-User-Doc.
+- **Vertrags-Erhalt (Pflicht-DoD) — State-Machine-formal:** Die
+  Serialisierungs-Garantie („zwei parallele Aufrufe für denselben
+  Key dürfen nicht denselben Base-Stand lesen und gegenseitig
+  überschreiben") darf durch Eviction **nicht gebrochen werden**.
+  `SemaphoreSlim` exponiert keinen öffentlichen Waiter-Count, und
+  Lookup-then-Increment ist nicht atomar. Statt einer losen Liste
+  von „Pflichten" wird **eine einzige State-Machine** pro
+  Dictionary-Eintrag definiert — das schliesst die früheren
+  Mehrdeutigkeiten zwischen Acquire-Pfad, Aborted-Remove und
+  Re-Add aus.
+
+  **Pro Key gilt ein Eintrag `(SemaphoreSlim semaphore,
+  int leaseCount, int state)` mit dem `state`-Feld in genau drei
+  Werten:** `Live` (Default beim Anlegen), `Tombstoning` (Eviction
+  hat den Eintrag zur Entfernung markiert), `Removed` (Eviction
+  hat den Eintrag aus dem Dictionary entfernt — Endzustand für
+  alte Referenzen). Alle Zustands-Transitions sind CAS.
+
+  **Erlaubte Transitions** (alles andere ist ein Bug):
+
+  | Von          | Nach          | Auslöser                                                                                                         |
+  | ------------ | ------------- | ---------------------------------------------------------------------------------------------------------------- |
+  | Live         | Tombstoning   | Eviction-Sweep wählt Eintrag als idle-Kandidat (CAS muss erfolgreich sein, sonst Sweep überspringt).               |
+  | Tombstoning  | Live          | Sweep-Final-Check sieht `leaseCount > 0` (Race mit Acquire) und bricht Eviction ab.                                |
+  | Tombstoning  | Removed       | Sweep-Final-Check sieht `leaseCount == 0`. Eintrag wird via conditional remove (Instanz-Identität) entfernt + Dispose. |
+
+  **Acquire-Algorithmus (`TryAcquireLease`):**
+  1. Eintrag per `GetOrAdd` lookup (anlegen falls nicht vorhanden;
+     neue Instanz startet in `Live`).
+  2. CAS-Lesen des `state`-Feldes:
+     - `Live`: weiter zu Schritt 3.
+     - `Tombstoning`: **kein** `leaseCount`-Increment. Retry-
+       Schleife mit bounded Backoff (`SpinWait` + bei
+       Erfolglosigkeit `await Task.Yield()`), maximal N Iterationen.
+       Beim Retry erneut Schritt 1 (Eintrag ist inzwischen `Live`
+       (Sweep abgebrochen) oder durch eine frische Instanz ersetzt
+       (Sweep erfolgreich + neuer GetOrAdd)). Hartes Timeout nach N
+       Iterationen wirft, damit pathologische Sweep-Bugs sichtbar
+       werden.
+     - `Removed`: alte Referenz; `GetOrAdd` in Schritt 1 hat
+       bereits die frische Instanz geliefert (Endzustand-Caller
+       sind selten — entstehen nur, wenn ein Acquirer eine
+       Referenz über die Removed-Transition hinweg festhält).
+       Mit der frischen Instanz weitermachen.
+  3. `leaseCount` per `Interlocked.Increment` reservieren.
+  4. **Post-Reserve-Verify**: `state` erneut lesen. Wenn nicht mehr
+     `Live` (Eviction war seit Schritt 2 schneller), Lease per
+     `Interlocked.Decrement` zurücknehmen und zurück zu Schritt 1.
+  5. Nur ein in Schritt 4 verifizierter Lease darf auf
+     `semaphore.WaitAsync(cancellationToken)` gehen.
+
+  **Cancellation-Pflicht im Acquire (`WaitAsync`):** Wenn
+  `WaitAsync(ct)` per `OperationCanceledException` abbricht,
+  **wurde der Semaphore nicht gehalten** — `semaphore.Release()`
+  darf nicht aufgerufen werden (würde `SemaphoreFullException`
+  werfen), aber der bereits reservierte `leaseCount` muss via
+  `Interlocked.Decrement` zurückgenommen werden. Sonst bleiben
+  abgebrochene Caller als künstlich aktive Leases hängen und
+  Eviction wird dauerhaft blockiert. Standard-Muster: separater
+  `try/catch (OperationCanceledException)` um `WaitAsync` für
+  Lease-Rollback, dann separater `try/finally` für `Release` +
+  Lease-Decrement im Happy-Path.
+
+  **Eviction-Sweep-Algorithmus:**
+  1. Eintrag als idle-Kandidat identifiziert (TTL/LRU-Kriterium).
+  2. CAS `state: Live → Tombstoning`. Wenn die CAS fehlschlägt
+     (Eintrag ist nicht mehr `Live`), Sweep überspringt den
+     Kandidaten.
+  3. **Final-Check** `leaseCount == 0`:
+     - **Ja**: CAS `state: Tombstoning → Removed`, conditional remove
+       aus dem Dictionary (Instanz-Identität — exakte BCL-API ist
+       Slice-Plan-Entscheidung: Cast auf
+       `ICollection<KeyValuePair<,>>` mit `Remove(pair)`, oder
+       verfügbarer `TryRemove(KeyValuePair)`-Overload), dann
+       `semaphore.Dispose()`. (`SemaphoreSlim` hält intern
+       unmanaged-Ressourcen, insbesondere ein lazy
+       `AvailableWaitHandle` — Dispose ist Pflichtbestandteil
+       dieser Transition.)
+     - **Nein** (zwischen Schritt 2 und Final-Check hat ein Caller
+       Schritt 3 des Acquire ausgeführt; sein Verify in Schritt 4
+       wird zwar fehlschlagen und Lease zurücknehmen, aber im
+       Zeitfenster vor dem Decrement ist `leaseCount > 0`
+       sichtbar): CAS `state: Tombstoning → Live`. Eintrag bleibt
+       aktiv. Beim nächsten Sweep neu evaluiert.
+
+  **Warum diese State-Machine die Per-Key-Serialisierung erhält:**
+  Der Verify-Schritt-4 stellt sicher, dass kein Caller mit
+  reserviertem Lease auf `WaitAsync` geht, während der Eintrag
+  `Tombstoning` ist. Wenn Eviction abbricht (`Tombstoning → Live`),
+  bleibt **derselbe Semaphore** im Dictionary — alle Caller (alte
+  und neue) sehen dieselbe Instanz und bleiben serialisiert. Wenn
+  Eviction erfolgreich entfernt (`Tombstoning → Removed`), legt der
+  nächste `GetOrAdd` eine frische `Live`-Instanz an; alte
+  Referenzen werden in Schritt 4 oder Schritt 2 verworfen.
+  Generation-Wechsel und Critical-Section-Parallelität sind
+  ausgeschlossen.
+
+  **Vier Pflicht-Unit-Tests namentlich (Race-Coverage):**
+  (i) **„Acquire racing with Eviction-Removal":** Caller hat
+  Instanz-Referenz, Eviction führt `Tombstoning → Removed` durch
+  + neuer `GetOrAdd` legt frische Instanz an, Caller versucht
+  Lease-Reservierung — beweist dass Caller entweder auf die
+  frische Instanz wechselt (Removed-Pfad in Schritt 2) oder Lease
+  zurücknimmt und neu lädt.
+  (ii) **„Sweep während paralleler Calls":** Eviction-Sweep
+  parallel zu zwei aktiv haltenden Callern — beweist dass die
+  CAS `Live → Tombstoning` in Schritt 2 des Sweeps oder der
+  Final-Check `leaseCount == 0` in Schritt 3 keinen Eintrag mit
+  aktivem Lease entfernt.
+  (iii) **„Cancellation zwischen Lease-Reservierung und
+  Semaphore-Akquise":** Caller-`CancellationToken` feuert nach
+  Schritt 3 (Lease reserviert) aber vor `WaitAsync`-Erfolg —
+  beweist dass `leaseCount == 0` zurückbleibt und kein
+  `Release()` aufgerufen wird.
+  (iv) **„Sweep-Abort bei Lease-Race":** Eviction setzt
+  Tombstoning, parallel reserviert Caller Lease und sieht
+  Tombstoning im Verify (Schritt 4) → Decrement; Sweep sieht
+  trotzdem im Final-Check kurz `leaseCount > 0` → CAS
+  `Tombstoning → Live` — beweist dass derselbe Semaphore weiter
+  benutzt wird und Serialisierung erhalten bleibt.
+
+- **Aufwand:** ~4-5 PT (Slice + gemeinsamer Lease-Helper mit
+  State-Machine + Metrik mit Label + **vier** Concurrency-Tests
+  + Aktualisierung der Ursprungs-Followup-Notiz + Dokumentation).
+  **Doku-Ort:** wird im Slice-Plan festgelegt; `quality.md` §6 ist
+  Native-/.NET-Parity (nicht passend), Persistenz-Doku ist
+  ebenfalls fachfremd — vermutlich neuer Operations-/Metrik-
+  Abschnitt in `quality.md` oder kurze Betriebsnotiz im
+  Application-User-Doc.
 - **Slice-Plan:** `plan-RM-M3-FUP-03.md` (entsteht in `open/` →
   `in-progress/` → `done/`).
 - **Offene Entscheidungen** (Coverage **nicht** mehr offen —
@@ -375,8 +394,14 @@ Diese Notiz fixiert pro Kandidat:
      Workflow-Datei + ggf. `scripts/helm-cluster-smoke*`) plus
      **unconditional** nightly auf `main` (kein Path-Filter, weil
      Scheduled Runs keinen PR-Diff haben und die Stabilitäts-
-     Serie sonst nicht beweisbar ist). Failures werden im Issue-
-     Tracker erfasst, blocken aber keine PRs.
+     Serie sonst nicht beweisbar ist). **Failure-Behandlung:**
+     Workflow-Run zeigt Fehler im GitHub-Actions-UI; manuelle
+     Triage durch das Team beim Stand-up oder per
+     Workflow-Notification (kein PR-Block). Automatische
+     Issue-Anlage ist **explizit nicht** Bestandteil dieses Slices —
+     falls gewünscht, ist das ein eigener Folge-Slice
+     (z. B. `peter-evans/create-issue-from-file` oder ähnlich),
+     der den v1.1.0-Cluster-Smoke-Scope nicht aufbläht.
   2. **Nach 4 Wochen ununterbrochen grünem Nightly:** Promotion
      zu `required`. **Pflicht-Begleitänderung:** Trigger wird auf
      `pull_request` ohne `paths`-Filter umgestellt und der Job
