@@ -84,16 +84,27 @@ Diese Notiz fixiert pro Kandidat:
   Observability-Port `IOptimizationLockMetrics` analog zu den
   bestehenden Ports
   (`IOptimizationRunMetrics`/`IControlCycleMetrics`/`IOptimizationCoreMetrics`)
-  mit Pflicht-Implementierungen:
-  - `NoOpOptimizationLockMetrics` (Application-Default, gleicher
-    Slot wie die anderen `NoOp*Metrics`).
-  - Prometheus-Adapter analog zu den anderen Metrics-Adaptern
-    (vermutlich im selben Observability-Adapter-Projekt wie
-    die übrigen Prometheus-Implementierungen).
-  - Unit-Test für die Gauge-Ausgabe (gibt der Adapter den
-    aktuellen Tabellen-Stand korrekt frei, Label-Set passt).
-  - DI-Registrierung in `ApplicationServiceRegistration` analog zu
-    den vorhandenen Metrics-Ports.
+  mit Pflicht-Implementierungen und der bestehenden
+  **Layer-Trennung zwischen Application- und Telemetry-Adapter**:
+  - `NoOpOptimizationLockMetrics` in
+    `BatteryEms.Application.Observability` (Default), registriert
+    via `ApplicationServiceRegistration` — wie
+    `NoOpOptimizationRunMetrics` und die anderen NoOp-Defaults.
+  - `PrometheusOptimizationLockMetrics` in
+    `BatteryEms.Adapters.Telemetry/Prometheus/`, registriert in
+    `TelemetryRegistration.AddBessTelemetry()` neben den
+    bestehenden `PrometheusControlCycleMetrics`,
+    `PrometheusOptimizationRunMetrics` und
+    `PrometheusOptimizationCoreMetrics`. **Nicht** in
+    `ApplicationServiceRegistration` registrieren — dort gehört
+    nur der NoOp-Default hin (sonst Layering-Bruch und
+    Telemetry-Host würde NoOp nicht ersetzen).
+  - Unit-Test für die Gauge-Ausgabe in den Telemetry-Tests (gibt
+    der Adapter den aktuellen Tabellen-Stand korrekt frei,
+    Label-Set passt).
+  - Registration-Test, dass `AddBessTelemetry()` den NoOp-Default
+    durch den Prometheus-Adapter ersetzt — analog zu existierenden
+    Registration-Tests für die anderen Metrics-Ports.
 - **Begründung trotz fehlendem externen Trigger:** Präventive
   Hardening-Maßnahme; das Risiko-Profil verschlechtert sich mit
   jeder produktiven Stunde stillschweigend (Memory-Leak-Klasse),
@@ -242,7 +253,8 @@ Diese Notiz fixiert pro Kandidat:
   das Chart tatsächlich gegen einen Cluster (k3d/kind/minikube),
   prüft Pod-Health und tear-down.
 - **Nach v1.1.0:** Neuer Make-Target `make helm-cluster-smoke`
-  (k3d-basiert, Compose-Smoke-Vorbild). Workflow-Integration
+  (Cluster-Tool als Slice-Plan-Entscheidung, Vorschlag k3d,
+  Compose-Smoke-Vorbild). Workflow-Integration
   bewusst **nicht als blockierendes Gate**, sondern als
   **path-filtered optionaler PR-Check** plus `nightly`-Schedule
   auf `main`.
@@ -318,8 +330,21 @@ Diese Notiz fixiert pro Kandidat:
   (kein Path-Filter — Scheduled Runs haben keinen PR-Diff zum
   Filtern, und nur ein verlässlich jede Nacht laufender Job
   beweist die für die Promotion geforderte Stabilitäts-Serie).
-  Der PR-Filter gilt für PR-Checks in allen drei Promotion-
-  Stufen:
+  Der Filter-Mechanismus wechselt **bei der Required-Promotion**:
+  - **v1.1.0 (Stufe 1, optionaler PR-Check):** GitHub-`paths`-
+    Filter im Workflow-Trigger. Wenn keiner der unten genannten
+    Pfade berührt ist, startet der Job nicht.
+  - **Ab Stufe 2 (required):** GitHub erlaubt für `required`-
+    Checks keinen `paths`-Filter (`required` mit `paths` blockt
+    sonst alle Nicht-Helm-PRs, weil der Job nie startet).
+    Trigger wird auf `pull_request` ohne `paths` umgestellt, und
+    der Skip-Sentinel innerhalb des Jobs (`git diff --name-only`
+    gegen denselben Pfad-Set) gibt bei Nicht-Helm-PRs **Success**
+    zurück. Die *logische* Pfad-Liste bleibt also gleich; nur
+    der Mechanismus wechselt von Workflow-Filter zu Job-internem
+    Skip.
+
+  Die logische Pfad-Liste für beide Mechanismen:
   - `deploy/helm/**` (das Chart)
   - `Makefile` (Target-Definition)
   - `.github/workflows/cluster-smoke.yml` (oder wie immer der
@@ -467,8 +492,14 @@ Drift in v1.1.0 wäre Anti-Muster:
 - **MPC-Sidecar-First** (F-M5-12) — wartet auf konkreten Sidecar-
   Bedarf
 - **Multi-Asset-MPC** (F-M6-02-04) — wartet auf Flotten-Use-Case
-- **Per-Asset-Sidecar/Worker-pro-Asset** (F-M6-02-01/02/03) —
-  warten auf Isolation-Trigger
+- **Parallel-Fanout im shared Worker** (F-M6-02-01) — wartet
+  auf Tick-Budget-/Performance-Trigger (gemessene Tick-Dauer
+  überschreitet `CycleInterval`-Budget, langsames Asset blockiert
+  andere)
+- **Worker-pro-Asset als Deployment-Pattern** (F-M6-02-02) —
+  wartet auf Isolation-/Fault-Domain-Trigger
+- **Per-Asset-Sidecar oder Sidecar-Pool** (F-M6-02-03) — wartet
+  auf Asset-spezifisches Optimization-/MPC-Backend-Bedarf
 - **Edge-Adapter** (F-M6-05-01) — wartet auf konkrete Hardware-
   Auswahl
 - **Zertifizierungswelle** (F-M6-06-01) — wartet auf TSO-/Anlagen-
