@@ -72,11 +72,28 @@ Diese Notiz fixiert pro Kandidat:
   Slice-Welle nachgezogen, damit FUP-03-Closure und Followup-Note
   konsistent bleiben.
 - **Nach v1.1.0:** Geteilter Eviction-Mechanismus (LRU oder TTL)
-  mit konfigurierbarer Schwelle plus Metrik
+  mit konfigurierbarer Schwelle plus Gauge-Metrik
   `bess_optimization_lock_table_size{use_case="..."}` (Label
   unterscheidet die zwei Pfade). Implementiert entweder als eigener
   Helper-Type oder als zwei separate Eviction-Policies mit
   gemeinsamem Vertrag.
+
+  **Observability-Vertrag (Pflicht-DoD):** Die Gauge-Metrik fügt sich
+  nicht in `IOptimizationRunMetrics.Record(OptimizationRun)` ein
+  (Port ist per-Run, nicht per-Gauge). Es entsteht ein neuer
+  Observability-Port `IOptimizationLockMetrics` analog zu den
+  bestehenden Ports
+  (`IOptimizationRunMetrics`/`IControlCycleMetrics`/`IOptimizationCoreMetrics`)
+  mit Pflicht-Implementierungen:
+  - `NoOpOptimizationLockMetrics` (Application-Default, gleicher
+    Slot wie die anderen `NoOp*Metrics`).
+  - Prometheus-Adapter analog zu den anderen Metrics-Adaptern
+    (vermutlich im selben Observability-Adapter-Projekt wie
+    die übrigen Prometheus-Implementierungen).
+  - Unit-Test für die Gauge-Ausgabe (gibt der Adapter den
+    aktuellen Tabellen-Stand korrekt frei, Label-Set passt).
+  - DI-Registrierung in `ApplicationServiceRegistration` analog zu
+    den vorhandenen Metrics-Ports.
 - **Begründung trotz fehlendem externen Trigger:** Präventive
   Hardening-Maßnahme; das Risiko-Profil verschlechtert sich mit
   jeder produktiven Stunde stillschweigend (Memory-Leak-Klasse),
@@ -129,15 +146,32 @@ Diese Notiz fixiert pro Kandidat:
     `TryRemove(KeyValuePair)`-Overload) ist Slice-Plan-
     Entscheidung — der Vertrag ist die Instanz-bedingte
     Entfernung, nicht eine spezifische BCL-Methode.
+  - **Abgebrochener Remove (Tombstone bleibt, Eintrag bleibt
+    aktiv):** Wenn der Final-Check `leaseCount == 0` scheitert,
+    weil zwischen Tombstone-Setzen und Final-Check ein neuer
+    Acquire das Lease hochgezogen hat, **darf** der tombstoned
+    Eintrag nicht im Dictionary verharren. Sonst spinnt jeder
+    neue Acquirer im Re-Load-Pfad (`GetOrAdd` ersetzt einen
+    existierenden Eintrag nicht). Daher Pflicht: bei abgebrochenem
+    Remove **muss** entweder
+    (a) das `tombstoned`-Flag per CAS auf `false` zurückgesetzt
+    werden (Eintrag wird wieder normal nutzbar) oder
+    (b) der Eintrag per `TryUpdate`/conditional-replace durch
+    eine frische Generation ersetzt werden (alte
+    Instanz-Referenzen erkennen das beim Verify-Schritt).
+    Die Wahl ist Slice-Plan-Entscheidung; der Vertrag ist
+    **„kein Dictionary-Eintrag bleibt dauerhaft tombstoned"**.
+    Pflicht-Unit-Test: „Tombstone gesetzt während aktive Lease
+    hält; neuer Acquire kommt **vor** finalem Remove" — beweist
+    dass weder Spin noch Deadlock entsteht und der neue Acquire
+    sauber durchkommt.
   - **Dispose der entfernten Semaphore:** Nach erfolgreicher
     Entfernung aus dem Dictionary **und** finaler Bestätigung
     `leaseCount == 0` muss die `SemaphoreSlim`-Instanz disposed
     werden (sie hält intern unmanaged-Ressourcen, insbesondere
     ein lazy `AvailableWaitHandle`). Ein vergessener Dispose
     reduziert den Dictionary-Leak, lässt aber Semaphore-Ressourcen
-    unnötig liegen. Falls beim Tombstone-Check `leaseCount > 0`
-    festgestellt wird, **kein** Remove durchführen — Eintrag
-    bleibt aktiv. Eintrag wird beim nächsten Sweep neu evaluiert.
+    unnötig liegen.
   - **Race-sicheres Re-Add:** Wenn `TryAcquireLease` einen
     Tombstone oder Generations-Mismatch entdeckt, läuft
     `GetOrAdd` mit einer frischen Instanz (neue `generation`).
@@ -192,15 +226,51 @@ Diese Notiz fixiert pro Kandidat:
   (k3d-basiert, Compose-Smoke-Vorbild). Workflow-Integration
   bewusst **nicht als blockierendes Gate**, sondern als
   **path-filtered optionaler PR-Check** plus `nightly`-Schedule
-  auf `main`. Path-Filter muss **alle Inputs des Smoke-Laufs**
-  abdecken, nicht nur das Chart selbst — sonst brechen Änderungen
-  am Smoke unentdeckt durch:
+  auf `main`.
+
+  **Image-Strategie (Pflicht-Slice-Entscheidung):** Das Chart
+  referenziert per Default lokale, nicht-publizierte Images
+  (`bess-ems-runtime:latest`, optional `bess-ems-optimization-core-test-sidecar:latest`).
+  Ein echter k3d-Smoke muss explizit eine der zwei Strategien
+  wählen:
+  1. **„Build + Import"** — Smoke baut die benötigten Images
+     lokal (`make build`) und lädt sie via `k3d image import`
+     in den Cluster. Validiert „Code-Stand in diesem PR ist
+     chart-installierbar". Erkauft sich aber einen viel weiteren
+     Pflicht-Input-Set: alles, was den Image-Build beeinflusst
+     (`src/**`, `Dockerfile`, `Directory.Build.props`,
+     `global.json`, `Directory.Packages.props`, ...). Path-Filter
+     wird damit nahezu nutzlos.
+  2. **„Published Image"** — Smoke setzt `image.repository` und
+     `image.tag` per `--set` auf ein publiziertes Image
+     (z. B. `ghcr.io/pt9912/bess-ems:latest` aus dem letzten
+     erfolgreichen Release). Validiert „Chart ist gegen ein
+     bekannt-gutes Image installierbar". Schmaler Path-Filter
+     funktioniert. Erkennt aber **keine** Drift zwischen
+     PR-Code und Chart-Vertrag — diese Validierung passiert
+     unverändert im Release-Workflow gegen den frisch gebauten
+     Tag.
+
+  **Empfehlung für v1.1.0:** Strategie **(2)** Published Image,
+  weil der PR-Smoke explizit nur Chart-Installierbarkeit
+  validieren soll, nicht Code-vs-Chart-Kompatibilität (das macht
+  der Release-Workflow). Strategie (1) ist v1.2+-Erweiterung,
+  wenn Bedarf entsteht.
+
+  Mit Strategie (2) deckt der Path-Filter alle Inputs des
+  Smoke-Laufs ab:
   - `deploy/helm/**` (das Chart)
   - `Makefile` (Target-Definition)
   - `.github/workflows/cluster-smoke.yml` (oder wie immer der
     Workflow heißt — Job-Spec und Skip-Sentinel)
   - `scripts/helm-cluster-smoke*` (falls Helper-Skripte unter
     `scripts/` entstehen)
+
+  Der `optimizationCore`-Sidecar bleibt im PR-Smoke abgeschaltet
+  (`--set optimizationCore.enabled=false`), weil das zugehörige
+  Image (`bess-ems-optimization-core-test-sidecar`) nicht
+  publiziert wird. Die Sidecar-Topologie wird in einer späteren
+  Smoke-Welle abgedeckt.
 
   Der „Gate"-Charakter (Pflicht-Lauf, PR-blocking, Release-
   Vorbedingung) wird **bewusst aufgeschoben** bis stabile Lauf-
