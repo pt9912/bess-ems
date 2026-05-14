@@ -179,9 +179,23 @@ Diese Notiz fixiert pro Kandidat:
     unnötig liegen.
   - **Race-sicheres Re-Add:** Wenn `TryAcquireLease` einen
     Tombstone oder Generations-Mismatch entdeckt, läuft
-    `GetOrAdd` mit einer frischen Instanz (neue `generation`).
-    Aufrufer, die noch die alte Instanz halten, erkennen das
-    beim Verify-Schritt und reservieren neu.
+    `GetOrAdd` **nicht** sofort — dieser würde den noch nicht
+    entfernten tombstoned Eintrag zurückliefern und der Caller
+    spinnt. Stattdessen retry-Schleife mit drei möglichen
+    Auflösungen:
+    (a) **Tombstone wurde zurückgesetzt** (CAS auf `false`,
+    siehe Eviction-Abandoned-Pfad unten) — Caller liest den
+    Eintrag erneut und reserviert auf derselben Instanz.
+    (b) **Tombstone-Eintrag ist inzwischen entfernt** (Eviction
+    hat den conditional remove erfolgreich abgeschlossen) —
+    `GetOrAdd` legt eine frische Instanz an.
+    (c) **Eviction-Sweep ist noch in der Tombstone→Remove-
+    Phase** — Caller wartet kurz (bounded backoff, z. B. einige
+    `SpinWait`/`Thread.Yield` und bei Erfolglosigkeit
+    `await Task.Yield()`) und versucht erneut. Hartes Timeout
+    nach N Iterationen (Slice-Plan: konkreter Wert) wirft, damit
+    pathologische Sweep-Bugs nicht unbegrenzt blockieren statt
+    sichtbar zu failen.
   - **Concurrency-Test "Acquire racing with Eviction-Remove":**
     Pflicht-Unit-Test, der genau die Race-Sequenz „Caller hat
     Instanz-Referenz, Eviction setzt Tombstone und entfernt,
@@ -269,6 +283,25 @@ Diese Notiz fixiert pro Kandidat:
   validieren soll. Strategie (1) ist v1.2+-Erweiterung, wenn
   Bedarf entsteht.
 
+  **Pull-Path-Pflicht (Strategie 2):** `ghcr.io/pt9912/bess-ems`
+  ist nach dem v1.0.0-Push per Default **privat**
+  (siehe [`releasing.md`](../../../user/releasing.md) §5.2).
+  Ein k3d-Cluster mit anonymen Pulls würde reproduzierbar mit
+  HTTP 401 scheitern. Slice-Plan muss eine der drei Optionen
+  wählen:
+  - **(P1) GHCR-Paket auf public umstellen** (Operations-
+    Entscheidung — einmalig in den GHCR-Settings, hat
+    Verbreitungs-Konsequenzen).
+  - **(P2) Workflow-eigenen `GITHUB_TOKEN` für GHCR-Login,
+    dann `docker pull` auf dem Runner und `k3d image import`**
+    (Image landet im Cluster ohne dass der Cluster selbst
+    GHCR-Zugriff braucht; GHCR bleibt privat).
+  - **(P3) ImagePullSecret im k3d-Cluster** mit Workflow-
+    `GITHUB_TOKEN` als Credential. Aufwendiger als (P2), weil
+    Secret im Cluster gemanagt werden muss.
+  Empfehlung **(P2)** als Pragmatik: GHCR-Sichtbarkeit ist
+  Operations-Domain, der Smoke sollte nicht davon abhängen.
+
   **Bewusste Lücke:** Code-vs-Chart-Kompatibilität (frisch
   gebautes Image gegen frisch gerendertes Chart) wird **heute
   nirgendwo** automatisiert validiert — der aktuelle
@@ -281,9 +314,12 @@ Diese Notiz fixiert pro Kandidat:
   Operator-`helm install` — derselbe Stand wie heute.
 
   Mit Strategie (2) deckt der Path-Filter alle Inputs des
-  Smoke-Laufs ab. Der **gleiche Filter gilt in allen drei
-  Promotion-Stufen** (siehe unten); Inkonsistenz zwischen v1.1.0-
-  PR-Check und der späteren Required-Stufe wäre Anti-Muster:
+  PR-Smoke-Laufs ab. **Nightly auf `main` läuft unconditional**
+  (kein Path-Filter — Scheduled Runs haben keinen PR-Diff zum
+  Filtern, und nur ein verlässlich jede Nacht laufender Job
+  beweist die für die Promotion geforderte Stabilitäts-Serie).
+  Der PR-Filter gilt für PR-Checks in allen drei Promotion-
+  Stufen:
   - `deploy/helm/**` (das Chart)
   - `Makefile` (Target-Definition)
   - `.github/workflows/cluster-smoke.yml` (oder wie immer der
@@ -312,8 +348,10 @@ Diese Notiz fixiert pro Kandidat:
   1. **v1.1.0:** Path-filtered PR-Check mit dem oben genannten
      vollständigen Filter (`deploy/helm/**` + `Makefile` +
      Workflow-Datei + ggf. `scripts/helm-cluster-smoke*`) plus
-     nightly auf `main`. Failures werden im Issue-Tracker erfasst,
-     blocken aber keine PRs.
+     **unconditional** nightly auf `main` (kein Path-Filter, weil
+     Scheduled Runs keinen PR-Diff haben und die Stabilitäts-
+     Serie sonst nicht beweisbar ist). Failures werden im Issue-
+     Tracker erfasst, blocken aber keine PRs.
   2. **Nach 4 Wochen ununterbrochen grünem Nightly:** Promotion
      zu `required`. **Pflicht-Begleitänderung:** Trigger wird auf
      `pull_request` ohne `paths`-Filter umgestellt und der Job
@@ -402,8 +440,9 @@ zuerst Follow-up-Note bereinigen.**
 | M3-D3 PID-Routing               | C | **Aus Scope** — braucht Konsumenten-Entscheidung; v1.2+ |
 | M3-FUP-04 Replay-Carve-outs     | D | **Aus Scope** — alle Varianten trigger-getrieben |
 
-**Geschätzte Größe v1.1.0:** ~1-2 Wochen (2 Slices à 3-4 PT, plus
-Release-Vorbereitung gemäß `releasing.md` §2).
+**Geschätzte Größe v1.1.0:** ~7-9 PT (Kandidat A 4-5 PT, Kandidat B
+3-4 PT) plus Release-Vorbereitung gemäß `releasing.md` §2 — knapp
+zwei Arbeitswochen Brutto.
 
 **SemVer-Begründung:** Minor (v1.0.x → v1.1.0), weil zwei neue
 Capabilities kommen (Lock-Eviction-Konfiguration in beiden
@@ -492,10 +531,18 @@ Drift in v1.1.0 wäre Anti-Muster:
 2. **Lock-Eviction-Strategie** für RM-M3-FUP-03 (Vorschlag:
    gemeinsame TTL 24h + LRU 1000, idle-only mit `TryAcquireLease`-
    Pattern (Lease-Reservierung + Generations-Verify + Rollback bei
-   Mismatch), Tombstone-Eviction mit conditional remove auf
-   Instanz-Identität, **zwei** Pflicht-Concurrency-Tests
-   („Acquire racing with Eviction-Remove" + „Sweep während
-   paralleler Calls") — Details im DoD von Kandidat A).
+   Mismatch + bounded-retry-Schleife bei Tombstone-Encounter),
+   Tombstone-Eviction mit conditional remove auf Instanz-Identität,
+   CAS-Rückstellung des Tombstones bei abgebrochenem Remove,
+   `Dispose` der entfernten Semaphore. **Vier** Pflicht-
+   Concurrency-Tests namentlich:
+   (i) „Acquire racing with Eviction-Remove",
+   (ii) „Sweep während paralleler Calls",
+   (iii) „Cancellation zwischen Lease-Reservierung und Semaphore-
+   Akquise" (kein `Release`, aber Lease-Decrement),
+   (iv) „Tombstone gesetzt während aktive Lease hält; neuer
+   Acquire kommt vor finalem Remove" (kein Spin, Serialisierung
+   bleibt erhalten). Details im DoD von Kandidat A.
 3. **Cluster-Smoke-Tool** für F-M6-03-01 (Vorschlag: k3d).
 4. **Cluster-Smoke-Promotion-Pfad** bestätigen: path-filtered
    optional + nightly in v1.1.0 → PR-required (mit Sentinel-Skip-
