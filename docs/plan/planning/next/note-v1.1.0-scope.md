@@ -185,15 +185,29 @@ Vertrags-Anteil, nicht eine breite Feature-Fläche.
      (Eintrag ist nicht mehr `Live`), Sweep überspringt den
      Kandidaten.
   3. **Final-Check** `leaseCount == 0`:
-     - **Ja**: CAS `state: Tombstoning → Removed`, conditional remove
-       aus dem Dictionary (Instanz-Identität — exakte BCL-API ist
-       Slice-Plan-Entscheidung: Cast auf
+     - **Ja**: **Reihenfolge ist wichtig** —
+       (a) conditional remove aus dem Dictionary (Instanz-
+       Identität, Eintrag ist noch im Zustand `Tombstoning` —
+       exakte BCL-API ist Slice-Plan-Entscheidung: Cast auf
        `ICollection<KeyValuePair<,>>` mit `Remove(pair)`, oder
-       verfügbarer `TryRemove(KeyValuePair)`-Overload), dann
-       `semaphore.Dispose()`. (`SemaphoreSlim` hält intern
+       verfügbarer `TryRemove(KeyValuePair)`-Overload),
+       (b) CAS `state: Tombstoning → Removed` auf der
+       (jetzt aus dem Dictionary entfernten) Instanz —
+       informational für Caller, die noch eine alte Referenz
+       halten, damit ihr Verify-Schritt 4 sie auf den neuen
+       Eintrag im Dictionary umlenkt,
+       (c) `semaphore.Dispose()`. (`SemaphoreSlim` hält intern
        unmanaged-Ressourcen, insbesondere ein lazy
        `AvailableWaitHandle` — Dispose ist Pflichtbestandteil
        dieser Transition.)
+       **Warum diese Reihenfolge:** Würde der CAS `Tombstoning →
+       Removed` vor dem Dictionary-Remove laufen, könnte ein
+       paralleler `GetOrAdd` in einem schmalen Zeitfenster
+       den noch im Dictionary stehenden, aber bereits Removed-
+       markierten Eintrag zurückgeben. Der `Removed`-Zustand
+       darf erst gesetzt werden, **nachdem** ein neuer
+       `GetOrAdd` garantiert eine frische `Live`-Instanz
+       anlegt.
      - **Nein** (zwischen Schritt 2 und Final-Check hat ein Caller
        Schritt 3 des Acquire ausgeführt; sein Verify in Schritt 4
        wird zwar fehlschlagen und Lease zurücknehmen, aber im
@@ -488,7 +502,7 @@ zuerst Follow-up-Note bereinigen.**
 | RM-M3-FUP-03 Lock-Eviction (beide Use Cases) | A | **In Scope** — präventiv, deckt beide unbounded `_locks`-Tabellen ab |
 | F-M6-03-01 Cluster-Smoke (path-filtered + nightly, kein Gate) | B | **In Scope** — klein, deckt Lücke ab; Promotion zu Gate über mehrere Releases |
 | M3-D3 PID-Routing               | C | **Aus Scope** — braucht Konsumenten-Entscheidung; v1.2+ |
-| M3-FUP-04 Replay-Carve-outs     | D | **Aus Scope** — alle Varianten trigger-getrieben |
+| M3-FUP-04 Replay-Carve-outs     | D | **Aus Scope** — Source-Note zuerst refreshen (RM-M5-04 hat den JSON-Loader bereits geliefert); verbleibende Varianten danach trigger-getrieben |
 
 **Geschätzte Größe v1.1.0:** ~7-9 PT (Kandidat A 4-5 PT, Kandidat B
 3-4 PT) plus Release-Vorbereitung gemäß `releasing.md` §2 — knapp
@@ -585,20 +599,13 @@ Drift in v1.1.0 wäre Anti-Muster:
 
 1. **Bestätigung Scope-Wahl A + B** (nicht A + B + C, nicht A + B + D).
 2. **Lock-Eviction-Strategie** für RM-M3-FUP-03 (Vorschlag:
-   gemeinsame TTL 24h + LRU 1000, idle-only mit `TryAcquireLease`-
-   Pattern (Lease-Reservierung + Generations-Verify + Rollback bei
-   Mismatch + bounded-retry-Schleife bei Tombstone-Encounter),
-   Tombstone-Eviction mit conditional remove auf Instanz-Identität,
-   CAS-Rückstellung des Tombstones bei abgebrochenem Remove,
-   `Dispose` der entfernten Semaphore. **Vier** Pflicht-
-   Concurrency-Tests namentlich:
-   (i) „Acquire racing with Eviction-Remove",
-   (ii) „Sweep während paralleler Calls",
-   (iii) „Cancellation zwischen Lease-Reservierung und Semaphore-
-   Akquise" (kein `Release`, aber Lease-Decrement),
-   (iv) „Tombstone gesetzt während aktive Lease hält; neuer
-   Acquire kommt vor finalem Remove" (kein Spin, Serialisierung
-   bleibt erhalten). Details im DoD von Kandidat A.
+   gemeinsame TTL 24h + LRU 1000). Vertrag, State-Machine,
+   Algorithmus-Schritte und die **vier** Pflicht-Concurrency-Tests
+   sind alle im DoD von Kandidat A definiert (siehe Block
+   „Vertrags-Erhalt (Pflicht-DoD) — State-Machine-formal").
+   Hier nicht duplizieren — Drift zwischen Detailblock und
+   Kurzliste würde den Slice-Plan später zum falschen Algorithmus
+   verleiten.
 3. **Cluster-Smoke-Tool** für F-M6-03-01 (Vorschlag: k3d).
 4. **Cluster-Smoke-Promotion-Pfad** bestätigen: path-filtered
    optional + nightly in v1.1.0 → PR-required (mit Sentinel-Skip-
