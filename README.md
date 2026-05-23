@@ -245,6 +245,18 @@ referenceable in the specification with prefixes (e.g. `LH-CTRL-002`,
 
 ---
 
+## Related projects
+
+- **[grid-gym](https://github.com/pt9912/grid-gym)** — deterministic
+  simulation, replay and fault-injection platform for smart-grid and EMS
+  systems; a natural test and HIL companion for `bess-ems`.
+- **[grid-guide](https://github.com/pt9912/grid-guide)** — local desktop
+  assistant for preparing grid-connection and authority applications for PV,
+  storage and generation plants; covers the installation and permitting stage
+  that precedes EMS operation.
+
+---
+
 ## License
 
 Released under the [MIT License](LICENSE).

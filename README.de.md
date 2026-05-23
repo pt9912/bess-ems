@@ -247,6 +247,18 @@ referenzierbar.
 
 ---
 
+## Verwandte Projekte
+
+- **[grid-gym](https://github.com/pt9912/grid-gym)** — deterministische
+  Simulations-, Replay- und Fault-Injection-Plattform für Smart-Grid- und
+  EMS-Systeme; natürliche Test- und HIL-Ergänzung zu `bess-ems`.
+- **[grid-guide](https://github.com/pt9912/grid-guide)** — lokaler
+  Desktop-Assistent zur Vorbereitung von Netzanschluss- und Behördenanträgen
+  für PV-, Speicher- und Erzeugungsanlagen; deckt den Installations- und
+  Genehmigungsschritt vor dem EMS-Betrieb ab.
+
+---
+
 ## Lizenz
 
 Veröffentlicht unter der [MIT-Lizenz](LICENSE).
