@@ -1,79 +1,80 @@
 # bess-ems
 
-Battery Energy Management System (EMS) für Battery Energy Storage Systems (BESS).
+*English | [Deutsch](README.de.md)*
 
-`bess-ems` plant, überwacht und steuert Batteriespeicher unter Berücksichtigung
-von Marktmechanismen, Echtzeitmessdaten, technischen Grenzwerten und
-Sicherheitsanforderungen. Das System ist modular aufgebaut, containerisiert und
-so konzipiert, dass Marktoptimierung und technische Regelung strikt getrennt
-sind.
+Battery Energy Management System (EMS) for Battery Energy Storage Systems (BESS).
 
-> **Status:** M1–M6 sind abgeschlossen; `v1.0.0` ist veröffentlicht
+`bess-ems` plans, monitors and controls battery storage systems, taking into
+account market mechanisms, real-time measurement data, technical limits and
+safety requirements. The system is modular, containerised, and designed so that
+market optimisation and technical control are strictly separated.
+
+> **Status:** M1–M6 are complete; `v1.0.0` is released
 > ([Release](https://github.com/pt9912/bess-ems/releases/tag/v1.0.0),
 > [Roadmap](docs/plan/planning/in-progress/roadmap.md),
-> [Release-Prozess](docs/user/releasing.md))
+> [Release process](docs/user/releasing.md))
 
 ---
 
-## Kernidee
+## Core idea
 
 ```text
-Messdaten
-→ Validierung
+Measurements
+→ Validation
 → Snapshot
 → State Machine
-→ Markt-/Fahrplanauflösung
-→ Regelleistungspriorisierung (falls aktiviert)
+→ Market / schedule resolution
+→ Ancillary-services prioritisation (if enabled)
 → Constraint Limiter
 → Ramp Limiter
 → Command
-→ Protokolladapter
+→ Protocol Adapter
 ```
 
-Die zentrale Architekturregel:
+The central architectural rule:
 
-> Optimierung liefert Wunschwerte.
-> Der technische Regelkreis entscheidet, was sicher gefahren wird.
+> Optimisation produces desired values.
+> The technical control loop decides what can be operated safely.
 
-Optimierungsergebnisse werden niemals direkt an Batteriesysteme gesendet,
-sondern stets über State Machine, Constraint Limiter und Ramp Limiter geführt.
-
----
-
-## Funktionsumfang
-
-Das System adressiert unter anderem:
-
-- Day-Ahead-Markt, Intraday-Markt, Regelleistung
-- Lade- und Entladeregelung mit Leistungsrampen
-- Zustandsmaschinen für Betriebs- und Sicherheitszustände
-- PID-Regelung, MPC / State-Space-Modelle (perspektivisch)
-- LP / MILP / heuristische Optimierung über austauschbares Solver-Interface
-- Feldkommunikation über Modbus TCP, MQTT und (nach MVP) OPC-UA
-- Echtzeitnahe Messdatenverarbeitung mit Datenqualitätsbewertung
-- Persistenz, Auditierbarkeit und Monitoring
+Optimisation results are never sent directly to battery systems; they are
+always routed through the State Machine, Constraint Limiter and Ramp Limiter.
 
 ---
 
-## Technologie-Stack
+## Functional scope
 
-| Bereich                     | Technologie                                      |
-| --------------------------- | ------------------------------------------------ |
-| Hauptplattform              | C# / .NET 10                                     |
-| API                         | ASP.NET Core Minimal API                         |
-| Performance-kritischer Kern | C / C++ (optionaler Native Core über C-ABI)      |
-| Persistenz (MVP)            | PostgreSQL über Dapper + Npgsql                  |
-| Messaging / Feldbus         | MQTTnet, FluentModbus; OPC-UA nach MVP           |
-| Simulator                   | Go-Feldsimulator für Modbus/MQTT                 |
-| Betrieb / Gates             | Linux, Docker, Dockerfile-Stages, Makefile       |
-| Observability               | Strukturierte Logs; Prometheus/OTel schrittweise |
+The system addresses, among other things:
+
+- Day-ahead market, intraday market, ancillary services
+- Charge and discharge control with power ramps
+- State machines for operational and safety states
+- PID control, MPC / state-space models (planned)
+- LP / MILP / heuristic optimisation via a pluggable solver interface
+- Field communication via Modbus TCP, MQTT and (post-MVP) OPC-UA
+- Near-real-time measurement processing with data-quality assessment
+- Persistence, auditability and monitoring
 
 ---
 
-## Architekturschichten
+## Technology stack
 
-Ausführliche Definitionen, Verantwortlichkeiten und Grenzen sind in
-[`spec/architecture.md`](spec/architecture.md) dokumentiert.
+| Area                      | Technology                                       |
+| ------------------------- | ------------------------------------------------ |
+| Main platform             | C# / .NET 10                                     |
+| API                       | ASP.NET Core Minimal API                         |
+| Performance-critical core | C / C++ (optional native core via C ABI)         |
+| Persistence (MVP)         | PostgreSQL via Dapper + Npgsql                   |
+| Messaging / fieldbus      | MQTTnet, FluentModbus; OPC-UA post-MVP           |
+| Simulator                 | Go field simulator for Modbus/MQTT               |
+| Operations / gates        | Linux, Docker, Dockerfile stages, Makefile       |
+| Observability             | Structured logs; Prometheus/OTel incrementally   |
+
+---
+
+## Architecture layers
+
+Detailed definitions, responsibilities and boundaries are documented in
+[`spec/architecture.md`](spec/architecture.md).
 
 - Domain Layer
 - Market Layer
@@ -85,110 +86,109 @@ Ausführliche Definitionen, Verantwortlichkeiten und Grenzen sind in
 - API Layer
 - Native Core Layer (optional)
 
-Protokolladapter enthalten ausschließlich Transformationen zwischen externen
-Signalen und internen Modellen — keine Markt-, Optimierungs- oder
-Regelentscheidungen.
+Protocol adapters contain only transformations between external signals and
+internal models — no market, optimisation or control decisions.
 
 ---
 
-## Vorzeichenkonvention
+## Sign convention
 
-Wirkleistung am Batteriespeicher:
+Active power at the battery storage system:
 
-- `> 0 kW` → Entladen / Einspeisen
-- `< 0 kW` → Laden / Bezug
-- `0 kW` → kein aktiver Lade- oder Entladebefehl
+- `> 0 kW` → discharging / feeding in
+- `< 0 kW` → charging / drawing
+- `0 kW` → no active charge or discharge command
 
-Diese Konvention wird intern einheitlich verwendet. Abweichende
-Gerätekonventionen werden ausschließlich in Protokolladaptern abgebildet.
+This convention is used consistently internally. Deviating device conventions
+are mapped exclusively inside protocol adapters.
 
 ---
 
-## Sicherheitsprinzipien
+## Safety principles
 
-Sicherer Zustand im MVP bedeutet:
+Safe state in the MVP means:
 
-- kein aktiver Lade- oder Entladebefehl
-- keine Weiterleitung veralteter oder ungültiger Commands
-- Ausgabe eines `0 kW`-Commands, eines expliziten Stop-Commands oder
-  Deaktivierung der Ausgabe
-- persistierter und geloggter Grund
+- no active charge or discharge command
+- no forwarding of stale or invalid commands
+- emission of a `0 kW` command, an explicit stop command, or disabling of the
+  output
+- a persisted and logged reason
 
-Prioritätsreihenfolge im Regelkreis:
+Priority order in the control loop:
 
 1. Emergency Stop
-2. Batterie-, Wechselrichter- und Netzgrenzen
-3. Regelleistungsaktivierung
-4. verbindliche Marktverpflichtungen
-5. Intraday-Fahrplan
-6. Day-Ahead-Fahrplan
-7. lokale Optimierung
+2. Battery, inverter and grid limits
+3. Ancillary-services activation
+4. Binding market obligations
+5. Intraday schedule
+6. Day-ahead schedule
+7. Local optimisation
 
-Softwareseitige Stop- und Sicherheitsfunktionen ersetzen keinen hardwareseitigen
-Not-Aus, keine BMS-Schutztechnik und keine herstellerspezifischen
-Wechselrichter-Schutzfunktionen. Harte Echtzeit- und zertifizierungsrelevante
-Funktionen sind außerhalb des Docker-basierten EMS abzubilden.
+Software-side stop and safety functions do not replace a hardware emergency
+stop, BMS protection mechanisms or vendor-specific inverter protections. Hard
+real-time and certification-relevant functions must be implemented outside the
+Docker-based EMS.
 
-Der Go-Feldsimulator unter `simulators/bess-field-sim` ist ein Testwerkzeug:
-MQTT läuft dort bewusst anonym und plaintext über `tcp://` ohne TLS oder
-Credentials. Dies ist nur für lokale Mosquitto-/CI-Simulationen gedacht und
-nicht für Produktions-Broker.
+The Go field simulator under `simulators/bess-field-sim` is a test tool: MQTT
+runs there deliberately anonymously and in plaintext over `tcp://` without TLS
+or credentials. This is intended only for local Mosquitto / CI simulations and
+not for production brokers.
 
 ---
 
-## MVP-Abgrenzung
+## MVP scope
 
-### Zielumfang des MVP
+### In scope for the MVP
 
-- C#/.NET Worker Service
-- Domain-Modell, Realtime Snapshot Store, State Machine
+- C# / .NET Worker Service
+- Domain model, Realtime Snapshot Store, State Machine
 - Constraint Limiter, Ramp Limiter
-- Optimization-Interface (ohne produktiven Solver)
-- MQTT- und Modbus-TCP-Adapter
-- statischer Fahrplanimport, einfache Day-Ahead-Fahrplanverfolgung
-- PostgreSQL-Persistenz
-- Health-, Status-, Command-, Fahrplan- und Operator-Stop-API
-  (schreibend mit AuthN/AuthZ und Audit-Log)
-- strukturierte Logs
+- Optimisation interface (without a production solver)
+- MQTT and Modbus-TCP adapters
+- Static schedule import, simple day-ahead schedule tracking
+- PostgreSQL persistence
+- Health, status, command, schedule and operator-stop API
+  (write access with AuthN/AuthZ and audit log)
+- Structured logs
 - Docker Compose
-- Unit Tests für Kernlogik
+- Unit tests for core logic
 
 
 ---
 
-## Repository-Struktur
+## Repository structure
 
-Die verbindliche Modul- und Schichtenstruktur ist in
-[`spec/architecture.md`](spec/architecture.md) beschrieben. Die wichtigsten
-Einstiegspunkte im Repository sind:
+The authoritative module and layer structure is described in
+[`spec/architecture.md`](spec/architecture.md). The most important entry points
+in the repository are:
 
-- `BatteryEms.sln` — .NET-Solution
-- `src/hexagon/` — Domain und Application Core
-- `src/adapters/` — Driving Adapter (API, Worker) und Driven Adapter
-  (Modbus, MQTT, Persistence, Optimization, Telemetry)
-- `src/infrastructure/` — Infrastruktur-Implementierungen
-- `tests/` — Architektur-, Unit- und Integrationstests
-- `config/` — JSON-Schemas und Beispielkonfigurationen
-- `simulators/bess-field-sim/` — Go-Feldsimulator
-- `docs/plan/` — Roadmap, aktive und offene Detailpläne
+- `BatteryEms.sln` — .NET solution
+- `src/hexagon/` — domain and application core
+- `src/adapters/` — driving adapters (API, worker) and driven adapters
+  (Modbus, MQTT, persistence, optimisation, telemetry)
+- `src/infrastructure/` — infrastructure implementations
+- `tests/` — architecture, unit and integration tests
+- `config/` — JSON schemas and example configurations
+- `simulators/bess-field-sim/` — Go field simulator
+- `docs/plan/` — roadmap, active and pending detailed plans
 
 
 ---
 
 ## Installation
 
-Container-Image (signiert via Cosign keyless, SBOM-attestiert):
+Container image (signed via Cosign keyless, SBOM-attested):
 
 ```bash
 docker pull ghcr.io/pt9912/bess-ems:v1.0.0
-# oder :1.0.0 / :latest
+# or :1.0.0 / :latest
 ```
 
-Helm-Chart, Source-Tarball, native `libbattery_control_core.so` plus
-Header, SBOM und `SHA256SUMS` liegen als Release-Assets:
+Helm chart, source tarball, native `libbattery_control_core.so` plus headers,
+SBOM and `SHA256SUMS` are published as release assets:
 [Release v1.0.0](https://github.com/pt9912/bess-ems/releases/tag/v1.0.0).
 
-Verifikation der Image-Signatur:
+Verifying the image signature:
 
 ```bash
 cosign verify ghcr.io/pt9912/bess-ems:v1.0.0 \
@@ -196,14 +196,14 @@ cosign verify ghcr.io/pt9912/bess-ems:v1.0.0 \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
 ```
 
-Vollständige Release-Prozess-Doku in
+Full release-process documentation in
 [`docs/user/releasing.md`](docs/user/releasing.md).
 
 ---
 
-## Lokale Gates
+## Local gates
 
-Die aktiven Gate-Ziele sind im `Makefile` sichtbar:
+The active gate targets are visible in the `Makefile`:
 
 ```bash
 make help
@@ -218,33 +218,33 @@ make test-integration
 
 ---
 
-## Vorgehensmodell
+## Development approach
 
-V-Modell-ähnliche Anforderungsstruktur mit Kennungen und Rückverfolgbarkeit von
-Anforderung → Design → Implementierung → Test. Anforderungen sind im
-Lastenheft mit Präfixen (z. B. `LH-CTRL-002`, `LH-SAFE-001`) eindeutig
-referenzierbar.
+V-model–style requirements structure with identifiers and traceability from
+requirement → design → implementation → test. Requirements are uniquely
+referenceable in the specification with prefixes (e.g. `LH-CTRL-002`,
+`LH-SAFE-001`).
 
 ---
 
-## Weiterführend
+## Further reading
 
-- [`spec/lastenheft.md`](spec/lastenheft.md) — vollständige Anforderungen,
-  Abnahmekriterien, Rückverfolgbarkeitstabellen, Risiken und offene Punkte
-- [`spec/architecture.md`](spec/architecture.md) — Architekturentwurf:
-  Schichten, Module, Datenfluss, Native-Core-Strategie, Rückverfolgbarkeit
+- [`spec/lastenheft.md`](spec/lastenheft.md) — complete requirements,
+  acceptance criteria, traceability tables, risks and open items
+- [`spec/architecture.md`](spec/architecture.md) — architecture design:
+  layers, modules, data flow, native-core strategy, traceability
 - [`docs/plan/planning/in-progress/roadmap.md`](docs/plan/planning/in-progress/roadmap.md) —
-  Meilensteine M1–M6 mit Liefergegenständen und LH-Rückverfolgbarkeit
-- [`docs/user/releasing.md`](docs/user/releasing.md) — Release-Prozess,
-  Tag-Vertrag, Workflow-Schritte, Rollback
-- [`docs/user/quality.md`](docs/user/quality.md) — verbindliche
-  Qualitäts- und Messpfade (statische Analyse C#/.NET + C/C++, Tests,
-  Coverage, Vertrags-Gates, Native-Parity, CI/Release)
-- [`docs/archive/idea.md`](docs/archive/idea.md) — historische Native-Core-
-  Ideenskizze, nicht normativ
+  milestones M1–M6 with deliverables and LH traceability
+- [`docs/user/releasing.md`](docs/user/releasing.md) — release process,
+  tag contract, workflow steps, rollback
+- [`docs/user/quality.md`](docs/user/quality.md) — binding quality and
+  measurement paths (static analysis C# / .NET + C / C++, tests, coverage,
+  contract gates, native parity, CI/release)
+- [`docs/archive/idea.md`](docs/archive/idea.md) — historical native-core
+  idea sketch, non-normative
 
 ---
 
-## Lizenz
+## License
 
-Veröffentlicht unter der [MIT-Lizenz](LICENSE).
+Released under the [MIT License](LICENSE).
