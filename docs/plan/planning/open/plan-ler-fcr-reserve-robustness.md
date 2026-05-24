@@ -92,8 +92,8 @@ Nicht explizit modelliert:
     - optional `eta_discharge` (default: `1.0`, falls nicht aus dem Assetmodell übernommen)
     - optional `self_discharge_mode` (Standard: `absolute_kwh_per_hour`, Werte: `absolute_kwh_per_hour` | `relative_soc_per_hour`)
     - optional `self_discharge_kwh_per_hour` (Standard: `0`, gültig nur bei `self_discharge_mode=absolute_kwh_per_hour`)
-    - optional `self_discharge_soc_per_hour` (gültig nur bei `self_discharge_mode=relative_soc_per_hour`)
-    - `max_recovery_time`
+  - optional `self_discharge_soc_per_hour` (gültig nur bei `self_discharge_mode=relative_soc_per_hour`)
+  - `max_recovery_time`
     - `intraday_gate_closure`
     - `intraday_preparation_time`
     - `market_time_unit`
@@ -107,8 +107,8 @@ Nicht explizit modelliert:
     - Wird `eta_charge`/`eta_discharge` in der Policy nicht gesetzt, sind sie aus dem Assetmodell zu lesen.
     - Falls gesetzt, muss gelten: `0 < eta_charge <= 1` und `0 < eta_discharge <= 1`.
   - Selbstentladung:
-    - Exakt einer der beiden Verlusteinstellungen muss gesetzt sein: `self_discharge_kwh_per_hour` oder `self_discharge_soc_per_hour`.
-    - `self_discharge_mode=absolute_kwh_per_hour`:
+  - Exakt einer der beiden Verlusteinstellungen muss gesetzt sein: `self_discharge_kwh_per_hour` oder `self_discharge_soc_per_hour`.
+  - `self_discharge_mode=absolute_kwh_per_hour`:
       - `self_discharge_kwh_per_hour` ist Pflichtfeld (`>= 0`),
       - `self_discharge_soc_per_hour` wird ignoriert.
     - `self_discharge_mode=relative_soc_per_hour`:
@@ -125,8 +125,16 @@ Nicht explizit modelliert:
     - `soc_max_eff_kwh = soc_max_kwh - effective_soc_headroom_kwh`
     - `soc_min_eff_kwh < soc_max_eff_kwh` muss gelten, sonst `ROBUST_POLICY_UNSUPPORTED`.
   - Effektivzeiten je Produkt (Fallback auf `full_activation_time`):
-    - `full_activation_time_afrr_eff = coalesce(full_activation_time_afrr, full_activation_time)`
-    - `full_activation_time_mfrr_eff = coalesce(full_activation_time_mfrr, full_activation_time)`
+  - `full_activation_time_afrr_eff = coalesce(full_activation_time_afrr, full_activation_time)`
+  - `full_activation_time_mfrr_eff = coalesce(full_activation_time_mfrr, full_activation_time)`
+  - Harte Schema-Validierung:
+    - `self_discharge_mode` darf **nur** `absolute_kwh_per_hour` oder `relative_soc_per_hour` sein; alles andere -> `ROBUST_POLICY_UNSUPPORTED`.
+    - Sind beide Selbstentladungswerte gesetzt, ist der Fall ungültig (`ROBUST_POLICY_UNSUPPORTED`).
+    - Ist keiner gesetzt, ist der Fall ungültig (`ROBUST_POLICY_UNSUPPORTED`).
+    - `self_discharge_kwh_per_hour` darf nicht negativ sein.
+    - `self_discharge_soc_per_hour` muss in `[0,1]` liegen (als Anteil pro Stunde).
+    - `market_time_unit` muss exakt `minute` sein und mit `resolution_minutes` konsistent sein.
+    - `t_min_fcr`, `full_activation_time`, `max_recovery_time`, `intraday_gate_closure`, `intraday_preparation_time` dürfen nicht kleiner als `0` sein.
 
 - `ReserveEnergyEnvelope`
   - Zeitschrittweise Worst-Case-Energiehuelle fuer Up- und Down-Richtung.
@@ -495,6 +503,14 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 ## Testideen
 
 - `E_avail_up/down` bei SOC-Min/Max und Effizienz < 1.
+- Selbstentlade-Schemafehler (explizit):
+  - `self_discharge_mode=invalid` (`x_per_hour` unbekannt) → `ROBUST_POLICY_UNSUPPORTED`.
+  - beide Moduswerte gesetzt (`self_discharge_kwh_per_hour` und `self_discharge_soc_per_hour`) → `ROBUST_POLICY_UNSUPPORTED`.
+  - kein Moduswert gesetzt (beide optional Felder leer/nicht gesetzt) → `ROBUST_POLICY_UNSUPPORTED`.
+  - negative/überschüssige Werte (`self_discharge_kwh_per_hour < 0`, `self_discharge_soc_per_hour < 0` oder `> 1`) → `ROBUST_POLICY_UNSUPPORTED`.
+- `market_time_unit` abseits von `minute` → `ROBUST_POLICY_UNSUPPORTED`.
+- Auflösungsfelder kleiner 0 (`t_min_fcr`, `full_activation_time`, `max_recovery_time`, `intraday_gate_closure`, `intraday_preparation_time`) → `ROBUST_POLICY_UNSUPPORTED`.
+- `conservative_soc_headroom` außerhalb `0..1` (ratio) bzw. `<0` (kwh) → `ROBUST_POLICY_UNSUPPORTED`.
 - FCR-Worst-Case fuer nicht-LER: volle FCR-Leistung ueber Horizont.
 - LER-konservative FCR-Huelle mit `t_min_fcr`.
 - Alert State startet bei definierter Frequenzabweichung und endet erst

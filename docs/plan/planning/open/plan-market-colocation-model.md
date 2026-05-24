@@ -32,6 +32,25 @@ Optimierung -> Fahrplan -> State Machine -> Prioritaeten -> Limiter -> Command
 
 ## Arbeitsmodell
 
+### Architektur- und Solver-Scope für LP/MILP
+
+Der operative Optimierungsrequest enthält genau eine Solver-Scope-Ausprägung:
+
+- `solver_scope=LP`, wenn **keine** aktivierte Co-Location-/Herkunftsrestriktion betroffen ist.
+- `solver_scope=MILP`, wenn mindestens ein Constraint nur MILP-abbildbar ist (z. B. Co-Location-Schnittstelle, Herkunftsrestriktion, Nichtgleichzeitigkeit Import/Export).
+
+Die Umschaltung erfolgt per Request und ist nicht global. Ein Request mit mindestens einem betroffenen Asset (`ClassicalCoLocation`, `HybridWithGridImport`, `GreenStorageRestricted` oder aktivierter `OriginConstraint`) muss MILP verwenden.
+
+Kompatibilitätsprinzip:
+
+- Bestehende Standalone-only-Requests bleiben LP.
+- Bei nicht kompatibler `solver_scope`-Zuordnung endet der Lauf mit `CONFIG_INVALID`, nicht mit stiller Downgrade-Logik.
+- Für gemischte Multi-Site-/Multi-Asset-Fälle gilt:
+  - entweder explizite Request-Partitionierung vor dem Optimierer,
+  - oder ein bewusst einheitlicher MILP-Request für alle betroffenen Assets.
+- Der Scope bleibt pro Request eindeutig; innerhalb einer einzelnen Anfrage gibt es keinen partiellen LP/MILP-Mix.
+- Für den ersten produktiven Slice ist die Partitionierungsentscheidung im ADR festzuhalten.
+
 ### Projekt-/Standorttypen
 
 Der Slice modelliert mindestens diese Betriebsarten:
@@ -91,10 +110,11 @@ Moegliche Domain-/Application-Erweiterungen:
 - gleiche Zeitachse wie `PriceSeries` (UTC, step-genau, gleiche Horizon-Länge) bei produktiver Nutzung
 - Ist `alignment_mode=reject` (Default im produktiven ADR): die Zeitachse muss hart identisch sein (gleiches Horizon, gleiche Schrittweite, gleiche Startzeit).
 - Ist `alignment_mode=trim-to-common` gesetzt:
+  - produktive Optimierung darf diese Zeitachsenform nicht starten; dies führt zu `SCHEMA_INCONSISTENT`, solange keine Vorverarbeitung (`trim`-Pfad) explizit abgeschlossen wurde.
   - Schnittmenge auf den gemeinsamen Zeithorizont
   - deterministische Konvention bei Zeitachsen-Verschiebung
   - lückenbehaftete Schritte müssen im Anschluss vollständig abgearbeitet werden
-  - nur im Forecast-/Preprocessing-Pfad; wird produktiv in `Trim` verworfen.
+  - nur im Forecast-/Preprocessing-Pfad, danach muss der Standardpfad (`reject`) mit lückenloser Zeitachse erhalten bleiben.
   - keine offenen Zeitlücken; zulässig: kontrollierte Backfill-Regel (max. 2 Intervalle)
     - `value_kw` ist eine Produktionsleistung und für diese Serie standardmässig nicht negativ.
     - Negative Werte sind nur über einen separaten signierten Netzausgangs-Datensatz zulässig.
@@ -240,10 +260,11 @@ Bestandsrouten nicht brechen:
 - Default bleibt der bestehende LP-Standard fuer `StandaloneBess` und Szenarien ohne
   aktivierte Co-Location-/Herkunftsrestriktionen.
 - `ClassicalCoLocation`, `HybridWithGridImport`, `GreenStorageRestricted` und damit verbundene
-  Vorzeichen- und Herkunftsrestriktionen werden ueber explizit aktivierte
+  Vorzeichen- und Herkunftsrestriktionen werden über explizit aktivierte
   `CoLocationMode`-/Modellschalter auf MILP-Profil gestellt.
-- Der MILP-Schalter ist nicht global: nur betroffene Sites/Anfragen wechseln auf
-  MILP, andere Pfade bleiben in LP.
+- Für gemischte Szenarien ist der komplette Request auf MILP zu setzen oder
+  vor dem Solver fachlich zu partitionieren; ein partieller Scope-Mix
+  innerhalb eines Requests ist nicht erlaubt.
 - Regressionstest ist als Matrix verbindlich:
   - LP-basierter Standalone-Fall bleibt bit-kompatibel.
   - Co-Location mit aktivem Import/Export-/Herkunftsmodell muss auf MILP laufen.
@@ -284,10 +305,11 @@ Bestandsrouten nicht brechen:
   Constraint-Komponenten sichtbar.
 - Ein infeasibles Setup liefert einen klaren, operatorfaehigen Termination-Code:
   - `OK`: gueltiger Plan berechnet
-  - `CONFIG_INVALID`: Eingabedaten ungueltig/fehlerhaft (Schema oder Constraints)
-  - `CONFIG_INCONSISTENT`: regelwerkskonflikt (z. B. `GreenStorageRestricted` ohne Herkunftsnachweis)
-  - `MODEL_INFEASIBLE`: Optimierungsproblem ohne Loesung bei gueltigen Daten
-  - `SOLVER_ERROR`: Timeout/technisches Solverproblem
+- `CONFIG_INVALID`: Eingabedaten ungueltig/fehlerhaft (Schema oder Constraints)
+- `CONFIG_INCONSISTENT`: regelwerkskonflikt (z. B. `GreenStorageRestricted` ohne Herkunftsnachweis)
+- `MODEL_INFEASIBLE`: Optimierungsproblem ohne Loesung bei gueltigen Daten
+- `SOLVER_ERROR`: Timeout/technisches Solverproblem
+- `SCHEMA_INCONSISTENT`: Scope-/Datenkonflikt (z. B. Request-Konfiguration mit unzulässiger `alignment_mode=trim-to-common` im produktiven Lauf).
 - Replay-/Golden-Fixtures decken mindestens ein Standalone- und ein
   Co-Location-Szenario ab.
 - Der technische Dispatch-Pfad bleibt Safety-First und kennt keine

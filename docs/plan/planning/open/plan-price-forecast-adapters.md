@@ -46,6 +46,19 @@ Nicht vorhanden:
 - provider-spezifische Authentisierung
 - verbindlicher Serienvertrag fuer Zeitachse, Freshness, Gap-Handling und Fehlercodes
 
+Kompatibilitäts-/Migrationsprinzip:
+
+- Das bestehende `PriceSeries`-Import-Subsystem bleibt vollständig funktionsfähig.
+- `IForecastSeriesSource` wird als zusätzliche, kompatible Schnittstelle eingeführt.
+- `SeriesEnvelope` dient als einheitlicher Zwischenvertrag:
+  - bestehende Preisimporte nutzen weiterhin `IPriceSeriesSource`,
+  - Forecast/Forecast-Adapter nutzen `IForecastSeriesSource`,
+  - beide werden vor dem Optimierer über denselben Mapping-Layer auf die aktuelle Domäne projiziert.
+- In der Einführungsphase gilt "Dual-Path":
+  - Altpfad unverändert lauffähig,
+  - Neupfade können aktiv/inaktiv geschaltet werden,
+  - späterer Wechsel auf den neuen Pfad ohne Schnittstellenbruch durch einheitlichen Mapper.
+
 ## Verbindlicher Daten- und Fehlervertrag
 
 Einheitliche Adaptervertraege für Preis- und Forecastdaten:
@@ -85,6 +98,10 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
     - `retrieved_at_utc`
     - `valid_from_utc`, `valid_to_utc`
     - `provider_request_id`
+- `series_status` (finaler Endstatus je Serie): `SOURCE_OK`, `SOURCE_DEGRADED`, `SOURCE_FALLBACK_USED`, `SOURCE_REJECTED`
+- `status_flags` (array, optional): `SOURCE_FALLBACK_USED`, `SOURCE_BACKFILL`, `SOURCE_RATE_LIMIT`, ...
+- `status_message` (optional): menschenlesbar
+- `status_detail` (optional): strukturierte Zusatzinfo (z. B. `{ "source_code": "SOURCE_STALE", "backfill_intervals_closed": 2, "effective_source_id": "opsd-..." }`)
 - Validierungspflicht:
   - strikte UTC-Zeitachse
   - Schrittweite exakt `resolution_minutes`
@@ -104,6 +121,10 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
 - Konsistenz-Regel:
   - Wenn `series_type=price`, ist `market_bid_area` Pflichtfeld; `site_id` optional.
   - Wenn `series_type=forecast` und Standorttrennung aktiv ist, ist `site_id` Pflicht.
+- Statusmodell:
+  - Die finale Serienqualität bleibt ein einzelner Wert in `series_status` (`SOURCE_OK`, `SOURCE_DEGRADED`, `SOURCE_FALLBACK_USED`, `SOURCE_REJECTED`).
+  - Kombinierte Ereignisse (z. B. Fallback **und** Backfill) werden nur durch `status_flags` abgebildet; `series_status` bleibt ein `single-value`.
+  - `status_flags` ist verpflichtend, wenn `series_status != SOURCE_OK`.
 
 ### Freshness- und Gap-Policy (verbindlich)
 
@@ -150,11 +171,11 @@ Die `SOURCE_*`-Auswertung ist für jede Serie deterministisch:
 - `SOURCE_AUTH_ERROR`, `SOURCE_SCHEMA_MISMATCH`, `SOURCE_GAP` sind nicht fallback-fähig.
 - Sind Primärcode + kompatible Fallback-Quelle vorhanden:
   - Der Fallback wird synchron ausgewertet.
-  - Ist Fallback erfolgreich:
-    - bei `quality_mode=strict`: finaler Zustand darf nur `SOURCE_OK` oder `SOURCE_FALLBACK_USED` sein.
-    - bei `quality_mode=degraded_ok`: finaler Zustand darf `SOURCE_DEGRADED` oder `SOURCE_FALLBACK_USED` sein; keine kombinierte Endstatuskodierung.
-      - Wenn Fallback erfolgreich und keine zusätzliche Qualitätsminderung vorliegt: `SOURCE_FALLBACK_USED`.
-      - Wenn Fallback erfolgreich mit Backfill/Degradation: `SOURCE_DEGRADED`.
+- Ist Fallback erfolgreich:
+  - bei `quality_mode=strict`: finaler Zustand darf nur `SOURCE_OK` oder `SOURCE_FALLBACK_USED` sein.
+  - bei `quality_mode=degraded_ok`: finaler Zustand darf `SOURCE_DEGRADED` oder `SOURCE_FALLBACK_USED` sein; kombinierte Ereignisse werden in `status_flags` gehalten.
+    - Wenn Fallback erfolgreich und keine zusätzliche Qualitätsminderung vorliegt: `series_status=SOURCE_FALLBACK_USED`, `status_flags=[SOURCE_FALLBACK_USED]`.
+    - Wenn Fallback erfolgreich mit Backfill/Degradation: `series_status=SOURCE_DEGRADED`, `status_flags=[SOURCE_FALLBACK_USED, SOURCE_BACKFILL]`.
   - Ist Fallback fehlgeschlagen:
     - `strict`: harte Ablehnung (`SOURCE_REJECTED`).
     - `degraded_ok`: nur akzeptierbare Backfill/Degradation zulassen (`SOURCE_DEGRADED`), sonst `SOURCE_REJECTED`.
@@ -166,11 +187,12 @@ Die `SOURCE_*`-Auswertung ist für jede Serie deterministisch:
 - Primär: `SOURCE_OK`.
 - Mit Ersatzquelle: `SOURCE_FALLBACK_USED`.
 - Qualitätsminderung: `SOURCE_DEGRADED`.
+- Kombinationsregel: Ist Fallback erfolgreich **und** Backfill aktiv, ist der `series_status` `SOURCE_DEGRADED` mit `status_flags` inklusive `SOURCE_FALLBACK_USED` und `SOURCE_BACKFILL`.
 - harte Ablehnung: `SOURCE_REJECTED`.
 
 Hinweis:
-Endstatus ist ein einzelner Wert (`single-value`) je Serie. Fallback-Nutzung und
-Qualitätsminderung werden im Operator-Status separat als Ausführungsdetails erfasst.
+Endstatus ist ein einzelner Wert (`single-value`) je Serie (`series_status`).
+Fallback-/Degradationsdetails werden zusätzlich in `status_flags` und optionalem `status_detail` erfasst.
 
 ### Fehler- und Ablaufcodes
 

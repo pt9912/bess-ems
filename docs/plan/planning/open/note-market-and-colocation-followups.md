@@ -155,6 +155,8 @@ sowie Forecast-Serien.
   Zeitstempelung, Versionskennzeichen und Qualitätskennzahlen.
 - Operativer Importpfad mit automatischer Aktualisierung, Toleranzgrenzen
   und Alarmierung bei Datenlücken.
+- Qualitätsschema enthält kombinierte Status-Sichtbarkeit (Fallback + Degradation)
+  ohne Informationsverlust für Operator/Rückverfolgbarkeit.
 
 ---
 
