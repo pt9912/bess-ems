@@ -106,7 +106,7 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
     - `provider_request_id`
 - `series_status` (finaler Endstatus je Serie): `SOURCE_OK`, `SOURCE_DEGRADED`, `SOURCE_FALLBACK_USED`, `SOURCE_REJECTED`
 - `source_eval_status` (Rohstatus je Providerlauf, vor Fallback-/Degradationsentscheidung): `SOURCE_OK`, `SOURCE_AUTH_ERROR`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_EMPTY`, `SOURCE_STALE`, `SOURCE_GAP`, `SOURCE_SCHEMA_MISMATCH`, `SOURCE_RETRY_EXHAUSTED`
-- `status_flags` (array, optional): `SOURCE_FALLBACK_USED`, `SOURCE_BACKFILL`, `SOURCE_RATE_LIMIT`, ...
+- `status_flags` (array, required bei `series_status != SOURCE_OK`; optional bei `SOURCE_OK`): `SOURCE_FALLBACK_USED`, `SOURCE_BACKFILL`, `SOURCE_RATE_LIMIT`, ...
 
 Hinweis zur Semantik:
 - `source_eval_status` ist der interne Rohstatus pro Providerlauf (inkl. Primär- und Fallback-Pfad, vor Qualitätsentscheidung).
@@ -131,6 +131,48 @@ Hinweis zur Semantik:
   eines produktiven Forecast-Domaintypen im EMS ausschließlich über den Sidecar-Integrationspfad
   weiterverarbeitet werden. In späteren Slices kann derselbe Contract in ein produktives
   Forecast-Domain-Format überführt werden.
+
+### Normatives Status-Mapping (verbindlich)
+
+- `source_eval_status` ist **interner Rohstatus pro Providerlauf** und darf direkt an einem
+  externen Lauf nicht als End-Entscheidung gebunden werden.
+- `series_status` ist der **einzige externe Endstatus je Serie** im Operator/API-Vertrag.
+- `status_flags` ergänzt `series_status` um kombinierte Qualitätsereignisse.
+
+Kanonische Ableitungsregeln (deterministisch):
+
+- `source_eval_status=SOURCE_AUTH_ERROR` -> `series_status=SOURCE_REJECTED`, harte Abweisung.
+- `source_eval_status=SOURCE_SCHEMA_MISMATCH` -> `series_status=SOURCE_REJECTED`, harte Abweisung.
+- `source_eval_status=SOURCE_GAP` -> `series_status=SOURCE_REJECTED`, harte Abweisung
+  (nur wenn nicht durch kompatiblen Backfill vollständig behoben).
+- `source_eval_status=SOURCE_EMPTY` -> `series_status=SOURCE_REJECTED`, harte Abweisung.
+- `source_eval_status` aus `{SOURCE_STALE, SOURCE_RATE_LIMIT, SOURCE_UNAVAILABLE, SOURCE_RETRY_EXHAUSTED}`:
+  - Bei vorhandenem kompatiblem Fallback folgt die Fallback-Evaluierung.
+  - Bei erfolgreichem Fallback: `series_status=SOURCE_FALLBACK_USED` oder
+    `SOURCE_DEGRADED` je nach Backfill/Qualitätsminderung.
+  - Bei fehlendem kompatiblen Fallback: harte Abweisung außer im `degraded_ok`-Modus
+    für `SOURCE_STALE` (-> `SOURCE_DEGRADED`).
+- `source_eval_status=SOURCE_OK` bleibt `series_status=SOURCE_OK`, sofern weitere
+  Daten- und Zeitachsenvalidierung bestanden ist.
+
+Statusvokabular ist für alle Markt-/Forecast-Slices verbindlich:
+
+- `SOURCE_OK`
+- `SOURCE_DEGRADED`
+- `SOURCE_FALLBACK_USED`
+- `SOURCE_REJECTED`
+
+Interoperabilitätsregel (über Pläne hinweg):
+
+- Im Optimierungsrequest wird nur über den konkreten `series_status` und die
+  Slice-konfigurierten Qualitätsregeln entschieden (`strict`/`degraded_ok`).
+- `source_eval_status` darf nicht ohne Mapping in Operator-Sichten als Entscheidungsstatus
+  verwendet werden.
+- Wenn eine Pflichtserie auf `SOURCE_REJECTED` steht, ist der zugehörige Request im
+  produktiven Pfad als hartes Verarbeitungsfehlerbild zu behandeln.
+- Bei `SOURCE_DEGRADED`/`SOURCE_FALLBACK_USED` ist die Ausführung nur erlaubt,
+  wenn der Slice diese Qualitätsgrade explizit erlaubt.
+
 - Konsistenz-Regel:
   - Wenn `series_type=price`, ist `market_bid_area` Pflichtfeld; `site_id` optional.
   - Wenn `series_type=forecast` und Standorttrennung aktiv ist, ist `site_id` Pflicht.
@@ -140,7 +182,17 @@ Hinweis zur Semantik:
 - Statusmodell:
   - Die finale Serienqualität bleibt ein einzelner Wert in `series_status` (`SOURCE_OK`, `SOURCE_DEGRADED`, `SOURCE_FALLBACK_USED`, `SOURCE_REJECTED`).
   - Kombinierte Ereignisse (z. B. Fallback **und** Backfill) werden nur durch `status_flags` abgebildet; `series_status` bleibt ein `single-value`.
-  - `status_flags` ist verpflichtend, wenn `series_status != SOURCE_OK`.
+- `status_flags` ist verpflichtend, wenn `series_status != SOURCE_OK`.
+
+Empfohlene Integrationskonvention (API/Operator):
+
+- Laufzustände sollten die folgende Entkopplung nutzen:
+  - Datenqualität: `series_status` + `status_flags` + `status_detail`
+  - Operative Verfügbarkeit: zusätzlicher Dispatch-Guard (z. B. `CanExecute`)
+- `series_status=SOURCE_REJECTED` muss in Operator-/Replay-Ausgaben als harte
+  Datenblockade sichtbar sein.
+- `series_status=SOURCE_DEGRADED`/`SOURCE_FALLBACK_USED` bleibt aktiv nutzbar, aber
+  mit expliziter Anzeige von Qualitätsdegradation und Wiederherstellungspfad.
 
 ### Freshness- und Gap-Policy (verbindlich)
 

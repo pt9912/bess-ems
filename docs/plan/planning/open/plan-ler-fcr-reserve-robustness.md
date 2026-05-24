@@ -85,13 +85,14 @@ Nicht explizit modelliert:
     - optional `conservative_soc_headroom_ratio` (default `0`, nur bei `soc_strategy=conservative`); Bereich `0..1`
     - Wenn kein `conservative_soc_headroom_kwh` gesetzt ist, wird bei `conservative` `conservative_soc_headroom_ratio` genutzt.
     - `t_min_fcr`
-    - `full_activation_time` (Fallback-Wert; produkt-spezifische Werte empfohlen)
-    - optional `full_activation_time_afrr`
-    - optional `full_activation_time_mfrr`
-    - optional `eta_charge` (default: `1.0`, falls nicht aus dem Assetmodell übernommen)
-    - optional `eta_discharge` (default: `1.0`, falls nicht aus dem Assetmodell übernommen)
-    - optional `self_discharge_mode` (Werte: `absolute_kwh_per_hour` | `relative_soc_per_hour`)
-    - optional `self_discharge_kwh_per_hour` (gültig nur bei `self_discharge_mode=absolute_kwh_per_hour`)
+  - `full_activation_time` (Fallback-Wert; produkt-spezifische Werte empfohlen)
+  - optional `full_activation_time_afrr`
+  - optional `full_activation_time_mfrr`
+  - optional `simultaneous_reserve_direction_allowed` (default `false`)
+  - optional `eta_charge` (default: `1.0`, falls nicht aus dem Assetmodell übernommen)
+  - optional `eta_discharge` (default: `1.0`, falls nicht aus dem Assetmodell übernommen)
+  - optional `self_discharge_mode` (Werte: `absolute_kwh_per_hour` | `relative_soc_per_hour`)
+  - optional `self_discharge_kwh_per_hour` (gültig nur bei `self_discharge_mode=absolute_kwh_per_hour`)
   - optional `self_discharge_soc_per_hour` (gültig nur bei `self_discharge_mode=relative_soc_per_hour`)
   - `max_recovery_time`
     - `intraday_gate_closure`
@@ -129,13 +130,16 @@ Nicht explizit modelliert:
   - `full_activation_time_afrr_eff = coalesce(full_activation_time_afrr, full_activation_time)`
   - `full_activation_time_mfrr_eff = coalesce(full_activation_time_mfrr, full_activation_time)`
   - Harte Schema-Validierung:
-    - `self_discharge_mode` darf **nur** `absolute_kwh_per_hour` oder `relative_soc_per_hour` sein; alles andere -> `ROBUST_POLICY_UNSUPPORTED`.
-    - Sind beide Selbstentladungswerte gesetzt, ist der Fall ungültig (`ROBUST_POLICY_UNSUPPORTED`).
-    - Ist keiner gesetzt, ist der Fall ungültig (`ROBUST_POLICY_UNSUPPORTED`).
-    - `self_discharge_kwh_per_hour` darf nicht negativ sein.
-    - `self_discharge_soc_per_hour` muss in `[0,1]` liegen (als Anteil pro Stunde).
-    - `market_time_unit` muss exakt `minute` sein und mit `resolution_minutes` konsistent sein.
-    - `t_min_fcr`, `full_activation_time`, `max_recovery_time`, `intraday_gate_closure`, `intraday_preparation_time` dürfen nicht kleiner als `0` sein.
+  - `self_discharge_mode` darf **nur** `absolute_kwh_per_hour` oder `relative_soc_per_hour` sein; alles andere -> `ROBUST_POLICY_UNSUPPORTED`.
+  - Sind beide Selbstentladungswerte gesetzt, ist der Fall ungültig (`ROBUST_POLICY_UNSUPPORTED`).
+  - Ist keiner gesetzt, ist der Fall ungültig (`ROBUST_POLICY_UNSUPPORTED`).
+  - `self_discharge_kwh_per_hour` darf nicht negativ sein.
+  - `self_discharge_soc_per_hour` muss in `[0,1]` liegen (als Anteil pro Stunde).
+  - `market_time_unit` muss exakt `minute` sein und mit `resolution_minutes` konsistent sein.
+  - `t_min_fcr`, `full_activation_time`, `max_recovery_time`, `intraday_gate_closure`, `intraday_preparation_time` dürfen nicht kleiner als `0` sein.
+  - `simultaneous_reserve_direction_allowed` ist optional-boolean; fehlt/`false` wird als Default `false` interpretiert.
+  - `simultaneous_reserve_direction_allowed=true` ist in Kombination mit nicht-linearer Kopplung nur mit klarer
+    Reihenfolgeimplementierung in der Worst-Case-Rekursion erlaubt.
 
 - `ReserveEnergyEnvelope`
   - Zeitschrittweise Worst-Case-Energiehuelle fuer Up- und Down-Richtung.
@@ -218,10 +222,18 @@ Deterministische Berechnung (verbindlich):
   - Default: `1.0`, wenn das Produkt gebucht ist, sonst `0.0` bei nicht gebuchtem Produkt.
   - Bereich: `0 <= alpha_* <= 1` (numerisch stabiler Toleranzbereich in der Umsetzung, z. B. `1e-9`).
  - `Δt = resolution_minutes / 60` (in Stunden).
-- Für jede Richtungsberechnung wird konservativ davon ausgegangen, dass Up- und Down-Aktivierung nicht
-  simultan in derselben Zeitscheibe als Primärfall auftreten; falls das Produkt oder die
-  Systemdefinition simultanes Gegensignal vorsieht, ist der ADR um eine gekoppelte
-  Richtungslogik zu erweitern.
+  - Sofern `simultaneous_reserve_direction_allowed=false`, wird konservativ angenommen, dass Up- und Down-Aktivierung nicht
+    simultan in derselben Zeitscheibe als Primärfall auftreten.
+  - Sofern `simultaneous_reserve_direction_allowed=true`, werden simultane Richtungen
+    im selben Schritt wie folgt gekoppelt:
+    - `worst_total_kwh_t = worst_up_kwh_t + worst_down_kwh_t`
+    - `worst_total_kw_t = worst_total_kwh_t / Δt`
+    - Die Worst-Case-Rekursion wird deterministisch im Sequenzpfad geprüft:
+      1) Up-Branch auf `worst_up_kwh_t` (Absenkung),
+      2) Down-Branch auf `worst_down_kwh_t` auf dem SOC nach Up.
+    - Diese Kopplung ist bewusst konservativ und vollständig deterministisch.
+  - Wenn simultanes Gegensignal laut Produktdefinition aktiv ist, aber `simultaneous_reserve_direction_allowed=false`,
+    gilt hart `ROBUST_POLICY_UNSUPPORTED` mit `POLICY_MISMATCH`.
 - FCR-Worst-Case-Konsistenz bei Mindestzeit:
   - Für FCR wird die Mindestaktivierungszeit als Zustandsgröße geführt:
     - `fcr_remaining_t` ist der verbleibende Restbedarf in Minuten.
@@ -424,9 +436,8 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 - Ergebnis-/Run-Mapping (verbindlich):
   - `reserve_robustness_status = ReserveRobustnessResult.status`.
   - `reserve_robustness_limiting_reason = ReserveRobustnessResult.limiting_reason_code`.
-  - `CanExecute = (reserve_robustness_status == ROBUST_OK)` ist `true`, wenn der
-    erzeugte Schedule ohne Restore-Vorlauf sicher ausgeführt werden darf; bei
-    allen anderen Statuswerten `false`.
+  - `CanExecute = (reserve_robustness_status == ROBUST_OK)` ist die einzige ausführbare
+    Betriebsart; bei allen anderen Statuswerten ist `CanExecute=false`.
   - `CanExecute` ist harte Ausführungsbedingung im Dispatcher/Scheduler:
     `OptimizationSolverStatus.Feasible` bei `CanExecute=false` gilt weiterhin als nicht auszuführen.
   - `ROBUST_OK` => keine zusätzliche Hard-Stop-Sperre.
@@ -510,8 +521,8 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 - Bei `ROBUST_NEEDS_INTRADAY_RESTORE` ist der Optimierungslauf als
  `CanExecute=false` persistiert und die notwendige Restore-Massnahme
  in Operator-/Replay-Ausgabe explizit markiert.
- - `CanExecute=false` wird in allen Laufpfaden als harte Nicht-Ausführungsbedingung
-   durchgesetzt, unabhängig vom Solver-Status.
+  - `CanExecute=false` wird in allen nicht-`ROBUST_OK`-Laufpfaden als harte
+    Nicht-Ausführungsbedingung durchgesetzt, unabhängig vom Solver-Status.
 - `t_min_fcr`, `full_activation_time` und `max_recovery_time` sind in
   Tests sichtbar und nicht nur Konfigurationsfelder.
 - `full_activation_time_afrr` / `full_activation_time_mfrr` sind in den
@@ -549,6 +560,15 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
   Schedule-Aktivierung ab.
 
 ---
+
+## Zusätzliche Testfälle (Simulation)
+
+- Simultane Richtungsanforderungen:
+  - bei `simultaneous_reserve_direction_allowed=false` muss bei gleichzeitigen
+    Up-/Down-Anforderungen im selben Zeitschritt hart `ROBUST_POLICY_UNSUPPORTED`
+    mit `POLICY_MISMATCH` resultieren.
+  - bei `simultaneous_reserve_direction_allowed=true` wird bei Gleichzeitigkeit
+    die gekoppelte Worst-Case-Rekursion über `worst_total_kwh_t` geprüft.
 
 ## Offene Entscheidungen
 

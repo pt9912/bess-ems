@@ -96,6 +96,8 @@ Moegliche Domain-/Application-Erweiterungen:
   - Zeitreihe fuer PV/Wind-Erzeugung oder Forecast
   - Pflichtfelder pro Timestamp:
     - `site_id`
+      - bei produktiver Co-Location-Nutzung muss die `site_id` eindeutig einem
+        `SiteConstraint` zugeordnet sein; andernfalls `SCHEMA_INCONSISTENT`.
     - `timestamp_utc`
     - `resolution_minutes`
   - Die Felder `alignment_mode`, `alignment_prepared`, `alignment_prepared_by`,
@@ -205,7 +207,7 @@ Verbindliche Defaults (Phase-1-ADR):
 - `site_grid_power_sign` ist ein Pflichtfeld für produktive `SiteConstraint`-Konfigurationen.
   - Bei einem produktiven Lauf ohne `site_grid_power_sign` endet der Lauf mit `CONFIG_INCONSISTENT`.
   - Bei vorhandenen Legacy-Daten ohne `site_grid_power_sign` ist ein strukturierter Migrationspfad zwingend:
-    - Migrations-Release: bestehende `SiteConstraint`-Datensätze werden deterministisch auf `export_pos` normalisiert und mit `site_grid_power_sign_normalized=true` markiert.
+    - Migrations-Release: bestehende `SiteConstraint`-Datensätze, deren Vorzeichenkonvention aus vorhandenen Feldern eindeutig bestimmt werden kann, werden deterministisch auf den abgeleiteten Wert normalisiert und mit `site_grid_power_sign_normalized=true` markiert.
     - Folge-Release: unmarkierte `site_grid_power_sign`-freie Datensätze werden als `CONFIG_INCONSISTENT` abgewiesen.
     - Nach der Migrationsphase ist `site_grid_power_sign` ohne Ausnahmekodex Pflichtfeld.
 - `max_import_kw` und `max_export_kw` sind harte Pflichtfelder (`>= 0`) je Site.
@@ -221,6 +223,41 @@ Interpretation:
 - Die Export-/Importgrenzen gelten explizit für jede Zeitscheibe.
 - Die Kombination aus Import/Export- und Gesamtanschlussgrenze vermeidet Simultanfehler bei der Berechnung.
 - Für den produktiven MVP wird für Co-Location mindestens MILP angenommen; bei reiner LP ist diese Ausschlussregel nicht exakt abbildbar.
+
+### Legacy-Daten-Migrationslauf und Backout (verbindlich)
+
+Für produktive Freischaltung ist ein deterministischer Migrationspfad für bestehende
+`SiteConstraint`-Datensätze vorab definiert:
+
+- Migrationsfenster: vor Aktivierung des Co-Location-MVP, nicht inline im operativen Lauf.
+- Kandidatenklassifikation je Datensatz:
+  - `normalized`: `site_grid_power_sign` ist gesetzt oder eindeutig aus vorhandenen
+    Feldern deterministisch ableitbar.
+  - `repairable`: Signatur kann aus konsistenten Datenfeldern eindeutig und
+    deterministisch ermittelt werden (`normalized=false`, aber ableitbar).
+  - `unclear`: keine sichere Ableitung, keine gültige Signatur.
+  - `incompatible`: harte Daten- oder Grenzverletzung (z. B. negative Limits, fehlende
+    Pflichtwerte, inkonsistente Grenzdefinitionen).
+- Bei `repairable` Datensätzen wird automatisch eine Normalisierung durchgeführt:
+  - `site_grid_power_sign_normalized=true`
+  - `site_grid_power_sign_normalized_from=<ableitungsregel>`
+  - `site_grid_power_sign_normalized_at=<timestamp>`
+- `unclear` Datensätze müssen mit `CONFIG_INCONSISTENT` abgewiesen werden und enthalten
+  einen operatorfähigen Grundcode (z. B. `SITE_GRID_POWER_SIGN_MISSING`).
+- `incompatible` Datensätze werden mit `CONFIG_INCONSISTENT` und spezifischem
+  `limiting_reason` abgelehnt.
+- Unklare Datensätze dürfen nicht implizit in einen Default übernommen werden.
+- Alle Migrationsergebnisse sind in einem Audit-Bundle je Lauf zusammengefasst und
+  für Operator-Replay verfügbar.
+
+Rollback-/Backout-Verhalten:
+
+- Ist im produktiven Rollout noch ein Anteil `unclear`/`incompatible`, ist der Slice nicht freizuschalten.
+- Für Ausnahmeszenarien kann ein Release-Block oder eine kontrollierte Suspendierung gelten:
+  - Release-Block: Freigabe bis Daten bereinigt sind.
+  - Notfallmodus: optionaler Operator-Override nur für nicht-aktive Sites im Rahmen einer
+    dokumentierten Wartungsfreigabe.
+- Keine stillschweigende „Best-Effort“-Auto-Ableitung in produktivem Requestbetrieb.
 
 ### GreenStorageRestricted-Regeln (MVP)
 
