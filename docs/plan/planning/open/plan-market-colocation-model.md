@@ -59,7 +59,7 @@ Kompatibilitätsprinzip:
 - Für den ersten produktiven Slice ist die Partitionierungsentscheidung im ADR festzuhalten.
 - Partitionierung ist nur zulässig, wenn der Request-Builder alle Unterrequests vollständig
   isoliert und im Anschluss deterministisch reaggregiert. Andernfalls ist bei gemischten
-  Scope-Anforderungen ein `CONFIG_INVALID` mit Grundcode `SCHEMA_INCONSISTENT` zu werfen.
+  Scope-Anforderungen ein `CONFIG_INCONSISTENT` mit `TerminationCode=schema-inconsistent` zu werfen.
 
 ### Run- und Fehlerkodierung (Kompatibilität zum bestehenden Solver-Laufmodell)
 
@@ -275,9 +275,11 @@ Für produktive Freischaltung ist ein deterministischer Migrationspfad für best
   - Die Werte werden auf die Zielwerte normalisiert:
     - `export_pos` oder `import_pos` (case-insensitiv akzeptiert; alle anderen Werte
       sind inkonsistent).
-  - Genau eines der Aliasfelder muss gültig gesetzt sein; fehlt es oder sind mehrere
-    widersprüchliche Aliaswerte vorhanden, wird der Satz als `unclear` eingestuft
-    (`SITE_GRID_POWER_SIGN_MISSING`).
+  - Mindestens ein Aliasfeld muss gültig gesetzt sein.
+  - Sind mehrere Aliasfelder gesetzt, gilt:
+    - sind die normalisierten Werte konsistent, ist der Datensatz `repairable` (`site_grid_power_sign` kann deterministisch gesetzt werden).
+    - sind die normalisierten Werte widersprüchlich, wird der Datensatz als `unclear` eingestuft
+      (`SITE_GRID_POWER_SIGN_MISSING`).
 - Bei `repairable` Datensätzen wird automatisch eine Normalisierung durchgeführt:
   - `site_grid_power_sign_normalized=true`
   - `site_grid_power_sign_normalized_from=<ableitungsregel>`

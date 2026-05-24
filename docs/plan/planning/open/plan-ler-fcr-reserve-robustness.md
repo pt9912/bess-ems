@@ -94,9 +94,9 @@ Nicht explizit modelliert:
   - optional `self_discharge_mode` (Werte: `absolute_kwh_per_hour` | `relative_soc_per_hour`, optional nur relevant wenn `is_ler=true`)
   - optional `self_discharge_kwh_per_hour` (gültig nur bei `self_discharge_mode=absolute_kwh_per_hour`, optional nur bei `is_ler=true`)
   - optional `self_discharge_soc_per_hour` (gültig nur bei `self_discharge_mode=relative_soc_per_hour`, optional nur bei `is_ler=true`)
-  - `max_recovery_time`
-    - `intraday_gate_closure`
-    - `intraday_preparation_time`
+  - `max_recovery_time` (harte obere Grenze für die Wiederherstellungsdauer in Minuten)
+  - `intraday_gate_closure`
+  - `intraday_preparation_time`
     - `market_time_unit`
   - Zeiteinheiten (verbindlich, alle in Minuten):
     - `t_min_fcr`, `full_activation_time`, `full_activation_time_afrr`,
@@ -292,6 +292,27 @@ Deterministische Berechnung (verbindlich):
 - `ROBUST_OK`, wenn kein Schritt in beiden Branches versagt.
 - Bei Grenz- und Dateninkonsistenzen: `ROBUST_NEEDS_INTRADAY_RESTORE` oder
   `ROBUST_INFEASIBLE` anhand `limiting_reason_code`.
+
+Restore- und Gate-Entscheidungslogik (verbindlich):
+
+- Bei `ROBUST_INFEASIBLE` mit Primärursache `SOC_LIMIT` oder `RESERVE_CAPACITY` prüft der Prüfer zuerst, ob
+  die Abweichung durch kontrollierte Intraday-Restore-Aktionen behoben werden kann:
+  - Up-Verstoß-Defizit:
+    `restore_shortfall_up_kwh = max(0, worst_up_kwh_t - (soc_plan_up_t - soc_min_eff_kwh) * eta_discharge)`
+  - Down-Verstoß-Defizit:
+    `restore_shortfall_down_kwh = max(0, worst_down_kwh_t - (soc_max_eff_kwh - soc_plan_down_t) / eta_charge)`
+  - Verfügbare Wiederherstellungsleistung je Schritt:
+    `required_activation_kw_used = coalesce(required_activation_kw, max(worst_up_kw_t, worst_down_kw_t, 1e-9))`
+  - Konservative Wiederherstellungsdauer:
+    `restore_shortfall_kwh = max(restore_shortfall_up_kwh, restore_shortfall_down_kwh)`
+    `required_recovery_minutes = restore_shortfall_kwh / required_activation_kw_used * 60`
+- Falls `required_recovery_minutes > max_recovery_time` => `ROBUST_INFEASIBLE` mit
+  `limiting_reason_code=NO_RECOVERY_PATH`.
+- Falls die Zeit bis zum nächsten zulässigen Intraday-Restore-Zeitfenster kleiner als
+  `required_recovery_minutes + intraday_preparation_time + intraday_gate_closure` ist:
+  - Ergebnis `ROBUST_INFEASIBLE` mit `limiting_reason_code=INTRADAY_GATE_CLOSED`.
+- Ansonsten wird der Endstatus `ROBUST_NEEDS_INTRADAY_RESTORE`.
+- Bei allen anderen Fällen bleibt der bestehende Abgleich auf `ROBUST_OK`/`ROBUST_INFEASIBLE` unverändert.
 
 Explizite Mappings zwischen Eingangsfehlern und Ergebniscodes:
 
