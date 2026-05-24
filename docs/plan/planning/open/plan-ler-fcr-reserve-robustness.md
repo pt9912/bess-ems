@@ -102,13 +102,14 @@ Nicht explizit modelliert:
   - `intraday_preparation_time` (optional, Default `0`, wird für Restore-gesteuerte Läufe benötigt)
   - `minutes_until_next_restore_window_start` (optional, `>= 0`)
   - `minutes_until_next_restore_window_end` (optional, wenn ein Fenster bekannt ist)
-  - `market_time_unit`
+  - `market_time_unit` (Kompatibilitäts-/Zukunfts-Hook; im ersten Slice fest auf `minute`)
   - Zeiteinheiten (verbindlich, alle in Minuten):
     - `t_min_fcr`, `full_activation_time`, `full_activation_time_afrr`,
       `full_activation_time_mfrr`, `max_recovery_time`, `intraday_gate_closure`,
       `intraday_preparation_time`, `minutes_until_next_restore_window_start`,
       `minutes_until_next_restore_window_end`
-    - `market_time_unit` muss `minute` sein.
+    - `market_time_unit` muss im ersten Slice `minute` sein; andere MTU-Werte sind
+      reserviert für spätere 15-/30-Minuten-Produktlogik und aktuell nicht erlaubt.
     - `resolution_minutes` und diese Policy-Felder müssen kompatibel sein.
   - Wirkungsgrade:
     - Wird `eta_charge`/`eta_discharge` in der Policy nicht gesetzt, sind sie aus dem Assetmodell zu lesen.
@@ -134,7 +135,13 @@ Nicht explizit modelliert:
     - Wenn gesetzt, begrenzt `restore_capability_up_kw` den maximal nutzbaren Restore-Leistungsfluss der Up-Richtung (Lade-Richtung) und `restore_capability_down_kw` die Down-Richtung (Entlade-Richtung).
     - `restore_capability_up_kw` und `restore_capability_down_kw` müssen, falls gesetzt, strikt `> 0` sein.
     - Wenn ein Feld fehlt:
-      - wird im ersten Slice zuerst auf eine technische Basisgrenze aus der Asset-/Reserveband-Konfiguration zurückgegriffen;
+      - wird im ersten Slice zuerst auf eine technische Basisgrenze aus der Asset-/Reserveband-Konfiguration zurückgegriffen:
+        - Up-Restore (Lade-Richtung): verfügbare Ladeleistung aus Asset-Ladelimit,
+          bereits gebundener Fahrplanleistung und aktiven Reserveband-Abzügen.
+        - Down-Restore (Entlade-Richtung): verfügbare Entladeleistung aus Asset-Entladelimit,
+          bereits gebundener Fahrplanleistung und aktiven Reserveband-Abzügen.
+        - Bei Co-Location zusätzlich die im Request bereits validierten Import-/Export- und
+          Netzanschlusspunktgrenzen.
       - ist diese Basisgrenze nicht verfügbar und ist ein Restore-Szenario aktiv, ist der Request mit `ROBUST_POLICY_UNSUPPORTED` (`POLICY_MISMATCH`) zu blockieren.
   - Für `soc_strategy=conservative` gelten Zusatzregeln:
     - `conservative_soc_headroom_ratio` muss im Bereich `0..1` liegen.
@@ -217,6 +224,8 @@ Nicht explizit modelliert:
   - `SOC_LIMIT`, `RESERVE_CAPACITY`, `RECOVERY_TIMEOUT`, `POLICY_MISMATCH`,
       `SOURCE_DATA_MISSING`, `NO_RECOVERY_PATH`, `INTRADAY_GATE_CLOSED`
   - `status_description` (optional, menschenlesbar)
+  - `action` (optional, maschinenlesbares Operator-Token; erster Wert:
+    `intraday_restore_required`)
 
 ### Worst-Case-Energie
 
@@ -282,16 +291,18 @@ Deterministische Berechnung (verbindlich):
   - Wenn simultanes Gegensignal laut Produktdefinition aktiv ist, aber `simultaneous_reserve_direction_allowed=false`,
     gilt hart `ROBUST_POLICY_UNSUPPORTED` mit `POLICY_MISMATCH`.
 - FCR-Worst-Case-Konsistenz bei Mindestzeit:
-  - Für FCR wird die Mindestaktivierungszeit als Zustandsgröße geführt:
-    - `fcr_remaining_t` ist der Alert-Tracking-Zustand in Minuten und dient der laufenden Laufzeit-Rekursion.
-    - Zur Worst-Case-Hülle für die Prüfung auf dem Entscheidungszeitpunkt gilt eine konservative
-      Vollauslastungsansicht: pro Schritt wird `fcr_remaining_t` vor der Energieableitung auf
-      `t_min_fcr` gesetzt, unabhängig vom aktuellen Alert-Status.
-    - Bei Schrittübergang in Alert wird für die Tracking-Ansicht `fcr_remaining_t` auf `t_min_fcr` gesetzt.
+  - Für FCR wird die Mindestaktivierungszeit mit zwei getrennten Zustandsgrößen geführt:
+    - `fcr_remaining_envelope_t` ist die konservative Worst-Case-Hülle in Minuten.
+      Für die Prüfung am Entscheidungszeitpunkt gilt pro Schritt:
+      `fcr_remaining_envelope_t = t_min_fcr`, unabhängig vom aktuellen Alert-Status.
+    - `fcr_remaining_tracking_t` ist der Alert-Tracking-Zustand in Minuten und dient
+      nur Laufzeit-Replay, Operator-Ausgabe und fortlaufender Alert-Rekursion.
+    - Bei Schrittübergang in Alert wird für die Tracking-Ansicht
+      `fcr_remaining_tracking_t` auf `t_min_fcr` gesetzt.
     - Während fortlaufender Alert-Phasen:
-      `fcr_remaining_{t+1} = max(0, fcr_remaining_t - Δt*60)`.
-    - Bei Alert in Schritt `t` ist die zunächst zu reservierende FCR-Energie auf
-      `min(Δt, fcr_remaining_t/60)` h zu skalieren.
+      `fcr_remaining_tracking_{t+1} = max(0, fcr_remaining_tracking_t - Δt*60)`.
+    - Für die Worst-Case-Hülle ist die zu reservierende FCR-Energie auf
+      `min(Δt, fcr_remaining_envelope_t/60)` h zu skalieren.
     - Mit der Tracking-Logik wird bei kleinen `Δt` die volle Mindestdauer konservativ über Folgeintervalle berücksichtigt.
 - Hilfsgröße:
   - `self_discharge_loss_kwh_t` ist deterministisch zu berechnen:
@@ -304,16 +315,17 @@ Deterministische Berechnung (verbindlich):
   - `soc_{t+1,plan} = soc_t - max(0, b_t) * Δt / eta_discharge + max(0, -b_t) * eta_charge * Δt - self_discharge_loss_kwh_t`.
 - Effektiver SOC für Worst-Case-Prüfung:
   - `soc_t` vor der Worst-Case-Prüfung hart validieren:
-    - `soc_min_eff_kwh <= soc_t <= soc_max_eff_kwh`, sonst `ROBUST_POLICY_UNSUPPORTED`.
+    - `soc_min_eff_kwh <= soc_t <= soc_max_eff_kwh`, sonst `ROBUST_INFEASIBLE`
+      mit `limiting_reason_code=SOC_LIMIT`.
   - `soc_t^{eff} = soc_t - self_discharge_loss_kwh_t`.
 - Verfügbare Energiemengen für die Verfügbarkeitsprüfung am Schrittanfang auf Basis der geplan­ten Fahrplanwirkung:
   - `soc_plan_base_t = soc_t^{eff} - max(0, b_t) * Δt / eta_discharge + max(0, -b_t) * eta_charge * Δt`
   - `available_up_kwh_t = max(0, soc_plan_base_t - soc_min_eff_kwh) * eta_discharge`
   - `available_down_kwh_t = max(0, soc_max_eff_kwh - soc_plan_base_t) / eta_charge`
 - Worst-Case-Energie je Richtung (kWh):
-  - `fcr_remaining_t`-abhängiger FCR-Term:
-    - `fcr_term_up_t = min(Δt, fcr_remaining_t/60) * fcr_up_kw_t`
-    - `fcr_term_down_t = min(Δt, fcr_remaining_t/60) * fcr_down_kw_t`
+  - `fcr_remaining_envelope_t`-abhängiger FCR-Term:
+    - `fcr_term_up_t = min(Δt, fcr_remaining_envelope_t/60) * fcr_up_kw_t`
+    - `fcr_term_down_t = min(Δt, fcr_remaining_envelope_t/60) * fcr_down_kw_t`
   - `worst_up_kwh_t = fcr_term_up_t + min(Δt, full_activation_time_afrr_eff/60) * (alpha_afrr_up_t * afrr_up_kw_t) + min(Δt, full_activation_time_mfrr_eff/60) * (alpha_mfrr_up_t * mfrr_up_kw_t)`
   - `worst_down_kwh_t = fcr_term_down_t + min(Δt, full_activation_time_afrr_eff/60) * (alpha_afrr_down_t * afrr_down_kw_t) + min(Δt, full_activation_time_mfrr_eff/60) * (alpha_mfrr_down_t * mfrr_down_kw_t)`
 - Normalisierte Worst-Case-Leistung:
@@ -368,7 +380,9 @@ Restore- und Gate-Entscheidungslogik (verbindlich):
     - `required_recovery_minutes = max(required_recovery_minutes_up, required_recovery_minutes_down)`
     - Falls ein aktiver Branch (`restore_shortfall_*_kwh > 0`) keine positive Restore-Kapazität hat:
       `ROBUST_INFEASIBLE` mit `limiting_reason_code=NO_RECOVERY_PATH`.
-    - `restore_capability_used` ist der Richtungswert (`worst_up_kw_t` oder `worst_down_kw_t`), der `required_recovery_minutes` bestimmt; bei Gleichstand deterministisch die Up-Richtung.
+    - `restore_capability_used` ist die effektive Restore-Kapazität (`restore_capability_up_t`
+      oder `restore_capability_down_t`), die den maximalen `required_recovery_minutes`-Wert
+      bestimmt; bei Gleichstand deterministisch die Up-Richtung.
 - Falls `required_recovery_minutes > max_recovery_time` => `ROBUST_INFEASIBLE` mit
   `limiting_reason_code=RECOVERY_TIMEOUT`.
 - Falls kein zulässiges Window vorliegt:
@@ -411,7 +425,9 @@ Verbindliche Zeitscheiben-Definition:
   berechnet; die daraus abgeleiteten `worst_up_kw_t`/`worst_down_kw_t` sind normalisierte
   Leistungsgrössen für die `ReserveEnergyEnvelope`-Ausgabe.
 - `ReserveEnergyEnvelope.resolution_minutes` und `ReserveRobustnessPolicy.market_time_unit`
-  müssen pro Check konsistent sein, sonst `ROBUST_POLICY_UNSUPPORTED`.
+  müssen pro Check konsistent sein. Im ersten Slice heißt konsistent:
+  `market_time_unit=minute` und alle Zeitfelder sind Minutenwerte; andere MTU-Werte
+  führen zu `ROBUST_POLICY_UNSUPPORTED`.
 
 ### Alert State und Reserve Mode
 
@@ -532,21 +548,21 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
 - Ergebnisverhalten:
   - Robustheitsverletzung wird über bestehende `OptimizationSolverStatus` +
     strukturierte `TerminationCode` + harte `CanExecute`-Sperren ausgedrückt.
-  - Mapping-Matrix in diesem Plan ist identisch zur gleichen Matrix in
+  - Mapping-Matrix in diesem Plan ist die autoritative gemeinsame Matrix für
     [`plan-market-colocation-model.md`](plan-market-colocation-model.md):
 
     | Ergebnisklasse                                  | OptimizationSolverStatus | TerminationCode (Beispiel)                                           | CanExecute |
     | --- | --- | --- | --- |
-    | Gültiger Plan/Plan verwendbar                    | `Optimal` oder `Feasible` | `MODEL_OK`-äquivalente Codefolge (bestehendes Mapping) | `true` |
-    | Reiner Rechenfehler/Timeout/Solverfehler         | `Failed`                 | Solver-spezifische harte Codes (bestehendes Mapping) | `false` |
+    | Gültiger Plan/Plan verwendbar                    | `Optimal` oder `Feasible` | bestehende Erfolgs-Codes, z. B. `or-tools-optimal` oder `or-tools-feasible-not-proven-optimal` | `true` |
+    | Solver-seitige mathematische Infeasibility       | `Infeasible`             | bestehender Solver-Code, z. B. `or-tools-infeasible` | `false` |
+    | Reiner Rechenfehler/Timeout/Solverfehler         | `Failed` oder bestehender Timeout-Status | Solver-spezifische harte Codes, z. B. `or-tools-abnormal`, `or-tools-model-invalid`, `or-tools-not-solved` | `false` |
     | Konfigurationsfehler (`CONFIG_*`)                | `Failed`                 | `config-invalid` oder `config-inconsistent` | `false` |
     | Schematafehler (`SCHEMA_INCONSISTENT`)          | `Failed`                 | `schema-inconsistent` | `false` |
     | Robustheits-/Reserve-Blockade                      | `Failed`                 | `reserve-robustness-*` | `false` |
     | Harte Source-/Policy-Abweisungen außerhalb Produktbereichs | `Failed`          | `source-*`/`policy-*` falls eingeführt | `false` |
   - Die verwendeten `TerminationCode` für robustheitsbezogene Sperren sind
-    `reserve-robustness-not-executable`, `reserve-robustness-infeasible`,
-    `reserve-robustness-recovery-timeout`, `reserve-robustness-source-missing`,
-    `reserve-robustness-policy-unsupported`.
+    `reserve-robustness-infeasible`, `reserve-robustness-recovery-timeout`,
+    `reserve-robustness-source-missing`, `reserve-robustness-policy-unsupported`.
   - Keine impliziten Reserveverletzungen im produzierten Fahrplan.
   - Bestehender Pfad ohne LER/FCR-Robustheit bleibt unverändert.
 - Ergebnis-/Run-Mapping (verbindlich):
@@ -560,6 +576,11 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
     `OptimizationRun`-Wire/DB-Pfad müssen gemeinsam erweitert werden (`can_execute`
     in Wireobjekt + Datenhaltung + Mapping), damit das Feld die Invariante
     korrekt trägt.
+  - Diese Migration ist ein eigener Pre-Slice
+    `Domain-Migration OptimizationRun.CanExecute` und umfasst alle Konstruktor-Aufrufer,
+    Repository-Implementierungen, Tests/Fixtures, Proto-/API-/Wire-Mappings sowie die
+    Umstellung aller Dispatch-/Scheduler-/API-Konsumenten von `HasUsableSolution` auf
+    `HasUsableSolution && CanExecute`.
   - Bei `reserve_robustness_status != ROBUST_OK` ist
     `reserve_robustness_limiting_reason` als Pflichtfeld im `OptimizationRun`-`TerminationDetail`
     zu persistieren, inkl. optionaler `status_description`, damit Operator-/Replay-Sichten die Ursache eindeutig nachvollziehen.
@@ -578,11 +599,9 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
     - bei verfügbarem Restore-Fenster: Optimierung bleibt lauffähig,
       der Lauf wird mit `OptimizationSolverStatus.Feasible` persistiert,
       `CanExecute=false` und Operator-Hinweis `action=intraday_restore_required`.
-    - bei geschlossenem Gate / keinem Wiederherstellungsfenster:
-      `OptimizationSolverStatus.Failed` mit
-      `TerminationCode=reserve-robustness-not-executable`,
-      `TerminationDetail=INTRADAY_GATE_CLOSED`,
-      `CanExecute=false` in Operator-/Replay-Ausgabe.
+    - bei geschlossenem Gate / keinem Wiederherstellungsfenster entsteht nach der
+      verbindlichen Entscheidungslogik kein `ROBUST_NEEDS_INTRADAY_RESTORE`, sondern
+      `ROBUST_INFEASIBLE` mit `limiting_reason_code=INTRADAY_GATE_CLOSED`.
   - `ROBUST_INFEASIBLE`:
     - bei `limiting_reason_code=RECOVERY_TIMEOUT` =>
       `OptimizationSolverStatus.Failed` mit
@@ -679,7 +698,7 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
   - konservative `simultaneous_reserve_direction_allowed`-Semantik.
 - [ ] Wiederherstellungslogik ist implementiert:
   - `ROBUST_NEEDS_INTRADAY_RESTORE`-Routing,
-  - Intraday-Gateway-/Fensterlogik,
+  - Intraday-Gate-/Fensterlogik,
   - harte `CanExecute`-Abgrenzung im Dispatcher.
 - [ ] Ergebnis-Mapping ist aktiv:
   - `reserve_robustness_status` + `reserve_robustness_limiting_reason`,
@@ -705,7 +724,8 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
   - Bei `OptimizationSolverStatus` (`Optimal|Feasible`) + `CanExecute=false` darf der Lauf in keiner API/Dispatcher-Route in den ausführbaren Zustand übergehen.
 - `ROBUST_NEEDS_INTRADAY_RESTORE`-Pfad erzeugt `OptimizationSolverStatus.Feasible` mit
   `CanExecute=false`, `reserve_robustness_status=ROBUST_NEEDS_INTRADAY_RESTORE` und
-  `status_description/action=intraday_restore_required` im Replay-/Operator-Output.
+  `action=intraday_restore_required` (optional ergänzt durch `status_description`) im
+  Replay-/Operator-Output.
 - `market_time_unit` abseits von `minute` → `ROBUST_POLICY_UNSUPPORTED`.
 - Auflösungsfelder kleiner oder gleich 0 (`resolution_minutes`) → `ROBUST_POLICY_UNSUPPORTED`.
 - Bei aktivem FCR gilt `t_min_fcr`/`full_activation_time <= 0` → `ROBUST_POLICY_UNSUPPORTED`.

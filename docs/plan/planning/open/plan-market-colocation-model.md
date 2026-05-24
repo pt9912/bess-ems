@@ -39,10 +39,10 @@ Der operative Optimierungsrequest enthält genau eine Solver-Scope-Ausprägung.
 Entscheidungsreihenfolge je Request:
 
 1. Wenn **keine** aktivierte Co-Location-/Herkunftsrestriktion betroffen ist => `solver_scope=LP`.
-2. Sonst (zumindest eine nicht LP-abbildbare Restriktion vorhanden) => `solver_scope=MILP`.
+2. Sonst (produktiver MVP mit Co-Location-/Herkunftsrestriktion) => `solver_scope=MILP`.
 3. Gemischte Requests aus LP- und MILP-relevanten Assets dürfen nur dann partitioniert werden,
-   wenn die ADR-seitige Sonderlogik explizit aktiviert ist und die Partitionierung vollständig
-   isolierbar sowie deterministisch reaggregierbar ist.
+   wenn ein Folge-ADR für homogene Solver-Scope-Partitionierung explizit aktiviert ist und
+   die Partitionierung vollständig isolierbar sowie deterministisch reaggregierbar ist.
 
 Die Umschaltung erfolgt per Request und ist nicht global. Ein Request mit mindestens einem betroffenen
 Asset (`ClassicalCoLocation`, `HybridWithGridImport` oder aktivierter `OriginConstraint`)
@@ -67,7 +67,9 @@ Kompatibilitätsprinzip:
 Semantik der fachlichen Coderäume (für deterministische Fehlerauswertung):
 
 - `CONFIG_INVALID`: globale Konfiguration/Request-Kontraktfehler (z. B. ungültige Kombinationen
-  der Solver-Scope-Aktivierungen oder fehlende Muss-Felder auf Scope-Ebene).
+  der Solver-Scope-Aktivierungen, produktiv gesperrte Modi oder fehlende Muss-Felder auf
+  dem globalen Solver-Scope). Standortbezogene Migrations-/Ableitungsfälle wie fehlende
+  Sign-Konventionen werden nicht hier, sondern als `CONFIG_INCONSISTENT` klassifiziert.
 - `CONFIG_INCONSISTENT`: fachlich konsistenzrelevante, aber konfigurationsnahe Inkonsistenzen
   im Request (z. B. nicht auflösbare/inhomogene Modellierung über aktivierte Co-Location-Modi
   oder nicht deterministisch ableitbare Sign-Konvention).
@@ -82,7 +84,10 @@ Modell als `OptimizationSolverStatus` + `TerminationCode`:
 
 - `OK` (korrektes Ergebnis): `OptimizationSolverStatus.Optimal` oder
   `OptimizationSolverStatus.Feasible` je Ergebnisqualität.
-- `MODEL_INFEASIBLE` / Reservefehler mit harter Infeasibility: `OptimizationSolverStatus.Infeasible`.
+- `MODEL_INFEASIBLE` (solver-seitige mathematische Infeasibility ohne fachlichen
+  Reserve-/Robustheits-Blocker): `OptimizationSolverStatus.Infeasible`.
+- Reserve-/Robustheits-Blockaden werden nicht hier dupliziert; das autoritative Mapping
+  steht in [`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md).
 - `CONFIG_INVALID`: `OptimizationSolverStatus.Failed` mit `TerminationCode=config-invalid`.
 - `CONFIG_INCONSISTENT`: `OptimizationSolverStatus.Failed` mit
   `TerminationCode=config-inconsistent` (kein `schema-inconsistent`).
@@ -126,7 +131,7 @@ Mögliche Domain-/Application-Erweiterungen:
   - `max_import_kw`
   - `max_export_kw`
   - optional `grid_connection_power_kw`
-  - `can_dispatch` (produktiver Scope: required, migrationsfähig mit Standardisierung)
+  - `can_dispatch` (required bei aktiver Request-Beteiligung im produktiven Scope)
     - Semantik: `true` = aktive Teilnahme am Request, `false` = bewusst ausgeschaltet.
     - Produktiver Scope:
       - `true`/`false` ist bindend.
@@ -274,9 +279,12 @@ Interpretation:
 - Die Kombination aus Import/Export- und Gesamtanschlussgrenze vermeidet Simultanfehler bei der Berechnung.
  - Für den produktiven MVP gilt als konservativer ADR-Default:
    `CoLocationMode != StandaloneBess` => `solver_scope=MILP`.
-   Hintergrund: Dieser Default vereinfacht den operativen Einstieg, ist aber bewusst konservativ.
-   Der Default darf im ADR als Ausnahme nur gelockert werden, wenn die gewählte Co-Location-Konfiguration ausschließlich LP-abbildbare Restriktionen enthält.
-   Als zwingend MILP-gebundenes Minimum bleibt der Import/Export-Mutex (`p_grid_import_t * p_grid_export_t = 0`) mit Richtungs-Binärisierung erhalten; alle weiteren LP-fähigen Sonderfälle benötigen eine explizite ADR-Freigabe.
+   Hintergrund: Der Import/Export-Mutex (`p_grid_import_t * p_grid_export_t = 0`) ist
+   bei jeder Site mit `max_import_kw > 0` und `max_export_kw > 0` MILP-gebunden und
+   wird über Richtungs-Binärisierung erzwungen.
+   Eine LP-Ausnahme darf ein ADR nur für konkret belegte Sonderfälle freigeben, in denen
+   der Mutex strukturell entfällt (z. B. `max_import_kw=0` oder `max_export_kw=0`) und
+   keine Herkunfts-/Richtungsbinarisierung aktiv ist.
 
 ### Legacy-Daten-Migrationslauf und Backout (verbindlich)
 
@@ -364,6 +372,15 @@ Rollback-/Backout-Verhalten:
 - Abregelung `c_t` ist im Modus erlaubt und mindert damit lokal verfügbaren Strom.
 - Bei fehlender Herkunftstransparenz darf kein produktiver Lauf gestartet werden.
 
+Fehlerklassifikation für `GreenStorageRestricted`:
+
+| Auslöser | Coderraum | Grundcode |
+| --- | --- | --- |
+| Produktiver Routine-Run ohne explizite Validierungs-/Freigabeaktivierung | `CONFIG_INVALID` | `GREEN_STORAGE_RESTRICTED_PRODUCTIVE_BLOCKED` |
+| Fehlender oder nicht auditierbarer Herkunftsnachweis | `CONFIG_INCONSISTENT` | `GREEN_STORAGE_ORIGIN_PROOF_MISSING` |
+| Keine ausreichende lokale Quelle für geplantes Laden | `CONFIG_INCONSISTENT` | `GREEN_STORAGE_LOCAL_SOURCE_INSUFFICIENT` |
+| Versuchter Netzbezug (`p_grid_import_t > 0`) | `CONFIG_INCONSISTENT` | `GREEN_STORAGE_GRID_CHARGE_BLOCKED` |
+
 ### Optimierungswirkung
 
 Der Horizon-Optimierer muss zusätzlich berücksichtigen können:
@@ -433,15 +450,15 @@ Bestandsrouten nicht brechen:
 5. Tests:
    - Kein simultaner Netzimport/Netzeinspeisung im gleichen Zeitschritt.
    - Standalone bleibt bit-kompatibel zum heutigen Pfad.
-- PV-Überschuss kann Batterie laden, ohne Exportlimit zu verletzen.
+   - PV-Überschuss kann Batterie laden, ohne Exportlimit zu verletzen.
    - `site_grid_power_sign=import_pos`: Vorzeichen-/Grenzlogik bleibt konsistent
      zur Export-Variante bei identischem physischem Leistungsfluss.
    - Netzexportlimit begrenzt Batterieentladung plus lokale Erzeugung.
    - `GreenStorageRestricted`: `e_local_0`-Randfall (`0` und >0) und `local_origin_capacity_kwh`-Randfall (`0`, Minimalreserve) werden explizit geprüft.
-   - `GreenStorageRestricted`: Lauf wird mit `CONFIG_INCONSISTENT` geblockt, wenn eine Netzladung (`p_grid_import_t > 0`) versucht wird.
+   - `GreenStorageRestricted`: Lauf wird mit `CONFIG_INCONSISTENT` und
+     `GREEN_STORAGE_GRID_CHARGE_BLOCKED` geblockt, wenn eine Netzladung
+     (`p_grid_import_t > 0`) versucht wird.
    - Reservebänder reduzieren weiterhin verfügbare Lade-/Entladeleistung.
-- `GreenStorageRestricted` lehnt unzulässige Netzladung ab oder markiert
-  den Run als unzulässig.
    - `migration_strict=false` erlaubt nicht-aktive `can_dispatch=false`-Sites mit
      `unclear`/`incompatible` im Migrationsfenster, blockiert aber aktive Sites
      mit `can_dispatch=true` konsistent auf `CONFIG_INCONSISTENT`.
@@ -455,7 +472,7 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
 
 - Autoritative Quelle für den gemeinsamen Vertrag ist
   [`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md).
-- Die vollständige `CanExecute`-/`OptimizationSolverStatus`/`TerminationCode`-Matrix ist dort autoritativ festgelegt und wird hier nur referenziert.
+- Die vollständige `CanExecute`-/`OptimizationSolverStatus`/`TerminationCode`-Matrix ist dort autoritativ festgelegt und wird hier nicht dupliziert.
 - Änderungen an dieser Matrix sind Release-blocking, wenn nicht gemeinsam in beiden Plänen umgesetzt.
 - Preis-/Forecast-Serienidentität ist mit
   [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md)
@@ -466,15 +483,25 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
 - Änderungen an `CanExecute`, Laufkodierung oder Terminierungsdetails sind nur
   gemeinsam und im selben Release-Commit umzusetzen.
 - Cross-Slice-Contract ist verbindlich und prüfpflichtig:
-  - Die Mapping-Matrix (`OptimizationSolverStatus` + `TerminationCode` + `CanExecute`) ist zwischen diesem Plan und
-    [`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md) exakt identisch festzulegen.
+  - Die Mapping-Matrix (`OptimizationSolverStatus` + `TerminationCode` + `CanExecute`)
+    wird ausschließlich in [`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md)
+    gepflegt; dieser Plan darf nur auf sie referenzieren.
   - Abweichung ist ein hartes Release-Blocking; kein Slice darf unabhängig freigegeben werden.
 - Implementierungsvorgabe:
-  - Die Datenklasse für Optimierungsläufe muss `CanExecute` als persistiertes Feld erhalten.
-  - Da `OptimizationRun` ein immutables Record/Objekt mit strikter Konstruktorinvariante ist, ist `CanExecute` als echter Domain-Constructor-Migrationsschritt zu planen (bestehender Wire-/DB-Pfad + neue Spalte für `can_execute`).
+  - Vor Aktivierung dieses Slices ist ein eigener Pre-Slice
+    `Domain-Migration OptimizationRun.CanExecute` abzuschließen.
+  - Dieser Pre-Slice erweitert die Datenklasse für Optimierungsläufe um `CanExecute`
+    als persistiertes Feld.
+  - Da `OptimizationRun` ein immutables Objekt mit strikter Konstruktorinvariante ist,
+    umfasst der Pre-Slice mindestens Domain-Constructor, bestehende Konstruktor-Aufrufer,
+    Wire-/DB-Pfad, neue Spalte bzw. Store-Feld `can_execute`, Proto-/API-Mapping,
+    Tests/Fixtures und Repository-Implementierungen.
   - Solange `HasUsableSolution` in der vorhandenen Codebasis weiterhin auf
     `OptimizationSolverStatus.{Optimal,Feasible}` basiert, gilt `CanExecute` als harte
     Betriebs-Gate-Quelle für den Dispatcher/Scheduler, nicht umgekehrt.
+  - Alle bestehenden `HasUsableSolution`-Konsumenten im Dispatch-/Scheduler-/API-Pfad
+    sind auf konjunktive Gate-Logik umzustellen:
+    `HasUsableSolution && CanExecute`.
 - Ein Slice darf erst freigegeben werden, wenn beide Dokumente semantisch
   übereinstimmen und die Cross-Checks bestanden sind.
 - Co-Location folgt dem selben CanExecute-Vertrag:
@@ -495,7 +522,8 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
   Constraint-Komponenten sichtbar.
 - Ein Setup wird so gemappt, dass Operator- und Replay-Sichten klar trennbar bleiben:
   - `OptimizationSolverStatus.Optimal` oder `OptimizationSolverStatus.Feasible`: gültiger Plan.
-  - `OptimizationSolverStatus.Infeasible`: Reiner Rechenfehler (entspricht `MODEL_INFEASIBLE`).
+  - `OptimizationSolverStatus.Infeasible`: reine solver-seitige mathematische
+    Infeasibility (entspricht `MODEL_INFEASIBLE`), nicht Reserve-/Robustheitsblockade.
   - `OptimizationSolverStatus.Failed` mit `TerminationCode=config-invalid`: globale
     Eingabekonfiguration nicht zulässig (z. B. Scope-Konfigurationsbruch).
   - `OptimizationSolverStatus.Failed` mit `TerminationCode=config-inconsistent`:

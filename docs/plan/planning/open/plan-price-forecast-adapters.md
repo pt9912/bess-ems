@@ -55,10 +55,18 @@ Kompatibilitäts-/Migrationsprinzip:
   - Forecast/Forecast-Adapter nutzen `IForecastSeriesSource`,
   - beide werden vor dem Optimierer über denselben Mapping-Layer auf die aktuelle Domäne projiziert.
 - Für den produktiven Slice ist die bestehende `PriceSeries`/Persistenzkette kompatibel zu erweitern:
-- bestehender Schlüsselaspekt in `InMemoryPriceSeriesStore.PriceSeriesKey`
-  (Quelle: `src/hexagon/BatteryEms.Application/Markets/InMemoryPriceSeriesStore.cs`)
-  darf nicht nur auf Markt/Produkt/Bereich/Quelle/Timestep basieren.
-- Die Persistenz muss mindestens `series_id`, `series_version` **und** `source.provider_id` als Teil der Identität tragen (oder einen deterministischen Ersatzschlüssel aus genau diesen Werten plus `series_type/product/site_id/market_bid_area`).
+  - bestehender Schlüsselaspekt in `InMemoryPriceSeriesStore.PriceSeriesKey`
+    (Quelle: `src/hexagon/BatteryEms.Application/Markets/InMemoryPriceSeriesStore.cs`)
+    darf nicht nur auf Markt/Produkt/Bereich/Quelle/Timestep basieren.
+  - Die Persistenz muss mindestens `series_id`, `series_version` **und**
+    `source.provider_id` als Teil der Identität tragen (oder einen deterministischen
+    Ersatzschlüssel aus genau diesen Werten plus
+    `series_type/product/site_id/market_bid_area`).
+  - Liefergegenstand des Slices ist eine explizite Schema-Migration für `PriceSeries`
+    selbst: neue Serienidentitätsfelder am Domain-/Application-Record, neuer
+    Store-Key, Mapping zwischen `SeriesEnvelope` und `PriceSeriesRequest`,
+    Import-/API-Wire-Kompatibilität sowie Anpassung aller dauerhaften Stores, soweit
+    im Produktpfad vorhanden.
   - Ohne diese Erweiterung bleibt F-MKT-02 im produktiven Modus auf den bisherigen Altpfad beschränkt, bis ein dedizierter Speicher-Migrationspfad freigegeben wurde.
 - In der Einführungsphase gilt "Dual-Path":
   - Altpfad unverändert lauffähig,
@@ -81,7 +89,11 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
 - Der minimale `SeriesEnvelope` enthält:
   - `series_id` (stabil)
   - `series_version` (stabil, monoton wachsend oder semantische Versionskennung)
-  - `series_family_alias` (optional, empfohlen): stabiler Alias für kontrollierte Migrationspfade; ein Wechsel der Familienkennung erfolgt nur über diesen Alias bzw. durch neue Serienkennung, nicht per stillschweigendem Wechsel derselben `series_id`.
+  - `series_family_alias`: optional bei stabiler Serienfamilie, verpflichtend bei
+    kontrolliertem Family-Wechsel ohne neue `series_id`; stabiler Alias für
+    kontrollierte Migrationspfade. Ein Wechsel der Familienkennung erfolgt nur über
+    diesen Alias bzw. durch neue Serienkennung, nicht per stillschweigendem Wechsel
+    derselben `series_id`.
   - Erforderlich und vergleichbar pro `(series_id, site_id?, market_bid_area?, series_product, series_type, source.provider_id)`.
   - Akzeptiert werden:
     - streng monoton wachsende numerische Versionen (int-kompatibel),
@@ -223,7 +235,9 @@ Kanonische Ableitungsregeln (deterministisch):
   - bei vollständig behebbaren Gaps:
     - bei `quality_mode=degraded_ok`: `series_status=SOURCE_DEGRADED` mit `status_flags=[SOURCE_BACKFILL]`
     - bei `quality_mode=strict`: harte Ablehnung als `series_status=SOURCE_REJECTED`
-  - ist eine vollständige Schließung nicht möglich (oder `n_intervals <= 48`), wird `series_status=SOURCE_REJECTED`.
+  - ist eine vollständige Schließung nicht möglich oder überschreitet
+    `missing_raw_intervals` die berechnete Grenze `max_missing_raw_intervals`, wird
+    `series_status=SOURCE_REJECTED`.
 - `source_eval_status=SOURCE_EMPTY` -> `series_status=SOURCE_REJECTED`, harte Abweisung.
 - `source_eval_status` aus `{SOURCE_STALE, SOURCE_RATE_LIMIT, SOURCE_UNAVAILABLE, SOURCE_RETRY_EXHAUSTED}`:
   - Bei vorhandenem kompatiblem Fallback folgt die Fallback-Evaluierung.
@@ -238,6 +252,7 @@ Statusvokabular ist für alle Markt-/Forecast-Slices verbindlich:
 
 - `SOURCE_OK`
 - `SOURCE_DEGRADED`
+  - in `quality_mode=strict` kein gültiger Endstatus.
 - `SOURCE_FALLBACK_USED`
 - `SOURCE_REJECTED`
 
@@ -289,20 +304,27 @@ Empfohlene Integrationskonvention (API/Operator):
   - mindestens 99,5 %
   - Bezug auf Rohdaten vor Backfill (`raw_values_coverage`).
   - `n_intervals` ist die erwartete Schrittzahl im Zielhorizont.
-  - Für sehr kurze Horizonte (`n_intervals <= 48`) wird diese Quote intern auf
-    `100 %` gesetzt.
-  - Für diese kurzen Horizonte gilt harte Volldeckung der Rohdaten: Jede
-    Rohdatenlücke führt zu einem harten Qualitätsfehler (`SOURCE_GAP`) vor
-    Backfill.
+  - Es gibt keine separate harte `48`-Intervalle-Schwelle.
+  - Zulässige Rohdatenlücken werden deterministisch berechnet:
+    `max_missing_raw_intervals = floor(n_intervals * (1 - min_coverage_ratio))`.
+    Bei 96 Intervallen sind damit 0 Rohdatenlücken zulässig; bei 200 Intervallen
+    genau 1. Diese Rundungsregel ist bewusst konservativ und ersetzt
+    horizon-spezifische Magic Numbers.
   - Die konsolidierte konsumierbare Serie muss nach Backfill keine offenen Lücken mehr enthalten.
 - Lückenregime:
-  - Für `n_intervals > 48` sind Rohdaten mit Lücken vor Backfill zulässig, solange `raw_values_coverage` die Mindestquote erreicht.
+  - Rohdaten mit Lücken vor Backfill sind nur zulässig, solange
+    `raw_values_coverage` die Mindestquote erreicht und
+    `missing_raw_intervals <= max_missing_raw_intervals` gilt.
   - kontrollierter Backfill darf maximal 2 aufeinanderfolgende Intervalle pro Lücke schließen.
   - bei Backfill gilt der finale Datenvertrag weiterhin (keine offenen Restlücken).
   - Vollständig behobene Lücken werden als qualitätsgemindert markiert:
     - `series_status=SOURCE_DEGRADED` mit `status_flags=[SOURCE_BACKFILL]`.
   - In `quality_mode=strict` werden diese Serien nicht akzeptiert.
-  - `SOURCE_GAP` gilt als harte Ablehnung nur für nicht vollständig behebbaren oder noch offenen Restlücken nach abgeschlossener Backfill-Behandlung.
+  - `SOURCE_GAP` gilt in `quality_mode=strict` immer als harte Ablehnung, auch wenn
+    die Lücke technisch per Backfill vollständig behebbar wäre.
+  - In `quality_mode=degraded_ok` gilt `SOURCE_GAP` als harte Ablehnung nur für nicht
+    vollständig behebbare oder noch offene Restlücken nach abgeschlossener
+    Backfill-Behandlung.
 
 ### Qualitätsentscheidungen bei `SOURCE_*` (verbindlich)
 
@@ -339,7 +361,8 @@ Die `SOURCE_*`-Auswertung ist für jede Serie deterministisch:
     - führt der Fallback zusätzliche Qualitätsminderung (`SOURCE_BACKFILL` o. ä.), ist das Ergebnis `SOURCE_REJECTED`.
     - explizit mit der Ausnahme: `SOURCE_FALLBACK_USED` ist in `strict` nur ohne
       `SOURCE_BACKFILL` erlaubt.
-    - `SOURCE_DEGRADED` ist in `quality_mode=strict` kein gültiger Endstatus.
+    - Zusätzliche Qualitätsminderung führt in `strict` auf `SOURCE_REJECTED`; das
+      Statusvokabular oben bleibt normativ.
   - bei `quality_mode=degraded_ok`: finaler Zustand darf `series_status=SOURCE_DEGRADED` oder `series_status=SOURCE_FALLBACK_USED` sein; kombinierte Ereignisse werden in `status_flags` gehalten.
     - Wenn Fallback erfolgreich und keine zusätzliche Qualitätsminderung vorliegt: `series_status=SOURCE_FALLBACK_USED`, `status_flags=[SOURCE_FALLBACK_USED]`.
     - Wenn Fallback erfolgreich mit Backfill/Degradation: `series_status=SOURCE_DEGRADED`, `status_flags=[SOURCE_FALLBACK_USED, SOURCE_BACKFILL]`.
@@ -443,13 +466,13 @@ Endgültige Serienendstatus sind:
   - Datenhorizont
   - Quelle und Produkt
   - Serien-ID plus `series_version` des zuletzt geladenen Satzes
-- Primärkennzeichnung je `series_type` (`primary`, `fallback`, `disabled`)
 - Deterministische Reaktionsregeln:
   - `SOURCE_OK`: normaler Betrieb
   - `SOURCE_AUTH_ERROR`: harte Ablehnung (`SOURCE_REJECTED`), kein Retry/Fallback.
   - `SOURCE_SCHEMA_MISMATCH`: harte Ablehnung (`SOURCE_REJECTED`), kein Retry/Fallback.
   - `SOURCE_GAP` wird gemäß den im vorangehenden Abschnitt definierten globalen Ableitungsregeln entschieden
-    (Backfill/`SOURCE_DEGRADED` oder harte Ablehnung bei nicht behebbaren Restlücken).
+    (`quality_mode=strict` => `SOURCE_REJECTED`, `quality_mode=degraded_ok` =>
+    Backfill/`SOURCE_DEGRADED` oder harte Ablehnung bei nicht behebbaren Restlücken).
 - `SOURCE_RATE_LIMIT`, `SOURCE_STALE`, `SOURCE_UNAVAILABLE`, `SOURCE_RETRY_EXHAUSTED`:
     - Primär wird kontrollierter Fallback auf `fallback`-Quelle versucht, sofern vorhanden und kompatibel.
     - Fallback nur akzeptieren, wenn `SeriesEnvelope`, Einheit und Horizon exakt kompatibel sind.
@@ -468,6 +491,10 @@ Endgültige Serienendstatus sind:
 
 Primär-/Fallback-Regel ist verbindlich:
 
+- Je `series_type`/`series_product` wird genau eine Quelle als `primary` markiert;
+  weitere Quellen sind `fallback` oder `disabled`.
+- Diese Kennzeichnung ist Source-Auswahllogik und gehört zu Phase 2, nicht zum
+  reinen Adapter-/Importvertrag aus Phase 1.
 - Preis:
   - Primär: EPEX (nur wenn Zugriff, Lizenz und Nutzungsbedingungen geklärt sind)
   - Fallback: Open Power System Data / Replay-konforme Datenquelle
@@ -479,10 +506,12 @@ Aktivierungslogik:
 - `SOURCE_EMPTY` wird ohne zugelassenen, kompatiblen Fallback nur als harte
   Fehlerklasse `SOURCE_REJECTED` behandelt.
 - Primärquelle wird standardmäßig genutzt.
+- Bei Ausfall oder Qualitätsfehlern der Primärquelle wird nur auf eine explizit als
+  `fallback` konfigurierte, kompatible Quelle gewechselt.
 - Qualitäts- und Fallback-Entscheide inkl. `SOURCE_*`-Matrix, `quality_mode`,
   `fallback`-Kompatibilität, harte Ablehnungen und `status_flags` sind
   verbindlich im Abschnitt
-  [Qualitätsentscheidungen bei `SOURCE_*` (verbindlich)](#qualitätsentscheidungen-bei-source-_verbindlich)
+  [Qualitätsentscheidungen bei `SOURCE_*` (verbindlich)](#qualitätsentscheidungen-bei-source_-verbindlich)
   festgelegt.
 - Diese Phase beschreibt nur den Source-Auswahl- und Aktivierungspfad; die
   Status-/Fallback-Matrix wird nicht hier dupliziert.
@@ -532,10 +561,16 @@ arbeitet mit deterministischen Preiswerten.
 1. Folge-ADR oder Architektur-Schräftigung für externe Datenquellen.
 2. Adapter-Port für Preis-/Forecast-Quellen oder Erweiterung des
    bestehenden `IPriceSeriesSource`-Umfelds.
-3. Quellenstatusmodell inklusive Refresh-/Fehlerstatus.
-4. Mindestens ein Adapter mit Mock-/Replay-fähigem Testpfad.
-5. API- oder Operator-UI-Status für Datenquellen.
-6. Tests:
+3. Schema-Migration `PriceSeries`/Store-Identität:
+   - `series_id`, `series_version`, `source.provider_id` und Serien-Signaturfelder am
+     produktiven Serienmodell oder deterministischem Ersatzschlüssel,
+   - neuer `PriceSeriesKey`/Store-Key für InMemory und dauerhafte Stores,
+   - Mapper `SeriesEnvelope` -> `PriceSeriesRequest`/Domain-Serie,
+   - Migrations-/Fallback-Verhalten für Altimporte.
+4. Quellenstatusmodell inklusive Refresh-/Fehlerstatus.
+5. Mindestens ein Adapter mit Mock-/Replay-fähigem Testpfad.
+6. API- oder Operator-UI-Status für Datenquellen.
+7. Tests:
    - erfolgreiche Serienladung
    - fehlende Credentials
    - identische `(series_id, series_version, source.provider_id)` mehrfach laden mit identischem Payload bleibt idempotent
@@ -548,7 +583,7 @@ arbeitet mit deterministischen Preiswerten.
    - UTC-Zeitachse, Schrittweite und Lückenbehandlung (99,5 % Mindestabdeckung)
    - Optimierung bekommt exakt die erwartete Schrittzahl
    - operatorfähige Laufcodes werden bei Fehlerpfaden gesetzt (`SOURCE_*`)
-7. Runbook für Credentials, Rate Limits und Provider-Ausfall.
+8. Runbook für Credentials, Rate Limits und Provider-Ausfall.
 
 ---
 
@@ -575,7 +610,11 @@ arbeitet mit deterministischen Preiswerten.
   - `source_metadata` mit Versions-/Zeit-/Provider-Informationen,
   - klare Trennschärfe Producer- und Operator-Sichten.
 - [ ] Persistenzkompatibilität hergestellt:
-  - bestehende Serie- und Import-Speicher (InMemory + dauerhafte Stores, soweit vorhanden) führen `series_id`/`series_version` in der Serien-Identität oder einem deterministisch äquivalenten Ersatzschlüssel.
+  - bestehende Serie- und Import-Speicher (InMemory + dauerhafte Stores, soweit vorhanden)
+    führen `series_id`/`series_version`/`source.provider_id` in der Serien-Identität
+    oder einem deterministisch äquivalenten Ersatzschlüssel.
+  - `PriceSeries` selbst, `PriceSeriesKey`, Import-Request-Mapping und alle Store-Pfade
+    sind Teil derselben Migration; reine Adapter-Vertragsänderungen reichen nicht.
   - ohne diese Erweiterung bleibt eine produktive Aufnahme neuer Serienkennungen im Slice gesperrt (Fallback-Pfad definiert).
   - Produktive Familie-/Versionswechsel sind nur per dokumentiertem Cutover erlaubt; ein stiller `series_version_family`- oder Revisionsfamilienwechsel ohne Release-Freigabe führt zu harter Ablehnung.
 - [ ] Import-Adapter sind bereit für produktive Nutzung:

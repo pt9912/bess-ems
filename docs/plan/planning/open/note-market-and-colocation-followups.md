@@ -167,12 +167,9 @@ sowie Forecast-Serien.
 - [ ] `GreenStorageRestricted` ist als separater Sondermodus im selben Slice als
   Validierungsmodus dokumentiert.
 - [ ] F-MKT-02-Abnahmebedingungen sind dokumentiert (je 2 Adapter je Typ: 1 Primär + 1 Fallback + Fallback-/Degradation-Modell, Aktualisierung + Alarmierung).
-- [ ] Trigger-Koordination bei parallelen Auslösern ist definiert und konfliktfrei:
-  - Reihenfolge der Freigabe ist festgelegt:
-    - Produktiv-Freigaben mit neuer Markt-/Co-Location-Logik vor Forecast-/Adapter-Produktivpfad.
-    - Forecast-/Adapter-Produktivfreigabe hängt von erfolgreicher Serien-Identitätsintegration in die bestehende `PriceSeries`-Persistenz ab.
-  - degraded/fallback Verhalten ist begrenzt dokumentiert,
-  - harte Start-Blockade ohne `series_status`-Entscheidung ist festgelegt.
+- [ ] Trigger-Koordination bei parallelen Auslösern ist definiert und konfliktfrei;
+  autoritativ ist der folgende Abschnitt
+  [Trigger-Koordination bei gleichzeitigen Auslösern](#trigger-koordination-bei-gleichzeitigen-auslösern).
 - [ ] Copyright- und Nutzungsgrenzen sind explizit dokumentiert und für externe Claims verifiziert.
 
 ## Trigger-Koordination bei gleichzeitigen Auslösern
@@ -191,12 +188,12 @@ sowie Forecast-Serien.
   4. Parallelbetrieb ist erst freigegeben, wenn `CanExecute`-Semantik zwischen
      `plan-market-colocation-model.md` und
      `plan-ler-fcr-reserve-robustness.md` verbindlich abgeglichen ist.
-5. Bei Konflikten gilt als harte Regel: neue Betriebslogik darf nicht ohne definierte
-   `series_status`-Entscheidung in den Markt- und Optimierungsworkflow starten.
-   Für nicht adapter-getragene Serien im bestehenden Altpfad ist ein kontrollierter
-   Übergang nur über den expliziten degradierten Serienzustand erlaubt
-   (`series_status=SOURCE_DEGRADED`, optional mit `status_flags` wie
-   `SOURCE_BACKFILL`).
+  5. Bei Konflikten gilt als harte Regel: neue Betriebslogik darf nicht ohne definierte
+     `series_status`-Entscheidung in den Markt- und Optimierungsworkflow starten.
+     Für nicht adapter-getragene Serien im bestehenden Altpfad ist ein kontrollierter
+     Übergang nur über den expliziten degradierten Serienzustand erlaubt
+     (`series_status=SOURCE_DEGRADED`, optional mit `status_flags` wie
+     `SOURCE_BACKFILL`).
 
 ---
 
