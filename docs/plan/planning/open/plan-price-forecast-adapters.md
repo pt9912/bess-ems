@@ -117,11 +117,14 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
   - mindestens 99,5 %
   - Bezug auf Rohdaten vor Backfill (`raw_values_coverage`).
   - `n_intervals` ist die erwartete Schrittzahl im Zielhorizont.
-  - Für sehr kurze Horizonte (`n_intervals <= 48`) wird diese Quote intern auf `100 %` gesetzt,
-    um kleine Lückenfenster nicht durch den globalen Backfill-Mechanismus zu verwässern.
+  - Für sehr kurze Horizonte (`n_intervals <= 48`) wird diese Quote intern auf
+    `100 %` gesetzt.
+  - Für diese kurzen Horizonte gilt harte Volldeckung der Rohdaten: Jede
+    Rohdatenlücke führt zu einem harten Qualitätsfehler (`SOURCE_GAP`) vor
+    Backfill.
   - Die konsolidierte konsumierbare Serie muss nach Backfill keine offenen Lücken mehr enthalten.
 - Lückenregime:
-  - Rohdaten mit Lücken sind vor Backfill zulässig, solange `raw_values_coverage` die Mindestquote erreicht.
+  - Für `n_intervals > 48` sind Rohdaten mit Lücken vor Backfill zulässig, solange `raw_values_coverage` die Mindestquote erreicht.
   - kontrollierter Backfill darf maximal 2 aufeinanderfolgende Intervalle pro Lücke schließen.
   - bei Backfill gilt der finale Datenvertrag weiterhin (keine offenen Restlücken).
   - Serien mit Backfill markieren Ergebnisqualität als `SOURCE_DEGRADED`.

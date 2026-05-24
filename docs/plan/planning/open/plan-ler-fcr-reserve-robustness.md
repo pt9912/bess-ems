@@ -200,9 +200,10 @@ Deterministische Berechnung (verbindlich):
 - Reserve-Anforderungen je Zeitschritt:
   - `fcr_up_kw_t`, `fcr_down_kw_t`, `afrr_up_kw_t`, `afrr_down_kw_t`, `mfrr_up_kw_t`, `mfrr_down_kw_t`
   - optionale Pflichtanteile je Produkt und Richtung:
-    - `alpha_afrr_up_t`, `alpha_afrr_down_t`
-    - `alpha_mfrr_up_t`, `alpha_mfrr_down_t`
-    - Default: `1.0`, wenn das Produkt gebucht ist, sonst `0.0` bei nicht gebuchtem Produkt.
+  - `alpha_afrr_up_t`, `alpha_afrr_down_t`
+  - `alpha_mfrr_up_t`, `alpha_mfrr_down_t`
+  - Default: `1.0`, wenn das Produkt gebucht ist, sonst `0.0` bei nicht gebuchtem Produkt.
+  - Bereich: `0 <= alpha_* <= 1` (numerisch stabiler Toleranzbereich in der Umsetzung, z. B. `1e-9`).
  - `Δt = resolution_minutes / 60` (in Stunden).
 - Hilfsgröße:
   - `self_discharge_loss_kwh_t` ist deterministisch zu berechnen:
@@ -394,6 +395,8 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
   - `CanExecute = (reserve_robustness_status == ROBUST_OK)` ist `true`, wenn der
     erzeugte Schedule ohne Restore-Vorlauf sicher ausgeführt werden darf; bei
     allen anderen Statuswerten `false`.
+  - `CanExecute` ist harte Ausführungsbedingung im Dispatcher/Scheduler:
+    `OptimizationSolverStatus.Feasible` bei `CanExecute=false` gilt weiterhin als nicht auszuführen.
   - `ROBUST_OK` => keine zusätzliche Hard-Stop-Sperre.
   - `ROBUST_NEEDS_INTRADAY_RESTORE` =>
     - bei verfügbarem Restore-Fenster: Optimierung bleibt lauffähig,
@@ -473,8 +476,10 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 - Ein hoher SOC mit aFRR-Down-Verpflichtung erzeugt entsprechend einen
   Entladebedarf oder einen klaren Infeasible-Status.
 - Bei `ROBUST_NEEDS_INTRADAY_RESTORE` ist der Optimierungslauf als
-  `CanExecute=false` persistiert und die notwendige Restore-Massnahme
-  in Operator-/Replay-Ausgabe explizit markiert.
+ `CanExecute=false` persistiert und die notwendige Restore-Massnahme
+ in Operator-/Replay-Ausgabe explizit markiert.
+ - `CanExecute=false` wird in allen Laufpfaden als harte Nicht-Ausführungsbedingung
+   durchgesetzt, unabhängig vom Solver-Status.
 - `t_min_fcr`, `full_activation_time` und `max_recovery_time` sind in
   Tests sichtbar und nicht nur Konfigurationsfelder.
 - `full_activation_time_afrr` / `full_activation_time_mfrr` sind in den
