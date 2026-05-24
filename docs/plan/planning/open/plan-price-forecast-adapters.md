@@ -110,6 +110,20 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
          den alten und neuen Stream parallel beobachten.
       2. Während der Übernahmephase auf Alias-Kennzeichnung in Operator-/Replay-Berichten prüfen; beide Familien müssen bis zum Cutover denselben fachlichen Wertbereich liefern.
       3. Nach Freigabe wird die alte Family für den produktiven Pfad abgeschaltet, neue Family wird normativ aktiv.
+    - Verbindlicher Cutover-/Rollback-SOP:
+      1. **Vorbereitung**: Neue Family mit eigenem `series_family_alias` oder neuem (`series_id`, `series_product`) freigeben.
+      2. **Dual-Active-Wahrnehmung**: Alte und neue Family mindestens in zwei vollständigen Release-Fenstern parallel beobachten; `value_hash`-Abweichungen sind als `status_flags` mit `status_message` auditierbar.
+      3. **Cutover freigeben**: Neue Family wird produktiv als `primary` markiert und auf mindestens `SOURCE_OK` oder ausdrücklich zugelassene `SOURCE_DEGRADED` gesetzt.
+      4. **Produktiver Umschaltpunkt**: Alte Family in produktiven Runs auf `SOURCE_REJECTED`/`CanExecute=false` halten; alte Werte sind nur noch Replay/Diagnose sichtbar.
+      5. **Rollback-Fenster**: Rückkehr auf alte Family nur mit explizitem Release-Block (`release_block` oder `controlled_switchover`) möglich; Rollback ist nur dann erlaubt, wenn neue Family in einem vollständigen Fenster keine akzeptierbare Lastserie (ohne harte Fallback) abgedeckt.
+      6. **Abschluss**: Alter Family-Schlüssel wird auf `ARCHIVED` gesetzt; neue Family läuft ohne Alias-Wechsel weiter.
+
+Kontrollierte Abnahmetests für Family-/Versionswechsel:
+- **Dual-Active-Fähigkeit**: Alte und neue Family werden gleichzeitig geladen; beide dürfen im Beobachtungsfenster aktiv sein, solange beide dieselbe Semantik (`series_type`, `series_product`, `market_bid_area`, `site_id`, `resolution_minutes`) liefern.
+- **Unsichtbarer Familienwechsel wird blockiert**: Derselbe `series_id`/`series_product` ohne neue Alias-/Schlüsselstruktur und ohne Release-Step darf nie von `numeric` auf `timestamp` (oder umgekehrt) springen.
+- **Harsh-Case bei Alias-Ungleichheit**: `series_id`/`series_version`/`source.provider_id` gleich, aber Family-Wechsel ohne Revisionsbruch, liefern unterschiedliche `value_hash` -> harte `SOURCE_REJECTED`.
+- **Regressionstest `value_hash`**: Gleiche Vollsignatur + gleicher Hash ist idempotent; gleicher Hash plus gleicher `series_version`/Provider muss ohne Seiteneffekte mehrfach akzeptiert werden.
+- **Rollback-Sichtbarkeit**: Im kontrollierten Rollback werden alte und neue `series_family_alias` mindestens bis zum Ende eines Validation-Fensters in Operator-/Replay-Sicht weiterhin explizit aufgelöst.
   - Für einen stabilen Tie-Break werden bei gleicher Klasse numerisch zuerst `series_version` (wie definiert),
     dann bei gleicher Version der hash-basierte Payload-Fingerprint (`value_hash`) verwendet.
     - „gleiche Klasse“ meint die normalisierte Vergleichsschicht der festen Versionsfamilie pro Serie/Provider.
@@ -579,6 +593,7 @@ arbeitet mit deterministischen Preiswerten.
   - eindeutiger Revisionsvergleich pro `(series_id, series_version, source.provider_id)`,
   - payload-identisches Re-Load ist idempotent,
   - Provider-Kontexte trennscharf unabhängig von identischem `series_id`/`series_version`.
+  - kontrollierter Cutover/Rollback für `series_version_family` ist dokumentiert und mit den obigen Family-Tests verifiziert.
 - [ ] Liefergegenstände bei Aktivierung umgesetzt:
   - ADR/Architektur-Spezifikation,
   - Source-Port- und Statusmodell,

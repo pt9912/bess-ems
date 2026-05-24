@@ -456,6 +456,19 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
 
 - Autoritative Quelle für den gemeinsamen Vertrag ist
   [`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md).
+- Verbindliche Basismatrix für den Cross-Slice-Vertrag (`OptimizationSolverStatus` + `TerminationCode` + `CanExecute`) in diesem Plan und im LER/FCR-Plan:
+
+  | Ergebnisklasse                                  | OptimizationSolverStatus | TerminationCode (Beispiel)                                           | CanExecute |
+  | --- | --- | --- | --- |
+  | Gültiger Plan/Plan verwendbar                    | `Optimal` oder `Feasible` | `MODEL_OK`-äquivalente Codefolge (bestehendes Mapping) | `true` |
+  | Reiner Rechenfehler/Timeout/Solverfehler         | `Failed`                 | Solver-spezifische harte Codes (bestehendes Mapping) | `false` |
+  | Konfigurationsfehler (`CONFIG_*`)                | `Failed`                 | `config-invalid` oder `config-inconsistent` | `false` |
+  | Schematafehler (`SCHEMA_INCONSISTENT`)          | `Failed`                 | `schema-inconsistent` | `false` |
+  | Robustheits-/Reserve-Blockade                      | `Failed`                 | `reserve-robustness-*` | `false` |
+  | Harte Source-/Policy-Abweisungen außerhalb Produktbereichs | `Failed`          | `source-*`/`policy-*` falls eingeführt | `false` |
+
+  Diese Matrix ist die Pflicht-Referenz für beide Pläne. Jede Änderung ist nur im selben Release-Commit auf beiden Seiten erlaubt.
+
 - Preis-/Forecast-Serienidentität ist mit
   [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md)
   semantisch deckungsgleich definiert:
@@ -508,6 +521,9 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
      Co-Location-Szenario ab.
   - Der technische Dispatch-Pfad bleibt Safety-First und kennt keine
   externen Marktdetails.
+  - Scheduler/Dispatcher wird integrationstauglich getestet mit
+    `OptimizationSolverStatus.(Optimal|Feasible)` bei `CanExecute=false`:
+    es darf kein Lauf in den ausführbaren Pfad gehen.
 
 ## Definition of Done (DoD)
 

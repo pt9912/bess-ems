@@ -542,6 +542,17 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 - Ergebnisverhalten:
   - Robustheitsverletzung wird über bestehende `OptimizationSolverStatus` +
     strukturierte `TerminationCode` + harte `CanExecute`-Sperren ausgedrückt.
+  - Mapping-Matrix in diesem Plan ist identisch zur gleichen Matrix in
+    [`plan-market-colocation-model.md`](plan-market-colocation-model.md):
+
+    | Ergebnisklasse                                  | OptimizationSolverStatus | TerminationCode (Beispiel)                                           | CanExecute |
+    | --- | --- | --- | --- |
+    | Gültiger Plan/Plan verwendbar                    | `Optimal` oder `Feasible` | `MODEL_OK`-äquivalente Codefolge (bestehendes Mapping) | `true` |
+    | Reiner Rechenfehler/Timeout/Solverfehler         | `Failed`                 | Solver-spezifische harte Codes (bestehendes Mapping) | `false` |
+    | Konfigurationsfehler (`CONFIG_*`)                | `Failed`                 | `config-invalid` oder `config-inconsistent` | `false` |
+    | Schematafehler (`SCHEMA_INCONSISTENT`)          | `Failed`                 | `schema-inconsistent` | `false` |
+    | Robustheits-/Reserve-Blockade                      | `Failed`                 | `reserve-robustness-*` | `false` |
+    | Harte Source-/Policy-Abweisungen außerhalb Produktbereichs | `Failed`          | `source-*`/`policy-*` falls eingeführt | `false` |
   - Die verwendeten `TerminationCode` für robustheitsbezogene Sperren sind
     `reserve-robustness-not-executable`, `reserve-robustness-infeasible`,
     `reserve-robustness-recovery-timeout`, `reserve-robustness-source-missing`,
@@ -695,6 +706,8 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
   - `is_ler=true` und beide Moduswerte gesetzt (`self_discharge_kwh_per_hour` und `self_discharge_soc_per_hour`) → `ROBUST_POLICY_UNSUPPORTED`.
   - `is_ler=true` und kein Moduswert gesetzt (beide optional Felder leer/nicht gesetzt) → `ROBUST_POLICY_UNSUPPORTED`.
   - negative/überschüssige Werte (`self_discharge_kwh_per_hour < 0`, `self_discharge_soc_per_hour < 0` oder `> 1`) → `ROBUST_POLICY_UNSUPPORTED`.
+- Scheduler-/Dispatcher-Guard (hart):
+  - Bei `OptimizationSolverStatus` (`Optimal|Feasible`) + `CanExecute=false` darf der Lauf in keiner API/Dispatcher-Route in den ausführbaren Zustand übergehen.
 - `ROBUST_NEEDS_INTRADAY_RESTORE`-Pfad erzeugt `OptimizationSolverStatus.Feasible` mit
   `CanExecute=false`, `reserve_robustness_status=ROBUST_NEEDS_INTRADAY_RESTORE` und
   `status_description/action=intraday_restore_required` im Replay-/Operator-Output.
