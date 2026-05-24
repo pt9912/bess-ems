@@ -86,11 +86,40 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
 - `max_stale_age_minutes`:
   - Preisreihen: 90 Minuten (default, pro Serie konfigurierbar)
   - Forecastreihen: 720 Minuten (default, pro Feature konfigurierbar)
+- `quality_mode`:
+  - `strict` (Default): Keine Degradation erlaubt.
+  - `degraded_ok`: Degradierte Nutzung erlaubt, Ergebnis muss als `SOURCE_DEGRADED` gekennzeichnet werden.
 - `min_coverage_ratio` Pflicht:
   - mindestens 99,5 %
+  - Bezug auf Rohdaten vor Backfill (`raw_values_coverage`).
+  - Die konsolidierte konsumierbare Serie muss nach Backfill keine offenen Lücken mehr enthalten.
 - Lückenregime:
-  - offene Lücken sind nicht erlaubt
-- kontrollierter Backfill darf maximal 2 aufeinanderfolgende Intervalle schließen und setzt Status auf `SOURCE_DEGRADED`
+  - Rohdaten mit Lücken sind vor Backfill zulässig, solange `raw_values_coverage` die Mindestquote erreicht.
+  - kontrollierter Backfill darf maximal 2 aufeinanderfolgende Intervalle pro Lücke schließen.
+  - bei Backfill gilt der finale Datenvertrag weiterhin (keine offenen Restlücken).
+  - Serien mit Backfill markieren Ergebnisqualität als `SOURCE_DEGRADED`.
+
+### Qualitätsentscheidungen bei `SOURCE_*` (verbindlich)
+
+- `SOURCE_GAP` bedeutet harte Ablehnung (`SOURCE_REJECTED`), weil die Zielserie im
+  Endzustand lückenfrei sein muss.
+- `SOURCE_AUTH_ERROR` ist harter Stopp (`SOURCE_REJECTED`) ohne automatischen Retry/Fallback,
+  da eine explizite Operator-Intervention für Credentials nötig ist.
+- `SOURCE_EMPTY` ist harte Ablehnung (`SOURCE_REJECTED`), sofern kein zugelassenes
+  Fallback aktiv ist.
+- `SOURCE_RETRY_EXHAUSTED` folgt denselben Regeln wie `SOURCE_UNAVAILABLE`:
+  Fallback nur bei erlaubt konfiguriertem Ersatzpfad, sonst harte Ablehnung.
+- Wenn `quality_mode=strict`:
+  - `SOURCE_STALE` -> harte Ablehnung (`SOURCE_REJECTED`).
+  - `SOURCE_DEGRADED` aus Backfill kann nicht akzeptiert werden (`SOURCE_REJECTED`).
+- Wenn `quality_mode=degraded_ok`:
+  - `SOURCE_DEGRADED` ist als degradeierter Zustand akzeptierbar.
+  - `SOURCE_STALE` darf als degradeierter Zustand akzeptiert werden, wenn keine harten
+    Datenkonflikte (Schema/Horizont/Fehlende Pflichtfelder) auftreten.
+- In beiden Modi gilt:
+  - `SOURCE_RATE_LIMIT`, `SOURCE_EMPTY`, `SOURCE_RETRY_EXHAUSTED`, `SOURCE_SCHEMA_MISMATCH`,
+    `SOURCE_UNAVAILABLE` bleiben hart,
+    sofern kein vertragskonformer Fallback aktiv wird.
 
 ### Fehler- und Ablaufcodes
 
@@ -167,10 +196,19 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
 - Primärkennzeichnung je `series_type` (`primary`, `fallback`, `disabled`)
 - Deterministische Reaktionsregeln:
   - `SOURCE_OK`: normaler Betrieb
-  - `SOURCE_RATE_LIMIT` / `SOURCE_STALE` / `SOURCE_UNAVAILABLE`:
-    - Versuch kontrollierter Fallback auf `fallback`-Quelle
-    - bei Ausfall des Fallbacks oder unvereinbarem Schema: harte Fehlklassifikation
-  - `SOURCE_STALE` + kein definierter Fallback: Run abbrechen (keine Implizitwerte)
+  - `SOURCE_AUTH_ERROR`: harte Ablehnung (`SOURCE_REJECTED`), kein Retry/Fallback.
+  - `SOURCE_RATE_LIMIT` / `SOURCE_STALE` / `SOURCE_UNAVAILABLE` / `SOURCE_EMPTY` /
+    `SOURCE_RETRY_EXHAUSTED`:
+    - Primär wird kontrollierter Fallback auf `fallback`-Quelle versucht, sofern vorhanden.
+    - Fallback nur akzeptieren, wenn `SeriesEnvelope`, Einheit und Horizon exakt kompatibel sind.
+    - Bei Ausfall / Schemakonflikt des Fallbacks:
+      - bei `quality_mode=degraded_ok` und Primärcode `SOURCE_STALE`: degradierte Fortsetzung als `SOURCE_DEGRADED` möglich
+      - sonst harte Fehlklassifikation (`SOURCE_REJECTED`)
+  - `SOURCE_STALE` ohne konfigurierte Fallback-Quelle:
+    - bei `quality_mode=strict`: harte Fehlklassifikation (`SOURCE_REJECTED`)
+    - bei `quality_mode=degraded_ok`: degradierte Fortsetzung (`SOURCE_DEGRADED`)
+  - `SOURCE_EMPTY` / `SOURCE_RETRY_EXHAUSTED` ohne akzeptablen Fallback:
+    - immer `SOURCE_REJECTED`
 
 ### Phase 2: Erste produktive Quelle
 
@@ -186,12 +224,18 @@ Primär-/Fallback-Regel ist verbindlich:
 Aktivierungslogik:
 
 - Primärquelle wird standardmaessig genutzt.
- - Bei Qualitätsfehler (`SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_SCHEMA_MISMATCH`)
-   wird der Fallbackzugriff nur genutzt, wenn:
-  - derselbe `SeriesEnvelope`-Vertrag eingehalten wird
-  - Lücke/Abweichung im Fallback innerhalb definierter Konfigurationsgrenzen bleibt
-  - Operator den Fallbackstatus explizit akzeptiert
-- Ohne akzeptablen Fallback wird Lauf mit klarem Status (`SOURCE_REJECTED`) beendet.
+  - Bei Qualitätsfehler (`SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_EMPTY`, `SOURCE_RETRY_EXHAUSTED`, `SOURCE_SCHEMA_MISMATCH`)
+    wird der Fallbackzugriff nur genutzt, wenn:
+   - derselbe `SeriesEnvelope`-Vertrag eingehalten wird
+   - Lücke/Abweichung im Fallback innerhalb definierter Konfigurationsgrenzen bleibt
+   - Operator den Fallbackstatus explizit akzeptiert
+- Ohne akzeptablen Fallback gilt:
+  - `SOURCE_STALE`:
+    - bei `quality_mode=degraded_ok`: `SOURCE_DEGRADED`
+    - sonst `SOURCE_REJECTED`
+  - `SOURCE_RATE_LIMIT` / `SOURCE_UNAVAILABLE` / `SOURCE_SCHEMA_MISMATCH`: `SOURCE_REJECTED`
+  - `SOURCE_EMPTY` / `SOURCE_RETRY_EXHAUSTED`: `SOURCE_REJECTED`
+  - `SOURCE_AUTH_ERROR`: `SOURCE_REJECTED` (ohne Fallback)
 
 Zusätzlich:
 
@@ -244,8 +288,7 @@ arbeitet mit deterministischen Preiswerten.
    - fehlende Credentials
    - Primary-Validierung gegen Secondary-Adapter bei Primary-Ausfall
    - Rate-Limit-/Providerfehler
-   - stale Daten werden je nach Konfiguration markiert (`SOURCE_DEGRADED`) oder mit
-     `SOURCE_STALE`/`SOURCE_REJECTED` hart abgelehnt
+   - stale Daten werden je nach `quality_mode` korrekt gefuehrt (`SOURCE_DEGRADED` vs `SOURCE_REJECTED`)
    - Zeitzone/DST bleibt konsistent
    - UTC-Zeitachse, Schrittweite und Lückenbehandlung (99,5 % Mindestabdeckung)
    - Optimierung bekommt exakt die erwartete Schrittzahl

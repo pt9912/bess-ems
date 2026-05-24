@@ -121,8 +121,8 @@ Nicht explizit modelliert:
     - `ROBUST_SOURCE_DATA_MISSING`
     - `ROBUST_POLICY_UNSUPPORTED`
   - `limiting_reason_code`:
-    - `SOC_LIMIT`, `RESERVE_CAPACITY`, `RECOVERY_TIMEOUT`, `POLICY_MISMATCH`,
-      `SOURCE_DATA_MISSING`, `NO_RECOVERY_PATH`
+  - `SOC_LIMIT`, `RESERVE_CAPACITY`, `RECOVERY_TIMEOUT`, `POLICY_MISMATCH`,
+      `SOURCE_DATA_MISSING`, `NO_RECOVERY_PATH`, `INTRADAY_GATE_CLOSED`
   - `status_description` (optional, menschenlesbar)
 
 ### Worst-Case-Energie
@@ -148,16 +148,45 @@ LER darf im konservativen Modus eine andere FCR-Energiehuelle nutzen als
 ein nicht-LER-Asset. Diese Abweichung muss in Tests und Operator-Ausgabe
 sichtbar sein.
 
+Deterministische Berechnung (verbindlich):
+
+- Eingänge:
+  - `soc_t`: SOC zu Beginn des Intervalls in kWh.
+  - `soc_min_kwh`, `soc_max_kwh` pro Asset.
+  - `eta_discharge`, `eta_charge`.
+  - `self_discharge_kwh_per_hour` optional (Default `0`): deterministische Selbstentladung in kWh pro Stunde.
+  - Vorzeichenkonvention wie im Optimierer: `b_t > 0` Entladen, `b_t < 0` Laden.
+- Reserve-Anforderungen je Zeitschritt:
+  - `fcr_up_kw_t`, `fcr_down_kw_t`, `afrr_up_kw_t`, `afrr_down_kw_t`, `mfrr_up_kw_t`, `mfrr_down_kw_t`
+  - optional: Pflichtanteil je Produkt `alpha_afrr_t`, `alpha_mfrr_t` im Bereich `[0,1]`
+    - Default: `1.0`, wenn das Produkt gebucht ist, sonst `0.0` bei nicht gebuchtem Produkt.
+ - `Δt = resolution_minutes / 60` (in Stunden).
+- Hilfsgröße:
+  - `self_discharge_loss_kwh_t = self_discharge_kwh_per_hour * Δt`.
+- Interner SOC-Rechnungszugang aus geplanter Fahrplanposition:
+  - `soc_{t+1,plan} = soc_t - max(0, b_t) * Δt / eta_discharge + max(0, -b_t) * eta_charge * Δt - self_discharge_loss_kwh_t`.
+- Effektiver SOC für Worst-Case-Prüfung:
+  - `soc_t^{eff} = max(soc_min_kwh, soc_t - self_discharge_loss_kwh_t)`.
+- Verfügbare Energiemengen für die Verfügbarkeitsprüfung am Schrittanfang:
+  - `available_up_kwh_base_t = max(0, soc_t^{eff} - soc_min_kwh) * eta_discharge`
+  - `available_down_kwh_base_t = max(0, soc_max_kwh - soc_t^{eff}) / eta_charge`
+- Worst-Case-Energie je Richtung (kWh):
+  - `worst_up_kwh_t = min(Δt, t_min_fcr/60) * fcr_up_kw_t + min(Δt, full_activation_time/60) * (alpha_afrr_t * afrr_up_kw_t + alpha_mfrr_t * mfrr_up_kw_t)`
+  - `worst_down_kwh_t = min(Δt, t_min_fcr/60) * fcr_down_kw_t + min(Δt, full_activation_time/60) * (alpha_afrr_t * afrr_down_kw_t + alpha_mfrr_t * mfrr_down_kw_t)`
+- Normalisierte Worst-Case-Leistung:
+  - `worst_up_kw_t = worst_up_kwh_t / Δt`
+  - `worst_down_kw_t = worst_down_kwh_t / Δt`
+- Abgleich:
+  - `ROBUST_OK`, wenn `worst_up_kwh_t <= available_up_kwh_base_t` und
+    `worst_down_kwh_t <= available_down_kwh_base_t` für alle `t`.
+  - sonst `ROBUST_NEEDS_INTRADAY_RESTORE` bzw. `ROBUST_INFEASIBLE` anhand `limiting_reason_code`.
+
 Verbindliche Zeitscheiben-Definition:
 
 - `Δt = resolution_minutes / 60` (in Stunden) je Schritt.
-- `worst_up_kwh_t`/`worst_down_kwh_t`:
-  - Berechnung im Envelope-Generator:
-    - `worst_up_kwh_t = worst_up_kw_t * Δt`.
-    - `worst_down_kwh_t = worst_down_kw_t * Δt`.
-  - Der Generator muss dafür die vorab gewichtete Worst-Case-Leistung liefern:
-    - FCR-Anteil: Leistung * `min(Δt, t_min_fcr / 60)`.
-    - aFRR-/mFRR-Aufrufanteil: Leistung * `min(Δt, full_activation_time / 60)`.
+- `worst_up_kwh_t`/`worst_down_kwh_t` werden exakt gemäss vorheriger Deterministik-Berechnung
+  berechnet; die daraus abgeleiteten `worst_up_kw_t`/`worst_down_kw_t` sind normalisierte
+  Leistungsgrössen für die `ReserveEnergyEnvelope`-Ausgabe.
 - `ReserveEnergyEnvelope.resolution_minutes` und `ReserveRobustnessPolicy.market_time_unit`
   müssen pro Check konsistent sein, sonst `ROBUST_POLICY_UNSUPPORTED`.
 
@@ -193,15 +222,18 @@ Pflichtregeln:
 
 ### Intraday-SOC-Restauration
 
-Wenn `ReserveRobustnessResult` auf `ROBUST_NEEDS_INTRADAY_RESTORE`
-steht, darf der Optimierer einen Intraday-Restaurationsfahrplan
-vorschlagen:
+ Wenn `ReserveRobustnessResult` auf `ROBUST_NEEDS_INTRADAY_RESTORE`
+ steht, darf der Optimierer einen Intraday-Restaurationsfahrplan
+ vorschlagen:
 
-- Laden, wenn Worst-Case-Up nicht gedeckt ist.
-- Entladen, wenn Worst-Case-Down nicht gedeckt ist.
-- harte Begrenzung durch Asset-Leistung, Reservebaender,
-  SOC-Grenzen und Gate-Closure-Zeit.
-- keine automatische Marktorder im Domain- oder Regelkreis.
+ - Laden, wenn Worst-Case-Up nicht gedeckt ist.
+ - Entladen, wenn Worst-Case-Down nicht gedeckt ist.
+ - harte Begrenzung durch Asset-Leistung, Reservebaender,
+   SOC-Grenzen und Gate-Closure-Zeit.
+ - Restore ist nur dann ausgabe- und ausführungspfadfähig, wenn aktuell ein
+   ausreichendes Wiederherstellungsfenster offen ist und `intraday_gate_closure`
+   nicht aktiv ist.
+ - keine automatische Marktorder im Domain- oder Regelkreis.
 
 Der Slice definiert nur EMS-seitig den Bedarf und einen Fahrplanvorschlag;
 Order-Routing oder Boersenanbindung bleibt ausserhalb.
@@ -256,8 +288,12 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
   - `reserve_robustness_status = ReserveRobustnessResult.status`.
   - `reserve_robustness_limiting_reason = ReserveRobustnessResult.limiting_reason_code`.
   - `ROBUST_OK` => `run_status=OK`, `can_execute=true`.
-  - `ROBUST_NEEDS_INTRADAY_RESTORE` => `run_status=DEGRADED`, `can_execute=true`,
-    Operator-Hinweis `action=intraday_restore_required`.
+  - `ROBUST_NEEDS_INTRADAY_RESTORE` =>
+    - bei verfügbarem Restore-Fenster: `run_status=DEGRADED`,
+      `can_execute=true`, Operator-Hinweis `action=intraday_restore_required`.
+    - bei geschlossenem Gate / keinem Wiederherstellungsfenster: `run_status=BLOCKED`,
+      `can_execute=false`, `limiting_reason_code=INTRADAY_GATE_CLOSED`,
+      Operator-Hinweis `action=intraday_restore_not_executable`.
   - `ROBUST_INFEASIBLE`:
     - bei `limiting_reason_code=RECOVERY_TIMEOUT` => `run_status=BLOCKED`,
       `can_execute=false`, Eingriff notwendig.
