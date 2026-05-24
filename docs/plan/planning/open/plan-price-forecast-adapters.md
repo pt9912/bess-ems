@@ -108,6 +108,9 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
 - `min_coverage_ratio` Pflicht:
   - mindestens 99,5 %
   - Bezug auf Rohdaten vor Backfill (`raw_values_coverage`).
+  - `n_intervals` ist die erwartete Schrittzahl im Zielhorizont.
+  - Für sehr kurze Horizonte (`n_intervals <= 48`) wird diese Quote intern auf `100 %` gesetzt,
+    um kleine Lückenfenster nicht durch den globalen Backfill-Mechanismus zu verwässern.
   - Die konsolidierte konsumierbare Serie muss nach Backfill keine offenen Lücken mehr enthalten.
 - Lückenregime:
   - Rohdaten mit Lücken sind vor Backfill zulässig, solange `raw_values_coverage` die Mindestquote erreicht.
@@ -246,13 +249,15 @@ Aktivierungslogik:
    - derselbe `SeriesEnvelope`-Vertrag eingehalten wird
    - Lücke/Abweichung im Fallback innerhalb definierter Konfigurationsgrenzen bleibt
    - Operator den Fallbackstatus explizit akzeptiert
-- Ohne akzeptablen Fallback gilt:
-  - `SOURCE_STALE`:
-    - bei `quality_mode=degraded_ok`: `SOURCE_DEGRADED`
-    - sonst `SOURCE_REJECTED`
-  - `SOURCE_RATE_LIMIT` / `SOURCE_UNAVAILABLE` / `SOURCE_SCHEMA_MISMATCH`: `SOURCE_REJECTED`
-  - `SOURCE_EMPTY` / `SOURCE_RETRY_EXHAUSTED`: `SOURCE_REJECTED`
-  - `SOURCE_AUTH_ERROR`: `SOURCE_REJECTED` (ohne Fallback)
+  - `SOURCE_GAP` bleibt harte Ablehnung (`SOURCE_REJECTED`) und ist nicht per fallback-degradiert.
+  - Ohne akzeptablen Fallback gilt:
+    - `SOURCE_STALE`:
+      - bei `quality_mode=degraded_ok`: `SOURCE_DEGRADED`
+      - sonst `SOURCE_REJECTED`
+    - `SOURCE_RATE_LIMIT` / `SOURCE_UNAVAILABLE` / `SOURCE_SCHEMA_MISMATCH`: `SOURCE_REJECTED`
+    - `SOURCE_EMPTY` / `SOURCE_RETRY_EXHAUSTED`: `SOURCE_REJECTED`
+    - `SOURCE_GAP`: `SOURCE_REJECTED`
+    - `SOURCE_AUTH_ERROR`: `SOURCE_REJECTED` (ohne Fallback)
 
 Zusätzlich:
 

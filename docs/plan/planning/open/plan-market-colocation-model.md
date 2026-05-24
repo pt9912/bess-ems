@@ -117,18 +117,21 @@ Fuer jede Site gilt folgendes Basis-Modell (LP) mit separater MILP-Kontrolllogik
 - `c_t` = Abregelung der lokalen Erzeugung (kW), `0 <= c_t <= g_t`
 - `p_grid_import_t`, `p_grid_export_t` = Leistung am Netzknoten (kW), beide `>= 0`
 - `site_power_t` = Netzleistung nach Konvention (kW)
+- `s_site` = Signierungsfaktor der Site-Konvention:
+  - `s_site = +1`, wenn `site_grid_power_sign = export_pos`
+  - `s_site = -1`, wenn `site_grid_power_sign = import_pos`
 - `d_t` = Richtungsbinarvariable je Zeitschritt (`MILP`)
 
 Gleichungen:
 
-- `site_power_t = (g_t - c_t) + b_t`
-- bei Konvention `site_grid_power_sign=export_pos`: `site_power_t = p_grid_export_t - p_grid_import_t`
-- bei Konvention `site_grid_power_sign=import_pos`: `site_power_t = p_grid_import_t - p_grid_export_t`
+- `site_power_t = s_site * ((g_t - c_t) + b_t)`
+- bei Konvention `site_grid_power_sign=export_pos` (`s_site=+1`): `site_power_t = p_grid_export_t - p_grid_import_t`
+- bei Konvention `site_grid_power_sign=import_pos` (`s_site=-1`): `site_power_t = p_grid_import_t - p_grid_export_t`
 - `p_grid_import_t <= site.max_import_kw`
 - `p_grid_export_t <= site.max_export_kw`
 - simultane Netznutzung ist ausgeschlossen:
   - Formulierung: `p_grid_import_t * p_grid_export_t = 0`
-  - MILP-Linearisation (`d_t`=Exportrichtung=1, `d_t`=Importrichtung=0):
+  - MILP-Linearisation (`d_t`=Exportrichtung (gemäss `site_power_t`-Konvention)=1, `d_t`=Importrichtung=0):
     - `p_grid_import_t <= site.max_import_kw * (1 - d_t)`
     - `p_grid_export_t <= site.max_export_kw * d_t`
     - `d_t ∈ {0,1}`

@@ -201,9 +201,31 @@ Deterministische Berechnung (verbindlich):
       - falls ja: `soc_down_{t+1} = soc_plan_down_t + worst_down_kwh_t * eta_charge`
       - falls nein: `ROBUST_INFEASIBLE` mit `SOC_LIMIT`
       - Nach dem Update: `soc_down_{t+1} >= soc_min_kwh` und `soc_down_{t+1} <= soc_max_kwh`, sonst `ROBUST_INFEASIBLE` mit `SOC_LIMIT`
-  - `ROBUST_OK`, wenn kein Schritt in beiden Branches versagt.
-  - Bei Grenz- und Dateninkonsistenzen: `ROBUST_NEEDS_INTRADAY_RESTORE` oder
-    `ROBUST_INFEASIBLE` anhand `limiting_reason_code`.
+- `ROBUST_OK`, wenn kein Schritt in beiden Branches versagt.
+- Bei Grenz- und Dateninkonsistenzen: `ROBUST_NEEDS_INTRADAY_RESTORE` oder
+  `ROBUST_INFEASIBLE` anhand `limiting_reason_code`.
+
+Explizite Mappings zwischen Eingangsfehlern und Ergebniscodes:
+
+- `ROBUST_POLICY_UNSUPPORTED`
+  - Policy fehlt oder ist inkompatibel (`market_time_unit`, Auflösungsinkonsistenzen,
+    unbekannte Produktparameter, fehlende `full_activation_time*`-Felder).
+  - `limiting_reason_code=POLICY_MISMATCH`
+- `ROBUST_SOURCE_DATA_MISSING`
+  - Erforderliche Reserve-/Statusdaten (z. B. `fcr_*`, `afrr_*`, `mfrr_*`, Frequenz-/LER-Status) sind nicht verfügbar.
+  - `limiting_reason_code=SOURCE_DATA_MISSING`
+- `ROBUST_INFEASIBLE` bei `RESERVE_CAPACITY`
+  - Kumulierte Worst-Case-Energie oder `available_*`-Berechnung reicht für geplante Reserven nicht aus.
+- `ROBUST_INFEASIBLE` bei `SOC_LIMIT`
+  - Plausibilisierte SOC-Rekursion verletzt Mindest-/Maximal-SOC in einem der Richtungs-Szenarien.
+- `ROBUST_NEEDS_INTRADAY_RESTORE`
+  - Reserve ist prinzipiell buchbar, aber ein aktueller Wiederherstellungsschritt ist im aktuellen
+    Restore-Fenster notwendig bzw. nur nach Intraday-Regelung wiederherstellbar.
+- `ROBUST_INFEASIBLE` bei `NO_RECOVERY_PATH`
+  - Kein zulässiger Restore-Vorschlag wegen Leistungs-/SOC-/Reserveband-Limit oder fehlender
+    Wiederherstellung im Zeitfenster.
+- `ROBUST_INFEASIBLE` bei `INTRADAY_GATE_CLOSED`
+  - Restore erforderlich, aber Gate-/Vorlaufregeln verhindern Ausführung.
 
 Verbindliche Zeitscheiben-Definition:
 
@@ -237,6 +259,9 @@ Pflichtregeln:
 - `full_activation_time` ist in derselben Zeiteinheit wie `t_min_fcr` anzugeben;
   produkt-spezifische Werte `full_activation_time_afrr` und
   `full_activation_time_mfrr` verwenden ebenfalls dieselbe Einheit.
+- `intraday_preparation_time` gilt als Mindestvorlauf für den Restore-Einstieg:
+  Ein Restore-Vorschlag darf nur erzeugt werden, wenn vor dem geplanten Ausführungsfenster
+  mindestens die Vorlaufzeit eingehalten ist.
 - Reserve Mode darf nur aktiviert werden, wenn der resultierende
   Robustheitszustand operator-faehig erklaert wird.
 - Recovery endet erst, wenn Worst-Case-Lieferfaehigkeit wieder
