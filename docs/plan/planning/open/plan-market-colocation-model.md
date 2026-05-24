@@ -264,7 +264,12 @@ Interpretation:
 Für produktive Freischaltung ist ein deterministischer Migrationspfad für bestehende
 `SiteConstraint`-Datensätze vorab definiert:
 
-- Migrationsfenster: vor Aktivierung des Co-Location-MVP, nicht inline im operativen Lauf.
+- Migrationsfenster ist zweistufig:
+  - `migration_dry_run=true`: vollständige Klassifikation mit vollständigem Audit-Bundle, aber ohne Laufblockade.
+  - `migration_dry_run=false` (Standard für produktive Freischaltung): keine Änderung der Runtime-Lauflogik, nur deterministische Ergebnisklassen.
+  - `migration_strict=true` (Standard): unklare oder inkompatible Datensätze werden in produktiven Co-Location-Requests blockiert.
+  - `migration_strict=false` (nur mit explizitem Release-Governance): erlaubt die Koexistenz bis zur Bereinigung nicht-aktiver Sites; aktive Sites bleiben weiterhin blockiert.
+- Migrationsfenster (vor Aktivierung des Co-Location-MVP, nicht inline im operativen Lauf).
 - Kandidatenklassifikation je Datensatz:
   - `normalized`: `site_grid_power_sign` ist gesetzt oder eindeutig aus vorhandenen
     Feldern deterministisch ableitbar.
@@ -304,11 +309,14 @@ Für produktive Freischaltung ist ein deterministischer Migrationspfad für best
 
 Rollback-/Backout-Verhalten:
 
-- Ist im produktiven Rollout noch ein Anteil `unclear`/`incompatible`, ist der Slice nicht freizuschalten.
+- Bei `migration_strict=true` ist im produktiven Rollout der Slice bei offenem Anteil
+  `unclear`/`incompatible` nicht freizuschalten.
 - Für Ausnahmeszenarien kann ein Release-Block oder eine kontrollierte Suspendierung gelten:
   - Release-Block: Freigabe bis Daten bereinigt sind.
   - Notfallmodus: optionaler Operator-Override nur für nicht-aktive Sites im Rahmen einer
     dokumentierten Wartungsfreigabe.
+  - Nicht-aktive Sites sind im Notfallmodus mit `can_dispatch=false` explizit zu markieren;
+    aktive Sites bleiben weiterhin hart blockiert.
 - Keine stillschweigende „Best-Effort“-Auto-Ableitung in produktivem Requestbetrieb.
 
 ### GreenStorageRestricted-Regeln (MVP)
@@ -409,6 +417,19 @@ Bestandsrouten nicht brechen:
    - `GreenStorageRestricted` lehnt unzulaessige Netzladung ab oder markiert
      den Run als unzulaessig.
 6. Operator-/API-Doku fuer die neuen Eingaben und Fehlermodi.
+
+## Gemeinsamer Ausführungs-/Fehlermodus-Vertrag
+
+Die Ausführungsregeln für Status/Mappings (`OptimizationSolverStatus`,
+`TerminationCode`, `CanExecute`, `TerminationDetail`) sind in diesem Slice und im
+LER/FCR-Robustheitsslice **identisch** zu halten.
+
+- Autoritative Quelle für den gemeinsamen Vertrag ist
+  [`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md).
+- Änderungen an `CanExecute` oder Laufkodierung sind nur gemeinsam und im selben
+  Release-Commit umzusetzen.
+- Ein Slice darf erst freigegeben werden, wenn beide Dokumente semantisch
+  übereinstimmen und die Cross-Checks bestanden sind.
 
 ---
 

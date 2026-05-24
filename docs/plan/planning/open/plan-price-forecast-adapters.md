@@ -173,6 +173,8 @@ Interoperabilitätsregel (über Pläne hinweg):
   produktiven Pfad als hartes Verarbeitungsfehlerbild zu behandeln.
 - Bei `SOURCE_DEGRADED`/`SOURCE_FALLBACK_USED` ist die Ausführung nur erlaubt,
   wenn der Slice diese Qualitätsgrade explizit erlaubt.
+- `SOURCE_EMPTY` bleibt **in beiden Qualitätsmodi** hart als `SOURCE_REJECTED`
+  und darf nicht implizit in `degraded_ok` umgewertet werden.
 
 - Konsistenz-Regel:
   - Wenn `series_type=price`, ist `market_bid_area` Pflichtfeld; `site_id` optional.

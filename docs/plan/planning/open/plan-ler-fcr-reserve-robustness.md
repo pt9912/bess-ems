@@ -476,6 +476,13 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 
 ### Phase 3: Optimierungsintegration
 
+- Dieser Abschnitt ist der gemeinsame Referenzvertrag für Ausführungs- und
+  Guard-Verhalten (`OptimizationSolverStatus`, `TerminationCode`, `CanExecute`,
+  `CanExecute=false`-Interpretation).  
+  Das Gegenstück im Co-Location-Slice ist
+  [`plan-market-colocation-model.md`](plan-market-colocation-model.md);
+  beide Abschnitte müssen semantisch identisch bleiben.
+
 - Precheck fuer Schedule-Optimierung:
   - Reserveband darf nicht nur leistungsmässig passen, sondern muss
     energie-/SOC-robust sein.
