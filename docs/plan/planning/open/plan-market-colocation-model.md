@@ -98,6 +98,10 @@ Moegliche Domain-/Application-Erweiterungen:
     - `site_id`
     - `timestamp_utc`
     - `resolution_minutes`
+  - Die Felder `alignment_mode`, `alignment_prepared`, `alignment_prepared_by`,
+    `alignment_prepared_horizon_start_utc`, `alignment_prepared_horizon_end_utc`
+    entsprechen der Co-Location-Erweiterung von `SeriesEnvelope` aus
+    [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md).
   - `alignment_mode` (`reject` | `trim-to-common`)  
       - `reject`: harte Ablehnung bei Zeitachsenabweichung (Default im produktiven ADR)
       - `trim-to-common`: kontrollierte Trimmung auf gemeinsame Schnittmenge für Vorverarbeitung;
@@ -199,7 +203,11 @@ Gleichungen:
 Verbindliche Defaults (Phase-1-ADR):
 
 - `site_grid_power_sign` ist ein Pflichtfeld für produktive `SiteConstraint`-Konfigurationen.
-  - Bei einem Produktivlauf ohne `site_grid_power_sign` endet der Lauf mit `CONFIG_INCONSISTENT`.
+  - Bei einem produktiven Lauf ohne `site_grid_power_sign` endet der Lauf mit `CONFIG_INCONSISTENT`.
+  - Bei vorhandenen Legacy-Daten ohne `site_grid_power_sign` ist ein strukturierter Migrationspfad zwingend:
+    - Migrations-Release: bestehende `SiteConstraint`-Datensätze werden deterministisch auf `export_pos` normalisiert und mit `site_grid_power_sign_normalized=true` markiert.
+    - Folge-Release: unmarkierte `site_grid_power_sign`-freie Datensätze werden als `CONFIG_INCONSISTENT` abgewiesen.
+    - Nach der Migrationsphase ist `site_grid_power_sign` ohne Ausnahmekodex Pflichtfeld.
 - `max_import_kw` und `max_export_kw` sind harte Pflichtfelder (`>= 0`) je Site.
 - `grid_connection_power_kw` ist optional; wenn nicht gesetzt, ist nur die Einzelgrenze über `max_import_kw`/`max_export_kw` aktiv.
 - `d_t` ist Richtungs-Binärvariable entsprechend der Site-Konvention; für beide

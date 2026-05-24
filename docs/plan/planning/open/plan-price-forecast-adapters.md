@@ -87,6 +87,12 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
   - `resolution_minutes` (ganzzahlig)
   - `timezone` (muss `UTC` sein)
   - `horizon_start_utc`, `horizon_end_utc`
+  - optionale Co-Location-Vorverarbeitungsmetadaten:
+    - `alignment_mode` (`reject` | `trim-to-common`)
+    - `alignment_prepared` (bool, nur bei `alignment_mode=trim-to-common` sinnvoll)
+    - `alignment_prepared_by` (string, z. B. `forecast-preprocessor/v1`, `batch-trimmer/...`)
+    - `alignment_prepared_horizon_start_utc`
+    - `alignment_prepared_horizon_end_utc`
   - `values` als geordnete Punkte:
     - `timestamp_utc`
     - `value`
@@ -128,6 +134,9 @@ Hinweis zur Semantik:
 - Konsistenz-Regel:
   - Wenn `series_type=price`, ist `market_bid_area` Pflichtfeld; `site_id` optional.
   - Wenn `series_type=forecast` und Standorttrennung aktiv ist, ist `site_id` Pflicht.
+  - Co-Location-Vorverarbeitung:
+    - `alignment_mode=reject` ist produktiv der Default.
+    - `alignment_mode=trim-to-common` ist nur zulässig, wenn `alignment_prepared=true` gesetzt ist, die Horizon-Metadaten vorhanden sind und ein vorbereiteter, deterministisch versionierter Vorverarbeitungspfad dokumentiert wurde.
 - Statusmodell:
   - Die finale Serienqualität bleibt ein einzelner Wert in `series_status` (`SOURCE_OK`, `SOURCE_DEGRADED`, `SOURCE_FALLBACK_USED`, `SOURCE_REJECTED`).
   - Kombinierte Ereignisse (z. B. Fallback **und** Backfill) werden nur durch `status_flags` abgebildet; `series_status` bleibt ein `single-value`.
