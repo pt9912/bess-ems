@@ -79,9 +79,17 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
   - Akzeptiert werden:
     - streng monoton wachsende numerische Versionen (int-kompatibel),
     - oder Zeitstempel-basierte semantische Versionen (z. B. `2026-05-24T12:00:00Z-v3`).
-  - Repräsentationsstabilität: die Versionsfamilie pro `(series_id, ... , source.provider_id)` ist verbindlich.
+- Repräsentationsstabilität: die Versionsfamilie pro `(series_id, ... , source.provider_id)` ist verbindlich.
+  - `series_version_family` (optional, empfohlen): `numeric` oder `timestamp`, zur
+    verbindlichen Normalisierung der `series_version`.
+    - Bei ausbleibender Angabe wird die Familie aus dem Versionsformat deterministisch abgeleitet.
     - Die Familie wird beim ersten gültigen Write bestimmt (`int` oder `timestamp`-basiert).
-    - Ein späterer Wechsel der Versionsfamilie wird als harte Schemaabweichung (`source_eval_status=SOURCE_SCHEMA_MISMATCH`, `series_status=SOURCE_REJECTED`) bewertet und muss migriert werden.
+  - Ein späterer Wechsel der Versionsfamilie wird im Normalbetrieb als harte
+    Schemaabweichung (`source_eval_status=SOURCE_SCHEMA_MISMATCH`, `series_status=SOURCE_REJECTED`) bewertet.
+  - Migrationsprinzip bei `series_version_family`-Wechsel:
+    - Produktiv ist ein Wechsel nur mit geplanter Migrationsfolge zulässig.
+    - Die Umstellung muss explizit über neue Serienkennung/Alias erfolgen (z. B. neues `series_id`/`series_product`-Paar), nicht per stillschweigendem Familienwechsel derselben `series_id`.
+    - Während der Migrationsphase können beide Serienfolgen parallel aktiv sein; nach erfolgreichem Cutover wird die alte Folge deaktiviert.
   - Für einen stabilen Tie-Break werden bei gleicher Klasse numerisch zuerst `series_version` (wie definiert),
     dann bei gleicher Version der hash-basierte Payload-Fingerprint (`value_hash`) verwendet.
     - „gleiche Klasse“ meint die normalisierte Vergleichsschicht der festen Versionsfamilie pro Serie/Provider.

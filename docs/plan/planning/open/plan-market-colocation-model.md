@@ -123,7 +123,10 @@ Moegliche Domain-/Application-Erweiterungen:
   - `max_import_kw`
   - `max_export_kw`
   - optional `grid_connection_power_kw`
-  - optional `can_dispatch` (default `true` für produktive Slices; aktiv setzt der Operator gezielt auf `false`)
+  - optional `can_dispatch`
+    - Für neu konfigurierte produktive Slice-Konfigurationen kann `can_dispatch` implizit als `true` gelten.
+    - Für Legacy-Datensätze ohne explizites Feld gilt die Site im Migrationskontext als inaktiv.
+    - Aktive Teilnahme am aktuellen Co-Location-Request erfordert `can_dispatch=true`.
   - `site_grid_power_sign` (verpflichtend): `export_pos` oder `import_pos`
     - `export_pos`: positive Leistung bedeutet Export ans Netz
     - `import_pos`: positive Leistung bedeutet Import aus dem Netz
@@ -306,7 +309,7 @@ Für produktive Freischaltung ist ein deterministischer Migrationspfad für best
   - `site_grid_power_sign_normalized_at=<timestamp>`
 - `unclear` Datensätze müssen mit `CONFIG_INCONSISTENT` abgewiesen werden und enthalten
   einen operatorfähigen Grundcode (z. B. `SITE_GRID_POWER_SIGN_MISSING`).
-- `incompatible` Datensätze werden mit `CONFIG_INCONSISTENT` und spezifischem
+- `incompatible` Datensätze werden mit `SCHEMA_INCONSISTENT` und spezifischem
   `limiting_reason` abgelehnt.
 - Unklare Datensätze dürfen nicht implizit in einen Default übernommen werden.
 - Bei `migration_strict=false` gilt:

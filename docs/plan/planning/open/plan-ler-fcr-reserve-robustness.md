@@ -130,7 +130,9 @@ Nicht explizit modelliert:
   - Restore-Leistung:
     - Wenn gesetzt, begrenzt `restore_capability_up_kw` den maximal nutzbaren Restore-Leistungsfluss der Up-Richtung (Lade-Richtung) und `restore_capability_down_kw` die Down-Richtung (Entlade-Richtung).
     - `restore_capability_up_kw` und `restore_capability_down_kw` müssen, falls gesetzt, strikt `> 0` sein.
-    - Wenn ein Feld fehlt, gilt im ersten Slice der konservative Default `restore_capability_* = worst_*_kw_t` der jeweiligen Schrittzeitreihe.
+    - Wenn ein Feld fehlt:
+      - wird im ersten Slice zuerst auf eine technische Basisgrenze aus der Asset-/Reserveband-Konfiguration zurückgegriffen;
+      - ist diese Basisgrenze nicht verfügbar und ist ein Restore-Szenario aktiv, ist der Request mit `ROBUST_POLICY_UNSUPPORTED` (`POLICY_MISMATCH`) zu blockieren.
   - Für `soc_strategy=conservative` gelten Zusatzregeln:
     - `conservative_soc_headroom_ratio` muss im Bereich `0..1` liegen.
     - `conservative_soc_headroom_kwh` muss `>= 0` sein.
@@ -333,10 +335,16 @@ Restore- und Gate-Entscheidungslogik (verbindlich):
     `restore_shortfall_down_kwh = max(0, worst_down_kwh_t - (soc_max_eff_kwh - soc_plan_down_t) / eta_charge)`
 - Verfügbare Wiederherstellungsleistung je Schritt:
     - Up-Branch:
-      `restore_capability_up_t = if restore_capability_up_kw is set then restore_capability_up_kw else worst_up_kw_t`
+      `restore_capability_up_t_fallback` ist der deterministische technische Default je Schritt
+      (z. B. aus Asset- oder Reservebandgrenzen), nicht aus der bereits erzeugten
+      `ReserveEnergyEnvelope`.
+      `restore_capability_up_t = if restore_capability_up_kw is set then restore_capability_up_kw else restore_capability_up_t_fallback`
       `required_activation_kw_up = if restore_shortfall_up_kwh > 0 then restore_capability_up_t else 0`
     - Down-Branch:
-      `restore_capability_down_t = if restore_capability_down_kw is set then restore_capability_down_kw else worst_down_kw_t`
+      `restore_capability_down_t_fallback` ist der analoge deterministische technische Default je Schritt
+      (z. B. aus Asset- oder Reservebandgrenzen), nicht aus der bereits erzeugten
+      `ReserveEnergyEnvelope`.
+      `restore_capability_down_t = if restore_capability_down_kw is set then restore_capability_down_kw else restore_capability_down_t_fallback`
       `required_activation_kw_down = if restore_shortfall_down_kwh > 0 then restore_capability_down_t else 0`
     - Richtungsbasierte Mindest-Rekonstruktionsdauer:
       - `restore_time_up = if restore_shortfall_up_kwh > 0 and required_activation_kw_up > 0 then restore_shortfall_up_kwh / required_activation_kw_up * 60 else 0`
