@@ -35,6 +35,10 @@ Optimierung -> Fahrplan -> State Machine -> Prioritäten -> Limiter -> Command
 ### Architektur- und Solver-Scope für LP/MILP
 
 Der operative Optimierungsrequest enthält genau eine Solver-Scope-Ausprägung.
+`solver_scope` wird Bestandteil der bestehenden `ScheduleOptimizationRequest`-
+Erweiterung bzw. des daraus erzeugten Optimization-Core-Requests, nicht von
+`OptimizationRun`; der Run persistiert nur Ergebnisstatus, Terminierung und
+`CanExecute`.
 
 Entscheidungsreihenfolge je Request:
 
@@ -195,6 +199,9 @@ Mögliche Domain-/Application-Erweiterungen:
       - nur im Forecast-/Preprocessing-Pfad, danach muss der Standardpfad (`reject`) mit lückenloser Zeitachse erhalten bleiben.
       - keine offenen Zeitlücken; zulässig: kontrollierte Backfill-Regel
         (max. 2 aufeinanderfolgende Intervalle pro Lücke).
+      - Backfill ist nur in diesem vorbereiteten `trim-to-common`-Vorverarbeitungspfad
+        zulässig. Bei `alignment_mode=reject` gibt es kein Backfill; jede
+        Zeitachsenabweichung bleibt `SCHEMA_INCONSISTENT`.
     - `value_kw` ist eine Produktionsleistung und für diese Serie standardmäßig nicht negativ.
     - Negative Werte sind nur über einen separaten signierten Netzausgangs-Datensatz zulässig.
     - Metadatenpflicht für `source`, `product`, `updated_at_utc`, `value_version`.

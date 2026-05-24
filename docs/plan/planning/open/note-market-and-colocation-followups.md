@@ -152,7 +152,8 @@ sowie Forecast-Serien.
 - Mindestens zwei produktive Preis-Adapter (z. B. EPEX + OPSD
   Open-Power-System-Data) mit
   dokumentiertem Fallback-Verhalten, Quellenmetadaten und Refresh-Status.
-- Mindestens zwei Forecast-Adapter (z. B. Wetter + Lastprognose) mit
+- Mindestens zwei Forecast-Adapter je produktiv aktivierter Forecast-Familie
+  (1 Primär + 1 fallbackfähiger Adapter; z. B. Last oder Wetter) mit
   Zeitstempelung, Versionskennzeichen und Qualitätskennzahlen.
 - Operativer Importpfad mit automatischer Aktualisierung, Toleranzgrenzen
   und Alarmierung bei Datenlücken.
@@ -181,8 +182,8 @@ sowie Forecast-Serien.
     Betriebsmodus mit aktivierter Qualitätsakzeptanz konform ist (`series_status` in `{SOURCE_OK, SOURCE_FALLBACK_USED}` bei
     `quality_mode=strict`, oder `series_status` in `{SOURCE_OK, SOURCE_DEGRADED, SOURCE_FALLBACK_USED}` bei
     `quality_mode=degraded_ok`).
-    In `quality_mode=strict` ist `SOURCE_FALLBACK_USED` nur dann zulässig, wenn kein zusätzlicher Qualitätsverlust
-    dokumentiert ist (also `status_flags` ohne `SOURCE_BACKFILL`).
+    Die genaue `SOURCE_FALLBACK_USED`-Zulässigkeit in `strict` folgt der
+    Statusmatrix in [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md).
     Für die Abgrenzung gelten die Serienbegriffe (`series_type`, `series_product`, `market_bid_area`) exakt nach
     [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md).
   4. Parallelbetrieb ist erst freigegeben, wenn `CanExecute`-Semantik zwischen

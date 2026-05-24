@@ -321,10 +321,15 @@ Deterministische Berechnung (verbindlich):
     - `soc_min_eff_kwh <= soc_t <= soc_max_eff_kwh`, sonst `ROBUST_INFEASIBLE`
       mit `limiting_reason_code=SOC_LIMIT`.
   - `soc_t^{eff} = soc_t - self_discharge_loss_kwh_t`.
-- Verfügbare Energiemengen für die Verfügbarkeitsprüfung am Schrittanfang auf Basis der geplan­ten Fahrplanwirkung:
-  - `soc_plan_base_t = soc_t^{eff} - max(0, b_t) * Δt / eta_discharge + max(0, -b_t) * eta_charge * Δt`
-  - `available_up_kwh_t = max(0, soc_plan_base_t - soc_min_eff_kwh) * eta_discharge`
-  - `available_down_kwh_t = max(0, soc_max_eff_kwh - soc_plan_base_t) / eta_charge`
+- Verfügbare Energiemengen für die `ReserveEnergyEnvelope` sind branch-spezifisch:
+  - `available_up_kwh_t` wird pro Schritt aus dem Up-Branch-Zustand nach geplanter
+    Fahrplanwirkung berechnet:
+    `available_up_kwh_t = max(0, soc_plan_up_t - soc_min_eff_kwh) * eta_discharge`.
+  - `available_down_kwh_t` wird pro Schritt aus dem Down-Branch-Zustand nach geplanter
+    Fahrplanwirkung berechnet:
+    `available_down_kwh_t = max(0, soc_max_eff_kwh - soc_plan_down_t) / eta_charge`.
+  - Es gibt kein persistiertes globales `soc_plan_base_t` für diese Envelope-Felder;
+    `soc_up_t` und `soc_down_t` aus der Rekursion sind die maßgeblichen Zustände.
 - Worst-Case-Energie je Richtung (kWh):
   - `fcr_remaining_envelope_t`-abhängiger FCR-Term:
     - `fcr_term_up_t = min(Δt, fcr_remaining_envelope_t/60) * fcr_up_kw_t`
@@ -558,10 +563,12 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
     | --- | --- | --- | --- |
     | Gültiger Plan/Plan verwendbar                    | `Optimal` oder `Feasible` | bestehende Erfolgs-Codes, z. B. `or-tools-optimal` oder `or-tools-feasible-not-proven-optimal` | `true` |
     | Solver-seitige mathematische Infeasibility       | `Infeasible`             | bestehender Solver-Code, z. B. `or-tools-infeasible` | `false` |
-    | Reiner Rechenfehler/Timeout/Solverfehler         | `Failed` oder bestehender Timeout-Status | Solver-spezifische harte Codes, z. B. `or-tools-abnormal`, `or-tools-model-invalid`, `or-tools-not-solved` | `false` |
+    | Time Limit ohne ausführbaren Plan                 | `TimeLimit`              | bestehender Timeout-Code, z. B. `or-tools-time-limit` | `false` |
+    | Iteration Limit ohne ausführbaren Plan            | `IterationLimit`         | bestehender Iterations-Code, sofern vom Solver geliefert | `false` |
+    | Reiner Rechenfehler/Solverfehler                  | `Failed`                 | Solver-spezifische harte Codes, z. B. `or-tools-abnormal`, `or-tools-model-invalid`, `or-tools-not-solved` | `false` |
     | Konfigurationsfehler (`CONFIG_*`)                | `Failed`                 | `config-invalid` oder `config-inconsistent` | `false` |
     | Schematafehler (`SCHEMA_INCONSISTENT`)          | `Failed`                 | `schema-inconsistent` | `false` |
-    | Restore erforderlich, Plan nicht ausführbar bis Restore erfolgt | `Feasible` | `reserve-robustness-needs-restore` | `false` |
+    | Restore erforderlich, Plan nicht ausführbar bis Restore erfolgt | eigentliches Solverergebnis (`Optimal` oder `Feasible`) | `reserve-robustness-needs-restore` | `false` |
     | Robustheits-/Reserve-Blockade                      | `Failed`                 | `reserve-robustness-*` | `false` |
     | Harte Source-/Policy-Abweisungen außerhalb Produktbereichs | `Failed`          | `source-*`/`policy-*` falls eingeführt | `false` |
   - Die verwendeten `TerminationCode` für robustheitsbezogene Sperren sind
@@ -606,7 +613,7 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
     `TerminationCode=reserve-robustness-infeasible`.
   - `ROBUST_NEEDS_INTRADAY_RESTORE` =>
     - bei verfügbarem Restore-Fenster: Optimierung bleibt lauffähig,
-      der Lauf wird mit `OptimizationSolverStatus.Feasible` persistiert,
+      der Lauf wird mit dem eigentlichen Solverstatus (`Optimal` oder `Feasible`) persistiert,
       `TerminationCode=reserve-robustness-needs-restore`, `CanExecute=false`
       und Operator-Hinweis `action=intraday_restore_required`.
     - bei geschlossenem Gate / keinem Wiederherstellungsfenster entsteht nach der
@@ -617,6 +624,9 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
       `OptimizationSolverStatus.Failed` mit
       `TerminationCode=reserve-robustness-recovery-timeout`,
       `TerminationDetail=RECOVERY_TIMEOUT`.
+      Symbolische `TerminationDetail`-Werte sind maschinenlesbare Reason-Tokens
+      aus `limiting_reason_code`; messwertartige Details bleiben weiterhin als
+      strukturierte `key=value`- oder menschenlesbare Detailstrings erlaubt.
     - sonst => `OptimizationSolverStatus.Failed` mit
       `TerminationCode=reserve-robustness-infeasible`.
   - `ROBUST_SOURCE_DATA_MISSING` => `OptimizationSolverStatus.Failed`
@@ -624,7 +634,8 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
   - `ROBUST_POLICY_UNSUPPORTED` => `OptimizationSolverStatus.Failed` mit
     `TerminationCode=reserve-robustness-policy-unsupported`.
 - `ROBUST_OK` wird mit dem eigentlichen Optimizerergebnis (`Optimal`/`Feasible`) persistiert.
-- `ROBUST_NEEDS_INTRADAY_RESTORE` wird immer als `OptimizationSolverStatus.Feasible`
+- `ROBUST_NEEDS_INTRADAY_RESTORE` bewahrt den eigentlichen Solverstatus (`Optimal`
+  oder `Feasible`) und wird
   mit `TerminationCode=reserve-robustness-needs-restore`, `CanExecute=false`
   und explizitem Restore-Hinweis persistiert.
 
@@ -733,8 +744,9 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
   - negative/überschüssige Werte (`self_discharge_kwh_per_hour < 0`, `self_discharge_soc_per_hour < 0` oder `> 1`) → `ROBUST_POLICY_UNSUPPORTED`.
 - Scheduler-/Dispatcher-Guard (hart):
   - Bei `OptimizationSolverStatus` (`Optimal|Feasible`) + `CanExecute=false` darf der Lauf in keiner API/Dispatcher-Route in den ausführbaren Zustand übergehen.
-- `ROBUST_NEEDS_INTRADAY_RESTORE`-Pfad erzeugt `OptimizationSolverStatus.Feasible` mit
-  `CanExecute=false`, `reserve_robustness_status=ROBUST_NEEDS_INTRADAY_RESTORE` und
+- `ROBUST_NEEDS_INTRADAY_RESTORE`-Pfad bewahrt den eigentlichen Solverstatus
+  (`Optimal` oder `Feasible`) und erzeugt `CanExecute=false`,
+  `reserve_robustness_status=ROBUST_NEEDS_INTRADAY_RESTORE` und
   `action=intraday_restore_required` (optional ergänzt durch `status_description`) im
   Replay-/Operator-Output.
 - `market_time_unit` abseits von `minute` → `ROBUST_POLICY_UNSUPPORTED`.

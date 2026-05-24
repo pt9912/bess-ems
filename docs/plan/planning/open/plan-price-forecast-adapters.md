@@ -57,10 +57,10 @@ Kompatibilitäts-/Migrationsprinzip:
 - Für den produktiven Slice ist die bestehende `PriceSeries`/Persistenzkette kompatibel zu erweitern:
   - bestehender Schlüsselaspekt in `InMemoryPriceSeriesStore.PriceSeriesKey`
     (Quelle: `src/hexagon/BatteryEms.Application/Markets/InMemoryPriceSeriesStore.cs`)
-    darf nicht nur auf Markt/Produkt/Bereich/Quelle/Timestep basieren. Der heutige
-    Typ ist ein privater Store-Record; die Migration muss ihn entweder durch einen
-    expliziten, testbaren Serienidentitätstyp ersetzen oder den Store-Key vollständig
-    neu schneiden.
+    darf nicht nur auf `MarketBidArea`/`Product`/`PriceKind`/`Source`/`HorizonStart`/
+    `HorizonEnd`/`TimeStep` basieren. Der heutige Typ ist ein privater Store-Record;
+    die Migration muss ihn entweder durch einen expliziten, testbaren Serienidentitätstyp
+    ersetzen oder den Store-Key vollständig neu schneiden.
   - Die Persistenz muss mindestens `series_id`, `series_version` **und**
     `source.provider_id` als Teil der Identität tragen (oder einen deterministischen
     Ersatzschlüssel aus genau diesen Werten plus
@@ -223,10 +223,11 @@ Hinweis zur Semantik:
 - `series_type=price` wird auf bestehende Preis-Produkte in `PriceSeries` abgebildet.
   - dafür ist `market_bid_area` verpflichtend und wird auf das entsprechende
     `PriceSeries`-Feld gemappt.
-- `series_type=forecast` dient in diesem Slice der Sidecar-/Inputlogik und darf bis zur Aktivierung
-  eines produktiven Forecast-Domaintypen im EMS ausschließlich über den Sidecar-Integrationspfad
-  weiterverarbeitet werden. In späteren Slices kann derselbe Contract in ein produktives
-  Forecast-Domain-Format überführt werden.
+- `series_type=forecast` dient in diesem Slice als Adapter-/Sidecar-Vertrag für
+  deterministische Point-Forecasts. Das hier eingeführte `ForecastSeries`-Schema ist
+  ein DTO-/Contract-Typ an der Application-Grenze, noch kein produktiver
+  EMS-Domaintyp für Optimierungsentscheidungen. Ein späterer Slice kann denselben
+  Contract in ein produktives Forecast-Domainmodell überführen.
 
 ### Normatives Status-Mapping (verbindlich)
 
@@ -347,16 +348,13 @@ Die `SOURCE_*`-Auswertung ist für jede Serie deterministisch:
 - bei Schema-, Zeitachsen- oder Horizonabweichungen: sofort `source_eval_status=SOURCE_SCHEMA_MISMATCH` → `series_status=SOURCE_REJECTED` (kein Fallback).
 
 2) Rohcode-Auswertung
-- `source_eval_status=SOURCE_OK` → direkt in Schritt 3.
-- `source_eval_status=SOURCE_AUTH_ERROR` → harte Ablehnung (`series_status=SOURCE_REJECTED`), kein Retry/Fallback.
-- `source_eval_status=SOURCE_GAP`:
-  - bei vollständig behebbaren Gaps innerhalb der Coverage-Grenze
-    (`missing_raw_intervals <= max_missing_raw_intervals`):
-    - bei `quality_mode=degraded_ok`: Ergebnis wie bisher (`series_status=SOURCE_DEGRADED`, `status_flags=[SOURCE_BACKFILL]`).
-    - bei `quality_mode=strict`: harte Ablehnung als `series_status=SOURCE_REJECTED`.
-  - bei nicht behebbaren Gaps: harte Ablehnung (`series_status=SOURCE_REJECTED`), kein Retry/Fallback.
-- `source_eval_status=SOURCE_EMPTY` → harte Ablehnung (`series_status=SOURCE_REJECTED`), kein Retry/Fallback.
-- `source_eval_status` in `{SOURCE_STALE, SOURCE_RATE_LIMIT, SOURCE_UNAVAILABLE, SOURCE_RETRY_EXHAUSTED}` → Schritt 3.
+- Rohcodes werden ausschließlich nach den **Kanonischen Ableitungsregeln** oben
+  klassifiziert. Diese Flow-Sektion wiederholt die Matrix nicht normativ.
+- `SOURCE_OK` geht direkt in die Endstatuszuordnung.
+- harte Rohcodes (`SOURCE_AUTH_ERROR`, `SOURCE_SCHEMA_MISMATCH`, `SOURCE_EMPTY`,
+  nicht behebbare `SOURCE_GAP`) enden ohne Retry/Fallback in `SOURCE_REJECTED`.
+- fallback-fähige Rohcodes (`SOURCE_STALE`, `SOURCE_RATE_LIMIT`,
+  `SOURCE_UNAVAILABLE`, `SOURCE_RETRY_EXHAUSTED`) gehen in Schritt 3.
 
 3) Fallback- und Qualitätsmoduslogik
 - Fallback ist versuchsweise nur für diese Codes:
@@ -540,8 +538,10 @@ Zusätzlich:
 
 ### Phase 3: Forecast-Sidecar-Input
 
-Wenn Forecasting nicht im EMS laufen soll, definiert dieser Slice nur den
-Input-/Output-Vertrag für einen Forecast-Sidecar:
+Für Forecasting außerhalb des EMS definiert dieser Slice den
+Input-/Output-Vertrag für einen Forecast-Sidecar. Für EMS-internen Verbrauch
+bleibt `ForecastSeries` in diesem Slice ein Contract-/DTO-Typ, kein produktiver
+Domain-Typ für Optimierungsentscheidungen:
 
 - Input:
   - Preis-Historie
@@ -552,7 +552,8 @@ Input-/Output-Vertrag für einen Forecast-Sidecar:
   - Kalenderfeatures
 - Output:
   - `PriceSeries` für Punktforecast
-  - `ForecastSeries`-Schema für deterministische Nicht-Preis-Forecasts (Load/PV/Wind/Wetter)
+  - `ForecastSeries`-Contract-Schema für deterministische Nicht-Preis-Forecasts
+    (Load/PV/Wind/Wetter)
 - optional später: Quantile oder Szenariopfade in separatem Slice
 
 Vertraglich gilt der gleiche `SeriesEnvelope` für den Sidecar-Output (Zeitachse, Einheit, Source-Metadaten, Qualitätscode).
@@ -576,7 +577,8 @@ arbeitet mit deterministischen Preiswerten.
 
 1. Folge-ADR oder Architektur-Schräftigung für externe Datenquellen.
 2. Adapter-Port für Preis-/Forecast-Quellen oder Erweiterung des
-   bestehenden `IPriceSeriesSource`-Umfelds.
+   bestehenden `IPriceSeriesSource`-Umfelds; Forecast-Ergebnisse bleiben in diesem
+   Slice Contract-/DTO-Daten, bis ein produktiver Forecast-Domaintyp aktiviert wird.
 3. Schema-Migration `PriceSeries`/Store-Identität:
    - `series_id`, `series_version`, `source.provider_id` und Serien-Signaturfelder am
      produktiven Serienmodell oder deterministischem Ersatzschlüssel,
@@ -634,7 +636,8 @@ arbeitet mit deterministischen Preiswerten.
   - ohne diese Erweiterung bleibt eine produktive Aufnahme neuer Serienkennungen im Slice gesperrt (Fallback-Pfad definiert).
   - Produktive Familie-/Versionswechsel sind nur per dokumentiertem Cutover erlaubt; ein stiller `series_version_family`- oder Revisionsfamilienwechsel ohne Release-Freigabe führt zu harter Ablehnung.
 - [ ] Import-Adapter sind bereit für produktive Nutzung:
-  - je Typ mindestens zwei Adapter (1 Primär + 1 Fallbackfähiger): Preis und Forecast,
+  - je produktiv aktivierter Serie bzw. Feature-Familie mindestens zwei Adapter
+    (1 Primär + 1 fallbackfähiger Adapter): Preis und Forecast,
   - je Typ klar definierte Qualitäts- und Fallback-Pfade inkl. `quality_mode`.
   - klare Refresh-/Staleness-/Rate-Limit-Politik.
 - [ ] Fallback-/Degradationslogik ist deterministisch umgesetzt:
@@ -659,9 +662,10 @@ arbeitet mit deterministischen Preiswerten.
 ## Abschlussentscheidungen
 
 - Wird in einem ersten produktiven Slice zusätzlich `ForecastSeries`-Schema eingeführt?
-  - Ja, als deterministisches Point-Forecast-Schema und erweiterter Liefervertrag,
-    solange es ein kompatibles `SeriesEnvelope` bleibt; Quantile und Szenariopfade
-    bleiben Folgeslice.
+  - Ja, aber nur als deterministisches Point-Forecast-Contract-Schema an der
+    Application-/Sidecar-Grenze. Es ist in diesem Slice kein produktiver
+    EMS-Domaintyp für Optimierungsentscheidungen; Quantile, Szenariopfade und die
+    produktive Domain-Aktivierung bleiben Folgeslices.
 - Sollen Forecast-Szenarien/Quantile direkt modelliert oder erst in einem
   separaten probabilistischen Optimierungsslice behandelt werden?
   - Entscheidung: Erst im ersten Slice sind nur point-forecast-Pfade relevant; Quantile/Probabilistik geht in ein Folge-Slice.

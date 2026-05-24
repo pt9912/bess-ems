@@ -56,20 +56,38 @@ Nicht vorhanden:
        fachlicher Guard die Ausführung sperrt.
 
 2. Konstruktor-Aufrufer und Factories
-   - alle direkten `OptimizationRun`-Aufrufer aktualisieren:
+   - alle direkten `OptimizationRun`-Aufrufer aktualisieren; die konkrete Liste ist
+     per `rg "new OptimizationRun\\(" src tests` vor Umsetzung zu ziehen und umfasst
+     mindestens Optimizer, Use-Case-Fehlerpfade, Repository-Readmodelle, Tests und
+     Fixtures.
+   - bekannte heutige Schwerpunkte:
      - `NoOpScheduleOptimizer`,
-     - `OptimizationCoreResultFactory`,
-     - OR-Tools-/Optimization-Core-Mapper,
-     - Use-Case-Fehlerpfade,
+     - `OptimizationCoreResultFactory` und `OptimizationCoreScheduleOptimizer`,
+     - `OrToolsScheduleOptimizer`,
+     - `DefaultScheduleOptimizationUseCase` und `DefaultIntradayReoptimizationUseCase`,
+     - `DapperOptimizationRunRepository` und `InMemoryOptimizationRunRepository`,
+     - `ScheduleOptimizationResult`-/Dispatcher-nahe Konsumenten,
      - Tests und Fixtures.
 
 3. Persistenz und Wire
-   - `can_execute` in allen produktiven Stores hinzufügen.
+   - `can_execute` in allen produktiven Stores hinzufügen:
+     - `schema/schema.yaml` erweitern,
+     - d-migrate-generierte RunOnce-Migration `000N_*.sql` erzeugen,
+     - `DapperOptimizationRunRepository` Read/Write-Mapper aktualisieren,
+     - In-Memory-Repository und Persistenztests synchron anpassen.
    - Bestehende Daten migrieren:
      - bei `status in {optimal, feasible}` initial `can_execute=true`,
      - sonst `can_execute=false`,
      - spätere fachliche Hard-Stops überschreiben auf `false`.
    - Wire-Mapper und API-/DTO-Ausgaben erweitern.
+   - API-Kompatibilität:
+     - `can_execute` ist nach der Migration ein required Feld in
+       Optimierungs-Run-Responses.
+     - Die Änderung ist JSON-additiv; bestehende externe Konsumenten dürfen das Feld
+       ignorieren, neue Dispatcher-/Scheduler-Konsumenten müssen es verwenden.
+     - Während eines kontrollierten Übergangsfensters darf der Read-Pfad für alte
+       Datensätze den oben beschriebenen Initialwert ableiten; nach Abschluss der
+       Migration muss das persistierte Feld maßgeblich sein.
    - Proto-/Optimization-Core-Mapping erweitern, soweit `OptimizationRun` über
      den Sidecar-Pfad materialisiert wird.
 
@@ -77,6 +95,11 @@ Nicht vorhanden:
    - Alle operativen `HasUsableSolution`-Verbraucher im Scheduler-/Dispatcher-,
      API- und Replay-Aktivierungspfad auf `HasUsableSolution && CanExecute`
      umstellen.
+   - Migrationsreihenfolge:
+     1. Persistenz-/Readmodelle und API-Ausgabe liefern `can_execute`.
+     2. Interne Dispatcher-/Scheduler-Konsumenten schalten auf das konjunktive Gate.
+     3. Externe Verbraucher erhalten Release-Hinweis; die alte Interpretation
+        `HasUsableSolution` allein ist danach nur noch Anzeige-/Analyseinformation.
    - Reine Anzeige-/Analysepfade dürfen `HasUsableSolution` weiterhin separat
      ausgeben, müssen aber `CanExecute` daneben zeigen.
 
