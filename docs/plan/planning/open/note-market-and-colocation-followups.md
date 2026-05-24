@@ -115,6 +115,9 @@ förder-/herkunftsgebundenem Grünstromspeicher.
   Überbauung).
 - Für den ersten Slice existiert mindestens ein validierter Testfall je
   Betriebsform inkl. Rechen- und Ergebnisbericht.
+- `GreenStorageRestricted` ist im gleichen Slice nur im **Validierungsmodus**
+  erlaubt und dient zunächst nur zur Eingangskonformität (kein produktiver
+  Förderlogik-Umfang im Regelkreis).
 
 ---
 

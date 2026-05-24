@@ -90,7 +90,7 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
   - mindestens 99,5 %
 - Lückenregime:
   - offene Lücken sind nicht erlaubt
-  - kontrollierter Backfill darf maximal 2 aufeinanderfolgende Intervalle schließen und setzt Status auf `DEGRADED`
+- kontrollierter Backfill darf maximal 2 aufeinanderfolgende Intervalle schließen und setzt Status auf `SOURCE_DEGRADED`
 
 ### Fehler- und Ablaufcodes
 
@@ -105,6 +105,7 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
 - `SOURCE_RETRY_EXHAUSTED` – Retries erfolglos
 - `SOURCE_FALLBACK_USED` – kontrollierter Fallback aktiv
 - `SOURCE_REJECTED` – harte Qualitätsprüfung fehlgeschlagen
+- `SOURCE_DEGRADED` – kontrollierter Backfill oder andere Teilqualitätsminderung
 
 ---
 
@@ -185,8 +186,8 @@ Primär-/Fallback-Regel ist verbindlich:
 Aktivierungslogik:
 
 - Primärquelle wird standardmaessig genutzt.
-- Bei Qualitätsfehler (`SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_SCHEMA_MISMATCH`)
-  wird der Fallbackzugriff nur genutzt, wenn:
+ - Bei Qualitätsfehler (`SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_SCHEMA_MISMATCH`)
+   wird der Fallbackzugriff nur genutzt, wenn:
   - derselbe `SeriesEnvelope`-Vertrag eingehalten wird
   - Lücke/Abweichung im Fallback innerhalb definierter Konfigurationsgrenzen bleibt
   - Operator den Fallbackstatus explizit akzeptiert
@@ -243,7 +244,7 @@ arbeitet mit deterministischen Preiswerten.
    - fehlende Credentials
    - Primary-Validierung gegen Secondary-Adapter bei Primary-Ausfall
    - Rate-Limit-/Providerfehler
-   - stale Daten werden je nach Konfiguration markiert (`DEGRADED`) oder mit
+   - stale Daten werden je nach Konfiguration markiert (`SOURCE_DEGRADED`) oder mit
      `SOURCE_STALE`/`SOURCE_REJECTED` hart abgelehnt
    - Zeitzone/DST bleibt konsistent
    - UTC-Zeitachse, Schrittweite und Lückenbehandlung (99,5 % Mindestabdeckung)

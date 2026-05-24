@@ -89,8 +89,14 @@ Moegliche Domain-/Application-Erweiterungen:
     - `value_kw` darf negativ sein, nur nach Modell-Konvention erlaubt
     - Metadatenpflicht fuer `source`, `product`, `updated_at_utc`, `value_version`
 
+- `LocalOriginState`
+  - virtuelle Zwischenbilanz für herkunftsgebundene Energie (kWh)
+  - `e_local_t` je Zeitschritt
+  - Begrenzung via `local_origin_capacity_kwh`
+
 - `CoLocationMode`
   - Betriebsart nach obigem Arbeitsmodell
+  - `GreenStorageRestricted` ist Sonderfall im selben Co-Location-Kontext und nutzt den gleichen Basis-Constraint-Stack.
 
 - `CurtailmentCost`
   - Strafkosten fuer Abregelung lokaler Erzeugung
@@ -101,7 +107,7 @@ Moegliche Domain-/Application-Erweiterungen:
 
 ### Netzanschlusspunkt-Konvention (verbindlich)
 
-Für jede Site wird folgendes, lineares Site-Modell festgelegt:
+Fuer jede Site gilt folgendes Basis-Modell (LP) mit separater MILP-Kontrolllogik fuer Richtungen:
 
 - `b_t` = Batterieleistung (kW), Batterie-Vorzeichen bleibt unverändert:
   - `b_t > 0`: Entladen
@@ -110,6 +116,7 @@ Für jede Site wird folgendes, lineares Site-Modell festgelegt:
 - `c_t` = Abregelung der lokalen Erzeugung (kW), `0 <= c_t <= g_t`
 - `p_grid_import_t`, `p_grid_export_t` = Leistung am Netzknoten (kW), beide `>= 0`
 - `site_power_t` = Netzleistung nach Konvention (kW)
+- `d_t` = Richtungsbinarvariable je Zeitschritt (`MILP`)
 
 Gleichungen:
 
@@ -118,6 +125,13 @@ Gleichungen:
 - bei `site_grid_power_sign=import_pos`: Vorzeichen invertiert
 - `p_grid_import_t <= site.max_import_kw`
 - `p_grid_export_t <= site.max_export_kw`
+- simultane Netznutzung ist ausgeschlossen:
+  - Formulierung: `p_grid_import_t * p_grid_export_t = 0`
+  - MILP-Linearisation (`site_grid_power_sign=export_pos`):
+    - `p_grid_import_t <= site.max_import_kw * (1 - d_t)`
+    - `p_grid_export_t <= site.max_export_kw * d_t`
+    - `d_t ∈ {0,1}`
+  - bei `site_grid_power_sign=import_pos`: Rollen vertauschen
 - optional, falls `grid_connection_power_kw` gesetzt:
   - `p_grid_import_t + p_grid_export_t <= site.grid_connection_power_kw`
 
@@ -126,16 +140,23 @@ Interpretation:
 - `b_t` und `(g_t - c_t)` wirken auf denselben Punkt.
 - Die Export-/Importgrenzen gelten explizit für jede Zeitscheibe.
 - Die Kombination aus Import/Export- und Gesamtanschlussgrenze vermeidet Simultanfehler bei der Berechnung.
+- Für den produktiven MVP wird für Co-Location mindestens MILP angenommen; bei reiner LP ist diese Ausschlussregel nicht exakt abbildbar.
 
 ### GreenStorageRestricted-Regeln (MVP)
 
 `GreenStorageRestricted` ist im ersten Umsetzungsumfang als harte Validierung spezifiziert:
 
 - Erlaubte Ladequelle: ausschliesslich lokale Erzeugung (`p_grid_import_t == 0`).
-- `b_t` kann nur geladen werden, wenn eine belastbare Herkunft vorliegt:
+- Einführung der herkunftsbezogenen Zwischengröße `e_local_t` (kWh), mit
+  `Δt = resolution_minutes / 60`:
+  - `e_local_{t+1} = e_local_t + ((g_t - c_t) - b_t) * Δt`
+  - `0 <= e_local_t <= local_origin_capacity_kwh`
+  - `e_local_0` ist konfigurierbar (meist 0).
+- Harte Koppelregeln:
+  - `-b_t <= (g_t - c_t)` (Laden nur solange lokaler Überschuss vorliegt)
+  - `b_t <= e_local_t / Δt` (Entladen nur aus vorhandener lokaler Herkunftsmasse)
   - Ist kein Herkunftsnachweis oder keine ausreichende lokale Quelle vorhanden, gilt `CONFIG_INCONSISTENT`.
 - Abregelung `c_t` ist im Modus erlaubt und mindert damit lokal verfügbaren Strom.
-- Entladen ist nur aus nachweislich lokal und zulässig hergerichteter Energie möglich.
 - Bei fehlender Herkunftstransparenz darf kein produktiver Lauf gestartet werden.
 
 ### Optimierungswirkung
@@ -183,6 +204,7 @@ Konvention festlegen, bevor Code umgesetzt wird.
 4. OR-Tools-Modellerweiterung oder neuer Solver-Pfad fuer
    Co-Location-Constraints.
 5. Tests:
+   - Kein simultaner Netzimport/Netzeinspeisung im gleichen Zeitschritt.
    - Standalone bleibt bit-kompatibel zum heutigen Pfad.
    - PV-Ueberschuss kann Batterie laden, ohne Exportlimit zu verletzen.
    - Netzexportlimit begrenzt Batterieentladung plus lokale Erzeugung.
@@ -216,6 +238,8 @@ Konvention festlegen, bevor Code umgesetzt wird.
 
 - Reicht ein LP-Modell oder braucht der erste produktive Co-Location-Scope
   MILP-Binaervariablen fuer Lade-/Entlade-/Herkunftsentscheidungen?
+  - Entschieden: Für den ersten produktiven Co-Location-Scope wird MILP genutzt, um
+    Simultanfluss- und Herkunftskontrollen formal erzwingbar zu machen.
 - Wird `LocalGenerationSeries` als eigener Application-Typ eingefuehrt oder
   als spezialisierte `PriceSeries`-aehnliche Zeitreihe modelliert?
 - Soll Abregelung als Kostenkomponente, Constraint-Violation oder eigene
