@@ -520,8 +520,12 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 - Intraday-Restauration:
   - optionaler Optimierungsinput fuer benötigte Up-/Down-Energiekorrektur.
 - Ergebnisverhalten:
-  - Robustheitsverletzung beendet den Lauf nicht direkt über neue Run-Statuswerte,
-    sondern über bestehende `OptimizationSolverStatus` + strukturierte Termination-Codes.
+  - Robustheitsverletzung wird über bestehende `OptimizationSolverStatus` +
+    strukturierte `TerminationCode` + harte `CanExecute`-Sperren ausgedrückt.
+  - Die verwendeten `TerminationCode` für robustheitsbezogene Sperren sind
+    `reserve-robustness-not-executable`, `reserve-robustness-infeasible`,
+    `reserve-robustness-recovery-timeout`, `reserve-robustness-source-missing`,
+    `reserve-robustness-policy-unsupported`.
   - Keine impliziten Reserveverletzungen im produzierten Fahrplan.
   - Bestehender Pfad ohne LER/FCR-Robustheit bleibt unveraendert.
 - Ergebnis-/Run-Mapping (verbindlich):
@@ -535,6 +539,12 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
   - `CanExecute` ist harte Ausführungsbedingung im Dispatcher/Scheduler:
     `OptimizationSolverStatus.Feasible` bei `CanExecute=false` gilt weiterhin als nicht auszuführen.
   - `ROBUST_OK` => keine zusätzliche Hard-Stop-Sperre.
+  - `ROBUST_INFEASIBLE` mit `limiting_reason_code=RESERVE_CAPACITY` oder
+    `SOC_LIMIT` => `OptimizationSolverStatus.Failed` mit
+    `TerminationCode=reserve-robustness-infeasible`.
+  - `ROBUST_INFEASIBLE` mit `limiting_reason_code=INTRADAY_GATE_CLOSED` oder
+    `NO_RECOVERY_PATH` => `OptimizationSolverStatus.Failed` mit
+    `TerminationCode=reserve-robustness-infeasible`.
   - `ROBUST_NEEDS_INTRADAY_RESTORE` =>
     - bei verfügbarem Restore-Fenster: Optimierung bleibt lauffähig,
       der Lauf wird mit `OptimizationSolverStatus.Feasible` persistiert,
@@ -675,7 +685,8 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 - FCR-Worst-Case fuer nicht-LER: volle FCR-Leistung ueber Horizont.
 - LER-konservative FCR-Huelle mit `t_min_fcr`.
 - Voller Aktivierungszeitraum deutlich größer als Horizon (`full_activation_time`, `full_activation_time_afrr`, `full_activation_time_mfrr`) nutzt deterministisch den `Δt`-clip ohne Negative oder unzulässige Reserve-Anforderung.
-- Grenzwert-Effizienz `eta_charge` / `eta_discharge` nahe Null (z. B. `1e-9`) wird explizit getestet auf deterministische Behandlung (entweder clamp/bounding oder klare Verfahrens-Fehlerklasse, kein implizites Clampen in `NaN`/`inf`).
+- Grenzwert-Effizienz `eta_charge` / `eta_discharge` nahe Null (z. B. `1e-9`) wird explizit als harte Verweigerung
+  auf `ROBUST_POLICY_UNSUPPORTED` getestet (`eta_min`-Grenzprüfung), ohne implizite `clamp`-/`bounding`-Logik.
 - Alert State startet bei definierter Frequenzabweichung und endet erst
   bei Rueckkehr in den Normalbereich.
 - Recovery scheitert nach `max_recovery_time` mit operator-faehigem

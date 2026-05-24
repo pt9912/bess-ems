@@ -159,9 +159,14 @@ Hinweis zur Semantik:
     `series_id`, `source.provider_id`, `series_type`, `series_product`,
     `market_bid_area` (falls gesetzt), `site_id` (falls gesetzt),
     `unit`, `resolution_minutes`, `series_version`.
-  - Wird dieselbe Signatur-Vollmenge mehrfach geladen, muss der vollständig gehashte
-    Payload identisch sein; andernfalls wird der Lauf als harter Fehler
-    (`source_eval_status=SOURCE_SCHEMA_MISMATCH`, `series_status=SOURCE_REJECTED`) behandelt.
+  - Wird dieselbe Signatur-Vollmenge mehrfach geladen, wird vollständige Payload-Identität über `value_hash` erwartet:
+    - identische `value_hash`-Werte sind idempotent,
+    - unterschiedliche `value_hash` bei identischer Signatur und identischem `series_version` führen als harter Fehler zu  
+      (`source_eval_status=SOURCE_SCHEMA_MISMATCH`, `series_status=SOURCE_REJECTED`).
+  - Für inhaltliche Korrekturen ist ein Revisionswechsel zwingend:
+    entweder höhere `series_version` derselben Familie oder ein kontrollierter
+    Migrationspfad über `series_family_alias` (oder neue `series_id`).
+    Ohne expliziten Revisionswechsel ist keine In-Place-Korrektur derselben Version im produktiven Lauf erlaubt.
   - Eine eingehende Serie mit älterer Version als die letzte akzeptierte Referenzversion für dieselbe
     Serien-Signatur wird nach dem stabilisierten Vergleich als harte Versionsabweichung
     (`series_status=SOURCE_REJECTED`) abgewiesen.
@@ -170,8 +175,6 @@ Hinweis zur Semantik:
     Wenn `market_bid_area`, `site_id`, `unit` oder `resolution_minutes` für dieselbe
     `series_id`/`source.provider_id`/`series_type`/`series_product`-Kombination variieren,
     ergibt sich `source_eval_status=SOURCE_SCHEMA_MISMATCH` / `series_status=SOURCE_REJECTED`.
-  - Für identische Serienversionen ist Verhalten idempotent: bestehende gültige Daten dürfen nur dann
-    aktualisiert werden, wenn sich die `series_version` oder der `value_hash` geändert hat.
 - Mapping-Regel:
 - `series_type=price` wird auf bestehende Preis-Produkte in `PriceSeries` abgebildet.
   - dafür ist `market_bid_area` verpflichtend und wird auf das entsprechende
@@ -516,6 +519,7 @@ arbeitet mit deterministischen Preiswerten.
    - erfolgreiche Serienladung
    - fehlende Credentials
    - identische `(series_id, series_version, source.provider_id)` mehrfach laden mit identischem Payload bleibt idempotent
+   - identische `(series_id, series_version, source.provider_id)` mit anderem `value_hash` führt deterministisch zu `SOURCE_REJECTED`
    - gleicher `(series_id, series_version)` mit anderem `provider_id` wird als separater Provider-Kontext bewertet
    - Primary-Validierung gegen Secondary-Adapter bei Primary-Ausfall
    - Rate-Limit-/Providerfehler

@@ -453,8 +453,8 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
 - Co-Location folgt dem selben CanExecute-Vertrag:
   - `CanExecute=true` nur bei validen Ergebnissen ohne harte Konfigurations- oder Schemaabweisung.
   - `CanExecute=false` bei `OptimizationSolverStatus.Failed` mit `TerminationCode` aus
-    `config-invalid`, `config-inconsistent`, `schema-inconsistent`, bei harten
-    Robustheits- oder Validierungs-Blockaden.
+    `config-invalid`, `config-inconsistent`, `schema-inconsistent` und
+    `reserve-robustness-*` bei harten Robustheits- oder Validierungs-Blockaden.
   - Operator-/Replay-Verbraucher dürfen einen Lauf nur im Zustand
     `CanExecute=true` in den aktiv ausführbaren Pfad überführen.
 
