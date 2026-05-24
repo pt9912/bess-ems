@@ -137,7 +137,7 @@ Nicht explizit modelliert:
   - `self_discharge_kwh_per_hour` darf nicht negativ sein.
   - `self_discharge_soc_per_hour` muss in `[0,1]` liegen (als Anteil pro Stunde).
   - `market_time_unit` muss exakt `minute` sein und mit `resolution_minutes` konsistent sein.
-  - `t_min_fcr`, `full_activation_time`, `max_recovery_time`, `intraday_gate_closure`, `intraday_preparation_time` dürfen nicht kleiner als `0` sein.
+  - `t_min_fcr`, `full_activation_time`, `full_activation_time_afrr`, `full_activation_time_mfrr`, `max_recovery_time`, `intraday_gate_closure`, `intraday_preparation_time` und `resolution_minutes` müssen streng `> 0` sein.
   - `simultaneous_reserve_direction_allowed` ist optional-boolean; fehlt/`false` wird als Default `false` interpretiert.
   - `simultaneous_reserve_direction_allowed=true` ist in Kombination mit nicht-linearer Kopplung nur mit klarer
     Reihenfolgeimplementierung in der Worst-Case-Rekursion erlaubt.
@@ -438,6 +438,9 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 - Ergebnis-/Run-Mapping (verbindlich):
   - `reserve_robustness_status = ReserveRobustnessResult.status`.
   - `reserve_robustness_limiting_reason = ReserveRobustnessResult.limiting_reason_code`.
+  - Bei `reserve_robustness_status != ROBUST_OK` ist
+    `reserve_robustness_limiting_reason` als Pflichtfeld im `OptimizationRun`-`TerminationDetail`
+    zu persistieren, inkl. optionaler `status_description`, damit Operator-/Replay-Sichten die Ursache eindeutig nachvollziehen.
   - `CanExecute = (reserve_robustness_status == ROBUST_OK)` ist die einzige ausführbare
     Betriebsart; bei allen anderen Statuswerten ist `CanExecute=false`.
   - `CanExecute` ist harte Ausführungsbedingung im Dispatcher/Scheduler:
@@ -546,7 +549,7 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
   - `is_ler=true` und kein Moduswert gesetzt (beide optional Felder leer/nicht gesetzt) → `ROBUST_POLICY_UNSUPPORTED`.
   - negative/überschüssige Werte (`self_discharge_kwh_per_hour < 0`, `self_discharge_soc_per_hour < 0` oder `> 1`) → `ROBUST_POLICY_UNSUPPORTED`.
 - `market_time_unit` abseits von `minute` → `ROBUST_POLICY_UNSUPPORTED`.
-- Auflösungsfelder kleiner 0 (`t_min_fcr`, `full_activation_time`, `max_recovery_time`, `intraday_gate_closure`, `intraday_preparation_time`) → `ROBUST_POLICY_UNSUPPORTED`.
+- Auflösungsfelder kleiner oder gleich 0 (`t_min_fcr`, `full_activation_time`, `full_activation_time_afrr`, `full_activation_time_mfrr`, `max_recovery_time`, `intraday_gate_closure`, `intraday_preparation_time`, `resolution_minutes`) → `ROBUST_POLICY_UNSUPPORTED`.
 - `conservative_soc_headroom` außerhalb `0..1` (ratio) bzw. `<0` (kwh) → `ROBUST_POLICY_UNSUPPORTED`.
 - FCR-Worst-Case fuer nicht-LER: volle FCR-Leistung ueber Horizont.
 - LER-konservative FCR-Huelle mit `t_min_fcr`.

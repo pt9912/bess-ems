@@ -61,6 +61,24 @@ Kompatibilitätsprinzip:
   isoliert und im Anschluss deterministisch reaggregiert. Andernfalls ist bei gemischten
   Scope-Anforderungen ein `CONFIG_INVALID` mit Grundcode `SCHEMA_INCONSISTENT` zu werfen.
 
+### Run- und Fehlerkodierung (Kompatibilität zum bestehenden Solver-Laufmodell)
+
+Die Co-Location-/Migrationserkennung verwendet die fachlichen Coderäume `CONFIG_*` und
+`SCHEMA_INCONSISTENT`, persistiert diese aber über das bestehende `OptimizationRun`-
+Modell als `OptimizationSolverStatus` + `TerminationCode`:
+
+- `OK` (korrektes Ergebnis): `OptimizationSolverStatus.Optimal` oder
+  `OptimizationSolverStatus.Feasible` je Ergebnisqualität.
+- `MODEL_INFEASIBLE` / Reservefehler mit harter Infeasibility: `OptimizationSolverStatus.Infeasible`.
+- `CONFIG_INVALID`: `OptimizationSolverStatus.Failed` mit `TerminationCode=config-invalid`.
+- `CONFIG_INCONSISTENT`: `OptimizationSolverStatus.Failed` mit
+  `TerminationCode=config-inconsistent`.
+- `SCHEMA_INCONSISTENT`: `OptimizationSolverStatus.Failed` mit `TerminationCode=schema-inconsistent`.
+- Solver- oder Laufzeitfehler: `OptimizationSolverStatus.Failed` mit bestehendem Solver-Code
+  (bestehende Terminierungskonventionen).
+- Alle fachlichen Gründe werden zusätzlich in `TerminationDetail` geführt, damit
+  Operator-/Replay-Pfade die Unterscheidung ohne Hilfskontext nachziehen können.
+
 ### Projekt-/Standorttypen
 
 Der Slice modelliert mindestens diese Betriebsarten:
@@ -388,16 +406,19 @@ Bestandsrouten nicht brechen:
   unveraendert.
 - Co-Location-Constraints werden im Run-Ergebnis als eigene Objective- oder
   Constraint-Komponenten sichtbar.
-- Ein infeasibles Setup liefert einen klaren, operatorfaehigen Termination-Code:
-  - `OK`: gueltiger Plan berechnet
-- `CONFIG_INVALID`: Eingabedaten ungueltig/fehlerhaft (Schema oder Constraints)
-- `CONFIG_INCONSISTENT`: regelwerkskonflikt (z. B. `GreenStorageRestricted` ohne Herkunftsnachweis)
-- `MODEL_INFEASIBLE`: Optimierungsproblem ohne Loesung bei gueltigen Daten
-- `SOLVER_ERROR`: Timeout/technisches Solverproblem
-- `SCHEMA_INCONSISTENT`: Scope-/Datenkonflikt (z. B. Request-Konfiguration mit unzulässiger `alignment_mode=trim-to-common` im produktiven Lauf).
-- Replay-/Golden-Fixtures decken mindestens ein Standalone- und ein
-  Co-Location-Szenario ab.
-- Der technische Dispatch-Pfad bleibt Safety-First und kennt keine
+- Ein Setup wird so gemappt, dass Operator- und Replay-Sichten klar trennbar bleiben:
+  - `OptimizationSolverStatus.Optimal` oder `OptimizationSolverStatus.Feasible`: gültiger Plan.
+  - `OptimizationSolverStatus.Infeasible`: Reiner Rechenfehler (entspricht `MODEL_INFEASIBLE`).
+  - `OptimizationSolverStatus.Failed` mit `TerminationCode=config-invalid`: Eingabedaten ungueltig/fehlerhaft
+    (Schema oder Constraints).
+  - `OptimizationSolverStatus.Failed` mit `TerminationCode=config-inconsistent`: regelwerkskonflikt
+    (z. B. `GreenStorageRestricted` ohne Herkunftsnachweis).
+  - `OptimizationSolverStatus.Failed` mit `TerminationCode=schema-inconsistent`: Scope-/Datenkonflikt
+    (z. B. unzulässige `alignment_mode=trim-to-common` im produktiven Lauf).
+  - `OptimizationSolverStatus.Failed` mit Solverfehler-Code: Timeout/technisches Solverproblem.
+  - Replay-/Golden-Fixtures decken mindestens ein Standalone- und ein
+     Co-Location-Szenario ab.
+  - Der technische Dispatch-Pfad bleibt Safety-First und kennt keine
   externen Marktdetails.
 
 ---
