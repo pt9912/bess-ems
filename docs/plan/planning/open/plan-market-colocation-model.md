@@ -66,11 +66,28 @@ Moegliche Domain-/Application-Erweiterungen:
   - `max_import_kw`
   - `max_export_kw`
   - optional `grid_connection_power_kw`
+  - optional `site_grid_power_sign`: `export_pos` oder `import_pos` (default: `export_pos`)
+    - `export_pos`: positive Leistung bedeutet Export ans Netz
+    - `import_pos`: positive Leistung bedeutet Import aus dem Netz
 
 - `LocalGenerationSeries`
   - Zeitreihe fuer PV/Wind-Erzeugung oder Forecast
-  - gleiche Zeitraster-Regeln wie `PriceSeries`
-  - Quelle, Produkt, Einheit und Forecast-/Actual-Kennzeichnung
+  - Pflichtfelder pro Timestamp:
+    - `site_id`
+    - `timestamp_utc`
+    - `resolution_minutes`
+    - `value_kw`
+    - `value_type` (`forecast` | `actual`)
+    - `source`
+    - `product`
+    - `unit` (z. B. `kW`)
+    - `updated_at_utc`
+    - `value_version`
+  - Validierung:
+    - gleiche Zeitachse wie `PriceSeries` (UTC, step-genau, gleiche Horizon-Länge)
+    - keine offenen Zeitlücken; zulässig: kontrollierte Backfill-Regel (max. 2 Intervalle)
+    - `value_kw` darf negativ sein, nur nach Modell-Konvention erlaubt
+    - Metadatenpflicht fuer `source`, `product`, `updated_at_utc`, `value_version`
 
 - `CoLocationMode`
   - Betriebsart nach obigem Arbeitsmodell
@@ -82,12 +99,52 @@ Moegliche Domain-/Application-Erweiterungen:
   - optionale Restriktion, ob Batterieenergie aus lokaler Erzeugung,
     Netzbezug oder beidem stammen darf
 
+### Netzanschlusspunkt-Konvention (verbindlich)
+
+Für jede Site wird folgendes, lineares Site-Modell festgelegt:
+
+- `b_t` = Batterieleistung (kW), Batterie-Vorzeichen bleibt unverändert:
+  - `b_t > 0`: Entladen
+  - `b_t < 0`: Laden
+- `g_t` = lokale Erzeugung vor Abregelung (kW), standardmäßig positiv bei Einspeise-Richtung
+- `c_t` = Abregelung der lokalen Erzeugung (kW), `0 <= c_t <= g_t`
+- `p_grid_import_t`, `p_grid_export_t` = Leistung am Netzknoten (kW), beide `>= 0`
+- `site_power_t` = Netzleistung nach Konvention (kW)
+
+Gleichungen:
+
+- `site_power_t = (g_t - c_t) + b_t`
+- bei Konvention `site_grid_power_sign=export_pos`: `site_power_t = p_grid_export_t - p_grid_import_t`
+- bei `site_grid_power_sign=import_pos`: Vorzeichen invertiert
+- `p_grid_import_t <= site.max_import_kw`
+- `p_grid_export_t <= site.max_export_kw`
+- optional, falls `grid_connection_power_kw` gesetzt:
+  - `p_grid_import_t + p_grid_export_t <= site.grid_connection_power_kw`
+
+Interpretation:
+
+- `b_t` und `(g_t - c_t)` wirken auf denselben Punkt.
+- Die Export-/Importgrenzen gelten explizit für jede Zeitscheibe.
+- Die Kombination aus Import/Export- und Gesamtanschlussgrenze vermeidet Simultanfehler bei der Berechnung.
+
+### GreenStorageRestricted-Regeln (MVP)
+
+`GreenStorageRestricted` ist im ersten Umsetzungsumfang als harte Validierung spezifiziert:
+
+- Erlaubte Ladequelle: ausschliesslich lokale Erzeugung (`p_grid_import_t == 0`).
+- `b_t` kann nur geladen werden, wenn eine belastbare Herkunft vorliegt:
+  - Ist kein Herkunftsnachweis oder keine ausreichende lokale Quelle vorhanden, gilt `CONFIG_INCONSISTENT`.
+- Abregelung `c_t` ist im Modus erlaubt und mindert damit lokal verfügbaren Strom.
+- Entladen ist nur aus nachweislich lokal und zulässig hergerichteter Energie möglich.
+- Bei fehlender Herkunftstransparenz darf kein produktiver Lauf gestartet werden.
+
 ### Optimierungswirkung
 
 Der Horizon-Optimierer muss zusaetzlich beruecksichtigen koennen:
 
 - Netzanschlusspunkt-Grenzen fuer Import und Export
 - lokale Erzeugungsprognose pro Zeitschritt
+- optionales Herkunftssourcing bei Lade-/Entladungspfaden (`OriginConstraint`)
 - optionale Abregelung lokaler Erzeugung
 - Batterie-Ladefenster aus lokalem Ueberschuss
 - Reservebaender aus `ReserveBand`
@@ -121,7 +178,7 @@ Konvention festlegen, bevor Code umgesetzt wird.
 1. Folge-ADR oder ADR-Schaerfung fuer Co-Location-Modell und
    Netzanschlusspunkt-Vorzeichen.
 2. Domain-Modelle fuer Standorttyp, Netzanschlussgrenzen und lokale
-   Erzeugungs-/Forecast-Zeitreihen.
+   Erzeugungs-/Forecast-Zeitreihen inkl. verbindlicher Site-Netzflussdefinition.
 3. Application-Port-Erweiterung fuer Optimierungsrequests.
 4. OR-Tools-Modellerweiterung oder neuer Solver-Pfad fuer
    Co-Location-Constraints.
@@ -142,8 +199,12 @@ Konvention festlegen, bevor Code umgesetzt wird.
   unveraendert.
 - Co-Location-Constraints werden im Run-Ergebnis als eigene Objective- oder
   Constraint-Komponenten sichtbar.
-- Ein infeasibles Setup liefert einen operatorfaehigen Termination-Code,
-  nicht nur `infeasible`.
+- Ein infeasibles Setup liefert einen klaren, operatorfaehigen Termination-Code:
+  - `OK`: gueltiger Plan berechnet
+  - `CONFIG_INVALID`: Eingabedaten ungueltig/fehlerhaft (Schema oder Constraints)
+  - `CONFIG_INCONSISTENT`: regelwerkskonflikt (z. B. `GreenStorageRestricted` ohne Herkunftsnachweis)
+  - `MODEL_INFEASIBLE`: Optimierungsproblem ohne Loesung bei gueltigen Daten
+  - `SOLVER_ERROR`: Timeout/technisches Solverproblem
 - Replay-/Golden-Fixtures decken mindestens ein Standalone- und ein
   Co-Location-Szenario ab.
 - Der technische Dispatch-Pfad bleibt Safety-First und kennt keine
@@ -161,4 +222,3 @@ Konvention festlegen, bevor Code umgesetzt wird.
   Fahrplanzeitreihe materialisiert werden?
 - Welche Netzanschlusspunkt-Vorzeichenkonvention wird fuer Site-Level-
   Leistung normativ?
-
