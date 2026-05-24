@@ -456,6 +456,12 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
 
 - Autoritative Quelle für den gemeinsamen Vertrag ist
   [`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md).
+- Preis-/Forecast-Serienidentität ist mit
+  [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md)
+  semantisch deckungsgleich definiert:
+  `series_id`, `source.provider_id`, `series_type`, `series_product`,
+  `market_bid_area` (falls gesetzt), `site_id` (falls gesetzt), `unit`,
+  `resolution_minutes`, `series_version`.
 - Änderungen an `CanExecute`, Laufkodierung oder Terminierungsdetails sind nur
   gemeinsam und im selben Release-Commit umzusetzen.
 - Implementierungsvorgabe:

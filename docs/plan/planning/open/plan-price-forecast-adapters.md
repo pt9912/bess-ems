@@ -318,6 +318,7 @@ Die `SOURCE_*`-Auswertung ist für jede Serie deterministisch:
     - führt der Fallback zusätzliche Qualitätsminderung (`SOURCE_BACKFILL` o. ä.), ist das Ergebnis `SOURCE_REJECTED`.
     - explizit mit der Ausnahme: `SOURCE_FALLBACK_USED` ist in `strict` nur ohne
       `SOURCE_BACKFILL` erlaubt.
+    - `SOURCE_DEGRADED` ist in `quality_mode=strict` kein gültiger Endstatus.
   - bei `quality_mode=degraded_ok`: finaler Zustand darf `series_status=SOURCE_DEGRADED` oder `series_status=SOURCE_FALLBACK_USED` sein; kombinierte Ereignisse werden in `status_flags` gehalten.
     - Wenn Fallback erfolgreich und keine zusätzliche Qualitätsminderung vorliegt: `series_status=SOURCE_FALLBACK_USED`, `status_flags=[SOURCE_FALLBACK_USED]`.
     - Wenn Fallback erfolgreich mit Backfill/Degradation: `series_status=SOURCE_DEGRADED`, `status_flags=[SOURCE_FALLBACK_USED, SOURCE_BACKFILL]`.
@@ -325,7 +326,7 @@ Die `SOURCE_*`-Auswertung ist für jede Serie deterministisch:
     - `strict`: harte Ablehnung (`series_status=SOURCE_REJECTED`).
     - `degraded_ok`: nur akzeptierbare Backfill/Degradation zulassen (`series_status=SOURCE_DEGRADED`), sonst `series_status=SOURCE_REJECTED`.
 - Kein kompatibler Fallback:
-  - `strict`: harte Ablehnung bei `source_eval_status in {SOURCE_STALE, SOURCE_RETRY_EXHAUSTED, SOURCE_RATE_LIMIT, SOURCE_UNAVAILABLE}`.
+  - `strict`: harte Ablehnung bei `source_eval_status in {SOURCE_STALE, SOURCE_RATE_LIMIT, SOURCE_UNAVAILABLE, SOURCE_RETRY_EXHAUSTED}`.
   - `degraded_ok`: `source_eval_status=SOURCE_STALE` kann als `series_status=SOURCE_DEGRADED` akzeptiert werden; `SOURCE_EMPTY` bleibt `series_status=SOURCE_REJECTED`.
 
 4) Endstatuszuordnung bei akzeptierter Serie

@@ -186,15 +186,15 @@ Nicht explizit modelliert:
     - `required_up_kwh` (optional, fuer Restore-Planung)
     - `required_down_kwh` (optional, fuer Restore-Planung)
   - Optional:
-    - `required_activation_kw_up`:
+    - `restore_capability_kw_up`:
       - optionales Override in kW pro Zeitschritt für den Up-Wiederherstellungszweig auf Basis der betrachteten Reservezelle;
       - muss `> 0` sein.
-      - wird in der Restore-Rekonstruktion als harte Begrenzung verwendet, falls gesetzt.
+      - wird in der Restore-Rekonstruktion als harte Wiederherstellungskapazität verwendet, falls gesetzt.
       - bei Wert `<= 0` oder fehlendem Wert wird kein Override angenommen.
-    - `required_activation_kw_down`:
+    - `restore_capability_kw_down`:
       - optionales Override in kW pro Zeitschritt für den Down-Wiederherstellungszweig auf Basis der betrachteten Reservezelle;
       - muss `> 0` sein.
-      - wird in der Restore-Rekonstruktion als harte Begrenzung verwendet, falls gesetzt.
+      - wird in der Restore-Rekonstruktion als harte Wiederherstellungskapazität verwendet, falls gesetzt.
       - bei Wert `<= 0` oder fehlendem Wert wird kein Override angenommen.
     - `required_activation_minutes`:
       - optionales Feld in Minuten als Operatorkontext.
@@ -353,32 +353,32 @@ Restore- und Gate-Entscheidungslogik (verbindlich):
       (z. B. aus Asset- oder Reservebandgrenzen), nicht aus der bereits erzeugten
       `ReserveEnergyEnvelope`.
       `restore_capability_up_t = if restore_capability_up_kw is set then restore_capability_up_kw else restore_capability_up_t_fallback`
-      `required_activation_kw_up = if restore_shortfall_up_kwh > 0 then restore_capability_up_t else 0`
+      `restore_capability_kw_up = if restore_shortfall_up_kwh > 0 then restore_capability_up_t else 0`
     - Down-Branch:
       `restore_capability_down_t_fallback` ist der analoge deterministische technische Default je Schritt
       (z. B. aus Asset- oder Reservebandgrenzen), nicht aus der bereits erzeugten
       `ReserveEnergyEnvelope`.
       `restore_capability_down_t = if restore_capability_down_kw is set then restore_capability_down_kw else restore_capability_down_t_fallback`
-      `required_activation_kw_down = if restore_shortfall_down_kwh > 0 then restore_capability_down_t else 0`
+      `restore_capability_kw_down = if restore_shortfall_down_kwh > 0 then restore_capability_down_t else 0`
     - Richtungsbasierte Mindest-Rekonstruktionsdauer:
-      - `restore_time_up = if restore_shortfall_up_kwh > 0 and required_activation_kw_up > 0 then restore_shortfall_up_kwh / required_activation_kw_up * 60 else 0`
-      - `restore_time_down = if restore_shortfall_down_kwh > 0 and required_activation_kw_down > 0 then restore_shortfall_down_kwh / required_activation_kw_down * 60 else 0`
+      - `restore_time_up = if restore_shortfall_up_kwh > 0 and restore_capability_kw_up > 0 then restore_shortfall_up_kwh / restore_capability_kw_up * 60 else 0`
+      - `restore_time_down = if restore_shortfall_down_kwh > 0 and restore_capability_kw_down > 0 then restore_shortfall_down_kwh / restore_capability_kw_down * 60 else 0`
     - `restore_shortfall_kwh = max(restore_shortfall_up_kwh, restore_shortfall_down_kwh)`
-    - Falls ein aktiver Branch (`restore_shortfall_*_kwh > 0`) jedoch `required_activation_kw_* <= 0` hat:
-      `ROBUST_INFEASIBLE` mit `limiting_reason_code=NO_RECOVERY_PATH`.
+      - Falls ein aktiver Branch (`restore_shortfall_*_kwh > 0`) jedoch `restore_capability_kw_* <= 0` hat:
+        `ROBUST_INFEASIBLE` mit `limiting_reason_code=NO_RECOVERY_PATH`.
     - Mit manuellem Override aus der aktuellen Zeile von `ReserveEnergyEnvelope`:
-      - `required_activation_kw_up`
+      - `restore_capability_kw_up`
         - Falls gesetzt und `restore_shortfall_up_kwh > 0`:
-          `required_recovery_minutes_up = restore_shortfall_up_kwh / required_activation_kw_up * 60`
+          `required_recovery_minutes_up = restore_shortfall_up_kwh / restore_capability_kw_up * 60`
         - Sonst `required_recovery_minutes_up = +inf`.
-      - `required_activation_kw_down`
+      - `restore_capability_kw_down`
         - Falls gesetzt und `restore_shortfall_down_kwh > 0`:
-          `required_recovery_minutes_down = restore_shortfall_down_kwh / required_activation_kw_down * 60`
+          `required_recovery_minutes_down = restore_shortfall_down_kwh / restore_capability_kw_down * 60`
         - Sonst `required_recovery_minutes_down = +inf`.
       - `required_recovery_minutes = max(required_recovery_minutes_up, required_recovery_minutes_down)`.
     - Ohne Override:
       `required_recovery_minutes = max(restore_time_up, restore_time_down)` (konservativster Branch).
-    - `required_activation_kw_used` ist der Richtungswert (`worst_up_kw_t` oder `worst_down_kw_t`), der `required_recovery_minutes` bestimmt; bei Gleichstand deterministisch die Up-Richtung.
+    - `restore_capability_kw_used` ist der Richtungswert (`worst_up_kw_t` oder `worst_down_kw_t`), der `required_recovery_minutes` bestimmt; bei Gleichstand deterministisch die Up-Richtung.
 - Falls `required_recovery_minutes > max_recovery_time` => `ROBUST_INFEASIBLE` mit
   `limiting_reason_code=RECOVERY_TIMEOUT`.
 - Falls kein zulässiges Window vorliegt:

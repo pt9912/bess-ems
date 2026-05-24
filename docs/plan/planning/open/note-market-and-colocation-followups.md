@@ -186,6 +186,8 @@ sowie Forecast-Serien.
     `quality_mode=degraded_ok`).
     In `quality_mode=strict` ist `SOURCE_FALLBACK_USED` nur dann zulässig, wenn kein zusätzlicher Qualitätsverlust
     dokumentiert ist (also `status_flags` ohne `SOURCE_BACKFILL`).
+    Für die Abgrenzung gelten die Serienbegriffe (`series_type`, `series_product`, `market_bid_area`) exakt nach
+    [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md).
   4. Parallelbetrieb ist erst freigegeben, wenn `CanExecute`-Semantik zwischen
      `plan-market-colocation-model.md` und
      `plan-ler-fcr-reserve-robustness.md` verbindlich abgeglichen ist.
