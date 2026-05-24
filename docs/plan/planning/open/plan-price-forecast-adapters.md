@@ -53,8 +53,10 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
 ### Gemeinsame Serien-Typsignatur (verbindlich)
 
 - Provider-Ports liefern ein einheitliches `SeriesEnvelope`:
-  - `LoadPriceSeriesAsync`
-  - `LoadForecastSeriesAsync` oder separater Forecast-Port
+  - `LoadAsync` auf dem bestehenden `IPriceSeriesSource`-Port
+  - `LoadForecastAsync` oder separater Forecast-Port (wenn ein eigenes
+    Forecast-Interface eingeführt wird; kein paralleler `LoadPriceSeriesAsync`-Name
+    ohne Migration)
 - Der bestehende `PriceSeries`-/`IPriceSeriesSource`-Pfad bleibt die
   Application-Grenze; `SeriesEnvelope`-Objekte müssen in bestehende Domain-Serien
   überführt werden.
@@ -79,7 +81,7 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
     - optional `confidence` (nur spätere Extensions)
   - `source_metadata`:
     - `provider_id`
-    - `license_id`
+    - `license_id` (optional, falls lizenzrelevant)
     - `retrieved_at_utc`
     - `valid_from_utc`, `valid_to_utc`
     - `provider_request_id`
@@ -95,7 +97,7 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
 - `series_type=price` wird auf bestehende Preis-Produkte in `PriceSeries` abgebildet.
   - dafür ist `market_bid_area` verpflichtend und wird auf das entsprechende
     `PriceSeries`-Feld gemappt.
-- `series_type=forecast` dient in diesem Slice der Seitcar-/Inputlogik und darf bis zur Aktivierung
+- `series_type=forecast` dient in diesem Slice der Sidecar-/Inputlogik und darf bis zur Aktivierung
   eines produktiven Forecast-Domaintypen im EMS ausschließlich über den Sidecar-Integrationspfad
   weiterverarbeitet werden. In späteren Slices kann derselbe Contract in ein produktives
   Forecast-Domain-Format überführt werden.
@@ -123,6 +125,7 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
   - kontrollierter Backfill darf maximal 2 aufeinanderfolgende Intervalle pro Lücke schließen.
   - bei Backfill gilt der finale Datenvertrag weiterhin (keine offenen Restlücken).
   - Serien mit Backfill markieren Ergebnisqualität als `SOURCE_DEGRADED`.
+  - `SOURCE_GAP` gilt nur für nicht behebbare Restlücken nach abgeschlossener Backfill-Behandlung.
 
 ### Qualitätsentscheidungen bei `SOURCE_*` (verbindlich)
 
@@ -134,7 +137,7 @@ Die `SOURCE_*`-Auswertung ist für jede Serie deterministisch:
 2) Rohcode-Auswertung
 - `SOURCE_OK` → direkt in Schritt 3.
 - `SOURCE_AUTH_ERROR` → harte Ablehnung (`SOURCE_REJECTED`), kein Retry/Fallback.
-- `SOURCE_GAP` → harte Ablehnung (`SOURCE_REJECTED`), kein Retry/Fallback.
+- `SOURCE_GAP` → harte Ablehnung (`SOURCE_REJECTED`) für nicht behebbare Restlücken nach Backfill, kein Retry/Fallback.
 - `SOURCE_EMPTY` → harte Ablehnung (`SOURCE_REJECTED`), kein Retry/Fallback.
 - `SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_RETRY_EXHAUSTED` → Schritt 3.
 
@@ -223,9 +226,9 @@ Qualitätsminderung werden im Operator-Status separat als Ausführungsdetails er
 
 ### Phase 1: Adapter-Vertrag und Import-Hardening
 
-- Quellenneutrales Adapterinterface oberhalb externer Provider:
-  - `LoadPriceSeriesAsync`
-  - `LoadForecastSeriesAsync` oder separater Forecast-Port
+  - Quellenneutrales Adapterinterface oberhalb externer Provider:
+  - `LoadAsync` (`IPriceSeriesSource`)
+  - `LoadForecastAsync` oder separater Forecast-Port
   - verbindliches `SeriesEnvelope` gemäß obigem Datenvertrag
   - deterministisches Mapping in die bestehende Import-Pipeline (`IPriceSeriesSource`).
 - Cache-/Refresh-Vertrag:

@@ -70,15 +70,16 @@ Moegliche Domain-/Application-Erweiterungen:
     - `export_pos`: positive Leistung bedeutet Export ans Netz
     - `import_pos`: positive Leistung bedeutet Import aus dem Netz
 
-- `LocalGenerationSeries`
+  - `LocalGenerationSeries`
   - Zeitreihe fuer PV/Wind-Erzeugung oder Forecast
   - Pflichtfelder pro Timestamp:
     - `site_id`
     - `timestamp_utc`
     - `resolution_minutes`
-    - optional `alignment_mode` (`reject` | `trim-to-common`)  
+    - `alignment_mode` (`reject` | `trim-to-common`)  
       - `reject`: harte Ablehnung bei Zeitachsenabweichung (Default im produktiven ADR)
-      - `trim-to-common`: kontrollierte Trimmung auf gemeinsame Schnittmenge für Vorverarbeitung
+      - `trim-to-common`: kontrollierte Trimmung auf gemeinsame Schnittmenge für Vorverarbeitung;
+        nicht im produktiven Optimierungs-Request zulässig.
     - `value_kw`
     - `value_type` (`forecast` | `actual`)
     - `source`
@@ -87,12 +88,13 @@ Moegliche Domain-/Application-Erweiterungen:
     - `updated_at_utc`
     - `value_version`
 - Validierung:
-  - gleiche Zeitachse wie `PriceSeries` (UTC, step-genau, gleiche Horizon-Länge)
-  - Ist `alignment_mode=reject` (Default im produktiven ADR): die Zeitachse muss hart identisch sein (gleiches Horizon, gleiche Schrittweite, gleiche Startzeit).
-  - Ist `alignment_mode=trim-to-common` gesetzt:
-    - Schnittmenge auf den gemeinsamen Zeithorizont
-    - deterministische Konvention bei Zeitachsen-Verschiebung
-    - lückenbehaftete Schritte müssen im Anschluss vollständig abgearbeitet werden
+- gleiche Zeitachse wie `PriceSeries` (UTC, step-genau, gleiche Horizon-Länge) bei produktiver Nutzung
+- Ist `alignment_mode=reject` (Default im produktiven ADR): die Zeitachse muss hart identisch sein (gleiches Horizon, gleiche Schrittweite, gleiche Startzeit).
+- Ist `alignment_mode=trim-to-common` gesetzt:
+  - Schnittmenge auf den gemeinsamen Zeithorizont
+  - deterministische Konvention bei Zeitachsen-Verschiebung
+  - lückenbehaftete Schritte müssen im Anschluss vollständig abgearbeitet werden
+  - nur im Forecast-/Preprocessing-Pfad; wird produktiv in `Trim` verworfen.
   - keine offenen Zeitlücken; zulässig: kontrollierte Backfill-Regel (max. 2 Intervalle)
     - `value_kw` ist eine Produktionsleistung und für diese Serie standardmässig nicht negativ.
     - Negative Werte sind nur über einen separaten signierten Netzausgangs-Datensatz zulässig.
@@ -229,6 +231,23 @@ pro Site optional overridebar).
 - Keine Multi-Asset-Fleet-Optimierung ueber mehrere Standorte; das bleibt
   M6-Folgearbeit.
 
+## LP-/MILP-Kompatibilitaetsstrategie
+
+Die Umstellung auf Co-Location-MVP ist feature-gesteuert und darf bestehende LP-basierte
+Bestandsrouten nicht brechen:
+
+- Default bleibt der bestehende LP-Standard fuer `StandaloneBess` und Szenarien ohne
+  aktivierte Co-Location-/Herkunftsrestriktionen.
+- `ClassicalCoLocation`, `HybridWithGridImport`, `GreenStorageRestricted` und damit verbundene
+  Vorzeichen- und Herkunftsrestriktionen werden ueber explizit aktivierte
+  `CoLocationMode`-/Modellschalter auf MILP-Profil gestellt.
+- Der MILP-Schalter ist nicht global: nur betroffene Sites/Anfragen wechseln auf
+  MILP, andere Pfade bleiben in LP.
+- Regressionstest ist als Matrix verbindlich:
+  - LP-basierter Standalone-Fall bleibt bit-kompatibel.
+  - Co-Location mit aktivem Import/Export-/Herkunftsmodell muss auf MILP laufen.
+  - Degraded/Fallback-Fall im `GreenStorageRestricted` folgt dem selben LP/MILP-Wechselpfad.
+
 ---
 
 ## Liefergegenstaende bei Aktivierung
@@ -244,6 +263,8 @@ pro Site optional overridebar).
    - Kein simultaner Netzimport/Netzeinspeisung im gleichen Zeitschritt.
    - Standalone bleibt bit-kompatibel zum heutigen Pfad.
    - PV-Ueberschuss kann Batterie laden, ohne Exportlimit zu verletzen.
+   - `site_grid_power_sign=import_pos`: Vorzeichen-/Grenzlogik bleibt konsistent
+     zur Export-Variante bei identischem physischem Leistungsfluss.
    - Netzexportlimit begrenzt Batterieentladung plus lokale Erzeugung.
    - `GreenStorageRestricted`: `e_local_0`-Randfall (`0` und >0) und `local_origin_capacity_kwh`-Randfall (`0`, Minimalreserve) werden explizit geprüft.
    - `GreenStorageRestricted`: Lauf wird mit `CONFIG_INCONSISTENT` geblockt, wenn eine Netzladung (`p_grid_import_t > 0`) versucht wird.

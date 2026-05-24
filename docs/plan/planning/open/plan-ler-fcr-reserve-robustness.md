@@ -130,6 +130,8 @@ Nicht explizit modelliert:
     - `available_down_kwh`
     - `status`
     - `limiting_reason`
+    - `required_up_kwh` (optional, fuer Restore-Planung)
+    - `required_down_kwh` (optional, fuer Restore-Planung)
   - Optional:
     - `required_activation_kw`
     - `required_activation_minutes`
@@ -184,7 +186,9 @@ Deterministische Berechnung (verbindlich):
   - Vorzeichenkonvention wie im Optimierer: `b_t > 0` Entladen, `b_t < 0` Laden.
 - Reserve-Anforderungen je Zeitschritt:
   - `fcr_up_kw_t`, `fcr_down_kw_t`, `afrr_up_kw_t`, `afrr_down_kw_t`, `mfrr_up_kw_t`, `mfrr_down_kw_t`
-  - optional: Pflichtanteil je Produkt `alpha_afrr_t`, `alpha_mfrr_t` im Bereich `[0,1]`
+  - optionale Pflichtanteile je Produkt und Richtung:
+    - `alpha_afrr_up_t`, `alpha_afrr_down_t`
+    - `alpha_mfrr_up_t`, `alpha_mfrr_down_t`
     - Default: `1.0`, wenn das Produkt gebucht ist, sonst `0.0` bei nicht gebuchtem Produkt.
  - `Δt = resolution_minutes / 60` (in Stunden).
 - Hilfsgröße:
@@ -197,8 +201,8 @@ Deterministische Berechnung (verbindlich):
   - `available_up_kwh_base_t = max(0, soc_t^{eff} - soc_min_eff_kwh) * eta_discharge`
   - `available_down_kwh_base_t = max(0, soc_max_eff_kwh - soc_t^{eff}) / eta_charge`
 - Worst-Case-Energie je Richtung (kWh):
-  - `worst_up_kwh_t = min(Δt, t_min_fcr/60) * fcr_up_kw_t + min(Δt, full_activation_time_afrr_eff/60) * (alpha_afrr_t * afrr_up_kw_t) + min(Δt, full_activation_time_mfrr_eff/60) * (alpha_mfrr_t * mfrr_up_kw_t)`
-  - `worst_down_kwh_t = min(Δt, t_min_fcr/60) * fcr_down_kw_t + min(Δt, full_activation_time_afrr_eff/60) * (alpha_afrr_t * afrr_down_kw_t) + min(Δt, full_activation_time_mfrr_eff/60) * (alpha_mfrr_t * mfrr_down_kw_t)`
+  - `worst_up_kwh_t = min(Δt, t_min_fcr/60) * fcr_up_kw_t + min(Δt, full_activation_time_afrr_eff/60) * (alpha_afrr_up_t * afrr_up_kw_t) + min(Δt, full_activation_time_mfrr_eff/60) * (alpha_mfrr_up_t * mfrr_up_kw_t)`
+  - `worst_down_kwh_t = min(Δt, t_min_fcr/60) * fcr_down_kw_t + min(Δt, full_activation_time_afrr_eff/60) * (alpha_afrr_down_t * afrr_down_kw_t) + min(Δt, full_activation_time_mfrr_eff/60) * (alpha_mfrr_down_t * mfrr_down_kw_t)`
 - Normalisierte Worst-Case-Leistung:
   - `worst_up_kw_t = worst_up_kwh_t / Δt`
   - `worst_down_kw_t = worst_down_kwh_t / Δt`
@@ -298,8 +302,10 @@ Pflichtregeln:
  vorschlagen:
 
  - Zuerst wird je Zeitfenster berechnet, ob eine Wiederherstellung je Richtung nötig ist:
-   - `restore_up_kwh_t = max(0, required_up_kwh_t - available_up_kwh_t)`
-   - `restore_down_kwh_t = max(0, required_down_kwh_t - available_down_kwh_t)`
+   - `required_restore_up_kwh_t = coalesce(required_up_kwh_t, worst_up_kwh_t)`
+   - `required_restore_down_kwh_t = coalesce(required_down_kwh_t, worst_down_kwh_t)`
+   - `restore_up_kwh_t = max(0, required_restore_up_kwh_t - available_up_kwh_t)`
+   - `restore_down_kwh_t = max(0, required_restore_down_kwh_t - available_down_kwh_t)`
  - Wenn `restore_up_kwh_t > 0` und `restore_down_kwh_t > 0` im selben Schritt gilt:
    - `ReserveRobustnessResult` wird mit `ROBUST_INFEASIBLE` und `limiting_reason_code = NO_RECOVERY_PATH` geführt (ein Batteriekorridor kann pro Schritt nicht zugleich laden und entladen).
  - Sonst:
@@ -344,11 +350,14 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 - Application-Port:
   - `IReserveRobustnessCheck`
   - optional spaeter `IReserveRestorationPlanner`
-- Fehlercodes und Metriken:
+  - Fehlercodes und Metriken:
   - `reserve_robustness_status`
   - `reserve_robustness_limiting_reason`
   - `reserve_recovery_state`
   - `reserve_restore_energy_kwh`
+  - Run-Metadatum: `CanExecute` (bool), default `true` bei produktiv
+    nutzbaren Läufen, `false` bei klaren Restore- oder Gate-bedingten
+    Ausführungsblockaden.
 
 ### Phase 3: Optimierungsintegration
 
@@ -365,16 +374,19 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 - Ergebnis-/Run-Mapping (verbindlich):
   - `reserve_robustness_status = ReserveRobustnessResult.status`.
   - `reserve_robustness_limiting_reason = ReserveRobustnessResult.limiting_reason_code`.
+  - `CanExecute = reserve_robustness_status` ist `true`, wenn der erzeugte
+    Schedule ohne Restore-Vorlauf sicher ausgeführt werden darf; bei
+    `ROBUST_NEEDS_INTRADAY_RESTORE` immer `false`.
   - `ROBUST_OK` => keine zusätzliche Hard-Stop-Sperre.
   - `ROBUST_NEEDS_INTRADAY_RESTORE` =>
     - bei verfügbarem Restore-Fenster: Optimierung bleibt lauffähig,
       der Lauf wird mit `OptimizationSolverStatus.Feasible` persistiert,
-      `can_execute=false` und Operator-Hinweis `action=intraday_restore_required`.
+      `CanExecute=false` und Operator-Hinweis `action=intraday_restore_required`.
     - bei geschlossenem Gate / keinem Wiederherstellungsfenster:
       `OptimizationSolverStatus.Failed` mit
       `TerminationCode=reserve-robustness-not-executable`,
       `TerminationDetail=INTRADAY_GATE_CLOSED`,
-      `can_execute=false` in Operator-/Replay-Ausgabe.
+      `CanExecute=false` in Operator-/Replay-Ausgabe.
   - `ROBUST_INFEASIBLE`:
     - bei `limiting_reason_code=RECOVERY_TIMEOUT` =>
       `OptimizationSolverStatus.Failed` mit
@@ -388,7 +400,7 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
     `TerminationCode=reserve-robustness-policy-unsupported`.
 - `ROBUST_OK` wird mit dem eigentlichen Optimizerergebnis (`Optimal`/`Feasible`) persistiert.
 - `ROBUST_NEEDS_INTRADAY_RESTORE` wird immer als `OptimizationSolverStatus.Feasible`
-  mit `can_execute=false` und explizitem Restore-Hinweis persistiert.
+  mit `CanExecute=false` und explizitem Restore-Hinweis persistiert.
 
 ### Phase 4: Operator- und Replay-Sicht
 
@@ -427,7 +439,7 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 4. Application-Port `IReserveRobustnessCheck`.
 5. Optimierungs-Precheck fuer energie-robuste Reservebaender.
 6. Intraday-Restaurationsbedarf als strukturierter Optimierungsinput.
-7. Operator-faehige Fehlercodes, Metriken und API-Ausgabe.
+7. Operator-faehige Fehlercodes, Metriken und API-Ausgabe inkl. `CanExecute`.
 8. Dokumentation der Grenzen: keine Praequalifikation, keine
    automatische Marktorder.
 
@@ -444,7 +456,7 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 - Ein hoher SOC mit aFRR-Down-Verpflichtung erzeugt entsprechend einen
   Entladebedarf oder einen klaren Infeasible-Status.
 - Bei `ROBUST_NEEDS_INTRADAY_RESTORE` ist der Optimierungslauf als
-  `can_execute=false` persistiert und die notwendige Restore-Massnahme
+  `CanExecute=false` persistiert und die notwendige Restore-Massnahme
   in Operator-/Replay-Ausgabe explizit markiert.
 - `t_min_fcr`, `full_activation_time` und `max_recovery_time` sind in
   Tests sichtbar und nicht nur Konfigurationsfelder.
