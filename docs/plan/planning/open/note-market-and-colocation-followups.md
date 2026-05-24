@@ -91,7 +91,7 @@ Fachvalidierung und als Input für produktnahe Folge-Slices.
 
 **Problem heute:** `bess-ems` optimiert und dispatcht Batterie-Assets,
 aber das Marktmodell unterscheidet noch nicht explizit zwischen
-Standalone-BESS, klassischer Co-Location, Hybridmodell mit Netzbezug und
+Standalone-BESS, `ClassicalCoLocation`, Hybridmodell mit Netzbezug und
 förder-/herkunftsgebundenem Grünstromspeicher.
 
 **Trigger** (eines reicht):
@@ -112,13 +112,13 @@ förder-/herkunftsgebundenem Grünstromspeicher.
 **Abnahmekriterien:**
 
 - Marktmodell unterscheidet klar mindestens die drei produktiven Betriebsformen
-  (Standalone, klassische Co-Location, Hybrid mit Netzbezug) und behandelt
+  (`StandaloneBess`, `ClassicalCoLocation`, `HybridWithGridImport`) und behandelt
   `GreenStorageRestricted` als optionalen Sondermodus.
 - Für jede Form ist ein Constraint-Satz definiert
   (Netzanschlussleistung, Einspeisung, lokale Erzeugung, Speicher
   Überbauung).
 - Für den ersten Slice existieren mindestens je ein validierter Testfall für die
-  drei produktiven Betriebsformen inkl. Rechen- und Ergebnisbericht.
+  drei produktiven Betriebsformen (`StandaloneBess`, `ClassicalCoLocation`, `HybridWithGridImport`) inkl. Rechen- und Ergebnisbericht.
 - Für `GreenStorageRestricted` sind im ersten Slice eigene Validierungsfälle im
   selben Slice erforderlich (Validierungsmodus), ohne produktive Förderlogik im
   Regelkreis (Eingangskonformität nur).
@@ -163,7 +163,7 @@ sowie Forecast-Serien.
 
 - [ ] Externe Quellenanalyse abgeschlossen (DFBEW, Co-Location, Forecast-Trading, zusätzliche Medium-Quellen) und fachlich klassifiziert.
 - [ ] F-MKT-01-Abnahmebedingungen sind dokumentiert und für mindestens diese drei
-  produktiven Betriebsformen (Standalone, Classical Co-Location, Hybrid mit Netzbezug) definiert.
+  produktiven Betriebsformen (`StandaloneBess`, `ClassicalCoLocation`, `HybridWithGridImport`) definiert.
 - [ ] `GreenStorageRestricted` ist als separater Sondermodus im selben Slice als
   Validierungsmodus dokumentiert.
 - [ ] F-MKT-02-Abnahmebedingungen sind dokumentiert (mind. 2 Preis-Adapter + 2 Forecast-Adapter, Fallback-/Degradation-Modell, Aktualisierung + Alarmierung).

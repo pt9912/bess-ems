@@ -45,8 +45,11 @@ Entscheidungsreihenfolge je Request:
    isolierbar sowie deterministisch reaggregierbar ist.
 
 Die Umschaltung erfolgt per Request und ist nicht global. Ein Request mit mindestens einem betroffenen
-Asset (`ClassicalCoLocation`, `HybridWithGridImport`, `GreenStorageRestricted` oder aktivierter `OriginConstraint`)
+Asset (`ClassicalCoLocation`, `HybridWithGridImport` oder aktivierter `OriginConstraint`)
 wird standardmäßig als `MILP` ausgeführt.
+`GreenStorageRestricted` bleibt explizit außerhalb des produktiven Routine-Betriebs:
+- im produktiven Scope ist `GreenStorageRestricted` nur in einem expliziten Validierungsmodus (z. B. separater Migrations-/Freigabepfad) zulässig;
+- bei produktivem Routine-Run ohne diese explizite Freigabe gilt hart `CONFIG_INVALID` (`GREEN_STORAGE_RESTRICTED_PRODUCTIVE_BLOCKED`).
 
 Kompatibilitätsprinzip:
 

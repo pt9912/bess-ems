@@ -55,8 +55,8 @@ Kompatibilitäts-/Migrationsprinzip:
   - Forecast/Forecast-Adapter nutzen `IForecastSeriesSource`,
   - beide werden vor dem Optimierer über denselben Mapping-Layer auf die aktuelle Domäne projiziert.
 - Für den produktiven Slice ist die bestehende `PriceSeries`/Persistenzkette kompatibel zu erweitern:
-  - bestehender `IPriceSeriesStore`- und Import-Schlüssel darf nicht nur auf Markt/Produkt/Bereich/Quelle/Timestep basieren.
-  - Die Persistenz muss mindestens `series_id` und `series_version` als Teil der Identität tragen (oder einen deterministischen Ersatzschlüssel aus genau diesen Werten plus `series_type/product/site_id/area`).
+- bestehender `IPriceSeriesStore`- und Import-Schlüssel darf nicht nur auf Markt/Produkt/Bereich/Quelle/Timestep basieren.
+- Die Persistenz muss mindestens `series_id`, `series_version` **und** `source.provider_id` als Teil der Identität tragen (oder einen deterministischen Ersatzschlüssel aus genau diesen Werten plus `series_type/product/site_id/market_bid_area`).
   - Ohne diese Erweiterung bleibt F-MKT-02 im produktiven Modus auf den bisherigen Altpfad beschränkt, bis ein dedizierter Speicher-Migrationspfad freigegeben wurde.
 - In der Einführungsphase gilt "Dual-Path":
   - Altpfad unverändert lauffähig,
