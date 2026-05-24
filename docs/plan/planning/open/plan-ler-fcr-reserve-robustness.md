@@ -391,9 +391,9 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 - Ergebnis-/Run-Mapping (verbindlich):
   - `reserve_robustness_status = ReserveRobustnessResult.status`.
   - `reserve_robustness_limiting_reason = ReserveRobustnessResult.limiting_reason_code`.
-  - `CanExecute = reserve_robustness_status` ist `true`, wenn der erzeugte
-    Schedule ohne Restore-Vorlauf sicher ausgeführt werden darf; bei
-    `ROBUST_NEEDS_INTRADAY_RESTORE` immer `false`.
+  - `CanExecute = (reserve_robustness_status == ROBUST_OK)` ist `true`, wenn der
+    erzeugte Schedule ohne Restore-Vorlauf sicher ausgeführt werden darf; bei
+    allen anderen Statuswerten `false`.
   - `ROBUST_OK` => keine zusätzliche Hard-Stop-Sperre.
   - `ROBUST_NEEDS_INTRADAY_RESTORE` =>
     - bei verfügbarem Restore-Fenster: Optimierung bleibt lauffähig,
