@@ -86,8 +86,8 @@ Nicht explizit modelliert:
     - Wenn kein `conservative_soc_headroom_kwh` gesetzt ist, wird bei `conservative` `conservative_soc_headroom_ratio` genutzt.
     - `t_min_fcr`
   - `full_activation_time` (Fallback-Wert; produkt-spezifische Werte empfohlen)
-  - optional `full_activation_time_afrr`
-  - optional `full_activation_time_mfrr`
+- optional `full_activation_time_afrr` (nur wenn sinnvoll gesetzt; bei gesetztem Wert `> 0`)
+- optional `full_activation_time_mfrr` (nur wenn sinnvoll gesetzt; bei gesetztem Wert `> 0`)
   - optional `simultaneous_reserve_direction_allowed` (default `false`)
   - optional `eta_charge` (default: `1.0`, falls nicht aus dem Assetmodell übernommen)
   - optional `eta_discharge` (default: `1.0`, falls nicht aus dem Assetmodell übernommen)
@@ -149,7 +149,8 @@ Nicht explizit modelliert:
   - Wenn `minutes_until_next_restore_window_start` `null` ist, liegt zum Bewertungszeitpunkt
     kein gültiges Intraday-Restorefenster vor.
   - `market_time_unit` muss exakt `minute` sein und mit `resolution_minutes` konsistent sein.
-  - `t_min_fcr`, `full_activation_time`, `full_activation_time_afrr`, `full_activation_time_mfrr`, `max_recovery_time`, `intraday_gate_closure`, `intraday_preparation_time` und `resolution_minutes` müssen streng `> 0` sein.
+  - `t_min_fcr`, `full_activation_time`, `max_recovery_time`, `intraday_gate_closure`, `intraday_preparation_time` und `resolution_minutes` müssen streng `> 0` sein.
+  - `full_activation_time_afrr` und `full_activation_time_mfrr` müssen, falls gesetzt, streng `> 0` sein.
   - `simultaneous_reserve_direction_allowed` ist optional-boolean; fehlt/`false` wird als Default `false` interpretiert.
   - `simultaneous_reserve_direction_allowed=true` ist in Kombination mit nicht-linearer Kopplung nur mit klarer
     Reihenfolgeimplementierung in der Worst-Case-Rekursion erlaubt.
@@ -314,17 +315,22 @@ Restore- und Gate-Entscheidungslogik (verbindlich):
     `restore_shortfall_up_kwh = max(0, worst_up_kwh_t - (soc_plan_up_t - soc_min_eff_kwh) * eta_discharge)`
   - Down-Verstoß-Defizit:
     `restore_shortfall_down_kwh = max(0, worst_down_kwh_t - (soc_max_eff_kwh - soc_plan_down_t) / eta_charge)`
-  - Verfügbare Wiederherstellungsleistung je Schritt:
-    - `required_activation_kw_candidate` folgt der aktiven Restore-Richtung:
-      - `required_activation_kw_candidate = worst_up_kw_t`, wenn `restore_up_kwh_t > 0`
-      - `required_activation_kw_candidate = worst_down_kw_t`, wenn `restore_down_kwh_t > 0`
-      - andernfalls `required_activation_kw_candidate = 0`
-    - `required_activation_kw_used = coalesce(required_activation_kw, required_activation_kw_candidate)`
-    `restore_shortfall_kwh = max(restore_shortfall_up_kwh, restore_shortfall_down_kwh)`
-  - Wenn `required_activation_kw_used <= 0`: `ROBUST_INFEASIBLE` mit
-    `limiting_reason_code=NO_RECOVERY_PATH`.
-  - Bei positiver Aktivierungsfähigkeit wird die konservative Wiederherstellungsdauer berechnet als:
-    `required_recovery_minutes = restore_shortfall_kwh / required_activation_kw_used * 60`
+- Verfügbare Wiederherstellungsleistung je Schritt:
+    - Up-Branch: `restore_shortfall_up_kwh` kann durch `worst_up_kw_t` rückgewonnen werden:
+      `required_activation_kw_up = if restore_shortfall_up_kwh > 0 then worst_up_kw_t else 0`
+    - Down-Branch:
+      `required_activation_kw_down = if restore_shortfall_down_kwh > 0 then worst_down_kw_t else 0`
+    - Richtungsbasierte Mindest-Rekonstruktionsdauer:
+      - `restore_time_up = if restore_shortfall_up_kwh > 0 and required_activation_kw_up > 0 then restore_shortfall_up_kwh / required_activation_kw_up * 60 else 0`
+      - `restore_time_down = if restore_shortfall_down_kwh > 0 and required_activation_kw_down > 0 then restore_shortfall_down_kwh / required_activation_kw_down * 60 else 0`
+    - `restore_shortfall_kwh = max(restore_shortfall_up_kwh, restore_shortfall_down_kwh)`
+    - Falls ein aktiver Branch (`restore_shortfall_*_kwh > 0`) jedoch `required_activation_kw_* <= 0` hat:
+      `ROBUST_INFEASIBLE` mit `limiting_reason_code=NO_RECOVERY_PATH`.
+    - Mit manuellem Override `required_activation_kw > 0`:
+      `required_recovery_minutes = restore_shortfall_kwh / required_activation_kw * 60`.
+    - Ohne Override:
+      `required_recovery_minutes = max(restore_time_up, restore_time_down)` (konservativster Branch).
+    - `required_activation_kw_used` ist der Richtungswert (`worst_up_kw_t` oder `worst_down_kw_t`), der `required_recovery_minutes` bestimmt; bei Gleichstand deterministisch die Up-Richtung.
 - Falls `required_recovery_minutes > max_recovery_time` => `ROBUST_INFEASIBLE` mit
   `limiting_reason_code=RECOVERY_TIMEOUT`.
 - Falls kein zulässiges Window vorliegt:
@@ -342,7 +348,7 @@ Explizite Mappings zwischen Eingangsfehlern und Ergebniscodes:
 
 - `ROBUST_POLICY_UNSUPPORTED`
   - Policy fehlt oder ist inkompatibel (`market_time_unit`, Auflösungsinkonsistenzen,
-    unbekannte Produktparameter, fehlende `full_activation_time*`-Felder, ungültige Wirkungsgrade).
+    unbekannte Produktparameter, inkonsistente Zeitkonfiguration je Produkt, ungültige Wirkungsgrade).
   - `limiting_reason_code=POLICY_MISMATCH`
 - `ROBUST_SOURCE_DATA_MISSING`
   - Erforderliche Reserve-/Statusdaten (z. B. `fcr_*`, `afrr_*`, `mfrr_*`, Frequenz-/LER-Status) sind nicht verfügbar.
@@ -594,7 +600,9 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
   - `is_ler=true` und kein Moduswert gesetzt (beide optional Felder leer/nicht gesetzt) → `ROBUST_POLICY_UNSUPPORTED`.
   - negative/überschüssige Werte (`self_discharge_kwh_per_hour < 0`, `self_discharge_soc_per_hour < 0` oder `> 1`) → `ROBUST_POLICY_UNSUPPORTED`.
 - `market_time_unit` abseits von `minute` → `ROBUST_POLICY_UNSUPPORTED`.
-- Auflösungsfelder kleiner oder gleich 0 (`t_min_fcr`, `full_activation_time`, `full_activation_time_afrr`, `full_activation_time_mfrr`, `max_recovery_time`, `intraday_gate_closure`, `intraday_preparation_time`, `resolution_minutes`) → `ROBUST_POLICY_UNSUPPORTED`.
+- Auflösungsfelder kleiner oder gleich 0 (`t_min_fcr`, `full_activation_time`, `max_recovery_time`, `intraday_gate_closure`, `intraday_preparation_time`, `resolution_minutes`) → `ROBUST_POLICY_UNSUPPORTED`.
+- `full_activation_time_afrr` / `full_activation_time_mfrr` werden nur bei gesetztem Feldwert geprüft:
+  - gesetzt und `<= 0` → `ROBUST_POLICY_UNSUPPORTED`.
 - `conservative_soc_headroom` außerhalb `0..1` (ratio) bzw. `<0` (kwh) → `ROBUST_POLICY_UNSUPPORTED`.
 - FCR-Worst-Case fuer nicht-LER: volle FCR-Leistung ueber Horizont.
 - LER-konservative FCR-Huelle mit `t_min_fcr`.
