@@ -85,12 +85,19 @@ Nicht explizit modelliert:
     - `intraday_gate_closure`
     - `intraday_preparation_time`
     - `market_time_unit`
+  - Zeiteinheiten (verbindlich, alle in Minuten):
+    - `t_min_fcr`, `full_activation_time`, `max_recovery_time`,
+      `intraday_gate_closure`, `intraday_preparation_time`
+    - `market_time_unit` muss `minute` sein.
+    - `resolution_minutes` und diese Policy-Felder müssen kompatibel sein.
 
 - `ReserveEnergyEnvelope`
   - Zeitschrittweise Worst-Case-Energiehuelle fuer Up- und Down-Richtung.
   - Mindestfelder pro Schritt:
     - `timestamp_utc`
     - `resolution_minutes` (int, muss mit Policy/Horizont konsistent sein)
+    - `worst_up_kw`
+    - `worst_down_kw`
     - `worst_up_kwh`
     - `worst_down_kwh`
     - `available_up_kwh`
@@ -144,12 +151,13 @@ sichtbar sein.
 Verbindliche Zeitscheiben-Definition:
 
 - `Δt = resolution_minutes / 60` (in Stunden) je Schritt.
-- `worst_up_kwh_t`/`worst_down_kwh_t` berechnen:
-  - FCR-Teil: `P_FCR * min(Δt, t_min_fcr / 60)`.
-  - aFRR-/mFRR-Aufrufteil: Aktivierungsleistung multipliziert mit
-    `min(Δt, full_activation_time / 60)`.
-- `worst_*_kwh` muss stets auf dieselbe Zeiteinheit wie `worst_*_kw`/
-  Leistungskomponenten normiert werden.
+- `worst_up_kwh_t`/`worst_down_kwh_t`:
+  - Berechnung im Envelope-Generator:
+    - `worst_up_kwh_t = worst_up_kw_t * Δt`.
+    - `worst_down_kwh_t = worst_down_kw_t * Δt`.
+  - Der Generator muss dafür die vorab gewichtete Worst-Case-Leistung liefern:
+    - FCR-Anteil: Leistung * `min(Δt, t_min_fcr / 60)`.
+    - aFRR-/mFRR-Aufrufanteil: Leistung * `min(Δt, full_activation_time / 60)`.
 - `ReserveEnergyEnvelope.resolution_minutes` und `ReserveRobustnessPolicy.market_time_unit`
   müssen pro Check konsistent sein, sonst `ROBUST_POLICY_UNSUPPORTED`.
 
@@ -250,9 +258,12 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
   - `ROBUST_OK` => `run_status=OK`, `can_execute=true`.
   - `ROBUST_NEEDS_INTRADAY_RESTORE` => `run_status=DEGRADED`, `can_execute=true`,
     Operator-Hinweis `action=intraday_restore_required`.
-  - `ROBUST_INFEASIBLE` / `ROBUST_SOURCE_DATA_MISSING` => `run_status=FAILED`,
-    `can_execute=false`.
-  - `RECOVERY_TIMEOUT` / `ROBUST_POLICY_UNSUPPORTED` => `run_status=BLOCKED`,
+  - `ROBUST_INFEASIBLE`:
+    - bei `limiting_reason_code=RECOVERY_TIMEOUT` => `run_status=BLOCKED`,
+      `can_execute=false`, Eingriff notwendig.
+    - sonst => `run_status=FAILED`, `can_execute=false`.
+  - `ROBUST_SOURCE_DATA_MISSING` => `run_status=FAILED`, `can_execute=false`.
+  - `ROBUST_POLICY_UNSUPPORTED` => `run_status=BLOCKED`,
     `can_execute=false`, Eingriff notwendig.
 
 ### Phase 4: Operator- und Replay-Sicht
