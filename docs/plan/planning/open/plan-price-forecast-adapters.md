@@ -54,14 +54,14 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
 
 - Provider-Ports liefern ein einheitliches `SeriesEnvelope`:
   - `LoadAsync` auf dem bestehenden `IPriceSeriesSource`-Port
-  - `LoadForecastAsync` oder separater Forecast-Port (wenn ein eigenes
-    Forecast-Interface eingeführt wird; kein paralleler `LoadPriceSeriesAsync`-Name
-    ohne Migration)
+  - `LoadForecastAsync` auf neuem `IForecastSeriesSource`-Port
+    (separate Schnittstelle zur Preis-/Forecast-Domain, kein paralleler `LoadPriceSeriesAsync`-Name ohne explizite Migrationsphase)
 - Der bestehende `PriceSeries`-/`IPriceSeriesSource`-Pfad bleibt die
   Application-Grenze; `SeriesEnvelope`-Objekte müssen in bestehende Domain-Serien
   überführt werden.
 - Der minimale `SeriesEnvelope` enthält:
   - `series_id` (stabil)
+  - `series_version` (stabil, monoton wachsend oder semantische Versionskennung)
   - `site_id` (optional)
     - erforderlich für standortgebundene Forecast-/Erzeugungs-/Last-/Wetter-Reihen
     - optional oder leer für produktweite Forecast-Daten ohne Standortkontext
@@ -226,9 +226,10 @@ Qualitätsminderung werden im Operator-Status separat als Ausführungsdetails er
 
 ### Phase 1: Adapter-Vertrag und Import-Hardening
 
-  - Quellenneutrales Adapterinterface oberhalb externer Provider:
+- Quellenneutrales Adapterinterface oberhalb externer Provider:
   - `LoadAsync` (`IPriceSeriesSource`)
-  - `LoadForecastAsync` oder separater Forecast-Port
+  - `LoadForecastAsync` (`IForecastSeriesSource`)
+  - Adapter-Bridge zwischen `SeriesEnvelope` und produktiven Forecast-/Price-Domainmodellen
   - verbindliches `SeriesEnvelope` gemäß obigem Datenvertrag
   - deterministisches Mapping in die bestehende Import-Pipeline (`IPriceSeriesSource`).
 - Cache-/Refresh-Vertrag:
@@ -242,6 +243,7 @@ Qualitätsminderung werden im Operator-Status separat als Ausführungsdetails er
   - letzter Fehlercode (`SOURCE_*`)
   - Datenhorizont
   - Quelle und Produkt
+  - Serien-ID plus `series_version` des zuletzt geladenen Satzes
 - Primärkennzeichnung je `series_type` (`primary`, `fallback`, `disabled`)
 - Deterministische Reaktionsregeln:
   - `SOURCE_OK`: normaler Betrieb

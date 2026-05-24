@@ -66,7 +66,7 @@ Moegliche Domain-/Application-Erweiterungen:
   - `max_import_kw`
   - `max_export_kw`
   - optional `grid_connection_power_kw`
-  - optional `site_grid_power_sign`: `export_pos` oder `import_pos` (default: `export_pos`)
+  - `site_grid_power_sign` (verpflichtend): `export_pos` oder `import_pos`
     - `export_pos`: positive Leistung bedeutet Export ans Netz
     - `import_pos`: positive Leistung bedeutet Import aus dem Netz
 
@@ -161,7 +161,8 @@ Gleichungen:
 
 Verbindliche Defaults (Phase-1-ADR):
 
-- `site_grid_power_sign` ist ein Pflichtfeld für den produktiven `SiteConstraint`; fehlt es, gilt standardisiert `export_pos`.
+- `site_grid_power_sign` ist ein Pflichtfeld für produktive `SiteConstraint`-Konfigurationen.
+  - Bei einem Produktivlauf ohne `site_grid_power_sign` endet der Lauf mit `CONFIG_INCONSISTENT`.
 - `max_import_kw` und `max_export_kw` sind harte Pflichtfelder (`>= 0`) je Site.
 - `grid_connection_power_kw` ist optional; wenn nicht gesetzt, ist nur die Einzelgrenze über `max_import_kw`/`max_export_kw` aktiv.
 - `d_t` ist Richtungs-Binärvariable entsprechend der Site-Konvention; für beide
@@ -188,6 +189,7 @@ Interpretation:
   - `0 <= e_local_t <= local_origin_capacity_kwh`
   - `e_local_0` ist konfigurierbar (meist 0).
 - Harte Koppelregeln:
+  - `p_grid_import_t == 0` (für beide Site-Konventionen) – vollständiges Netzbezugsverbot.
   - `-b_t <= (g_t - c_t)` (Laden nur solange lokaler Überschuss vorliegt)
   - `b_t <= e_local_t * eta_discharge / Δt` (Entladen nur aus vorhandener lokaler Herkunftsmasse)
   - Ist kein Herkunftsnachweis oder keine ausreichende lokale Quelle vorhanden, gilt `CONFIG_INCONSISTENT`.
@@ -212,9 +214,8 @@ Die bestehende Vorzeichenkonvention bleibt unveraendert:
 - Batterie `> 0 kW` = Entladen
 - Batterie `< 0 kW` = Laden
 
-Für den Netzanschlusspunkt ist die Konvention in diesem Slice vollständig festgelegt
-(Produktivmodus: `site_grid_power_sign=export_pos` als Default, umsetzungsseitig
-pro Site optional overridebar).
+Für den Netzanschlusspunkt ist die Konvention in diesem Slice vollständig festgelegt.
+`site_grid_power_sign` ist je Site explizit zu konfigurieren; `export_pos` oder `import_pos` sind beide zulässig.
 
 ---
 

@@ -90,6 +90,9 @@ Nicht explizit modelliert:
     - optional `full_activation_time_mfrr`
     - optional `eta_charge` (default: `1.0`, falls nicht aus dem Assetmodell übernommen)
     - optional `eta_discharge` (default: `1.0`, falls nicht aus dem Assetmodell übernommen)
+    - optional `self_discharge_mode` (Standard: `absolute_kwh_per_hour`, Werte: `absolute_kwh_per_hour` | `relative_soc_per_hour`)
+    - optional `self_discharge_kwh_per_hour` (Standard: `0`, gültig nur bei `self_discharge_mode=absolute_kwh_per_hour`)
+    - optional `self_discharge_soc_per_hour` (gültig nur bei `self_discharge_mode=relative_soc_per_hour`)
     - `max_recovery_time`
     - `intraday_gate_closure`
     - `intraday_preparation_time`
@@ -103,6 +106,14 @@ Nicht explizit modelliert:
   - Wirkungsgrade:
     - Wird `eta_charge`/`eta_discharge` in der Policy nicht gesetzt, sind sie aus dem Assetmodell zu lesen.
     - Falls gesetzt, muss gelten: `0 < eta_charge <= 1` und `0 < eta_discharge <= 1`.
+  - Selbstentladung:
+    - Exakt einer der beiden Verlusteinstellungen muss gesetzt sein: `self_discharge_kwh_per_hour` oder `self_discharge_soc_per_hour`.
+    - `self_discharge_mode=absolute_kwh_per_hour`:
+      - `self_discharge_kwh_per_hour` ist Pflichtfeld (`>= 0`),
+      - `self_discharge_soc_per_hour` wird ignoriert.
+    - `self_discharge_mode=relative_soc_per_hour`:
+      - `self_discharge_soc_per_hour` ist Pflichtfeld (`>= 0`, Anteil SOC-Verlust pro Stunde),
+      - `self_discharge_kwh_per_hour` wird ignoriert.
   - Für `soc_strategy=conservative` gelten Zusatzregeln:
     - `conservative_soc_headroom_ratio` muss im Bereich `0..1` liegen.
     - `conservative_soc_headroom_kwh` muss `>= 0` sein.
@@ -182,7 +193,9 @@ Deterministische Berechnung (verbindlich):
   - `soc_t`: SOC zu Beginn des Intervalls in kWh.
   - `soc_min_kwh`, `soc_max_kwh` pro Asset.
   - `eta_discharge`, `eta_charge`.
-  - `self_discharge_kwh_per_hour` optional (Default `0`): deterministische Selbstentladung in kWh pro Stunde.
+  - `self_discharge_mode` (default `absolute_kwh_per_hour`) und damit korrespondierende Verlustkennzahl:
+    - `self_discharge_kwh_per_hour` (absolute VerlustkWh/h) oder
+    - `self_discharge_soc_per_hour` (SOC-Abschlag pro Stunde).
   - Vorzeichenkonvention wie im Optimierer: `b_t > 0` Entladen, `b_t < 0` Laden.
 - Reserve-Anforderungen je Zeitschritt:
   - `fcr_up_kw_t`, `fcr_down_kw_t`, `afrr_up_kw_t`, `afrr_down_kw_t`, `mfrr_up_kw_t`, `mfrr_down_kw_t`
@@ -192,7 +205,11 @@ Deterministische Berechnung (verbindlich):
     - Default: `1.0`, wenn das Produkt gebucht ist, sonst `0.0` bei nicht gebuchtem Produkt.
  - `Δt = resolution_minutes / 60` (in Stunden).
 - Hilfsgröße:
-  - `self_discharge_loss_kwh_t = self_discharge_kwh_per_hour * Δt`.
+  - `self_discharge_loss_kwh_t` ist deterministisch zu berechnen:
+    - bei `self_discharge_mode=absolute_kwh_per_hour`:
+      `self_discharge_loss_kwh_t = self_discharge_kwh_per_hour * Δt`.
+    - bei `self_discharge_mode=relative_soc_per_hour`:
+      `self_discharge_loss_kwh_t = soc_t * self_discharge_soc_per_hour * Δt`.
 - Interner SOC-Rechnungszugang aus geplanter Fahrplanposition:
   - `soc_{t+1,plan} = soc_t - max(0, b_t) * Δt / eta_discharge + max(0, -b_t) * eta_charge * Δt - self_discharge_loss_kwh_t`.
 - Effektiver SOC für Worst-Case-Prüfung:
