@@ -96,6 +96,7 @@ Nicht explizit modelliert:
   - optional `self_discharge_mode` (Werte: `absolute_kwh_per_hour` | `relative_soc_per_hour`, optional nur relevant wenn `is_ler=true`)
   - optional `self_discharge_kwh_per_hour` (gültig nur bei `self_discharge_mode=absolute_kwh_per_hour`, optional nur bei `is_ler=true`)
   - optional `self_discharge_soc_per_hour` (gültig nur bei `self_discharge_mode=relative_soc_per_hour`, optional nur bei `is_ler=true`)
+  - Für `is_ler=true` gilt nach Policy-/Asset-Auflösung: genau ein Verlustwert ist zulässig (`self_discharge_kwh_per_hour` oder `self_discharge_soc_per_hour`). Sind beide vorhanden, ist die Konfiguration als inkompatibel zu behandeln (`ROBUST_POLICY_UNSUPPORTED`).
   - `max_recovery_time` (harte obere Grenze für die Wiederherstellungsdauer in Minuten)
   - `intraday_gate_closure` (optional, Default `0`, wird für Restore-gesteuerte Läufe benötigt)
   - `intraday_preparation_time` (optional, Default `0`, wird für Restore-gesteuerte Läufe benötigt)
@@ -123,10 +124,10 @@ Nicht explizit modelliert:
   - `self_discharge_kwh_per_hour` und `self_discharge_soc_per_hour` können bei Bedarf aus dem Assetmodell geerbt werden.
   - `self_discharge_mode=absolute_kwh_per_hour`:
       - für `is_ler=true`: `self_discharge_kwh_per_hour` ist Pflichtfeld (`>= 0`),
-      - `self_discharge_soc_per_hour` wird ignoriert.
+      - `self_discharge_soc_per_hour` darf nicht gesetzt sein.
     - `self_discharge_mode=relative_soc_per_hour`:
       - für `is_ler=true`: `self_discharge_soc_per_hour` ist Pflichtfeld (`>= 0`, Anteil SOC-Verlust pro Stunde),
-      - `self_discharge_kwh_per_hour` wird ignoriert.
+      - `self_discharge_kwh_per_hour` darf nicht gesetzt sein.
   - Restore-Leistung:
     - Wenn gesetzt, begrenzt `restore_capability_up_kw` den maximal nutzbaren Restore-Leistungsfluss der Up-Richtung (Lade-Richtung) und `restore_capability_down_kw` die Down-Richtung (Entlade-Richtung).
     - `restore_capability_up_kw` und `restore_capability_down_kw` müssen, falls gesetzt, strikt `> 0` sein.
@@ -151,7 +152,7 @@ Nicht explizit modelliert:
   - `self_discharge_kwh_per_hour` darf nicht negativ sein.
   - `self_discharge_soc_per_hour` muss in `[0,1]` liegen (als Anteil pro Stunde).
   - Für `is_ler=true` ist ein effektiver LER-Wert erforderlich; fehlen beide Werte nach Policy/Asset-Auflösung,
-    oder sind beide gültig gesetzt, gilt `ROBUST_POLICY_UNSUPPORTED`.
+    oder sind beide gesetzt, gilt `ROBUST_POLICY_UNSUPPORTED`.
   - `minutes_until_next_restore_window_start` ist optional, muss aber bei
     aktiviertem Restore-Szenario `>= 0` sein.
   - Wenn `minutes_until_next_restore_window_start` gesetzt ist, muss
@@ -655,7 +656,7 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 - `E_avail_up/down` bei SOC-Min/Max und Effizienz < 1.
 - Selbstentlade-Schemafehler (explizit):
   - `self_discharge_mode=invalid` (`x_per_hour` unbekannt) → `ROBUST_POLICY_UNSUPPORTED`.
-  - beide Moduswerte gesetzt (`self_discharge_kwh_per_hour` und `self_discharge_soc_per_hour`) → `ROBUST_POLICY_UNSUPPORTED`.
+  - `is_ler=true` und beide Moduswerte gesetzt (`self_discharge_kwh_per_hour` und `self_discharge_soc_per_hour`) → `ROBUST_POLICY_UNSUPPORTED`.
   - `is_ler=true` und kein Moduswert gesetzt (beide optional Felder leer/nicht gesetzt) → `ROBUST_POLICY_UNSUPPORTED`.
   - negative/überschüssige Werte (`self_discharge_kwh_per_hour < 0`, `self_discharge_soc_per_hour < 0` oder `> 1`) → `ROBUST_POLICY_UNSUPPORTED`.
 - `ROBUST_NEEDS_INTRADAY_RESTORE`-Pfad erzeugt `OptimizationSolverStatus.Feasible` mit

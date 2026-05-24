@@ -392,7 +392,9 @@ Endgültige Serienendstatus sind:
 - Deterministische Reaktionsregeln:
   - `SOURCE_OK`: normaler Betrieb
   - `SOURCE_AUTH_ERROR`: harte Ablehnung (`SOURCE_REJECTED`), kein Retry/Fallback.
-  - `SOURCE_SCHEMA_MISMATCH`, `SOURCE_GAP`: harte Ablehnung (`SOURCE_REJECTED`), kein Fallback.
+  - `SOURCE_SCHEMA_MISMATCH`: harte Ablehnung (`SOURCE_REJECTED`), kein Retry/Fallback.
+  - `SOURCE_GAP` wird gemäß den im vorangehenden Abschnitt definierten globalen Ableitungsregeln entschieden
+    (Backfill/`SOURCE_DEGRADED` oder harte Ablehnung bei nicht behebbaren Restlücken).
 - `SOURCE_RATE_LIMIT`, `SOURCE_STALE`, `SOURCE_UNAVAILABLE`, `SOURCE_RETRY_EXHAUSTED`:
     - Primär wird kontrollierter Fallback auf `fallback`-Quelle versucht, sofern vorhanden und kompatibel.
     - Fallback nur akzeptieren, wenn `SeriesEnvelope`, Einheit und Horizon exakt kompatibel sind.

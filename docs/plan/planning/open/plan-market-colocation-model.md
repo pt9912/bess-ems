@@ -124,8 +124,9 @@ Moegliche Domain-/Application-Erweiterungen:
   - `max_export_kw`
   - optional `grid_connection_power_kw`
   - optional `can_dispatch`
-    - Für neu konfigurierte produktive Slice-Konfigurationen kann `can_dispatch` implizit als `true` gelten.
-    - Für Legacy-Datensätze ohne explizites Feld gilt die Site im Migrationskontext als inaktiv.
+    - Semantik: `true` = aktive Teilnahme am Request, `false` = bewusst ausgeschaltet.
+    - Fehlende Angabe gilt als `false` (nicht aktiv).
+    - In Legacy-Migrationsfenstern ohne explizite Aktivierungsentscheidung darf die Site als inaktiv bewertet werden, damit der Migrationsvorlauf keine harte Blockade auslöst.
     - Aktive Teilnahme am aktuellen Co-Location-Request erfordert `can_dispatch=true`.
   - `site_grid_power_sign` (verpflichtend): `export_pos` oder `import_pos`
     - `export_pos`: positive Leistung bedeutet Export ans Netz
@@ -275,7 +276,7 @@ Für produktive Freischaltung ist ein deterministischer Migrationspfad für best
   - `migration_strict=false` (nur mit explizitem Release-Governance): erlaubt die Koexistenz bis zur Bereinigung nicht-aktiver Sites; aktive Sites bleiben weiterhin blockiert.
   - Aktivitätsdeterministik:
     - Eine Site gilt für die Migrationsbewertung als aktiv, wenn sie explizit im Scope des aktuellen Co-Location-Requests aktiv ist.
-      Dafür ist `can_dispatch=true` erforderlich; bei Legacy-Datensätzen ohne explizite Aktivierungsentscheidung wird im Migrationsvorlauf keine harte Laufblockade ausgelöst.
+      Dafür ist `can_dispatch=true` erforderlich; bei `can_dispatch`-Fehlanzeige wird die Site als inaktiv bewertet, damit im Migrationsvorlauf keine harte Laufblockade ausgelöst wird.
     - Nicht aktive Sites werden explizit mit `can_dispatch=false` markiert oder im Migrationsaudit ohne harte Blockade geführt, bis sie aktiv in Betrieb genommen werden.
 - Migrationsfenster (vor Aktivierung des Co-Location-MVP, nicht inline im operativen Lauf).
 - Kandidatenklassifikation je Datensatz:
