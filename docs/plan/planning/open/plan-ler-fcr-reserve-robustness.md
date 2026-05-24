@@ -342,7 +342,8 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
   - `ROBUST_OK` => keine zusätzliche Hard-Stop-Sperre.
   - `ROBUST_NEEDS_INTRADAY_RESTORE` =>
     - bei verfügbarem Restore-Fenster: Optimierung bleibt lauffähig,
-      Operator-Hinweis `action=intraday_restore_required`.
+      der Lauf wird mit `OptimizationSolverStatus.Feasible` persistiert,
+      `can_execute=false` und Operator-Hinweis `action=intraday_restore_required`.
     - bei geschlossenem Gate / keinem Wiederherstellungsfenster:
       `OptimizationSolverStatus.Failed` mit
       `TerminationCode=reserve-robustness-not-executable`,
@@ -359,9 +360,9 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
     mit `TerminationCode=reserve-robustness-source-missing`.
   - `ROBUST_POLICY_UNSUPPORTED` => `OptimizationSolverStatus.Failed` mit
     `TerminationCode=reserve-robustness-policy-unsupported`.
-  - `ROBUST_NEEDS_INTRADAY_RESTORE` und `ROBUST_OK` können beide als
-    `OptimizationSolverStatus.Feasible` oder `OptimizationSolverStatus.Optimal`
-    persistiert werden, je nach tatsächlichem Optimizergebnis.
+- `ROBUST_OK` wird mit dem eigentlichen Optimizerergebnis (`Optimal`/`Feasible`) persistiert.
+- `ROBUST_NEEDS_INTRADAY_RESTORE` wird immer als `OptimizationSolverStatus.Feasible`
+  mit `can_execute=false` und explizitem Restore-Hinweis persistiert.
 
 ### Phase 4: Operator- und Replay-Sicht
 
@@ -416,6 +417,9 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
   Intraday-Restaurationsbedarf oder einen klaren Infeasible-Status.
 - Ein hoher SOC mit aFRR-Down-Verpflichtung erzeugt entsprechend einen
   Entladebedarf oder einen klaren Infeasible-Status.
+- Bei `ROBUST_NEEDS_INTRADAY_RESTORE` ist der Optimierungslauf als
+  `can_execute=false` persistiert und die notwendige Restore-Massnahme
+  in Operator-/Replay-Ausgabe explizit markiert.
 - `t_min_fcr`, `full_activation_time` und `max_recovery_time` sind in
   Tests sichtbar und nicht nur Konfigurationsfelder.
 - `full_activation_time_afrr` / `full_activation_time_mfrr` sind in den

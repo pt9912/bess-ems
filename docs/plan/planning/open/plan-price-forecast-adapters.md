@@ -62,7 +62,10 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
   - `series_id` (stabil)
   - `site_id` (optional)
     - erforderlich für standortgebundene Forecast-/Erzeugungs-/Last-/Wetter-Reihen
-    - optional oder leer für produktweite Preisreihen ohne Standortkontext
+    - optional oder leer für produktweite Forecast-Daten ohne Standortkontext
+  - `market_bid_area` (optional)
+    - erforderlich für `series_type=price`, damit die bestehende `PriceSeries`-Schiene
+      den Marktbereich eindeutig identifizieren kann
   - `series_type` (`price` oder `forecast`)
   - `series_product` (z. B. `day_ahead`, `intraday`, `load`, `pv`, `wind`, `weather-temp`)
   - `unit` (z. B. `EUR/MWh`, `kW`, `kWh`, etc.)
@@ -89,12 +92,14 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
   - Preisreihen haben konsistente Preis-Einheit
   - Forecastreihen haben konsistente physikalische Einheit
 - Mapping-Regel:
-  - `series_type=price` wird auf bestehende Preis-Produkte in `PriceSeries` abgebildet.
-  - `series_type=forecast` dient in diesem Slice der Seitcar-/Inputlogik und darf nur in
-    der dort definierten Integrationslogik weiterverarbeitet werden, solange kein
-    produktiver Forecast-Domaintyp im EMS aktiv ist.
+- `series_type=price` wird auf bestehende Preis-Produkte in `PriceSeries` abgebildet.
+  - dafür ist `market_bid_area` verpflichtend und wird auf das entsprechende
+    `PriceSeries`-Feld gemappt.
+- `series_type=forecast` dient in diesem Slice der Seitcar-/Inputlogik und darf nur in
+  der dort definierten Integrationslogik weiterverarbeitet werden, solange kein
+  produktiver Forecast-Domaintyp im EMS aktiv ist.
 - Konsistenz-Regel:
-  - Wenn `series_type=price`, ist `site_id` optional.
+  - Wenn `series_type=price`, ist `market_bid_area` Pflichtfeld; `site_id` optional.
   - Wenn `series_type=forecast` und Standorttrennung aktiv ist, ist `site_id` Pflicht.
 
 ### Freshness- und Gap-Policy (verbindlich)
@@ -119,6 +124,12 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
   - Serien mit Backfill markieren Ergebnisqualität als `SOURCE_DEGRADED`.
 
 ### Qualitätsentscheidungen bei `SOURCE_*` (verbindlich)
+
+- Zusatzregel: `SOURCE_EMPTY` ist kein degradierbarer Zustand.
+  - Bei aktivem, kompatiblem Fallback wird optional über `SOURCE_FALLBACK_USED`
+    auf Ersatzdaten umgeschaltet.
+  - Ohne nutzbaren Fallback gilt `SOURCE_EMPTY` als harte Ablehnung (`SOURCE_REJECTED`)
+    und wird nicht als `SOURCE_DEGRADED` geführt.
 
 - `SOURCE_GAP` bedeutet harte Ablehnung (`SOURCE_REJECTED`), weil die Zielserie im
   Endzustand lückenfrei sein muss.
@@ -242,6 +253,8 @@ Primär-/Fallback-Regel ist verbindlich:
   - Fallback: Open-Meteo oder Copernicus für Wetter, je Featuretyp
 
 Aktivierungslogik:
+  - `SOURCE_EMPTY` wird ohne zugelassenen, kompatiblen Fallback nur als harte
+    Fehlerklasse `SOURCE_REJECTED` behandelt.
 
 - Primärquelle wird standardmaessig genutzt.
   - Bei Qualitätsfehler (`SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_EMPTY`, `SOURCE_RETRY_EXHAUSTED`, `SOURCE_SCHEMA_MISMATCH`)

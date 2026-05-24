@@ -131,12 +131,18 @@ Gleichungen:
 - `p_grid_export_t <= site.max_export_kw`
 - simultane Netznutzung ist ausgeschlossen:
   - Formulierung: `p_grid_import_t * p_grid_export_t = 0`
-  - MILP-Linearisation (`d_t`=Exportrichtung (gemäss `site_power_t`-Konvention)=1, `d_t`=Importrichtung=0):
-    - `p_grid_import_t <= site.max_import_kw * (1 - d_t)`
-    - `p_grid_export_t <= site.max_export_kw * d_t`
+  - MILP-Linearisation (`d_t` ist Richtungsbit je Zeitschritt:
+    - `d_t = 1` bedeutet Fluss in positiver Richtung der gewählten Site-Konvention (`site_power_t > 0`)
+    - `d_t = 0` bedeutet Gegenrichtung):
+    - bei Konvention `site_grid_power_sign=export_pos`:
+      - `p_grid_import_t <= site.max_import_kw * (1 - d_t)`
+      - `p_grid_export_t <= site.max_export_kw * d_t`
+    - bei Konvention `site_grid_power_sign=import_pos`:
+      - `p_grid_import_t <= site.max_import_kw * d_t`
+      - `p_grid_export_t <= site.max_export_kw * (1 - d_t)`
     - `d_t ∈ {0,1}`
-  - `d_t` ist für beide Konventionen identisch definiert; nur `site_power_t` ändert
-    seine Zuordnung.
+- `d_t` ist für beide Sign-Konventionen identisch als Richtungs-Binärvariable definiert;
+  nur die `site_power_t`-Vorzeichenkonvention ändert die Bedeutung von `+`/`-`.
 - optional, falls `grid_connection_power_kw` gesetzt:
   - `p_grid_import_t + p_grid_export_t <= site.grid_connection_power_kw`
 
@@ -145,7 +151,9 @@ Verbindliche Defaults (Phase-1-ADR):
 - `site_grid_power_sign` ist ein Pflichtfeld für den produktiven `SiteConstraint`; fehlt es, gilt standardisiert `export_pos`.
 - `max_import_kw` und `max_export_kw` sind harte Pflichtfelder (`>= 0`) je Site.
 - `grid_connection_power_kw` ist optional; wenn nicht gesetzt, ist nur die Einzelgrenze über `max_import_kw`/`max_export_kw` aktiv.
-- `d_t` bleibt für beide Sign-Konventionen die Exportrichtungs-Binärvariable.
+- `d_t` ist Richtungs-Binärvariable entsprechend der Site-Konvention; für beide
+  Sign-Konventionen identisch definiert, nur die Vorzeichenzuordnung in
+  `site_power_t` wird umgeschaltet.
 - Die Ziellogik ist zeitscheibenweise identisch in beiden Konventionen; es wird ausschließlich die Vorzeichenzuordnung von `site_power_t` gewechselt.
 
 Interpretation:
