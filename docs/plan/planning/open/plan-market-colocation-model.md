@@ -211,6 +211,9 @@ pro Site optional overridebar).
 - Keine Zertifizierung oder Rechtsauslegung fuer EEG-/Foerdermodelle.
 - Kein automatischer externer Forecast-Abruf; das ist
   [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md).
+- Ein erster produktiver Co-Location-Slice kann mit lokalen Erzeugungs-/Lastreihen starten;
+  forecast-basierte Optimierung bleibt bis zur Aktivierung von
+  `plan-price-forecast-adapters.md` im degraded/fallback-Modus.
 - Keine Multi-Asset-Fleet-Optimierung ueber mehrere Standorte; das bleibt
   M6-Folgearbeit.
 

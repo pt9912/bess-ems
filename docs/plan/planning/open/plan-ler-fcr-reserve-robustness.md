@@ -79,6 +79,11 @@ Nicht explizit modelliert:
     - `reserve_product`
     - `is_ler`
     - `soc_strategy` (`active` | `conservative`)
+      - `active`: Berechnung nutzt den planlaeufigen SOC-Rahmen (`soc_min_kwh`, `soc_max_kwh`) ohne Zusatzpuffer.
+      - `conservative`: Berechnung nutzt Zusatzränder auf beiden SOC-Grenzen.
+    - optional `conservative_soc_headroom_kwh` (default `0`, nur bei `soc_strategy=conservative`)
+    - optional `conservative_soc_headroom_ratio` (default `0`, nur bei `soc_strategy=conservative`); Bereich `0..1`
+    - Wenn kein `conservative_soc_headroom_kwh` gesetzt ist, wird bei `conservative` `conservative_soc_headroom_ratio` genutzt.
     - `t_min_fcr`
     - `full_activation_time` (Fallback-Wert; produkt-spezifische Werte empfohlen)
     - optional `full_activation_time_afrr`
@@ -93,6 +98,10 @@ Nicht explizit modelliert:
       `intraday_preparation_time`
     - `market_time_unit` muss `minute` sein.
     - `resolution_minutes` und diese Policy-Felder müssen kompatibel sein.
+  - Für `soc_strategy=conservative` gelten Zusatzregeln:
+    - `conservative_soc_headroom_ratio` muss im Bereich `0..1` liegen.
+    - `conservative_soc_headroom_kwh` muss `>= 0` sein.
+    - `soc_min_kwh + effective_soc_headroom_kwh < soc_max_kwh` muss gelten, sonst `ROBUST_POLICY_UNSUPPORTED`.
   - Effektivzeiten je Produkt (Fallback auf `full_activation_time`):
     - `full_activation_time_afrr_eff = coalesce(full_activation_time_afrr, full_activation_time)`
     - `full_activation_time_mfrr_eff = coalesce(full_activation_time_mfrr, full_activation_time)`
@@ -172,10 +181,10 @@ Deterministische Berechnung (verbindlich):
 - Interner SOC-Rechnungszugang aus geplanter Fahrplanposition:
   - `soc_{t+1,plan} = soc_t - max(0, b_t) * Δt / eta_discharge + max(0, -b_t) * eta_charge * Δt - self_discharge_loss_kwh_t`.
 - Effektiver SOC für Worst-Case-Prüfung:
-  - `soc_t^{eff} = max(soc_min_kwh, soc_t - self_discharge_loss_kwh_t)`.
+  - `soc_t^{eff} = max(soc_min_eff_kwh, soc_t - self_discharge_loss_kwh_t)`.
 - Verfügbare Energiemengen für die Verfügbarkeitsprüfung am Schrittanfang:
-  - `available_up_kwh_base_t = max(0, soc_t^{eff} - soc_min_kwh) * eta_discharge`
-  - `available_down_kwh_base_t = max(0, soc_max_kwh - soc_t^{eff}) / eta_charge`
+  - `available_up_kwh_base_t = max(0, soc_t^{eff} - soc_min_eff_kwh) * eta_discharge`
+  - `available_down_kwh_base_t = max(0, soc_max_eff_kwh - soc_t^{eff}) / eta_charge`
 - Worst-Case-Energie je Richtung (kWh):
   - `worst_up_kwh_t = min(Δt, t_min_fcr/60) * fcr_up_kw_t + min(Δt, full_activation_time_afrr_eff/60) * (alpha_afrr_t * afrr_up_kw_t) + min(Δt, full_activation_time_mfrr_eff/60) * (alpha_mfrr_t * mfrr_up_kw_t)`
   - `worst_down_kwh_t = min(Δt, t_min_fcr/60) * fcr_down_kw_t + min(Δt, full_activation_time_afrr_eff/60) * (alpha_afrr_t * afrr_down_kw_t) + min(Δt, full_activation_time_mfrr_eff/60) * (alpha_mfrr_t * mfrr_down_kw_t)`
@@ -191,16 +200,16 @@ Deterministische Berechnung (verbindlich):
     - `soc_plan_up_t = soc_up_t - max(0, b_t) * Δt / eta_discharge + max(0, -b_t) * eta_charge * Δt - self_discharge_loss_kwh_t`
     - `soc_plan_down_t = soc_down_t - max(0, b_t) * Δt / eta_discharge + max(0, -b_t) * eta_charge * Δt - self_discharge_loss_kwh_t`
     - Sicherheitsanker:
-      - Falls `soc_plan_up_t < soc_min_kwh` oder `soc_plan_up_t > soc_max_kwh`, gilt `ROBUST_INFEASIBLE` mit `SOC_LIMIT`.
-      - Falls `soc_plan_down_t < soc_min_kwh` oder `soc_plan_down_t > soc_max_kwh`, gilt `ROBUST_INFEASIBLE` mit `SOC_LIMIT`.
-    - Up-Branch: `worst_up_kwh_t <= (soc_plan_up_t - soc_min_kwh) * eta_discharge`
+      - Falls `soc_plan_up_t < soc_min_eff_kwh` oder `soc_plan_up_t > soc_max_eff_kwh`, gilt `ROBUST_INFEASIBLE` mit `SOC_LIMIT`.
+      - Falls `soc_plan_down_t < soc_min_eff_kwh` oder `soc_plan_down_t > soc_max_eff_kwh`, gilt `ROBUST_INFEASIBLE` mit `SOC_LIMIT`.
+    - Up-Branch: `worst_up_kwh_t <= (soc_plan_up_t - soc_min_eff_kwh) * eta_discharge`
       - falls ja: `soc_up_{t+1} = soc_plan_up_t - worst_up_kwh_t / eta_discharge`
       - falls nein: `ROBUST_INFEASIBLE` mit `SOC_LIMIT`
-      - Nach dem Update: `soc_up_{t+1} >= soc_min_kwh` und `soc_up_{t+1} <= soc_max_kwh`, sonst `ROBUST_INFEASIBLE` mit `SOC_LIMIT`
-    - Down-Branch: `worst_down_kwh_t <= (soc_max_kwh - soc_plan_down_t) / eta_charge`
+      - Nach dem Update: `soc_up_{t+1} >= soc_min_eff_kwh` und `soc_up_{t+1} <= soc_max_eff_kwh`, sonst `ROBUST_INFEASIBLE` mit `SOC_LIMIT`
+    - Down-Branch: `worst_down_kwh_t <= (soc_max_eff_kwh - soc_plan_down_t) / eta_charge`
       - falls ja: `soc_down_{t+1} = soc_plan_down_t + worst_down_kwh_t * eta_charge`
       - falls nein: `ROBUST_INFEASIBLE` mit `SOC_LIMIT`
-      - Nach dem Update: `soc_down_{t+1} >= soc_min_kwh` und `soc_down_{t+1} <= soc_max_kwh`, sonst `ROBUST_INFEASIBLE` mit `SOC_LIMIT`
+      - Nach dem Update: `soc_down_{t+1} >= soc_min_eff_kwh` und `soc_down_{t+1} <= soc_max_eff_kwh`, sonst `ROBUST_INFEASIBLE` mit `SOC_LIMIT`
 - `ROBUST_OK`, wenn kein Schritt in beiden Branches versagt.
 - Bei Grenz- und Dateninkonsistenzen: `ROBUST_NEEDS_INTRADAY_RESTORE` oder
   `ROBUST_INFEASIBLE` anhand `limiting_reason_code`.

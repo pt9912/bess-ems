@@ -125,31 +125,39 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
 
 ### Qualitätsentscheidungen bei `SOURCE_*` (verbindlich)
 
-- Zusatzregel: `SOURCE_EMPTY` ist kein degradierbarer Zustand.
-  - Bei aktivem, kompatiblem Fallback wird optional über `SOURCE_FALLBACK_USED`
-    auf Ersatzdaten umgeschaltet.
-  - Ohne nutzbaren Fallback gilt `SOURCE_EMPTY` als harte Ablehnung (`SOURCE_REJECTED`)
-    und wird nicht als `SOURCE_DEGRADED` geführt.
+Die `SOURCE_*`-Auswertung ist für jede Serie deterministisch:
 
-- `SOURCE_GAP` bedeutet harte Ablehnung (`SOURCE_REJECTED`), weil die Zielserie im
-  Endzustand lückenfrei sein muss.
-- `SOURCE_AUTH_ERROR` ist harter Stopp (`SOURCE_REJECTED`) ohne automatischen Retry/Fallback,
-  da eine explizite Operator-Intervention für Credentials nötig ist.
-- `SOURCE_EMPTY` ist harte Ablehnung (`SOURCE_REJECTED`), sofern kein zugelassenes
-  Fallback aktiv ist.
-- `SOURCE_RETRY_EXHAUSTED` folgt denselben Regeln wie `SOURCE_UNAVAILABLE`:
-  Fallback nur bei erlaubt konfiguriertem Ersatzpfad, sonst harte Ablehnung.
-- Wenn `quality_mode=strict`:
-  - `SOURCE_STALE` -> harte Ablehnung (`SOURCE_REJECTED`).
-  - `SOURCE_DEGRADED` aus Backfill kann nicht akzeptiert werden (`SOURCE_REJECTED`).
-- Wenn `quality_mode=degraded_ok`:
-  - `SOURCE_DEGRADED` ist als degradeierter Zustand akzeptierbar.
-  - `SOURCE_STALE` darf als degradeierter Zustand akzeptiert werden, wenn keine harten
-    Datenkonflikte (Schema/Horizont/Fehlende Pflichtfelder) auftreten.
-- In beiden Modi gilt:
-  - `SOURCE_RATE_LIMIT`, `SOURCE_EMPTY`, `SOURCE_RETRY_EXHAUSTED`, `SOURCE_SCHEMA_MISMATCH`,
-    `SOURCE_UNAVAILABLE` bleiben hart,
-    sofern kein vertragskonformer Fallback aktiv wird.
+1) Vorvalidierung
+- bei Schema-, Zeitachsen- oder Horizonabweichungen: sofort `SOURCE_SCHEMA_MISMATCH` → `SOURCE_REJECTED` (kein Fallback).
+
+2) Rohcode-Auswertung
+- `SOURCE_OK` → direkt in Schritt 3.
+- `SOURCE_AUTH_ERROR` → harte Ablehnung (`SOURCE_REJECTED`), kein Retry/Fallback.
+- `SOURCE_GAP` → harte Ablehnung (`SOURCE_REJECTED`), kein Retry/Fallback.
+- `SOURCE_EMPTY` → kein Fallback, hartes `SOURCE_REJECTED` (Ausnahme nur kompatibler Fallback gemäß Schritt 3).
+- `SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_RETRY_EXHAUSTED` → Schritt 3.
+
+3) Fallback- und Qualitätsmoduslogik
+- Fallback ist versuchsweise nur für diese Codes:
+  - `SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_EMPTY`, `SOURCE_RETRY_EXHAUSTED`
+- `SOURCE_AUTH_ERROR`, `SOURCE_SCHEMA_MISMATCH`, `SOURCE_GAP` sind nicht fallback-fähig.
+- Sind Primärcode + kompatible Fallback-Quelle vorhanden:
+  - Der Fallback wird synchron ausgewertet.
+  - Ist Fallback erfolgreich:
+    - bei `quality_mode=strict`: finaler Zustand darf nur `SOURCE_OK` oder `SOURCE_FALLBACK_USED` sein.
+    - bei `quality_mode=degraded_ok`: finaler Zustand darf `SOURCE_DEGRADED` oder `SOURCE_FALLBACK_USED` (oder beide kombiniert) sein.
+  - Ist Fallback fehlgeschlagen:
+    - `strict`: harte Ablehnung (`SOURCE_REJECTED`).
+    - `degraded_ok`: nur akzeptierbare Backfill/Degradation zulassen (`SOURCE_DEGRADED`), sonst `SOURCE_REJECTED`.
+- Kein kompatibler Fallback:
+  - `strict`: harte Ablehnung bei `SOURCE_STALE`, `SOURCE_RETRY_EXHAUSTED`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_EMPTY`.
+  - `degraded_ok`: `SOURCE_STALE` kann als `SOURCE_DEGRADED` akzeptiert werden; `SOURCE_EMPTY` bleibt `SOURCE_REJECTED`.
+
+4) Endstatuszuordnung bei akzeptierter Serie
+- Primär: `SOURCE_OK`.
+- Mit Ersatzquelle: `SOURCE_FALLBACK_USED`.
+- Qualitätsminderung: `SOURCE_DEGRADED`.
+- harte Ablehnung: `SOURCE_REJECTED`.
 
 ### Fehler- und Ablaufcodes
 
@@ -228,18 +236,19 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
 - Deterministische Reaktionsregeln:
   - `SOURCE_OK`: normaler Betrieb
   - `SOURCE_AUTH_ERROR`: harte Ablehnung (`SOURCE_REJECTED`), kein Retry/Fallback.
-  - `SOURCE_RATE_LIMIT` / `SOURCE_STALE` / `SOURCE_UNAVAILABLE` / `SOURCE_EMPTY` /
-    `SOURCE_RETRY_EXHAUSTED`:
-    - Primär wird kontrollierter Fallback auf `fallback`-Quelle versucht, sofern vorhanden.
+  - `SOURCE_SCHEMA_MISMATCH`, `SOURCE_GAP`: harte Ablehnung (`SOURCE_REJECTED`), kein Fallback.
+  - `SOURCE_RATE_LIMIT`, `SOURCE_STALE`, `SOURCE_UNAVAILABLE`, `SOURCE_EMPTY`, `SOURCE_RETRY_EXHAUSTED`:
+    - Primär wird kontrollierter Fallback auf `fallback`-Quelle versucht, sofern vorhanden und kompatibel.
     - Fallback nur akzeptieren, wenn `SeriesEnvelope`, Einheit und Horizon exakt kompatibel sind.
+    - Bei Fallback Erfolg gilt Fallback-Ergebnis nach `quality_mode`:
+      - `strict`: nur akzeptierte Daten ohne Backfill/Verfallung (`SOURCE_OK`, `SOURCE_FALLBACK_USED`)
+      - `degraded_ok`: Fallback kann als `SOURCE_DEGRADED` geführt werden.
     - Bei Ausfall / Schemakonflikt des Fallbacks:
-      - bei `quality_mode=degraded_ok` und Primärcode `SOURCE_STALE`: degradierte Fortsetzung als `SOURCE_DEGRADED` möglich
-      - sonst harte Fehlklassifikation (`SOURCE_REJECTED`)
-  - `SOURCE_STALE` ohne konfigurierte Fallback-Quelle:
-    - bei `quality_mode=strict`: harte Fehlklassifikation (`SOURCE_REJECTED`)
-    - bei `quality_mode=degraded_ok`: degradierte Fortsetzung (`SOURCE_DEGRADED`)
-  - `SOURCE_EMPTY` / `SOURCE_RETRY_EXHAUSTED` ohne akzeptablen Fallback:
-    - immer `SOURCE_REJECTED`
+      - `quality_mode=degraded_ok` und Primärcode `SOURCE_STALE`: degradierte Fortsetzung als `SOURCE_DEGRADED` möglich
+      - sonst harte Ablehnung (`SOURCE_REJECTED`)
+  - Fallback nicht verfügbar:
+    - `strict`: harte Ablehnung für `SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_RETRY_EXHAUSTED`, `SOURCE_EMPTY`
+    - `degraded_ok`: nur `SOURCE_STALE` als `SOURCE_DEGRADED` möglich; `SOURCE_EMPTY` bleibt `SOURCE_REJECTED`.
 
 ### Phase 2: Erste produktive Quelle
 

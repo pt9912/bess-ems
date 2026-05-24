@@ -102,6 +102,9 @@ förder-/herkunftsgebundenem Grünstromspeicher.
   Einspeiselimit, lokalen Erzeugungsprognosen und Speicherüberbauung.
 - Ein Vermarktungsmodell verlangt getrennte Behandlung von Standalone,
   Hybrid mit Netzbezug und fördergebundenem Grünstromspeicher.
+- Für den ersten Slice ist ein produktiver Forecast-Adapter keine zwingende
+  Voraussetzung; fehlender externer Forecast-Zugriff schaltet die
+  forecast-basierte Co-Location-Nutzung in einen kontrollierten degraded/fallback-Modus.
 
 **Aktivierungs-Pfad:** eigener Slice-Plan
 [`plan-market-colocation-model.md`](plan-market-colocation-model.md).
