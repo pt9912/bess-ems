@@ -3,7 +3,7 @@
 **Dokumenttyp:** Slice-Skizze / offen
 **Status:** Open - wartet auf Regelleistungs-/FCR-Produkttrigger
 **Datum:** 2026-05-24
-**Quelle-Repo:** Fachliche Sichtung von [`BESS-Simulation`](https://github.com/flpp-signature/BESS-Simulation)
+**Quelle-Repo:** Öffentliches Referenzmaterial – Referenzpublikation als fachlicher Ausgangspunkt, kein Code-Übernahmeplan.
 Baltputnis et al. (2024), Journal of Energy Storage 102, 114082
 **Bezug:**
 [`../../../../spec/lastenheft.md`](../../../../spec/lastenheft.md),
@@ -16,16 +16,16 @@ Baltputnis et al. (2024), Journal of Energy Storage 102, 114082
 
 ## Ziel
 
-`bess-ems` soll fuer FCR-/aFRR-Reservebereitstellung explizit pruefen
-koennen, ob ein Asset oder Asset-Verbund unter Worst-Case-Aktivierung
+`bess-ems` soll für FCR-/aFRR-Reservebereitstellung explizit prüfen
+können, ob ein Asset oder Asset-Verbund unter Worst-Case-Aktivierung
 die zugesagte Reserve ohne SOC-Verletzung liefern kann.
 
-Der Slice schliesst die fachliche Luecke zwischen:
+Der Slice schließt die fachliche Lücke zwischen:
 
-- heute vorhandenen `ReserveBand`-Kapazitaetsrestriktionen,
+- heute vorhandenen `ReserveBand`-Kapazitätsrestriktionen,
 - Regelleistungsaktivierungen im Regelkreis,
 - Day-Ahead-/Intraday-Optimierung,
-- und dem robusten Betriebsfall fuer Limited Energy Reservoirs (LER).
+- und dem robusten Betriebsfall für Limited Energy Reservoirs (LER).
 
 Der technische Regelkreis bleibt Safety-first:
 
@@ -33,7 +33,7 @@ Der technische Regelkreis bleibt Safety-first:
 Regelleistungsaktivierung -> Fahrplanauflösung -> State Machine -> Limiter -> Command
 ```
 
-Die Robustheitspruefung darf Markt- und Optimierungsentscheidungen
+Die Robustheitsprüfung darf Markt- und Optimierungsentscheidungen
 vorbereiten oder ablehnen, aber keine BMS-/PCS-Schutzfunktion ersetzen.
 
 ---
@@ -42,12 +42,12 @@ vorbereiten oder ablehnen, aber keine BMS-/PCS-Schutzfunktion ersetzen.
 
 Heute in `bess-ems` vorhanden:
 
-- `ReserveBand` fuer FCR, aFRR und mFRR.
+- `ReserveBand` für FCR, aFRR und mFRR.
 - FCR als symmetrisches Reserveprodukt.
 - aFRR/mFRR als Up-/Down-Reserve.
 - Regelleistungsaktivierung als priorisierte Eingangsquelle im
   Regelkreis.
-- Optimierer, der Reservebaender von Lade-/Entladeleistung abzieht.
+- Optimierer, der Reservebänder von Lade-/Entladeleistung abzieht.
 - Intraday-Reoptimierung und `PriceSeries`-basierte Fahrplanoptimierung.
 
 Nicht explizit modelliert:
@@ -56,10 +56,10 @@ Nicht explizit modelliert:
 - FCR-Alert-State-Erkennung und Reserve-Mode-Transitions.
 - `t_min_FCR`, Full Activation Time und Recovery-Zeit als fachliche
   Constraints.
-- Worst-Case-Energiebedarf fuer FCR/aFRR ueber einen Horizont.
+- Worst-Case-Energiebedarf für FCR/aFRR über einen Horizont.
 - Intraday-SOC-Restauration als gezielte Massnahme zur
-  Reservefaehigkeit.
-- Operator-faehige Fehlermodi fuer "Reserve zugesagt, aber robust nicht
+  Reservefähigkeit.
+- Operator-fähige Fehlermodi für "Reserve zugesagt, aber robust nicht
   lieferbar".
 
 ---
@@ -69,17 +69,17 @@ Nicht explizit modelliert:
 ### Begriffe
 
 - `LimitedEnergyReservoir`
-  - Asset-Eigenschaft fuer Batterien, deren FCR-Lieferfaehigkeit durch
+  - Asset-Eigenschaft für Batterien, deren FCR-Lieferfähigkeit durch
     Energieinhalt und Recovery-Regeln begrenzt ist.
 
   - `ReserveRobustnessPolicy`
-    - Produkt- und Standortregel fuer robuste Reservepruefung.
+    - Produkt- und Standortregel für robuste Reserveprüfung.
   - Mindestfelder:
     - `asset_id`
     - `reserve_product`
     - `is_ler`
     - `soc_strategy` (`active` | `conservative`)
-      - `active`: Berechnung nutzt den planlaeufigen SOC-Rahmen (`soc_min_kwh`, `soc_max_kwh`) ohne Zusatzpuffer.
+      - `active`: Berechnung nutzt den planmäßigen SOC-Rahmen (`soc_min_kwh`, `soc_max_kwh`) ohne Zusatzpuffer.
       - `conservative`: Berechnung nutzt Zusatzränder auf beiden SOC-Grenzen.
     - optional `conservative_soc_headroom_kwh` (default `0`, nur bei `soc_strategy=conservative`)
     - optional `conservative_soc_headroom_ratio` (default `0`, nur bei `soc_strategy=conservative`); Bereich `0..1`
@@ -171,7 +171,7 @@ Nicht explizit modelliert:
     Reihenfolgeimplementierung in der Worst-Case-Rekursion erlaubt.
 
 - `ReserveEnergyEnvelope`
-  - Zeitschrittweise Worst-Case-Energiehuelle fuer Up- und Down-Richtung.
+  - Zeitschrittweise Worst-Case-Energiehuelle für Up- und Down-Richtung.
   - Mindestfelder pro Schritt:
     - `timestamp_utc`
     - `resolution_minutes` (int, muss mit Policy/Horizont konsistent sein)
@@ -183,15 +183,15 @@ Nicht explizit modelliert:
     - `available_down_kwh`
     - `status`
     - `limiting_reason`
-    - `required_up_kwh` (optional, fuer Restore-Planung)
-    - `required_down_kwh` (optional, fuer Restore-Planung)
+    - `required_up_kwh` (optional, für Restore-Planung)
+    - `required_down_kwh` (optional, für Restore-Planung)
   - Optional:
-    - `restore_capability_kw_up`:
+    - `restore_capability_up_kw`:
       - optionales Override in kW pro Zeitschritt für den Up-Wiederherstellungszweig auf Basis der betrachteten Reservezelle;
       - muss `> 0` sein.
       - wird in der Restore-Rekonstruktion als harte Wiederherstellungskapazität verwendet, falls gesetzt.
       - bei Wert `<= 0` oder fehlendem Wert wird kein Override angenommen.
-    - `restore_capability_kw_down`:
+    - `restore_capability_down_kw`:
       - optionales Override in kW pro Zeitschritt für den Down-Wiederherstellungszweig auf Basis der betrachteten Reservezelle;
       - muss `> 0` sein.
       - wird in der Restore-Rekonstruktion als harte Wiederherstellungskapazität verwendet, falls gesetzt.
@@ -202,11 +202,11 @@ Nicht explizit modelliert:
         Steuerparameter.
 
 - `AlertStateTimeline`
-  - Zeitreihe fuer FCR-Alert-State-Status, Reserve Mode,
+  - Zeitreihe für FCR-Alert-State-Status, Reserve Mode,
     Recovery-Status und `t_min_fcr`-Fortschritt.
 
 - `ReserveRobustnessResult`
-  - Ergebnis einer Pruefung:
+  - Ergebnis einer Prüfung:
   - `status`:
     - `ROBUST_OK`
     - `ROBUST_NEEDS_INTRADAY_RESTORE`
@@ -220,21 +220,21 @@ Nicht explizit modelliert:
 
 ### Worst-Case-Energie
 
-Der Slice uebernimmt die fachliche Idee aus `BESS-Simulation`, nicht den
+Der Slice übernimmt die fachliche Idee aus der Referenzpublikation, nicht den
 Python-Code:
 
-- verfuegbare Energie fuer positive Reserve:
+- verfügbare Energie für positive Reserve:
   - SOC oberhalb Mindest-SOC, inklusive Entladeeffizienz
-- verfuegbare Energie fuer negative Reserve:
+- verfügbare Energie für negative Reserve:
   - freier SOC-Raum bis Max-SOC, inklusive Ladeeffizienz
 - Worst-Case-Up:
   - FCR-Energiebedarf
-  - aFRR-/mFRR-Up-Kapazitaet und Aktivierungsenergie
+  - aFRR-/mFRR-Up-Kapazität und Aktivierungsenergie
   - bereits geplante Intraday-/Fahrplanpositionen
   - Selbstentladung, falls konfiguriert
 - Worst-Case-Down:
   - FCR-Energiebedarf
-  - aFRR-/mFRR-Down-Kapazitaet und Aktivierungsenergie
+  - aFRR-/mFRR-Down-Kapazität und Aktivierungsenergie
   - Gegenrichtung der Intraday-/Fahrplanpositionen
 
 LER darf im konservativen Modus eine andere FCR-Energiehuelle nutzen als
@@ -274,22 +274,25 @@ Deterministische Berechnung (verbindlich):
     im selben Schritt wie folgt gekoppelt:
     - `worst_total_kwh_t = worst_up_kwh_t + worst_down_kwh_t`
     - `worst_total_kw_t = worst_total_kwh_t / Δt`
-    - `worst_total_*` dient als auditierbare kombinierte Kennzahl für UI/Replay; für die harte Verifikation wird die konservative Reihenfolge deterministisch vorgegeben:
+    - `worst_total_*` dient als auditierbare kombinierte Kennzahl für UI/Replay; für die harte Verifikation wird die sequentielle Reihenfolge explizit definiert:
       1) Up-Branch auf `worst_up_kwh_t` (Absenkung),
       2) anschließend Down-Branch auf `worst_down_kwh_t` auf dem SOC nach Up.
+      - Im sequentiellen Pfad wird Up zuerst auf den Schrittzustand angewendet und Down nur auf dem danach aktualisierten SOC geführt.
     - Diese Kopplung ist bewusst konservativ und vollständig deterministisch.
   - Wenn simultanes Gegensignal laut Produktdefinition aktiv ist, aber `simultaneous_reserve_direction_allowed=false`,
     gilt hart `ROBUST_POLICY_UNSUPPORTED` mit `POLICY_MISMATCH`.
 - FCR-Worst-Case-Konsistenz bei Mindestzeit:
   - Für FCR wird die Mindestaktivierungszeit als Zustandsgröße geführt:
-    - `fcr_remaining_t` ist der verbleibende Restbedarf in Minuten.
-    - `fcr_remaining_0 = t_min_fcr`.
-    - Bei Schrittübergang in Alert wird `fcr_remaining_t` auf `t_min_fcr` gesetzt.
+    - `fcr_remaining_t` ist der Alert-Tracking-Zustand in Minuten und dient der laufenden Laufzeit-Rekursion.
+    - Zur Worst-Case-Hülle für die Prüfung auf dem Entscheidungszeitpunkt gilt eine konservative
+      Vollauslastungsansicht: pro Schritt wird `fcr_remaining_t` vor der Energieableitung auf
+      `t_min_fcr` gesetzt, unabhängig vom aktuellen Alert-Status.
+    - Bei Schrittübergang in Alert wird für die Tracking-Ansicht `fcr_remaining_t` auf `t_min_fcr` gesetzt.
     - Während fortlaufender Alert-Phasen:
       `fcr_remaining_{t+1} = max(0, fcr_remaining_t - Δt*60)`.
     - Bei Alert in Schritt `t` ist die zunächst zu reservierende FCR-Energie auf
       `min(Δt, fcr_remaining_t/60)` h zu skalieren.
-    - Mit dem obigen stateful Ansatz wird bei kleinen `Δt` die volle Mindestdauer konservativ über Folgeintervalle berücksichtigt.
+    - Mit der Tracking-Logik wird bei kleinen `Δt` die volle Mindestdauer konservativ über Folgeintervalle berücksichtigt.
 - Hilfsgröße:
   - `self_discharge_loss_kwh_t` ist deterministisch zu berechnen:
     - bei `self_discharge_mode=absolute_kwh_per_hour`:
@@ -348,37 +351,24 @@ Restore- und Gate-Entscheidungslogik (verbindlich):
   - Down-Verstoß-Defizit:
     `restore_shortfall_down_kwh = max(0, worst_down_kwh_t - (soc_max_eff_kwh - soc_plan_down_t) / eta_charge)`
 - Verfügbare Wiederherstellungsleistung je Schritt:
-    - Up-Branch:
-      `restore_capability_up_t_fallback` ist der deterministische technische Default je Schritt
+  - Effektive Restore-Kapazität je Richtung berechnet sich per Coalesce (Override zuerst, dann technischer Default):
+    - `restore_capability_up_t_fallback` ist der deterministische technische Default je Schritt
       (z. B. aus Asset- oder Reservebandgrenzen), nicht aus der bereits erzeugten
       `ReserveEnergyEnvelope`.
-      `restore_capability_up_t = if restore_capability_up_kw is set then restore_capability_up_kw else restore_capability_up_t_fallback`
-      `restore_capability_kw_up = if restore_shortfall_up_kwh > 0 then restore_capability_up_t else 0`
-    - Down-Branch:
-      `restore_capability_down_t_fallback` ist der analoge deterministische technische Default je Schritt
+    - `restore_capability_down_t_fallback` ist der analoge deterministische technische Default je Schritt
       (z. B. aus Asset- oder Reservebandgrenzen), nicht aus der bereits erzeugten
       `ReserveEnergyEnvelope`.
-      `restore_capability_down_t = if restore_capability_down_kw is set then restore_capability_down_kw else restore_capability_down_t_fallback`
-      `restore_capability_kw_down = if restore_shortfall_down_kwh > 0 then restore_capability_down_t else 0`
-    - Richtungsbasierte Mindest-Rekonstruktionsdauer:
-      - `restore_time_up = if restore_shortfall_up_kwh > 0 and restore_capability_kw_up > 0 then restore_shortfall_up_kwh / restore_capability_kw_up * 60 else 0`
-      - `restore_time_down = if restore_shortfall_down_kwh > 0 and restore_capability_kw_down > 0 then restore_shortfall_down_kwh / restore_capability_kw_down * 60 else 0`
-    - `restore_shortfall_kwh = max(restore_shortfall_up_kwh, restore_shortfall_down_kwh)`
-      - Falls ein aktiver Branch (`restore_shortfall_*_kwh > 0`) jedoch `restore_capability_kw_* <= 0` hat:
-        `ROBUST_INFEASIBLE` mit `limiting_reason_code=NO_RECOVERY_PATH`.
-    - Mit manuellem Override aus der aktuellen Zeile von `ReserveEnergyEnvelope`:
-      - `restore_capability_kw_up`
-        - Falls gesetzt und `restore_shortfall_up_kwh > 0`:
-          `required_recovery_minutes_up = restore_shortfall_up_kwh / restore_capability_kw_up * 60`
-        - Sonst `required_recovery_minutes_up = +inf`.
-      - `restore_capability_kw_down`
-        - Falls gesetzt und `restore_shortfall_down_kwh > 0`:
-          `required_recovery_minutes_down = restore_shortfall_down_kwh / restore_capability_kw_down * 60`
-        - Sonst `required_recovery_minutes_down = +inf`.
-      - `required_recovery_minutes = max(required_recovery_minutes_up, required_recovery_minutes_down)`.
-    - Ohne Override:
-      `required_recovery_minutes = max(restore_time_up, restore_time_down)` (konservativster Branch).
-    - `restore_capability_kw_used` ist der Richtungswert (`worst_up_kw_t` oder `worst_down_kw_t`), der `required_recovery_minutes` bestimmt; bei Gleichstand deterministisch die Up-Richtung.
+    - `restore_capability_up_policy_t = if restore_capability_up_kw is set then restore_capability_up_kw else restore_capability_up_t_fallback`
+    - `restore_capability_down_policy_t = if restore_capability_down_kw is set then restore_capability_down_kw else restore_capability_down_t_fallback`
+    - `restore_capability_up_t = if restore_shortfall_up_kwh > 0 then restore_capability_up_policy_t else 0`
+    - `restore_capability_down_t = if restore_shortfall_down_kwh > 0 then restore_capability_down_policy_t else 0`
+  - Richtungsbasierte Mindest-Rekonstruktionsdauer:
+    - `required_recovery_minutes_up = if restore_capability_up_t > 0 and restore_shortfall_up_kwh > 0 then restore_shortfall_up_kwh / restore_capability_up_t * 60 else +inf`
+    - `required_recovery_minutes_down = if restore_capability_down_t > 0 and restore_shortfall_down_kwh > 0 then restore_shortfall_down_kwh / restore_capability_down_t * 60 else +inf`
+    - `required_recovery_minutes = max(required_recovery_minutes_up, required_recovery_minutes_down)`
+    - Falls ein aktiver Branch (`restore_shortfall_*_kwh > 0`) keine positive Restore-Kapazität hat:
+      `ROBUST_INFEASIBLE` mit `limiting_reason_code=NO_RECOVERY_PATH`.
+    - `restore_capability_used` ist der Richtungswert (`worst_up_kw_t` oder `worst_down_kw_t`), der `required_recovery_minutes` bestimmt; bei Gleichstand deterministisch die Up-Richtung.
 - Falls `required_recovery_minutes > max_recovery_time` => `ROBUST_INFEASIBLE` mit
   `limiting_reason_code=RECOVERY_TIMEOUT`.
 - Falls kein zulässiges Window vorliegt:
@@ -442,7 +432,7 @@ Pflichtregeln:
 
 - Alert State wird aus Frequenzabweichung oder externem
   Regelleistungsstatus abgeleitet.
-- `t_min_fcr` zaehlt nur in zulaessigen Betriebsfenstern.
+- `t_min_fcr` zählt nur in zulässigen Betriebsfenstern.
 - `full_activation_time` ist in derselben Zeiteinheit wie `t_min_fcr` anzugeben;
   produkt-spezifische Werte `full_activation_time_afrr` und
   `full_activation_time_mfrr` verwenden ebenfalls dieselbe Einheit.
@@ -450,12 +440,12 @@ Pflichtregeln:
   Ein Restore-Vorschlag darf nur erzeugt werden, wenn vor dem geplanten Ausführungsfenster
   mindestens die Vorlaufzeit eingehalten ist.
 - Reserve Mode darf nur aktiviert werden, wenn der resultierende
-  Robustheitszustand operator-faehig erklaert wird.
-- Recovery endet erst, wenn Worst-Case-Lieferfaehigkeit wieder
+  Robustheitszustand operator-fähig erklaert wird.
+- Recovery endet erst, wenn Worst-Case-Lieferfähigkeit wieder
   hergestellt ist.
 - Wird `max_recovery_time` erreicht ohne Wiederherstellung, endet die
   Recovery mit `ROBUST_INFEASIBLE` und `limiting_reason_code=RECOVERY_TIMEOUT`.
-- Infeasible Recovery fuehrt zu einem klaren Status, nicht zu stiller
+- Infeasible Recovery führt zu einem klaren Status, nicht zu stiller
   Fahrplanfortsetzung.
 
 ### Intraday-SOC-Restauration
@@ -477,7 +467,7 @@ Pflichtregeln:
  - Sonst:
    - Laden, wenn `restore_up_kwh_t > 0` (Wird Worst-Case-Up nicht gedeckt).
    - Entladen, wenn `restore_down_kwh_t > 0` (Wird Worst-Case-Down nicht gedeckt).
- - harte Begrenzung durch Asset-Leistung, Reservebaender,
+ - harte Begrenzung durch Asset-Leistung, Reservebänder,
    SOC-Grenzen und Gate-Closure-Zeit.
  - Restore ist nur dann ausgabe- und ausführungspfadfähig, wenn aktuell ein
    ausreichendes Wiederherstellungsfenster offen ist und `intraday_gate_closure`
@@ -485,7 +475,7 @@ Pflichtregeln:
  - keine automatische Marktorder im Domain- oder Regelkreis.
 
 Der Slice definiert nur EMS-seitig den Bedarf und einen Fahrplanvorschlag;
-Order-Routing oder Boersenanbindung bleibt ausserhalb.
+Order-Routing oder Börsenanbindung bleibt außerhalb.
 
 ---
 
@@ -494,17 +484,17 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 ### Phase 1: Fachvertrag und Golden Fixtures
 
 - Fachliche Portierung der relevanten Formeln als Spezifikation:
-  - verfuegbare Up-/Down-Energie
+  - verfügbare Up-/Down-Energie
   - FCR-Worst-Case-Huelle
   - kombinierte FCR/aFRR-Energiehuelle
   - LER-Alert-/Recovery-Regeln
 - Replay-/Golden-Fixtures aus synthetischen Szenarien:
   - 6h volle FCR-Aktivierung
-  - 30min `t_min_fcr`-Erfuellung
+  - 30min `t_min_fcr`-Erfüllung
   - Alert-State-Ende mit Recovery
   - zu hohe aFRR-Up-Reserve bei niedrigem SOC
   - zu hohe aFRR-Down-Reserve bei hohem SOC
-- Keine Abhaengigkeit auf Python oder Excel im Produktpfad.
+- Keine Abhängigkeit auf Python oder Excel im Produktpfad.
 
 ### Phase 2: Domain- und Application-Modell
 
@@ -515,7 +505,7 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
   - `ReserveRobustnessResult`
 - Application-Port:
   - `IReserveRobustnessCheck`
-  - optional spaeter `IReserveRestorationPlanner`
+  - optional später `IReserveRestorationPlanner`
   - Fehlercodes und Metriken:
   - `reserve_robustness_status`
   - `reserve_robustness_limiting_reason`
@@ -534,11 +524,11 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
   [`plan-market-colocation-model.md`](plan-market-colocation-model.md);
   beide Abschnitte müssen semantisch identisch bleiben.
 
-- Precheck fuer Schedule-Optimierung:
+- Precheck für Schedule-Optimierung:
   - Reserveband darf nicht nur leistungsmässig passen, sondern muss
     energie-/SOC-robust sein.
 - Intraday-Restauration:
-  - optionaler Optimierungsinput fuer benötigte Up-/Down-Energiekorrektur.
+  - optionaler Optimierungsinput für benötigte Up-/Down-Energiekorrektur.
 - Ergebnisverhalten:
   - Robustheitsverletzung wird über bestehende `OptimizationSolverStatus` +
     strukturierte `TerminationCode` + harte `CanExecute`-Sperren ausgedrückt.
@@ -558,13 +548,18 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
     `reserve-robustness-recovery-timeout`, `reserve-robustness-source-missing`,
     `reserve-robustness-policy-unsupported`.
   - Keine impliziten Reserveverletzungen im produzierten Fahrplan.
-  - Bestehender Pfad ohne LER/FCR-Robustheit bleibt unveraendert.
+  - Bestehender Pfad ohne LER/FCR-Robustheit bleibt unverändert.
 - Ergebnis-/Run-Mapping (verbindlich):
   - `reserve_robustness_status = ReserveRobustnessResult.status`.
   - `reserve_robustness_limiting_reason = ReserveRobustnessResult.limiting_reason_code`.
   - `HasUsableSolution` wird in der aktuellen Codebasis weiterhin aus
     `OptimizationSolverStatus.{Optimal,Feasible}` abgeleitet; die produktive
     Ausführungssteuerung nutzt darüber hinaus das neue harte Gate `CanExecute`.
+  - `CanExecute` als hartes Persistenzfeld erfordert eine Domain-Constructor-Migration
+    für `OptimizationRun`: bestehender immutable Konstruktor und
+    `OptimizationRun`-Wire/DB-Pfad müssen gemeinsam erweitert werden (`can_execute`
+    in Wireobjekt + Datenhaltung + Mapping), damit das Feld die Invariante
+    korrekt trägt.
   - Bei `reserve_robustness_status != ROBUST_OK` ist
     `reserve_robustness_limiting_reason` als Pflichtfeld im `OptimizationRun`-`TerminationDetail`
     zu persistieren, inkl. optionaler `status_description`, damit Operator-/Replay-Sichten die Ursache eindeutig nachvollziehen.
@@ -605,8 +600,8 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 
 ### Phase 4: Operator- und Replay-Sicht
 
-- API-/UI-Ausgabe fuer:
-  - aktuelle Reservefaehigkeit
+- API-/UI-Ausgabe für:
+  - aktuelle Reservefähigkeit
   - Alert/Reserve/Recovery-State
   - erwartete Recovery-Endzeit
   - benoetigte Intraday-Restauration
@@ -621,12 +616,12 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 
 ## Nicht-Ziele
 
-- Kein direkter Python-Port aus `BESS-Simulation`.
+- Kein direkter Python-Port aus der Referenzpublikation.
 - Keine Excel-Konfiguration im Produktpfad.
-- Keine Boersenorder-Ausfuehrung.
-- Keine Zertifizierung als FCR-/aFRR-Praequalifikationsnachweis.
-- Kein Ersatz fuer BMS-/PCS-Schutzfunktionen.
-- Keine Aenderung der bestehenden Vorzeichenkonvention.
+- Keine Börsenorder-Ausführung.
+- Keine Zertifizierung als FCR-/aFRR-Präqualifikationsnachweis.
+- Kein Ersatz für BMS-/PCS-Schutzfunktionen.
+- Keine Änderung der bestehenden Vorzeichenkonvention.
 - Kein Forecast-Adapter; Quellenbeschaffung bleibt
   [`plan-price-forecast-adapters.md`](../open/plan-price-forecast-adapters.md).
 
@@ -634,14 +629,14 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 
 ## Liefergegenstaende bei Aktivierung
 
-1. ADR oder Architektur-Schaerfung fuer LER/FCR-Robustheitsmodell.
-2. Domain-/Application-Typen fuer Robustheit, Alert State und Recovery.
-3. Deterministische Golden-Fixtures fuer Worst-Case-Energiehuellen.
+1. ADR oder Architektur-Schärf für LER/FCR-Robustheitsmodell.
+2. Domain-/Application-Typen für Robustheit, Alert State und Recovery.
+3. Deterministische Golden-Fixtures für Worst-Case-Energiehuellen.
 4. Application-Port `IReserveRobustnessCheck`.
-5. Optimierungs-Precheck fuer energie-robuste Reservebaender.
+5. Optimierungs-Precheck für energie-robuste Reservebänder.
 6. Intraday-Restaurationsbedarf als strukturierter Optimierungsinput.
-7. Operator-faehige Fehlercodes, Metriken und API-Ausgabe inkl. `CanExecute`.
-8. Dokumentation der Grenzen: keine Praequalifikation, keine
+7. Operator-fähige Fehlercodes, Metriken und API-Ausgabe inkl. `CanExecute`.
+8. Dokumentation der Grenzen: keine Präqualifikation, keine
    automatische Marktorder.
 
 ---
@@ -669,7 +664,7 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 - Keine Reserveverletzung wird durch stilles Clamping versteckt.
 - Operator-Ausgabe nennt limitierende Ursache, Zeitschritt und Richtung.
 - Alle Golden-Fixtures laufen ohne Netzwerk, ohne Python-Runtime und ohne
-  Excel-Abhaengigkeit im `bess-ems`-Testpfad.
+  Excel-Abhängigkeit im `bess-ems`-Testpfad.
 
 ## Definition of Done (DoD)
 
@@ -718,16 +713,16 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 - `full_activation_time_afrr` / `full_activation_time_mfrr` werden nur bei gesetztem Feldwert geprüft:
   - gesetzt und `<= 0` → `ROBUST_POLICY_UNSUPPORTED`.
 - `conservative_soc_headroom` außerhalb `0..1` (ratio) bzw. `<0` (kwh) → `ROBUST_POLICY_UNSUPPORTED`.
-- FCR-Worst-Case fuer nicht-LER: volle FCR-Leistung ueber Horizont.
+- FCR-Worst-Case für nicht-LER: volle FCR-Leistung über Horizont.
 - LER-konservative FCR-Huelle mit `t_min_fcr`.
 - Voller Aktivierungszeitraum deutlich größer als Horizon (`full_activation_time`, `full_activation_time_afrr`, `full_activation_time_mfrr`) nutzt deterministisch den `Δt`-clip ohne Negative oder unzulässige Reserve-Anforderung.
 - Grenzwert-Effizienz `eta_charge` / `eta_discharge` nahe Null (z. B. `1e-9`) wird explizit als harte Verweigerung
   auf `ROBUST_POLICY_UNSUPPORTED` getestet (`eta_min`-Grenzprüfung), ohne implizite `clamp`-/`bounding`-Logik.
 - Alert State startet bei definierter Frequenzabweichung und endet erst
-  bei Rueckkehr in den Normalbereich.
-- Recovery scheitert nach `max_recovery_time` mit operator-faehigem
+  bei Rückkehr in den Normalbereich.
+- Recovery scheitert nach `max_recovery_time` mit operator-fähigem
   Status.
-- Voluntary-aFRR-Bid wird reduziert, bis Worst-Case-Pruefung besteht.
+- Voluntary-aFRR-Bid wird reduziert, bis Worst-Case-Prüfung besteht.
 - Intraday-Restauration respektiert Gate Closure und MTU.
 - Replay-Fall "Reserveleistung passt, Energie reicht nicht" bricht vor
   Schedule-Aktivierung ab.

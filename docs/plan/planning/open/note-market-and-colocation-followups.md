@@ -3,7 +3,7 @@
 **Dokumenttyp:** Vorabklärung / Trigger-Watch
 **Status:** Offen - Folgearbeiten aus externem Fachmaterial
 **Datum:** 2026-05-24
-**Quelle-Repo:** [`BESSelligence`](https://github.com/Ati-PK/BESSelligence) (Ordner `Docs`)
+**Quelle-Repo:** Öffentliches Referenzmaterial – externe Orientierung, keine Code-Übernahme.
 **Bezug:**
 [`../in-progress/roadmap.md`](../in-progress/roadmap.md),
 [`../../../user/bess-ems-function.md`](../../../user/bess-ems-function.md),
@@ -14,11 +14,11 @@
 
 ## Zweck
 
-Diese Notiz sammelt fachliche Folgearbeiten, die aus der Sichtung der
-Dokumente aus dem Git-Repository `BESSelligence` (siehe **Quelle-Repo** oben) im Ordner `Docs`
-relevant sind. Sie ist kein aktiver Implementierungsplan, sondern ein
-Trigger-Watch-Artefakt für Marktmodell, Co-Location, Preisquellen und
-Forecast-Inputs.
+Diese Notiz sammelt fachliche Folgearbeiten aus der Sichtung externer
+Referenzdokumente (siehe **Quelle-Repo** oben), die als fachlicher Input dienen,
+aber keine direkte Codeübernahme darstellen.
+Sie ist kein aktiver Implementierungsplan, sondern ein Trigger-Watch-Artefakt
+für Marktmodell, Co-Location, Preisquellen und Forecast-Inputs.
 
 Die vorhandene `bess-ems`-Basis deckt bereits zentrale Bausteine ab:
 
@@ -38,19 +38,19 @@ Fachvalidierung und als Input für produktnahe Folge-Slices.
 
 ### Hohe Relevanz
 
-- `DFBEW_HP_extern_Batteriespeicher_Frontier_Economics_2602.pdf` (liegt im Repo `BESSelligence`, Ordner `Docs`)
+- `DFBEW_HP_extern_Batteriespeicher_Frontier_Economics_2602.pdf` (liegt in den gesichteten Referenzunterlagen)
   - Geschäftsmodelle, regulatorischer Rahmen, Deutschland/Frankreich,
     Co-Location, Day-Ahead, Intraday, Systemdienstleistungen und Risiken.
   - Nutzen: Validierung von `LH-MKT-*`, Regelleistungsfolgearbeiten,
     Produkt-/Compliance-Gates und Betreiber-Risiken.
 
-- `suena_energy_Whitepaper_Co-Location.pdf` (liegt im Repo `BESSelligence`, Ordner `Docs`)
+- `suena_energy_Whitepaper_Co-Location.pdf` (liegt in den gesichteten Referenzunterlagen)
   - Co-Located-Speicher, Hybridmodelle mit Netzbezug, Speicher-
     Überbauung, Grünstromspeicher, Multi-Market-Optimierung und
     Netzrestriktionen.
   - Nutzen: Fachliche Vorlage für einen Co-Location-/Hybrid-BESS-Slice.
 
-- `BESS_Forecasting_Trading_Strategies.pptx` (liegt im Repo `BESSelligence`, Ordner `Docs`)
+- `BESS_Forecasting_Trading_Strategies.pptx` (liegt in den gesichteten Referenzunterlagen)
   - Revenue Streams, Day-Ahead-only-Grenzen, Intraday-/Balancing-
     Opportunitäten, Multi-Day-Planning, negative Preise, RL-Ausblick.
   - Nutzen: Produkt-/Roadmap-Input für Marktlogik, Operator-UI und
@@ -58,18 +58,18 @@ Fachvalidierung und als Input für produktnahe Folge-Slices.
 
 ### Mittlere Relevanz
 
-- `Data_sources_list.docx` (liegt im Repo `BESSelligence`, Ordner `Docs`)
+- `Data_sources_list.docx` (liegt in den gesichteten Referenzunterlagen)
   - EPEX, TSO-Daten, Wetter, Fuel, CO2, OPSD.
   - Nutzen: Quellenkatalog für Preis- und Forecast-Adapter.
 
 - `Feature_selection.docx` und
-  `WattWise Feature Selection_20260310.docx` (liegen im Repo `BESSelligence`, Ordner `Docs`)
+  `WattWise Feature Selection_20260310.docx` (liegen in den gesichteten Referenzunterlagen)
   - Lag-Features, residual load, Wind-/Solar-Forecast, Load-Forecast,
     Wetter, Gas, Coal, CO2, Kalenderfeatures.
   - Nutzen: Input-Vertrag für Forecast-Sidecar oder externe
     Forecast-Provider, nicht für den technischen Regelkreis.
 
-- `European_BESS_Optimizers_Landscape.pptx` (liegt im Repo `BESSelligence`, Ordner `Docs`)
+- `European_BESS_Optimizers_Landscape.pptx` (liegt in den gesichteten Referenzunterlagen)
   - Wettbewerbs-/Produktpositionierung.
   - Nutzen: Benchmarking für Feature-Scope und UI-Sprache; Aussagen zu
     Firmen, Funding und Uplift müssen vor externer Verwendung
@@ -166,7 +166,7 @@ sowie Forecast-Serien.
   produktiven Betriebsformen (`StandaloneBess`, `ClassicalCoLocation`, `HybridWithGridImport`) definiert.
 - [ ] `GreenStorageRestricted` ist als separater Sondermodus im selben Slice als
   Validierungsmodus dokumentiert.
-- [ ] F-MKT-02-Abnahmebedingungen sind dokumentiert (mind. 2 Preis-Adapter + 2 Forecast-Adapter, Fallback-/Degradation-Modell, Aktualisierung + Alarmierung).
+- [ ] F-MKT-02-Abnahmebedingungen sind dokumentiert (je 2 Adapter je Typ: 1 Primär + 1 Fallback + Fallback-/Degradation-Modell, Aktualisierung + Alarmierung).
 - [ ] Trigger-Koordination bei parallelen Auslösern ist definiert und konfliktfrei:
   - Reihenfolge der Freigabe ist festgelegt:
     - Produktiv-Freigaben mit neuer Markt-/Co-Location-Logik vor Forecast-/Adapter-Produktivpfad.
@@ -191,8 +191,12 @@ sowie Forecast-Serien.
   4. Parallelbetrieb ist erst freigegeben, wenn `CanExecute`-Semantik zwischen
      `plan-market-colocation-model.md` und
      `plan-ler-fcr-reserve-robustness.md` verbindlich abgeglichen ist.
-  5. Bei Konflikten gilt als harte Regel: neue Betriebslogik darf nicht ohne definierte
-     `series_status`-Entscheidung in den Markt- und Optimierungsworkflow starten.
+5. Bei Konflikten gilt als harte Regel: neue Betriebslogik darf nicht ohne definierte
+   `series_status`-Entscheidung in den Markt- und Optimierungsworkflow starten.
+   Für nicht adapter-getragene Serien im bestehenden Altpfad ist ein kontrollierter
+   Übergang nur über den expliziten degradierten Serienzustand erlaubt
+   (`series_status=SOURCE_DEGRADED`, optional mit `status_flags` wie
+   `SOURCE_BACKFILL`).
 
 ---
 

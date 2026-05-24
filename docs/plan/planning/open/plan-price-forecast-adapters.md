@@ -14,10 +14,10 @@
 ## Ziel
 
 `bess-ems` soll Preis- und Forecast-Daten nicht nur manuell importieren,
-sondern ueber austauschbare Quellenadapter beziehen koennen.
+sondern über austauschbare Quellenadapter beziehen können.
 
 Der bestehende `PriceSeries`-/`IPriceSeriesSource`-Pfad bleibt die
-Application-Grenze. Externe Providerlogik gehoert in Adapter, nicht in
+Application-Grenze. Externe Providerlogik gehört in Adapter, nicht in
 Domain, Optimierung oder Regelkreis.
 
 ---
@@ -41,10 +41,10 @@ Heute vorhanden:
 Nicht vorhanden:
 
 - produktive externe Preisquellenadapter
-- Forecast-Zeitreihen fuer Load, PV, Wind oder Wetter
+- Forecast-Zeitreihen für Load, PV, Wind oder Wetter
 - Quellenstatus, Refresh-Status, Rate-Limit-/Cache-Regeln
 - provider-spezifische Authentisierung
-- verbindlicher Serienvertrag fuer Zeitachse, Freshness, Gap-Handling und Fehlercodes
+- verbindlicher Serienvertrag für Zeitachse, Freshness, Gap-Handling und Fehlercodes
 
 Kompatibilitäts-/Migrationsprinzip:
 
@@ -55,7 +55,9 @@ Kompatibilitäts-/Migrationsprinzip:
   - Forecast/Forecast-Adapter nutzen `IForecastSeriesSource`,
   - beide werden vor dem Optimierer über denselben Mapping-Layer auf die aktuelle Domäne projiziert.
 - Für den produktiven Slice ist die bestehende `PriceSeries`/Persistenzkette kompatibel zu erweitern:
-- bestehender `IPriceSeriesStore`- und Import-Schlüssel darf nicht nur auf Markt/Produkt/Bereich/Quelle/Timestep basieren.
+- bestehender Schlüsselaspekt in `InMemoryPriceSeriesStore.PriceSeriesKey`
+  (Quelle: `src/hexagon/BatteryEms.Application/Markets/InMemoryPriceSeriesStore.cs`)
+  darf nicht nur auf Markt/Produkt/Bereich/Quelle/Timestep basieren.
 - Die Persistenz muss mindestens `series_id`, `series_version` **und** `source.provider_id` als Teil der Identität tragen (oder einen deterministischen Ersatzschlüssel aus genau diesen Werten plus `series_type/product/site_id/market_bid_area`).
   - Ohne diese Erweiterung bleibt F-MKT-02 im produktiven Modus auf den bisherigen Altpfad beschränkt, bis ein dedizierter Speicher-Migrationspfad freigegeben wurde.
 - In der Einführungsphase gilt "Dual-Path":
@@ -115,7 +117,7 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
       2. **Dual-Active-Wahrnehmung**: Alte und neue Family mindestens in zwei vollständigen Release-Fenstern parallel beobachten; `value_hash`-Abweichungen sind als `status_flags` mit `status_message` auditierbar.
       3. **Cutover freigeben**: Neue Family wird produktiv als `primary` markiert und auf mindestens `SOURCE_OK` oder ausdrücklich zugelassene `SOURCE_DEGRADED` gesetzt.
       4. **Produktiver Umschaltpunkt**: Alte Family in produktiven Runs auf `SOURCE_REJECTED`/`CanExecute=false` halten; alte Werte sind nur noch Replay/Diagnose sichtbar.
-      5. **Rollback-Fenster**: Rückkehr auf alte Family nur mit explizitem Release-Block (`release_block` oder `controlled_switchover`) möglich; Rollback ist nur dann erlaubt, wenn neue Family in einem vollständigen Fenster keine akzeptierbare Lastserie (ohne harte Fallback) abgedeckt.
+      5. **Rollback-Fenster**: Rückkehr auf alte Family nur mit explizitem Release-Block (`release_block` oder `controlled_switchover`) möglich; Rollback ist nur dann erlaubt, wenn die neue Family in einem vollständigen Beobachtungsfenster keine vollständige akzeptierbare Lastserie (ohne harte Fallback) geliefert hat.
       6. **Abschluss**: Alter Family-Schlüssel wird auf `ARCHIVED` gesetzt; neue Family läuft ohne Alias-Wechsel weiter.
 
 Kontrollierte Abnahmetests für Family-/Versionswechsel:
@@ -309,6 +311,7 @@ Die Entscheidungslogik ist zweistufig:
 - Daraus wird deterministisch ein externer `series_status` abgeleitet (`SOURCE_OK`, `SOURCE_DEGRADED`, `SOURCE_FALLBACK_USED`, `SOURCE_REJECTED`).
 
 Die `SOURCE_*`-Auswertung ist für jede Serie deterministisch:
+- Die folgenden Punkte sind ein Verweis auf die oben genannten **Kanonischen Ableitungsregeln** und keine zweite, abweichende Normdefinition.
 
 1) Vorvalidierung
 - bei Schema-, Zeitachsen- oder Horizonabweichungen: sofort `source_eval_status=SOURCE_SCHEMA_MISMATCH` → `series_status=SOURCE_REJECTED` (kein Fallback).
@@ -388,8 +391,8 @@ Endgültige Serienendstatus sind:
 
 - EPEX SPOT
   - Day-Ahead-Preise
-  - Intraday- oder Indexdaten, sofern lizenziert und verfuegbar
-  - Erwarteter Nutzen: produktive Preisbasis fuer Optimierung
+  - Intraday- oder Indexdaten, sofern lizenziert und verfügbar
+  - Erwarteter Nutzen: produktive Preisbasis für Optimierung
 
 - Open Power System Data oder andere offene historische Datasets
   - Benchmark-/Replay-Daten
@@ -409,12 +412,12 @@ Endgültige Serienendstatus sind:
 
 - Open-Meteo / Copernicus / ECMWF
   - Temperatur, Wind, Einstrahlung, Wolkenbedeckung
-  - Erwarteter Nutzen: Forecast-Features fuer PV/Wind/Load
+  - Erwarteter Nutzen: Forecast-Features für PV/Wind/Load
 
 - Fuel-/CO2-Quellen
   - Gas, Coal, CO2
-  - Erwarteter Nutzen: Preisprognose-Features, nicht kurzfristig fuer den
-    technischen Dispatch noetig
+  - Erwarteter Nutzen: Preisprognose-Features, nicht kurzfristig für den
+    technischen Dispatch nötig
 
 ---
 
@@ -432,8 +435,8 @@ Endgültige Serienendstatus sind:
   - TTL
   - `max_stale_age_minutes`
   - provider rate limit + Retry-Backoff
-  - operatorfahige Fehlercodes inkl. `SOURCE_*`
-- API-/Operator-Status fuer Quellen:
+- operatorfähige Fehlercodes inkl. `SOURCE_*`
+- API-/Operator-Status für Quellen:
   - letzter erfolgreicher Abruf + aktiver Statuscode
   - letzter Fehler
   - letzter Fehlercode (`SOURCE_*`)
@@ -466,7 +469,7 @@ Endgültige Serienendstatus sind:
 Primär-/Fallback-Regel ist verbindlich:
 
 - Preis:
-  - Primär: EPEX (nur wenn Zugriff, Lizenz und Nutzungsbedingungen geklaert sind)
+  - Primär: EPEX (nur wenn Zugriff, Lizenz und Nutzungsbedingungen geklärt sind)
   - Fallback: Open Power System Data / Replay-konforme Datenquelle
 - Forecast:
   - Primär: ENTSO-E
@@ -475,32 +478,26 @@ Primär-/Fallback-Regel ist verbindlich:
 Aktivierungslogik:
 - `SOURCE_EMPTY` wird ohne zugelassenen, kompatiblen Fallback nur als harte
   Fehlerklasse `SOURCE_REJECTED` behandelt.
-
-- Primärquelle wird standardmaessig genutzt.
-- Bei Qualitätsfehler (`SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_RETRY_EXHAUSTED`)
-    wird der Fallbackzugriff nur genutzt, wenn:
-   - derselbe `SeriesEnvelope`-Vertrag eingehalten wird
-   - Lücke/Abweichung im Fallback innerhalb definierter Konfigurationsgrenzen bleibt
-   - Operator den Fallbackstatus explizit akzeptiert
-  - `SOURCE_GAP` wird nur als harte Ablehnung (`SOURCE_REJECTED`) geführt, wenn die Gaps nicht vollständig durch Backfill geschlossen werden konnten oder wenn `n_intervals <= 48`.
-  - Ohne akzeptablen Fallback gilt:
-    - `SOURCE_STALE`:
-      - bei `quality_mode=degraded_ok`: `SOURCE_DEGRADED`
-      - sonst `SOURCE_REJECTED`
-    - `SOURCE_RATE_LIMIT` / `SOURCE_UNAVAILABLE` / `SOURCE_SCHEMA_MISMATCH`: `SOURCE_REJECTED`
-  - `SOURCE_RETRY_EXHAUSTED`: `SOURCE_REJECTED`
-    - `SOURCE_GAP`: `SOURCE_REJECTED`
-    - `SOURCE_AUTH_ERROR`: `SOURCE_REJECTED` (ohne Fallback)
+- Primärquelle wird standardmäßig genutzt.
+- Qualitäts- und Fallback-Entscheide inkl. `SOURCE_*`-Matrix, `quality_mode`,
+  `fallback`-Kompatibilität, harte Ablehnungen und `status_flags` sind
+  verbindlich im Abschnitt
+  [Qualitätsentscheidungen bei `SOURCE_*` (verbindlich)](#qualitätsentscheidungen-bei-source-_verbindlich)
+  festgelegt.
+- Diese Phase beschreibt nur den Source-Auswahl- und Aktivierungspfad; die
+  Status-/Fallback-Matrix wird nicht hier dupliziert.
+- Ohne genehmigte Fallback-Quelle bleibt der produktive Pfad hart blockiert (kein
+  Übergang über implizite Qualitätsdegradation).
 
 Zusätzlich:
 
-- Falls EPEX Lizenz nicht geklaert ist, startet Phase 2 direkt mit Fallback-Basisquelle
+- Falls EPEX Lizenz nicht geklärt ist, startet Phase 2 direkt mit Fallback-Basisquelle
   und dokumentiert den Lizenzaufhebungsplan im Runbook.
 
 ### Phase 3: Forecast-Sidecar-Input
 
 Wenn Forecasting nicht im EMS laufen soll, definiert dieser Slice nur den
-Input-/Output-Vertrag fuer einen Forecast-Sidecar:
+Input-/Output-Vertrag für einen Forecast-Sidecar:
 
 - Input:
   - Preis-Historie
@@ -510,8 +507,8 @@ Input-/Output-Vertrag fuer einen Forecast-Sidecar:
   - Wetter
   - Kalenderfeatures
 - Output:
-  - `PriceSeries` fuer Punktforecast
-  - optional spaeter: `ForecastSeries`/Quantile oder Szenariopfade in separatem Slice
+  - `PriceSeries` für Punktforecast
+- optional später: `ForecastSeries`/Quantile oder Szenariopfade in separatem Slice
 
 Vertraglich gilt der gleiche `SeriesEnvelope` für den Sidecar-Output (Zeitachse, Einheit, Source-Metadaten, Qualitätscode).
 
@@ -522,7 +519,7 @@ arbeitet mit deterministischen Preiswerten.
 
 ## Nicht-Ziele
 
-- Kein Scraping ohne geklaerte Nutzungsrechte.
+- Kein Scraping ohne geklärte Nutzungsrechte.
 - Kein Forecasting-Modell im Domain- oder Regelkreis.
 - Kein Vendor-/Credential-Secret im Repository.
 - Kein harter Netzaufruf in Unit Tests.
@@ -532,12 +529,12 @@ arbeitet mit deterministischen Preiswerten.
 
 ## Liefergegenstaende bei Aktivierung
 
-1. Folge-ADR oder Architektur-Schaerfung fuer externe Datenquellen.
-2. Adapter-Port fuer Preis-/Forecast-Quellen oder Erweiterung des
+1. Folge-ADR oder Architektur-Schräftigung für externe Datenquellen.
+2. Adapter-Port für Preis-/Forecast-Quellen oder Erweiterung des
    bestehenden `IPriceSeriesSource`-Umfelds.
 3. Quellenstatusmodell inklusive Refresh-/Fehlerstatus.
-4. Mindestens ein Adapter mit Mock-/Replay-faehigem Testpfad.
-5. API- oder Operator-UI-Status fuer Datenquellen.
+4. Mindestens ein Adapter mit Mock-/Replay-fähigem Testpfad.
+5. API- oder Operator-UI-Status für Datenquellen.
 6. Tests:
    - erfolgreiche Serienladung
    - fehlende Credentials
@@ -546,12 +543,12 @@ arbeitet mit deterministischen Preiswerten.
    - gleicher `(series_id, series_version)` mit anderem `provider_id` wird als separater Provider-Kontext bewertet
    - Primary-Validierung gegen Secondary-Adapter bei Primary-Ausfall
    - Rate-Limit-/Providerfehler
-   - stale Daten werden je nach `quality_mode` korrekt gefuehrt (`SOURCE_DEGRADED` vs `SOURCE_REJECTED`)
+   - stale Daten werden je nach `quality_mode` korrekt geführt (`SOURCE_DEGRADED` vs `SOURCE_REJECTED`)
    - Zeitzone/DST bleibt konsistent
    - UTC-Zeitachse, Schrittweite und Lückenbehandlung (99,5 % Mindestabdeckung)
    - Optimierung bekommt exakt die erwartete Schrittzahl
-   - operatorfahige Laufcodes werden bei Fehlerpfaden gesetzt (`SOURCE_*`)
-7. Runbook fuer Credentials, Rate Limits und Provider-Ausfall.
+   - operatorfähige Laufcodes werden bei Fehlerpfaden gesetzt (`SOURCE_*`)
+7. Runbook für Credentials, Rate Limits und Provider-Ausfall.
 
 ---
 
@@ -559,8 +556,8 @@ arbeitet mit deterministischen Preiswerten.
 
 - Optimierung kann eine importierte oder extern geladene Preisreihe
   ohne Codepfad-Unterschied nutzen.
-- Fehlende oder veraltete Quelldaten fuehren zu einem klaren
-  operatorfaehigen Fehler, nicht zu implizitem Fallback auf falsche Werte.
+- Fehlende oder veraltete Quelldaten führen zu einem klaren
+  operatorfähigen Fehler, nicht zu implizitem Fallback auf falsche Werte.
 - Externe Datenquellen sind in Tests durch Replay-/Fixture-Daten ersetzbar.
 - Quellenadapter verletzen keine Architekturregel: keine Markt- oder
   Regelentscheidung im Adapter.
@@ -582,8 +579,8 @@ arbeitet mit deterministischen Preiswerten.
   - ohne diese Erweiterung bleibt eine produktive Aufnahme neuer Serienkennungen im Slice gesperrt (Fallback-Pfad definiert).
   - Produktive Familie-/Versionswechsel sind nur per dokumentiertem Cutover erlaubt; ein stiller `series_version_family`- oder Revisionsfamilienwechsel ohne Release-Freigabe führt zu harter Ablehnung.
 - [ ] Import-Adapter sind bereit für produktive Nutzung:
-  - mindestens ein primärer und ein fallbackfähiger Preisadapter,
-  - mindestens ein primärer und ein fallbackfähiger Forecastadapter,
+  - je Typ mindestens zwei Adapter (1 Primär + 1 Fallbackfähiger): Preis und Forecast,
+  - je Typ klar definierte Qualitäts- und Fallback-Pfade inkl. `quality_mode`.
   - klare Refresh-/Staleness-/Rate-Limit-Politik.
 - [ ] Fallback-/Degradationslogik ist deterministisch umgesetzt:
   - harte Fehler (`SOURCE_REJECTED`) vs. degradierte Nutzung (`SOURCE_DEGRADED`) klar getrennt,

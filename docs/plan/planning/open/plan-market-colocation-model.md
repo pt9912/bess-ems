@@ -15,17 +15,17 @@
 ## Ziel
 
 `bess-ems` soll Standalone- und Co-Located-Batteriespeicher fachlich
-unterscheiden koennen, ohne die bestehende Safety-First-Regelpipeline
-zu veraendern.
+unterscheiden können, ohne die bestehende Safety-First-Regelpipeline
+zu ändern.
 
-Der Slice fuehrt ein explizites Markt-/Standortmodell fuer Co-Location
+Der Slice führt ein explizites Markt-/Standortmodell für Co-Location
 ein und erweitert die Optimierungsinputs um lokale Erzeugung,
 Netzanschlussgrenzen und Vermarktungsrestriktionen.
 
-Der technische Regelkreis bleibt unveraendert:
+Der technische Regelkreis bleibt unverändert:
 
 ```text
-Optimierung -> Fahrplan -> State Machine -> Prioritaeten -> Limiter -> Command
+Optimierung -> Fahrplan -> State Machine -> Prioritäten -> Limiter -> Command
 ```
 
 ---
@@ -97,7 +97,7 @@ Modell als `OptimizationSolverStatus` + `TerminationCode`:
 Der Slice modelliert mindestens diese Betriebsarten:
 
 - `StandaloneBess`
-  - Batterie handelt unabhaengig am Markt.
+  - Batterie handelt unabhängig am Markt.
   - Netzbezug und Netzeinspeisung sind technisch und marktlich erlaubt,
     soweit Asset- und Netzlimits eingehalten werden.
 
@@ -112,14 +112,14 @@ Der Slice modelliert mindestens diese Betriebsarten:
   - Optimierung muss Herkunfts-/Kostenunterschiede transparent halten.
 
 - `GreenStorageRestricted`
-  - Batterie darf nur unter definierten Herkunfts- oder Foerderregeln
+  - Batterie darf nur unter definierten Herkunfts- oder Förderregeln
     laden/entladen.
-  - Dieser Modus ist zunaechst Modell- und Validierungs-Scope; produktive
-    Foerderlogik braucht eigene Rechts-/Compliance-Freigabe.
+  - Dieser Modus ist zunächst Modell- und Validierungs-Scope; produktive
+    Förderlogik braucht eigene Rechts-/Compliance-Freigabe.
 
 ### Neue fachliche Konzepte
 
-Moegliche Domain-/Application-Erweiterungen:
+Mögliche Domain-/Application-Erweiterungen:
 
 - `SiteConstraint`
   - `site_id`
@@ -146,8 +146,8 @@ Moegliche Domain-/Application-Erweiterungen:
     - `import_pos`: positive Leistung bedeutet Import aus dem Netz
 
   - `LocalGenerationSeries`
-  - Zeitreihe fuer PV/Wind-Erzeugung oder Forecast
-  - Pflichtfelder pro Timestamp:
+  - Zeitreihe für PV/Wind-Erzeugung oder Forecast.
+  - Pflichtfelder:
     - `site_id`
       - bei produktiver Co-Location-Nutzung muss die `site_id` eindeutig einem
         `SiteConstraint` zugeordnet sein; andernfalls `SCHEMA_INCONSISTENT`.
@@ -157,18 +157,17 @@ Moegliche Domain-/Application-Erweiterungen:
     `alignment_prepared_horizon_start_utc`, `alignment_prepared_horizon_end_utc`
     entsprechen der Co-Location-Erweiterung von `SeriesEnvelope` aus
     [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md).
-  - `alignment_mode` (`reject` | `trim-to-common`)  
-      - `reject`: harte Ablehnung bei Zeitachsenabweichung (Default im produktiven ADR)
-      - `trim-to-common`: kontrollierte Trimmung auf gemeinsame Schnittmenge für Vorverarbeitung;
-        nur zulässig bei abgeschlossenem Forecast-Preprocessing und nur dann als
-        vorbereiteter Input (`alignment_prepared=true`).
-    - `alignment_prepared` (verpflichtend bei `trim-to-common`):
-      Kennzeichen, dass die Trimmung bereits vollständig deterministisch
-      durchgeführt wurde (inkl. Reihenfolge- und Segmentierungsvorschrift).
-    - `alignment_prepared_by` (verpflichtend bei `alignment_prepared=true`):
-      Präfix/Komponente, die den Vorverarbeitungslauf ausgeführt hat (`forecast-preprocessor/v1`, `batch-trimmer/...`).
-    - `alignment_prepared_horizon_start_utc` und `alignment_prepared_horizon_end_utc` (verpflichtend bei `alignment_prepared=true`):
-      Resultierende harte Zeitschnittgrenzen nach Trimming.
+  - Alignment-Felder:
+    - `alignment_mode` (`reject` | `trim-to-common`)
+      - `reject`: harte Ablehnung bei Zeitachsenabweichung (Default im produktiven ADR).
+      - `trim-to-common`: kontrollierte Trimmung auf gemeinsame Schnittmenge für Vorverarbeitung; nur zulässig bei abgeschlossenem Forecast-Preprocessing und nur dann als vorbereiteter Input (`alignment_prepared=true`).
+    - `alignment_prepared` (verpflichtend bei `trim-to-common`)
+      - Kennzeichen, dass die Trimmung bereits vollständig deterministisch durchgeführt wurde (inkl. Reihenfolge- und Segmentierungsvorschrift).
+    - `alignment_prepared_by` (verpflichtend bei `alignment_prepared=true`)
+      - Präfix/Komponente, die den Vorverarbeitungslauf ausgeführt hat (`forecast-preprocessor/v1`, `batch-trimmer/...`).
+    - `alignment_prepared_horizon_start_utc` und `alignment_prepared_horizon_end_utc` (verpflichtend bei `alignment_prepared=true`)
+      - Resultierende harte Zeitschnittgrenzen nach Trimming.
+  - Weitere Pflichtfelder:
     - `value_kw`
     - `value_type` (`forecast` | `actual`)
     - `source`
@@ -176,25 +175,21 @@ Moegliche Domain-/Application-Erweiterungen:
     - `unit` (z. B. `kW`)
     - `updated_at_utc`
     - `value_version`
-- Validierung:
-- gleiche Zeitachse wie `PriceSeries` (UTC, step-genau, gleiche Horizon-Länge) bei produktiver Nutzung
-- Ist `alignment_mode=reject` (Default im produktiven ADR): die Zeitachse muss hart identisch sein (gleiches Horizon, gleiche Schrittweite, gleiche Startzeit).
-  - Ist `alignment_mode=trim-to-common` gesetzt:
-  - `alignment_prepared` muss `true` sein; ohne abgeschlossene Vorverarbeitung führt der produktive Lauf zu `SCHEMA_INCONSISTENT`.
-  - `alignment_prepared` darf nur zusammen mit `alignment_mode=trim-to-common` verwendet werden.
-  - produktive Optimierung darf `trim-to-common` nur mit explizit abgeschlossenem
-    Vorverarbeitungs-Pfad und nachweislicher Versionierung in den zugehörigen
-    Vorverarbeitungsfeldern starten; ohne diese Voraussetzungen führt der Lauf zu
-    `SCHEMA_INCONSISTENT`.
-  - Schnittmenge auf den gemeinsamen Zeithorizont
-  - `alignment_prepared_by` und die vorbereiteten Horizon-Grenzen (`alignment_prepared_horizon_start_utc`, `alignment_prepared_horizon_end_utc`) müssen gesetzt sein.
-  - deterministische Konvention bei Zeitachsen-Verschiebung
-  - lückenbehaftete Schritte müssen im Anschluss vollständig abgearbeitet werden
-  - nur im Forecast-/Preprocessing-Pfad, danach muss der Standardpfad (`reject`) mit lückenloser Zeitachse erhalten bleiben.
-  - keine offenen Zeitlücken; zulässig: kontrollierte Backfill-Regel (max. 2 Intervalle)
-    - `value_kw` ist eine Produktionsleistung und für diese Serie standardmässig nicht negativ.
+  - Validierung:
+    - gleiche Zeitachse wie `PriceSeries` (UTC, step-genau, gleiche Horizon-Länge) bei produktiver Nutzung.
+    - Ist `alignment_mode=reject` (Default im produktiven ADR): die Zeitachse muss hart identisch sein (gleiches Horizon, gleiche Schrittweite, gleiche Startzeit).
+    - Ist `alignment_mode=trim-to-common` gesetzt:
+      - `alignment_prepared` darf nur zusammen mit `alignment_mode=trim-to-common` verwendet werden.
+      - produktive Optimierung darf `trim-to-common` nur mit explizit abgeschlossenem Vorverarbeitungs-Pfad und nachweislicher Versionierung in den zugehörigen Vorverarbeitungsfeldern starten; ohne diese Voraussetzungen führt der Lauf zu `SCHEMA_INCONSISTENT`.
+      - Schnittmenge auf den gemeinsamen Zeithorizont.
+      - `alignment_prepared_by` und die vorbereiteten Horizon-Grenzen (`alignment_prepared_horizon_start_utc`, `alignment_prepared_horizon_end_utc`) müssen gesetzt sein.
+      - deterministische Konvention bei Zeitachsen-Verschiebung.
+      - lückenbehaftete Schritte müssen im Anschluss vollständig abgearbeitet werden.
+      - nur im Forecast-/Preprocessing-Pfad, danach muss der Standardpfad (`reject`) mit lückenloser Zeitachse erhalten bleiben.
+      - keine offenen Zeitlücken; zulässig: kontrollierte Backfill-Regel (max. 2 Intervalle).
+    - `value_kw` ist eine Produktionsleistung und für diese Serie standardmäßig nicht negativ.
     - Negative Werte sind nur über einen separaten signierten Netzausgangs-Datensatz zulässig.
-    - Metadatenpflicht fuer `source`, `product`, `updated_at_utc`, `value_version`
+    - Metadatenpflicht für `source`, `product`, `updated_at_utc`, `value_version`.
 
 - `LocalOriginState`
   - virtuelle Zwischenbilanz für herkunftsgebundene Energie (kWh)
@@ -209,7 +204,7 @@ Moegliche Domain-/Application-Erweiterungen:
   - `GreenStorageRestricted` ist Sonderfall im selben Co-Location-Kontext und nutzt den gleichen Basis-Constraint-Stack.
 
 - `CurtailmentCost`
-  - Strafkosten fuer Abregelung lokaler Erzeugung
+  - Strafkosten für Abregelung lokaler Erzeugung
 
 - `OriginConstraint`
   - optionale Restriktion, ob Batterieenergie aus lokaler Erzeugung,
@@ -217,7 +212,7 @@ Moegliche Domain-/Application-Erweiterungen:
 
 ### Netzanschlusspunkt-Konvention (verbindlich)
 
-Fuer jede Site gilt folgendes Basis-Modell (LP) mit separater MILP-Kontrolllogik fuer Richtungen:
+Für jede Site gilt folgendes Basis-Modell (LP) mit separater MILP-Kontrolllogik für Richtungen:
 
 - `b_t` = Batterieleistung (kW), Batterie-Vorzeichen bleibt unverändert:
   - `b_t > 0`: Entladen
@@ -277,7 +272,11 @@ Interpretation:
 - `b_t` und `(g_t - c_t)` wirken auf denselben Punkt.
 - Die Export-/Importgrenzen gelten explizit für jede Zeitscheibe.
 - Die Kombination aus Import/Export- und Gesamtanschlussgrenze vermeidet Simultanfehler bei der Berechnung.
-- Für den produktiven MVP wird für Co-Location mindestens MILP angenommen; bei reiner LP ist diese Ausschlussregel nicht exakt abbildbar.
+ - Für den produktiven MVP gilt als konservativer ADR-Default:
+   `CoLocationMode != StandaloneBess` => `solver_scope=MILP`.
+   Hintergrund: Dieser Default vereinfacht den operativen Einstieg, ist aber bewusst konservativ.
+   Der Default darf im ADR als Ausnahme nur gelockert werden, wenn die gewählte Co-Location-Konfiguration ausschließlich LP-abbildbare Restriktionen enthält.
+   Als zwingend MILP-gebundenes Minimum bleibt der Import/Export-Mutex (`p_grid_import_t * p_grid_export_t = 0`) mit Richtungs-Binärisierung erhalten; alle weiteren LP-fähigen Sonderfälle benötigen eine explizite ADR-Freigabe.
 
 ### Legacy-Daten-Migrationslauf und Backout (verbindlich)
 
@@ -350,7 +349,7 @@ Rollback-/Backout-Verhalten:
 
 `GreenStorageRestricted` ist im ersten Umsetzungsumfang als harte Validierung spezifiziert:
 
-- Erlaubte Ladequelle: ausschliesslich lokale Erzeugung (`p_grid_import_t == 0`).
+- Erlaubte Ladequelle: ausschließlich lokale Erzeugung (`p_grid_import_t == 0`).
 - Einführung der herkunftsbezogenen Zwischengröße `e_local_t` (kWh), mit
   `Δt = resolution_minutes / 60`:
   - `e_local_{t+1} = e_local_t + eta_charge * max(0, -b_t) * Δt - max(0, b_t) * Δt / eta_discharge`
@@ -367,18 +366,18 @@ Rollback-/Backout-Verhalten:
 
 ### Optimierungswirkung
 
-Der Horizon-Optimierer muss zusaetzlich beruecksichtigen koennen:
+Der Horizon-Optimierer muss zusätzlich berücksichtigen können:
 
-- Netzanschlusspunkt-Grenzen fuer Import und Export
+- Netzanschlusspunkt-Grenzen für Import und Export
 - lokale Erzeugungsprognose pro Zeitschritt
 - optionales Herkunftssourcing bei Lade-/Entladungspfaden (`OriginConstraint`)
 - optionale Abregelung lokaler Erzeugung
-- Batterie-Ladefenster aus lokalem Ueberschuss
-- Reservebaender aus `ReserveBand`
-- bestehende Day-Ahead-/Intraday-Fahrplaene
+- Batterie-Ladefenster aus lokalem Überschuss
+- Reservebänder aus `ReserveBand`
+- bestehende Day-Ahead-/Intraday-Fahrpläne
 - Degradation- und SOC-Zielkosten wie heute
 
-Die bestehende Vorzeichenkonvention bleibt unveraendert:
+Die bestehende Vorzeichenkonvention bleibt unverändert:
 
 - Batterie `> 0 kW` = Entladen
 - Batterie `< 0 kW` = Laden
@@ -390,23 +389,23 @@ Für den Netzanschlusspunkt ist die Konvention in diesem Slice vollständig fest
 
 ## Nicht-Ziele
 
-- Kein Ersatz fuer BMS-/PCS-Schutzfunktionen.
-- Keine direkte Feldgeraete-Ansteuerung aus der Optimierung.
-- Keine Zertifizierung oder Rechtsauslegung fuer EEG-/Foerdermodelle.
+- Kein Ersatz für BMS-/PCS-Schutzfunktionen.
+- Keine direkte Feldgeräte-Ansteuerung aus der Optimierung.
+- Keine Zertifizierung oder Rechtsauslegung für EEG-/Fördermodelle.
 - Kein automatischer externer Forecast-Abruf; das ist
   [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md).
 - Ein erster produktiver Co-Location-Slice kann mit lokalen Erzeugungs-/Lastreihen starten;
   forecast-basierte Optimierung bleibt bis zur Aktivierung von
   `plan-price-forecast-adapters.md` im degraded/fallback-Modus.
-- Keine Multi-Asset-Fleet-Optimierung ueber mehrere Standorte; das bleibt
+- Keine Multi-Asset-Fleet-Optimierung über mehrere Standorte; das bleibt
   M6-Folgearbeit.
 
-## LP-/MILP-Kompatibilitaetsstrategie
+## LP-/MILP-Kompatibilitätsstrategie
 
 Die Umstellung auf Co-Location-MVP ist feature-gesteuert und darf bestehende LP-basierte
 Bestandsrouten nicht brechen:
 
-- Default bleibt der bestehende LP-Standard fuer `StandaloneBess` und Szenarien ohne
+- Default bleibt der bestehende LP-Standard für `StandaloneBess` und Szenarien ohne
   aktivierte Co-Location-/Herkunftsrestriktionen.
 - `ClassicalCoLocation`, `HybridWithGridImport`, `GreenStorageRestricted` und damit verbundene
   Vorzeichen- und Herkunftsrestriktionen werden über explizit aktivierte
@@ -424,29 +423,29 @@ Bestandsrouten nicht brechen:
 
 ## Liefergegenstaende bei Aktivierung
 
-1. Folge-ADR oder ADR-Schaerfung fuer Co-Location-Modell und
+1. Folge-ADR oder ADR-Schärf für Co-Location-Modell und
    Netzanschlusspunkt-Vorzeichen.
-2. Domain-Modelle fuer Standorttyp, Netzanschlussgrenzen und lokale
+2. Domain-Modelle für Standorttyp, Netzanschlussgrenzen und lokale
    Erzeugungs-/Forecast-Zeitreihen inkl. verbindlicher Site-Netzflussdefinition.
-3. Application-Port-Erweiterung fuer Optimierungsrequests.
-4. OR-Tools-Modellerweiterung oder neuer Solver-Pfad fuer
+3. Application-Port-Erweiterung für Optimierungsrequests.
+4. OR-Tools-Modellerweiterung oder neuer Solver-Pfad für
    Co-Location-Constraints.
 5. Tests:
    - Kein simultaner Netzimport/Netzeinspeisung im gleichen Zeitschritt.
    - Standalone bleibt bit-kompatibel zum heutigen Pfad.
-   - PV-Ueberschuss kann Batterie laden, ohne Exportlimit zu verletzen.
+- PV-Überschuss kann Batterie laden, ohne Exportlimit zu verletzen.
    - `site_grid_power_sign=import_pos`: Vorzeichen-/Grenzlogik bleibt konsistent
      zur Export-Variante bei identischem physischem Leistungsfluss.
    - Netzexportlimit begrenzt Batterieentladung plus lokale Erzeugung.
    - `GreenStorageRestricted`: `e_local_0`-Randfall (`0` und >0) und `local_origin_capacity_kwh`-Randfall (`0`, Minimalreserve) werden explizit geprüft.
    - `GreenStorageRestricted`: Lauf wird mit `CONFIG_INCONSISTENT` geblockt, wenn eine Netzladung (`p_grid_import_t > 0`) versucht wird.
-   - Reservebaender reduzieren weiterhin verfuegbare Lade-/Entladeleistung.
-   - `GreenStorageRestricted` lehnt unzulaessige Netzladung ab oder markiert
-     den Run als unzulaessig.
+   - Reservebänder reduzieren weiterhin verfügbare Lade-/Entladeleistung.
+- `GreenStorageRestricted` lehnt unzulässige Netzladung ab oder markiert
+  den Run als unzulässig.
    - `migration_strict=false` erlaubt nicht-aktive `can_dispatch=false`-Sites mit
      `unclear`/`incompatible` im Migrationsfenster, blockiert aber aktive Sites
      mit `can_dispatch=true` konsistent auf `CONFIG_INCONSISTENT`.
-6. Operator-/API-Doku fuer die neuen Eingaben und Fehlermodi.
+6. Operator-/API-Doku für die neuen Eingaben und Fehlermodi.
 
 ## Gemeinsamer Ausführungs-/Fehlermodus-Vertrag
 
@@ -456,19 +455,8 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
 
 - Autoritative Quelle für den gemeinsamen Vertrag ist
   [`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md).
-- Verbindliche Basismatrix für den Cross-Slice-Vertrag (`OptimizationSolverStatus` + `TerminationCode` + `CanExecute`) in diesem Plan und im LER/FCR-Plan:
-
-  | Ergebnisklasse                                  | OptimizationSolverStatus | TerminationCode (Beispiel)                                           | CanExecute |
-  | --- | --- | --- | --- |
-  | Gültiger Plan/Plan verwendbar                    | `Optimal` oder `Feasible` | `MODEL_OK`-äquivalente Codefolge (bestehendes Mapping) | `true` |
-  | Reiner Rechenfehler/Timeout/Solverfehler         | `Failed`                 | Solver-spezifische harte Codes (bestehendes Mapping) | `false` |
-  | Konfigurationsfehler (`CONFIG_*`)                | `Failed`                 | `config-invalid` oder `config-inconsistent` | `false` |
-  | Schematafehler (`SCHEMA_INCONSISTENT`)          | `Failed`                 | `schema-inconsistent` | `false` |
-  | Robustheits-/Reserve-Blockade                      | `Failed`                 | `reserve-robustness-*` | `false` |
-  | Harte Source-/Policy-Abweisungen außerhalb Produktbereichs | `Failed`          | `source-*`/`policy-*` falls eingeführt | `false` |
-
-  Diese Matrix ist die Pflicht-Referenz für beide Pläne. Jede Änderung ist nur im selben Release-Commit auf beiden Seiten erlaubt.
-
+- Die vollständige `CanExecute`-/`OptimizationSolverStatus`/`TerminationCode`-Matrix ist dort autoritativ festgelegt und wird hier nur referenziert.
+- Änderungen an dieser Matrix sind Release-blocking, wenn nicht gemeinsam in beiden Plänen umgesetzt.
 - Preis-/Forecast-Serienidentität ist mit
   [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md)
   semantisch deckungsgleich definiert:
@@ -482,7 +470,8 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
     [`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md) exakt identisch festzulegen.
   - Abweichung ist ein hartes Release-Blocking; kein Slice darf unabhängig freigegeben werden.
 - Implementierungsvorgabe:
-  - Die Datenklasse für Optimierungsruns muss `CanExecute` als persistiertes Feld erhalten.
+  - Die Datenklasse für Optimierungsläufe muss `CanExecute` als persistiertes Feld erhalten.
+  - Da `OptimizationRun` ein immutables Record/Objekt mit strikter Konstruktorinvariante ist, ist `CanExecute` als echter Domain-Constructor-Migrationsschritt zu planen (bestehender Wire-/DB-Pfad + neue Spalte für `can_execute`).
   - Solange `HasUsableSolution` in der vorhandenen Codebasis weiterhin auf
     `OptimizationSolverStatus.{Optimal,Feasible}` basiert, gilt `CanExecute` als harte
     Betriebs-Gate-Quelle für den Dispatcher/Scheduler, nicht umgekehrt.
@@ -501,7 +490,7 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
 ## Akzeptanzkriterien
 
 - Bestehende Day-Ahead-/Intraday-Optimierung ohne Co-Location-Input bleibt
-  unveraendert.
+  unverändert.
 - Co-Location-Constraints werden im Run-Ergebnis als eigene Objective- oder
   Constraint-Komponenten sichtbar.
 - Ein Setup wird so gemappt, dass Operator- und Replay-Sichten klar trennbar bleiben:
@@ -540,7 +529,7 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
 - [ ] `GreenStorageRestricted`-Regeln sind als harte Validierung umgesetzt (`p_grid_import_t == 0`, `e_local`-Kopplung, Konfigurationsgrenzen).
 - [ ] Gemeinsamer Fehler-/Ausführungsvertrag zu [plan-ler-fcr-reserve-robustness.md](plan-ler-fcr-reserve-robustness.md) ist abgeglichen (unter anderem `CanExecute`, `TerminationCode`, `TerminationDetail`, Cross-Checks, Mapping-Matrix) und durch mindestens einen Golden-Fixture-Test abgesichert.
 - [ ] Liefergegenstände bei Aktivierung sind vollständig umgesetzt:
-  - ADR/ADR-Schaerfung,
+  - ADR/ADR-Schräftigung,
   - Domain-/Application-Erweiterungen,
   - Solver/Modellerweiterung,
   - Regressionsmatrix + Migrationstestfälle,
@@ -551,7 +540,7 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
 ## Abschlussentscheidungen
 
 - Reicht ein LP-Modell oder braucht der erste produktive Co-Location-Scope
-  MILP-Binaervariablen fuer Lade-/Entlade-/Herkunftsentscheidungen?
+  MILP-Binaervariablen für Lade-/Entlade-/Herkunftsentscheidungen?
   - Entschieden: Für den ersten produktiven Co-Location-Scope wird MILP genutzt, um
     Simultanfluss- und Herkunftskontrollen formal erzwingbar zu machen.
 - Ist `LocalGenerationSeries` eigener Application-Typ oder spezialisierte Preiszeitreihe?
@@ -559,6 +548,6 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
 - Soll Abregelung als Kostenkomponente, Constraint-Violation oder eigene
   Fahrplanzeitreihe materialisiert werden?
   - Entschieden: Abregelung wird als Constraint (`c_t`) mit Kostenmodell (`CurtailmentCost`) umgesetzt; eigene Fahrplanzeitreihe ist für den ersten Scope nicht erforderlich.
-- Welche Netzanschlusspunkt-Vorzeichenkonvention wird fuer Site-Level-
+- Welche Netzanschlusspunkt-Vorzeichenkonvention wird für Site-Level-
   Leistung normativ?
   - Entschieden: `site_grid_power_sign` ist der normative Site-Parameter (`export_pos` oder `import_pos`), ohne globalen Default und ohne impliziten Fallback.
