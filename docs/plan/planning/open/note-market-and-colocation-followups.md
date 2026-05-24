@@ -120,8 +120,9 @@ förder-/herkunftsgebundenem Grünstromspeicher.
 - Für den ersten Slice existieren mindestens je ein validierter Testfall für die
   drei produktiven Betriebsformen (`StandaloneBess`, `ClassicalCoLocation`, `HybridWithGridImport`) inkl. Rechen- und Ergebnisbericht.
 - Für `GreenStorageRestricted` sind im ersten Slice eigene Validierungsfälle im
-  selben Slice erforderlich (Validierungsmodus), ohne produktive Förderlogik im
-  Regelkreis (Eingangskonformität nur).
+  selben Slice erforderlich. Validierungsmodus bedeutet vollständige
+  Solver-Formulierung mit harten Constraints, aber ohne produktive
+  Förder-/Marktautomatik im Regelkreis.
 
 ---
 
@@ -187,8 +188,8 @@ sowie Forecast-Serien.
     Für die Abgrenzung gelten die Serienbegriffe (`series_type`, `series_product`, `market_bid_area`) exakt nach
     [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md).
   4. Parallelbetrieb ist erst freigegeben, wenn `CanExecute`-Semantik zwischen
-     `plan-market-colocation-model.md` und
-     `plan-ler-fcr-reserve-robustness.md` verbindlich abgeglichen ist.
+     [`plan-domain-migration-optimization-run-can-execute.md`](plan-domain-migration-optimization-run-can-execute.md)
+     und den konsumierenden Slice-Plänen verbindlich umgesetzt ist.
   5. Bei Konflikten gilt als harte Regel: neue Betriebslogik darf nicht ohne definierte
      `series_status`-Entscheidung in den Markt- und Optimierungsworkflow starten.
      Für nicht adapter-getragene Serien im bestehenden Altpfad ist ein kontrollierter

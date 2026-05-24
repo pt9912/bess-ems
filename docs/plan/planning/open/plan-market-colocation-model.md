@@ -38,7 +38,9 @@ Der operative Optimierungsrequest enthält genau eine Solver-Scope-Ausprägung.
 `solver_scope` wird Bestandteil der bestehenden `ScheduleOptimizationRequest`-
 Erweiterung bzw. des daraus erzeugten Optimization-Core-Requests, nicht von
 `OptimizationRun`; der Run persistiert nur Ergebnisstatus, Terminierung und
-`CanExecute`.
+`CanExecute`. Für Audit/Replays muss der Request-Snapshot oder ein äquivalentes
+Run-Metadatum den gewählten `solver_scope` (`LP`/`MILP`) und eine mögliche
+Partitionierungsentscheidung enthalten.
 
 Entscheidungsreihenfolge je Request:
 
@@ -126,6 +128,9 @@ Der Slice modelliert mindestens diese Betriebsarten:
     laden/entladen.
   - Dieser Modus ist zunächst Modell- und Validierungs-Scope; produktive
     Förderlogik braucht eigene Rechts-/Compliance-Freigabe.
+  - Validierungsmodus bedeutet vollständige Solver-Formulierung mit harten
+    Herkunfts-/Netzbezugs-Constraints, aber ohne automatische produktive
+    Förder-/Marktentscheidung im Regelkreis.
 
 ### Neue fachliche Konzepte
 
@@ -157,6 +162,12 @@ Mögliche Domain-/Application-Erweiterungen:
 
   - `LocalGenerationSeries`
   - Zeitreihe für PV/Wind-Erzeugung oder Forecast.
+  - Produktive `LocalGenerationSeries`-Eingänge laufen über
+    `IForecastSeriesSource`/`SeriesEnvelope` aus
+    [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md) und tragen
+    `series_status`, `source_eval_status` und `status_flags`.
+  - Nur explizite Validierungs-/Migrationspfade dürfen den Adapterpfad umgehen; dann
+    muss der Lauf als nicht-produktiver Validierungslauf auditierbar sein.
   - Pflichtfelder:
     - `site_id`
       - bei produktiver Co-Location-Nutzung muss die `site_id` eindeutig einem
@@ -204,6 +215,8 @@ Mögliche Domain-/Application-Erweiterungen:
         Zeitachsenabweichung bleibt `SCHEMA_INCONSISTENT`.
     - `value_kw` ist eine Produktionsleistung und für diese Serie standardmäßig nicht negativ.
     - Negative Werte sind nur über einen separaten signierten Netzausgangs-Datensatz zulässig.
+    - Last-Forecasts sind keine `LocalGenerationSeries`; sie laufen als
+      `ForecastSeries` mit `series_product=load` über den Forecast-Adaptervertrag.
     - Metadatenpflicht für `source`, `product`, `updated_at_utc`, `value_version`.
 
 - `LocalOriginState`
@@ -300,6 +313,16 @@ Interpretation:
 
 Für produktive Freischaltung ist ein deterministischer Migrationspfad für bestehende
 `SiteConstraint`-Datensätze vorab definiert:
+
+Naming-Konvention für Toleranzschalter:
+
+| Bereich | Strenger Produktivmodus | Tolerierter Migrations-/Degraded-Modus |
+| --- | --- | --- |
+| Co-Location-Konfiguration | `migration_strict=true` | `migration_strict=false` nur mit Release-Governance |
+| Preis-/Forecast-Qualität | `quality_mode=strict` | `quality_mode=degraded_ok` nur bei expliziter Slice-Freigabe |
+
+Beide Schalter sind bewusst getrennt, müssen aber in Operator-/Runbook-Sichten
+nebeneinander ausgewiesen werden.
 
 - Migrationsfenster ist zweistufig:
   - `migration_dry_run=true`: vollständige Klassifikation mit vollständigem Audit-Bundle, aber ohne Laufblockade.
@@ -490,6 +513,10 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
   `series_id`, `source.provider_id`, `series_type`, `series_product`,
   `market_bid_area` (falls gesetzt), `site_id` (falls gesetzt), `unit`,
   `resolution_minutes`, `series_version`.
+- Produktive Nutzung externer lokaler Erzeugungs-/Forecast-Serien setzt den
+  Pre-Slice
+  [`Domain-Migration PriceSeries.Identity`](plan-domain-migration-price-series-identity.md)
+  voraus.
 - Änderungen an `CanExecute`, Laufkodierung oder Terminierungsdetails sind nur
   gemeinsam und im selben Release-Commit umzusetzen.
 - Cross-Slice-Contract ist verbindlich und prüfpflichtig:

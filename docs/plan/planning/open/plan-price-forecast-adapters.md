@@ -7,7 +7,8 @@
 **Bezug:**
 [`../../../../spec/lastenheft.md`](../../../../spec/lastenheft.md),
 [`../../../../spec/architecture.md`](../../../../spec/architecture.md),
-[`../done/plan-RM-M5-07.md`](../done/plan-RM-M5-07.md)
+[`../done/plan-RM-M5-07.md`](../done/plan-RM-M5-07.md),
+[`plan-domain-migration-price-series-identity.md`](plan-domain-migration-price-series-identity.md)
 
 ---
 
@@ -53,8 +54,13 @@ Kompatibilitäts-/Migrationsprinzip:
 - `SeriesEnvelope` dient als einheitlicher Zwischenvertrag:
   - bestehende Preisimporte nutzen weiterhin `IPriceSeriesSource`,
   - Forecast/Forecast-Adapter nutzen `IForecastSeriesSource`,
-  - beide werden vor dem Optimierer über denselben Mapping-Layer auf die aktuelle Domäne projiziert.
-- Für den produktiven Slice ist die bestehende `PriceSeries`/Persistenzkette kompatibel zu erweitern:
+  - Preisreihen werden vor dem Optimierer auf die aktuelle Domäne projiziert;
+    Forecastreihen bleiben in diesem Slice Contract-/DTO-Daten, bis ein produktiver
+    Forecast-Domaintyp aktiviert wird.
+- Vor produktiver Aktivierung dieses Slices ist der Pre-Slice
+  [`Domain-Migration PriceSeries.Identity`](plan-domain-migration-price-series-identity.md)
+  abzuschließen.
+- Die bestehende `PriceSeries`/Persistenzkette ist dort kompatibel zu erweitern:
   - bestehender Schlüsselaspekt in `InMemoryPriceSeriesStore.PriceSeriesKey`
     (Quelle: `src/hexagon/BatteryEms.Application/Markets/InMemoryPriceSeriesStore.cs`)
     darf nicht nur auf `MarketBidArea`/`Product`/`PriceKind`/`Source`/`HorizonStart`/
@@ -65,9 +71,9 @@ Kompatibilitäts-/Migrationsprinzip:
     `source.provider_id` als Teil der Identität tragen (oder einen deterministischen
     Ersatzschlüssel aus genau diesen Werten plus
     `series_type/product/site_id/market_bid_area`).
-  - Liefergegenstand des Slices ist eine explizite Schema-Migration für `PriceSeries`
-    selbst: neue Serienidentitätsfelder am Domain-/Application-Record, neuer
-    Store-Key, Mapping zwischen `SeriesEnvelope` und `PriceSeriesRequest`,
+  - Liefergegenstand des Pre-Slices ist eine explizite Schema-Migration für
+    `PriceSeries` selbst: neue Serienidentitätsfelder am Domain-/Application-Record,
+    neuer Store-Key, Mapping zwischen `SeriesEnvelope` und `PriceSeriesRequest`,
     Import-/API-Wire-Kompatibilität sowie Anpassung aller dauerhaften Stores, soweit
     im Produktpfad vorhanden.
   - Ohne diese Erweiterung bleibt F-MKT-02 im produktiven Modus auf den bisherigen Altpfad beschränkt, bis ein dedizierter Speicher-Migrationspfad freigegeben wurde.
@@ -280,7 +286,9 @@ Interoperabilitätsregel (über Pläne hinweg):
 
 - Konsistenz-Regel:
   - Wenn `series_type=price`, ist `market_bid_area` Pflichtfeld; `site_id` optional.
-  - Wenn `series_type=forecast` und Standorttrennung aktiv ist, ist `site_id` Pflicht.
+  - Wenn `series_type=forecast` in einem Co-Location- oder standortgetrennten
+    Optimierungsscope genutzt wird, ist `site_id` Pflicht. Reine systemweite
+    Wetter-/Marktfeatures ohne Standortbezug dürfen `site_id` leer lassen.
   - Co-Location-Vorverarbeitung:
     - `alignment_mode=reject` ist produktiv der Default.
     - `alignment_mode=trim-to-common` ist nur zulässig, wenn `alignment_prepared=true` gesetzt ist, die Horizon-Metadaten vorhanden sind und ein vorbereiteter, deterministisch versionierter Vorverarbeitungspfad dokumentiert wurde.
@@ -334,6 +342,10 @@ Empfohlene Integrationskonvention (API/Operator):
   - In `quality_mode=degraded_ok` gilt `SOURCE_GAP` als harte Ablehnung nur für nicht
     vollständig behebbare oder noch offene Restlücken nach abgeschlossener
     Backfill-Behandlung.
+  - Operator-Hinweis: Behebbare Gaps bleiben in `strict` abgelehnt, weil Backfill
+    einen geänderten Datenbestand erzeugt. Stale-Daten dürfen in `degraded_ok` nur
+    kontrolliert weiterlaufen, weil ihre Zeitachse vollständig ist und die
+    Qualitätsminderung sichtbar markiert wird.
 
 ### Qualitätsentscheidungen bei `SOURCE_*` (verbindlich)
 
@@ -458,7 +470,8 @@ Endgültige Serienendstatus sind:
 - Quellenneutrales Adapterinterface oberhalb externer Provider:
   - `LoadAsync` (`IPriceSeriesSource`)
   - `LoadForecastAsync` (`IForecastSeriesSource`)
-  - Adapter-Bridge zwischen `SeriesEnvelope` und produktiven Forecast-/Price-Domainmodellen
+  - Adapter-Bridge zwischen `SeriesEnvelope`, produktiven Preis-Domainmodellen und
+    Forecast-Contract-Daten
   - verbindliches `SeriesEnvelope` gemäß obigem Datenvertrag
   - deterministisches Mapping in die bestehende Import-Pipeline (`IPriceSeriesSource`).
 - Persistenz-/Schema-Migration als Phase-1-Voraussetzung:
@@ -467,6 +480,9 @@ Endgültige Serienendstatus sind:
   - `InMemoryPriceSeriesStore` ersetzt den privaten Alt-Key durch die neue
     Serienidentität; dauerhafte Stores folgen demselben Schlüsselvertrag.
   - Ohne diese Migration dürfen neue Serienkennungen nicht produktiv aufgenommen werden.
+  - Die Umsetzung liegt im Pre-Slice
+    [`Domain-Migration PriceSeries.Identity`](plan-domain-migration-price-series-identity.md);
+    dieser Adapter-Slice konsumiert nur den abgeschlossenen Identitätsvertrag.
 - Cache-/Refresh-Vertrag:
   - TTL
   - `max_stale_age_minutes`
@@ -580,6 +596,8 @@ arbeitet mit deterministischen Preiswerten.
    bestehenden `IPriceSeriesSource`-Umfelds; Forecast-Ergebnisse bleiben in diesem
    Slice Contract-/DTO-Daten, bis ein produktiver Forecast-Domaintyp aktiviert wird.
 3. Schema-Migration `PriceSeries`/Store-Identität:
+   - umgesetzt über
+     [`Domain-Migration PriceSeries.Identity`](plan-domain-migration-price-series-identity.md),
    - `series_id`, `series_version`, `source.provider_id` und Serien-Signaturfelder am
      produktiven Serienmodell oder deterministischem Ersatzschlüssel,
    - neuer `PriceSeriesKey`/Store-Key für InMemory und dauerhafte Stores,
@@ -631,6 +649,9 @@ arbeitet mit deterministischen Preiswerten.
   - bestehende Serie- und Import-Speicher (InMemory + dauerhafte Stores, soweit vorhanden)
     führen `series_id`/`series_version`/`source.provider_id` in der Serien-Identität
     oder einem deterministisch äquivalenten Ersatzschlüssel.
+  - der Pre-Slice
+    [`Domain-Migration PriceSeries.Identity`](plan-domain-migration-price-series-identity.md)
+    ist abgeschlossen.
   - `PriceSeries` selbst, `PriceSeriesKey`, Import-Request-Mapping und alle Store-Pfade
     sind Teil derselben Migration; reine Adapter-Vertragsänderungen reichen nicht.
   - ohne diese Erweiterung bleibt eine produktive Aufnahme neuer Serienkennungen im Slice gesperrt (Fallback-Pfad definiert).

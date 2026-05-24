@@ -85,6 +85,9 @@ Nicht explizit modelliert:
     - optional `conservative_soc_headroom_ratio` (default `0`, nur bei `soc_strategy=conservative`); Bereich `0..1`
     - Wenn kein `conservative_soc_headroom_kwh` gesetzt ist, wird bei `conservative` `conservative_soc_headroom_ratio` genutzt.
     - `t_min_fcr` (`FCR`-Pflichtfeld, falls FCR im gebuchten Portfolio aktiv)
+      - FCR gilt als aktiv, wenn `reserve_product=FCR` im Request/Portfolio markiert
+        ist oder eine der FCR-Zeitreihen (`fcr_up_kw_t`, `fcr_down_kw_t`) für den
+        Horizont positive Werte enthält.
   - `full_activation_time` (`FCR`-Pflichtfeld bei aktivem FCR-Produkt; bei inaktivem FCR kann `0` gesetzt werden)
 - optional `full_activation_time_afrr` (nur bei produktiv aktivem aFRR; bei gesetztem Wert `> 0`)
 - optional `full_activation_time_mfrr` (nur bei produktiv aktivem mFRR; bei gesetztem Wert `> 0`)
@@ -194,12 +197,12 @@ Nicht explizit modelliert:
     - `required_down_kwh` (optional, für Restore-Planung)
   - Optional:
     - `restore_capability_up_kw`:
-      - optionales Override in kW pro Zeitschritt für den Up-Wiederherstellungszweig auf Basis der betrachteten Reservezelle;
+      - optionales per-step Override in kW für den Up-Wiederherstellungszweig auf Basis der betrachteten Reservezelle;
       - muss `> 0` sein.
       - wird in der Restore-Rekonstruktion als harte Wiederherstellungskapazität verwendet, falls gesetzt.
       - bei Wert `<= 0` oder fehlendem Wert wird kein Override angenommen.
     - `restore_capability_down_kw`:
-      - optionales Override in kW pro Zeitschritt für den Down-Wiederherstellungszweig auf Basis der betrachteten Reservezelle;
+      - optionales per-step Override in kW für den Down-Wiederherstellungszweig auf Basis der betrachteten Reservezelle;
       - muss `> 0` sein.
       - wird in der Restore-Rekonstruktion als harte Wiederherstellungskapazität verwendet, falls gesetzt.
       - bei Wert `<= 0` oder fehlendem Wert wird kein Override angenommen.
@@ -290,6 +293,8 @@ Deterministische Berechnung (verbindlich):
       1) Up-Branch auf `worst_up_kwh_t` (Absenkung),
       2) anschließend Down-Branch auf `worst_down_kwh_t` auf dem SOC nach Up.
       - Im sequentiellen Pfad wird Up zuerst auf den Schrittzustand angewendet und Down nur auf dem danach aktualisierten SOC geführt.
+      - Up zuerst ist der konservative Default, weil die LER-Worst-Case-Annahme auf
+        der Entlade-/Up-Seite die kritischere Untergrenze zuerst belastet.
     - Diese Kopplung ist bewusst konservativ und vollständig deterministisch.
   - Wenn simultanes Gegensignal laut Produktdefinition aktiv ist, aber `simultaneous_reserve_direction_allowed=false`,
     gilt hart `ROBUST_POLICY_UNSUPPORTED` mit `POLICY_MISMATCH`.
@@ -371,17 +376,20 @@ Restore- und Gate-Entscheidungslogik (verbindlich):
   - Down-Verstoß-Defizit:
     `restore_shortfall_down_kwh = max(0, worst_down_kwh_t - (soc_max_eff_kwh - soc_plan_down_t) / eta_charge)`
 - Verfügbare Wiederherstellungsleistung je Schritt:
-  - Effektive Restore-Kapazität je Richtung berechnet sich per Coalesce (Override zuerst, dann technischer Default):
+  - Effektive Restore-Kapazität je Richtung berechnet sich per Coalesce:
+    per-step Envelope-Override > Policy-Skalar > technischer Default.
     - `restore_capability_up_t_fallback` ist der deterministische technische Default je Schritt
       (z. B. aus Asset- oder Reservebandgrenzen), nicht aus der bereits erzeugten
       `ReserveEnergyEnvelope`.
     - `restore_capability_down_t_fallback` ist der analoge deterministische technische Default je Schritt
       (z. B. aus Asset- oder Reservebandgrenzen), nicht aus der bereits erzeugten
       `ReserveEnergyEnvelope`.
-    - `restore_capability_up_policy_t = if restore_capability_up_kw is set then restore_capability_up_kw else restore_capability_up_t_fallback`
-    - `restore_capability_down_policy_t = if restore_capability_down_kw is set then restore_capability_down_kw else restore_capability_down_t_fallback`
-    - `restore_capability_up_t = if restore_shortfall_up_kwh > 0 then restore_capability_up_policy_t else 0`
-    - `restore_capability_down_t = if restore_shortfall_down_kwh > 0 then restore_capability_down_policy_t else 0`
+    - `restore_capability_up_policy_t = if ReserveRobustnessPolicy.restore_capability_up_kw is set then ReserveRobustnessPolicy.restore_capability_up_kw else restore_capability_up_t_fallback`
+    - `restore_capability_down_policy_t = if ReserveRobustnessPolicy.restore_capability_down_kw is set then ReserveRobustnessPolicy.restore_capability_down_kw else restore_capability_down_t_fallback`
+    - `restore_capability_up_source_t = if ReserveEnergyEnvelope.restore_capability_up_kw is set then ReserveEnergyEnvelope.restore_capability_up_kw else restore_capability_up_policy_t`
+    - `restore_capability_down_source_t = if ReserveEnergyEnvelope.restore_capability_down_kw is set then ReserveEnergyEnvelope.restore_capability_down_kw else restore_capability_down_policy_t`
+    - `restore_capability_up_t = if restore_shortfall_up_kwh > 0 then restore_capability_up_source_t else 0`
+    - `restore_capability_down_t = if restore_shortfall_down_kwh > 0 then restore_capability_down_source_t else 0`
   - Richtungsbasierte Mindest-Rekonstruktionsdauer:
     - `required_recovery_minutes_up = if restore_capability_up_t > 0 and restore_shortfall_up_kwh > 0 then restore_shortfall_up_kwh / restore_capability_up_t * 60 else +inf`
     - `required_recovery_minutes_down = if restore_capability_down_t > 0 and restore_shortfall_down_kwh > 0 then restore_shortfall_down_kwh / restore_capability_down_t * 60 else +inf`
@@ -623,10 +631,12 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
     - bei `limiting_reason_code=RECOVERY_TIMEOUT` =>
       `OptimizationSolverStatus.Failed` mit
       `TerminationCode=reserve-robustness-recovery-timeout`,
-      `TerminationDetail=RECOVERY_TIMEOUT`.
-      Symbolische `TerminationDetail`-Werte sind maschinenlesbare Reason-Tokens
-      aus `limiting_reason_code`; messwertartige Details bleiben weiterhin als
-      strukturierte `key=value`- oder menschenlesbare Detailstrings erlaubt.
+      `TerminationDetail=reason=RECOVERY_TIMEOUT`.
+      Für robustheitsbezogene Codes ist `TerminationDetail` strukturiert:
+      `reason=<LIMITING_REASON_CODE>` und optional `solver_code=<original-code>`.
+      Messwertartige Details dürfen als weitere `key=value`-Paare ergänzt werden.
+      Reine menschenlesbare Detailstrings bleiben nur bei bestehenden Solver-/
+      Laufzeitcodes zulässig.
     - sonst => `OptimizationSolverStatus.Failed` mit
       `TerminationCode=reserve-robustness-infeasible`.
   - `ROBUST_SOURCE_DATA_MISSING` => `OptimizationSolverStatus.Failed`
