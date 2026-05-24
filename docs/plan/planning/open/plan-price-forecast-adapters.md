@@ -134,18 +134,20 @@ Die `SOURCE_*`-Auswertung ist für jede Serie deterministisch:
 - `SOURCE_OK` → direkt in Schritt 3.
 - `SOURCE_AUTH_ERROR` → harte Ablehnung (`SOURCE_REJECTED`), kein Retry/Fallback.
 - `SOURCE_GAP` → harte Ablehnung (`SOURCE_REJECTED`), kein Retry/Fallback.
-- `SOURCE_EMPTY` → kein Fallback, hartes `SOURCE_REJECTED` (Ausnahme nur kompatibler Fallback gemäß Schritt 3).
+- `SOURCE_EMPTY` → harte Ablehnung (`SOURCE_REJECTED`), kein Retry/Fallback.
 - `SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_RETRY_EXHAUSTED` → Schritt 3.
 
 3) Fallback- und Qualitätsmoduslogik
 - Fallback ist versuchsweise nur für diese Codes:
-  - `SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_EMPTY`, `SOURCE_RETRY_EXHAUSTED`
+  - `SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_RETRY_EXHAUSTED`
 - `SOURCE_AUTH_ERROR`, `SOURCE_SCHEMA_MISMATCH`, `SOURCE_GAP` sind nicht fallback-fähig.
 - Sind Primärcode + kompatible Fallback-Quelle vorhanden:
   - Der Fallback wird synchron ausgewertet.
   - Ist Fallback erfolgreich:
     - bei `quality_mode=strict`: finaler Zustand darf nur `SOURCE_OK` oder `SOURCE_FALLBACK_USED` sein.
-    - bei `quality_mode=degraded_ok`: finaler Zustand darf `SOURCE_DEGRADED` oder `SOURCE_FALLBACK_USED` (oder beide kombiniert) sein.
+    - bei `quality_mode=degraded_ok`: finaler Zustand darf `SOURCE_DEGRADED` oder `SOURCE_FALLBACK_USED` sein; keine kombinierte Endstatuskodierung.
+      - Wenn Fallback erfolgreich und keine zusätzliche Qualitätsminderung vorliegt: `SOURCE_FALLBACK_USED`.
+      - Wenn Fallback erfolgreich mit Backfill/Degradation: `SOURCE_DEGRADED`.
   - Ist Fallback fehlgeschlagen:
     - `strict`: harte Ablehnung (`SOURCE_REJECTED`).
     - `degraded_ok`: nur akzeptierbare Backfill/Degradation zulassen (`SOURCE_DEGRADED`), sonst `SOURCE_REJECTED`.
@@ -158,6 +160,10 @@ Die `SOURCE_*`-Auswertung ist für jede Serie deterministisch:
 - Mit Ersatzquelle: `SOURCE_FALLBACK_USED`.
 - Qualitätsminderung: `SOURCE_DEGRADED`.
 - harte Ablehnung: `SOURCE_REJECTED`.
+
+Hinweis:
+Endstatus ist ein einzelner Wert (`single-value`) je Serie. Fallback-Nutzung und
+Qualitätsminderung werden im Operator-Status separat als Ausführungsdetails erfasst.
 
 ### Fehler- und Ablaufcodes
 
@@ -237,7 +243,7 @@ Die `SOURCE_*`-Auswertung ist für jede Serie deterministisch:
   - `SOURCE_OK`: normaler Betrieb
   - `SOURCE_AUTH_ERROR`: harte Ablehnung (`SOURCE_REJECTED`), kein Retry/Fallback.
   - `SOURCE_SCHEMA_MISMATCH`, `SOURCE_GAP`: harte Ablehnung (`SOURCE_REJECTED`), kein Fallback.
-  - `SOURCE_RATE_LIMIT`, `SOURCE_STALE`, `SOURCE_UNAVAILABLE`, `SOURCE_EMPTY`, `SOURCE_RETRY_EXHAUSTED`:
+- `SOURCE_RATE_LIMIT`, `SOURCE_STALE`, `SOURCE_UNAVAILABLE`, `SOURCE_RETRY_EXHAUSTED`:
     - Primär wird kontrollierter Fallback auf `fallback`-Quelle versucht, sofern vorhanden und kompatibel.
     - Fallback nur akzeptieren, wenn `SeriesEnvelope`, Einheit und Horizon exakt kompatibel sind.
     - Bei Fallback Erfolg gilt Fallback-Ergebnis nach `quality_mode`:
@@ -262,11 +268,11 @@ Primär-/Fallback-Regel ist verbindlich:
   - Fallback: Open-Meteo oder Copernicus für Wetter, je Featuretyp
 
 Aktivierungslogik:
-  - `SOURCE_EMPTY` wird ohne zugelassenen, kompatiblen Fallback nur als harte
-    Fehlerklasse `SOURCE_REJECTED` behandelt.
+- `SOURCE_EMPTY` wird ohne zugelassenen, kompatiblen Fallback nur als harte
+  Fehlerklasse `SOURCE_REJECTED` behandelt.
 
 - Primärquelle wird standardmaessig genutzt.
-  - Bei Qualitätsfehler (`SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_EMPTY`, `SOURCE_RETRY_EXHAUSTED`, `SOURCE_SCHEMA_MISMATCH`)
+- Bei Qualitätsfehler (`SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_EMPTY`, `SOURCE_RETRY_EXHAUSTED`)
     wird der Fallbackzugriff nur genutzt, wenn:
    - derselbe `SeriesEnvelope`-Vertrag eingehalten wird
    - Lücke/Abweichung im Fallback innerhalb definierter Konfigurationsgrenzen bleibt

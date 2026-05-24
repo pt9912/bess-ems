@@ -101,7 +101,13 @@ Nicht explizit modelliert:
   - Für `soc_strategy=conservative` gelten Zusatzregeln:
     - `conservative_soc_headroom_ratio` muss im Bereich `0..1` liegen.
     - `conservative_soc_headroom_kwh` muss `>= 0` sein.
-    - `soc_min_kwh + effective_soc_headroom_kwh < soc_max_kwh` muss gelten, sonst `ROBUST_POLICY_UNSUPPORTED`.
+    - `effective_soc_headroom_kwh = max(
+      conservative_soc_headroom_kwh,
+      conservative_soc_headroom_ratio * (soc_max_kwh - soc_min_kwh)
+    )`
+    - `soc_min_eff_kwh = soc_min_kwh + effective_soc_headroom_kwh`
+    - `soc_max_eff_kwh = soc_max_kwh - effective_soc_headroom_kwh`
+    - `soc_min_eff_kwh < soc_max_eff_kwh` muss gelten, sonst `ROBUST_POLICY_UNSUPPORTED`.
   - Effektivzeiten je Produkt (Fallback auf `full_activation_time`):
     - `full_activation_time_afrr_eff = coalesce(full_activation_time_afrr, full_activation_time)`
     - `full_activation_time_mfrr_eff = coalesce(full_activation_time_mfrr, full_activation_time)`
