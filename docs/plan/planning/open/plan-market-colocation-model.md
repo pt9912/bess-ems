@@ -59,7 +59,17 @@ Kompatibilitätsprinzip:
 - Für den ersten produktiven Slice ist die Partitionierungsentscheidung im ADR festzuhalten.
 - Partitionierung ist nur zulässig, wenn der Request-Builder alle Unterrequests vollständig
   isoliert und im Anschluss deterministisch reaggregiert. Andernfalls ist bei gemischten
-  Scope-Anforderungen ein `CONFIG_INCONSISTENT` mit `TerminationCode=schema-inconsistent` zu werfen.
+  Scope-Anforderungen ein `CONFIG_INCONSISTENT` mit `TerminationCode=config-inconsistent` zu werfen.
+
+Semantik der fachlichen Coderäume (für deterministische Fehlerauswertung):
+
+- `CONFIG_INVALID`: globale Konfiguration/Request-Kontraktfehler (z. B. ungültige Kombinationen
+  der Solver-Scope-Aktivierungen oder fehlende Muss-Felder auf Scope-Ebene).
+- `CONFIG_INCONSISTENT`: fachlich konsistenzrelevante, aber konfigurationsnahe Inkonsistenzen
+  im Request (z. B. nicht auflösbare/inhomogene Modellierung über aktivierte Co-Location-Modi
+  oder nicht deterministisch ableitbare Sign-Konvention).
+- `SCHEMA_INCONSISTENT`: reine Schemata- bzw. Datenvertragsverletzungen (z. B. unzulässiger
+  Datensatzzustand, inkonsistente Zeitachsen oder unerlaubte Vorverarbeitungszustände).
 
 ### Run- und Fehlerkodierung (Kompatibilität zum bestehenden Solver-Laufmodell)
 
@@ -72,7 +82,7 @@ Modell als `OptimizationSolverStatus` + `TerminationCode`:
 - `MODEL_INFEASIBLE` / Reservefehler mit harter Infeasibility: `OptimizationSolverStatus.Infeasible`.
 - `CONFIG_INVALID`: `OptimizationSolverStatus.Failed` mit `TerminationCode=config-invalid`.
 - `CONFIG_INCONSISTENT`: `OptimizationSolverStatus.Failed` mit
-  `TerminationCode=config-inconsistent`.
+  `TerminationCode=config-inconsistent` (kein `schema-inconsistent`).
 - `SCHEMA_INCONSISTENT`: `OptimizationSolverStatus.Failed` mit `TerminationCode=schema-inconsistent`.
 - Solver- oder Laufzeitfehler: `OptimizationSolverStatus.Failed` mit bestehendem Solver-Code
   (bestehende Terminierungskonventionen).
@@ -411,12 +421,15 @@ Bestandsrouten nicht brechen:
 - Ein Setup wird so gemappt, dass Operator- und Replay-Sichten klar trennbar bleiben:
   - `OptimizationSolverStatus.Optimal` oder `OptimizationSolverStatus.Feasible`: gültiger Plan.
   - `OptimizationSolverStatus.Infeasible`: Reiner Rechenfehler (entspricht `MODEL_INFEASIBLE`).
-  - `OptimizationSolverStatus.Failed` mit `TerminationCode=config-invalid`: Eingabedaten ungueltig/fehlerhaft
-    (Schema oder Constraints).
-  - `OptimizationSolverStatus.Failed` mit `TerminationCode=config-inconsistent`: regelwerkskonflikt
-    (z. B. `GreenStorageRestricted` ohne Herkunftsnachweis).
-  - `OptimizationSolverStatus.Failed` mit `TerminationCode=schema-inconsistent`: Scope-/Datenkonflikt
-    (z. B. unzulässige `alignment_mode=trim-to-common` im produktiven Lauf).
+  - `OptimizationSolverStatus.Failed` mit `TerminationCode=config-invalid`: globale
+    Eingabekonfiguration nicht zulässig (z. B. Scope-Konfigurationsbruch).
+  - `OptimizationSolverStatus.Failed` mit `TerminationCode=config-inconsistent`:
+    regelwerksbezogene Inkompatibilität im aktivierten Co-Location-Modell (z. B.
+    unklarer `site_grid_power_sign`-Herleitungsstatus bei aktivem Co-Location-Scope).
+  - `OptimizationSolverStatus.Failed` mit `TerminationCode=schema-inconsistent`:
+    strukturelle Vertragsverletzung (`LocalGenerationSeries`/Alignment-/Zeitscheiben-Schema
+    im produktiven Lauf, z. B. unzulässige `alignment_mode=trim-to-common` ohne
+    vollständige vorbereitende Versionierung).
   - `OptimizationSolverStatus.Failed` mit Solverfehler-Code: Timeout/technisches Solverproblem.
   - Replay-/Golden-Fixtures decken mindestens ein Standalone- und ein
      Co-Location-Szenario ab.

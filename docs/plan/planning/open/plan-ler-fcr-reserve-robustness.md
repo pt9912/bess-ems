@@ -97,11 +97,14 @@ Nicht explizit modelliert:
   - `max_recovery_time` (harte obere Grenze für die Wiederherstellungsdauer in Minuten)
   - `intraday_gate_closure`
   - `intraday_preparation_time`
-    - `market_time_unit`
+  - `minutes_until_next_restore_window_start` (optional, `>= 0`)
+  - `minutes_until_next_restore_window_end` (optional, wenn ein Fenster bekannt ist)
+  - `market_time_unit`
   - Zeiteinheiten (verbindlich, alle in Minuten):
     - `t_min_fcr`, `full_activation_time`, `full_activation_time_afrr`,
       `full_activation_time_mfrr`, `max_recovery_time`, `intraday_gate_closure`,
-      `intraday_preparation_time`
+      `intraday_preparation_time`, `minutes_until_next_restore_window_start`,
+      `minutes_until_next_restore_window_end`
     - `market_time_unit` muss `minute` sein.
     - `resolution_minutes` und diese Policy-Felder müssen kompatibel sein.
   - Wirkungsgrade:
@@ -136,6 +139,13 @@ Nicht explizit modelliert:
   - Für `is_ler=true`: sind beide Werte gesetzt, ist der Fall ungültig (`ROBUST_POLICY_UNSUPPORTED`).
   - `self_discharge_kwh_per_hour` darf nicht negativ sein.
   - `self_discharge_soc_per_hour` muss in `[0,1]` liegen (als Anteil pro Stunde).
+  - `minutes_until_next_restore_window_start` ist optional, muss aber bei
+    benötigtem Intraday-Restore `>= 0` sein.
+  - Wenn `minutes_until_next_restore_window_start` gesetzt ist, muss
+    `minutes_until_next_restore_window_end` gesetzt und
+    `minutes_until_next_restore_window_end > minutes_until_next_restore_window_start` sein.
+  - Wenn `minutes_until_next_restore_window_start` `null` ist, liegt zum Bewertungszeitpunkt
+    kein gültiges Intraday-Restorefenster vor.
   - `market_time_unit` muss exakt `minute` sein und mit `resolution_minutes` konsistent sein.
   - `t_min_fcr`, `full_activation_time`, `full_activation_time_afrr`, `full_activation_time_mfrr`, `max_recovery_time`, `intraday_gate_closure`, `intraday_preparation_time` und `resolution_minutes` müssen streng `> 0` sein.
   - `simultaneous_reserve_direction_allowed` ist optional-boolean; fehlt/`false` wird als Default `false` interpretiert.
@@ -302,14 +312,22 @@ Restore- und Gate-Entscheidungslogik (verbindlich):
   - Down-Verstoß-Defizit:
     `restore_shortfall_down_kwh = max(0, worst_down_kwh_t - (soc_max_eff_kwh - soc_plan_down_t) / eta_charge)`
   - Verfügbare Wiederherstellungsleistung je Schritt:
-    `required_activation_kw_used = coalesce(required_activation_kw, max(worst_up_kw_t, worst_down_kw_t, 1e-9))`
+    - `required_activation_kw_candidate = max(worst_up_kw_t, worst_down_kw_t)`
+    - `required_activation_kw_used = coalesce(required_activation_kw, required_activation_kw_candidate)`
   - Konservative Wiederherstellungsdauer:
     `restore_shortfall_kwh = max(restore_shortfall_up_kwh, restore_shortfall_down_kwh)`
     `required_recovery_minutes = restore_shortfall_kwh / required_activation_kw_used * 60`
+  - Falls `required_activation_kw_used <= 0`: `ROBUST_INFEASIBLE` mit
+    `limiting_reason_code=NO_RECOVERY_PATH`.
 - Falls `required_recovery_minutes > max_recovery_time` => `ROBUST_INFEASIBLE` mit
-  `limiting_reason_code=NO_RECOVERY_PATH`.
-- Falls die Zeit bis zum nächsten zulässigen Intraday-Restore-Zeitfenster kleiner als
-  `required_recovery_minutes + intraday_preparation_time + intraday_gate_closure` ist:
+  `limiting_reason_code=RECOVERY_TIMEOUT`.
+- Falls kein zulässiges Window vorliegt:
+  (`minutes_until_next_restore_window_start` ist `null` oder
+  `minutes_until_next_restore_window_end` ist `null`):
+  - Ergebnis `ROBUST_INFEASIBLE` mit `limiting_reason_code=INTRADAY_GATE_CLOSED`.
+- Falls das nächste Window den benötigten Zeitraum nicht trägt:
+  `minutes_until_next_restore_window_start + intraday_preparation_time + intraday_gate_closure + required_recovery_minutes >
+  minutes_until_next_restore_window_end`:
   - Ergebnis `ROBUST_INFEASIBLE` mit `limiting_reason_code=INTRADAY_GATE_CLOSED`.
 - Ansonsten wird der Endstatus `ROBUST_NEEDS_INTRADAY_RESTORE`.
 - Bei allen anderen Fällen bleibt der bestehende Abgleich auf `ROBUST_OK`/`ROBUST_INFEASIBLE` unverändert.
