@@ -202,9 +202,13 @@ Deterministische Berechnung (verbindlich):
   - `soc_t`: SOC zu Beginn des Intervalls in kWh.
   - `soc_min_kwh`, `soc_max_kwh` pro Asset.
   - `eta_discharge`, `eta_charge`.
-  - `self_discharge_mode` (default `absolute_kwh_per_hour`) und damit korrespondierende Verlustkennzahl:
-    - `self_discharge_kwh_per_hour` (absolute VerlustkWh/h) oder
-    - `self_discharge_soc_per_hour` (SOC-Abschlag pro Stunde).
+  - `self_discharge_mode` und damit korrespondierende Verlustkennzahl:
+    - zuerst Policy versuchen.
+    - falls nicht gesetzt: fallback auf Assetmodell.
+    - falls danach weiterhin unset: `ROBUST_POLICY_UNSUPPORTED`.
+    - danach genau einer der korrespondierenden Werte muss gesetzt sein:
+      - `self_discharge_kwh_per_hour` (absolute VerlustkWh/h) oder
+      - `self_discharge_soc_per_hour` (SOC-Abschlag pro Stunde).
   - Vorzeichenkonvention wie im Optimierer: `b_t > 0` Entladen, `b_t < 0` Laden.
 - Reserve-Anforderungen je Zeitschritt:
   - `fcr_up_kw_t`, `fcr_down_kw_t`, `afrr_up_kw_t`, `afrr_down_kw_t`, `mfrr_up_kw_t`, `mfrr_down_kw_t`
@@ -237,7 +241,9 @@ Deterministische Berechnung (verbindlich):
 - Interner SOC-Rechnungszugang aus geplanter Fahrplanposition:
   - `soc_{t+1,plan} = soc_t - max(0, b_t) * Δt / eta_discharge + max(0, -b_t) * eta_charge * Δt - self_discharge_loss_kwh_t`.
 - Effektiver SOC für Worst-Case-Prüfung:
-  - `soc_t^{eff} = max(soc_min_eff_kwh, soc_t - self_discharge_loss_kwh_t)`.
+  - `soc_t` vor der Worst-Case-Prüfung hart validieren:
+    - `soc_min_eff_kwh <= soc_t <= soc_max_eff_kwh`, sonst `ROBUST_POLICY_UNSUPPORTED`.
+  - `soc_t^{eff} = soc_t - self_discharge_loss_kwh_t`.
 - Verfügbare Energiemengen für die Verfügbarkeitsprüfung am Schrittanfang:
   - `available_up_kwh_base_t = max(0, soc_t^{eff} - soc_min_eff_kwh) * eta_discharge`
   - `available_down_kwh_base_t = max(0, soc_max_eff_kwh - soc_t^{eff}) / eta_charge`

@@ -163,7 +163,7 @@ Hinweis zur Semantik:
 ### Qualitätsentscheidungen bei `SOURCE_*` (verbindlich)
 
 Die Entscheidungslogik ist zweistufig:
-- `source_eval_status` wird zuerst berechnet (`OK`, harte oder degradierende Rohcodes).
+- `source_eval_status` wird zuerst berechnet (`SOURCE_*` inklusive `SOURCE_OK`, harte oder degradierende Rohcodes).
 - Daraus wird deterministisch ein externer `series_status` abgeleitet (`SOURCE_OK`, `SOURCE_DEGRADED`, `SOURCE_FALLBACK_USED`, `SOURCE_REJECTED`).
 
 Die `SOURCE_*`-Auswertung ist für jede Serie deterministisch:
