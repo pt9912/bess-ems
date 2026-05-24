@@ -240,11 +240,26 @@ Für produktive Freischaltung ist ein deterministischer Migrationspfad für best
 - Kandidatenklassifikation je Datensatz:
   - `normalized`: `site_grid_power_sign` ist gesetzt oder eindeutig aus vorhandenen
     Feldern deterministisch ableitbar.
-  - `repairable`: Signatur kann aus konsistenten Datenfeldern eindeutig und
-    deterministisch ermittelt werden (`normalized=false`, aber ableitbar).
+  - `repairable`: Signatur kann aus deterministischen und konsistenten
+    Legacy-Metadaten eindeutig und deterministisch ermittelt werden (`normalized=false`, aber ableitbar).
   - `unclear`: keine sichere Ableitung, keine gültige Signatur.
   - `incompatible`: harte Daten- oder Grenzverletzung (z. B. negative Limits, fehlende
     Pflichtwerte, inkonsistente Grenzdefinitionen).
+- Deterministische Ableitungsregeln für `repairable`:
+  - Es werden nur explizite Aliasfelder ausgewertet, die bereits in historischen
+    Datensätzen vorhanden und eindeutig gesetzt sind:
+    - `legacy_grid_power_sign`
+    - `legacy_site_grid_power_sign`
+    - `grid_power_sign`
+    - `grid_connection_direction`
+    - `site_network_power_sign`
+    - `site_grid_power_sign_raw`
+  - Die Werte werden auf die Zielwerte normalisiert:
+    - `export_pos` oder `import_pos` (case-insensitiv akzeptiert; alle anderen Werte
+      sind inkonsistent).
+  - Genau eines der Aliasfelder muss gültig gesetzt sein; fehlt es oder sind mehrere
+    widersprüchliche Aliaswerte vorhanden, wird der Satz als `unclear` eingestuft
+    (`SITE_GRID_POWER_SIGN_MISSING`).
 - Bei `repairable` Datensätzen wird automatisch eine Normalisierung durchgeführt:
   - `site_grid_power_sign_normalized=true`
   - `site_grid_power_sign_normalized_from=<ableitungsregel>`

@@ -164,7 +164,9 @@ sowie Forecast-Serien.
   1. `F-MKT-01` (Markt-/Co-Location-Modell) wird zuerst im operativen Produktivpfad freigegeben.
   2. `F-MKT-02` kann parallel als Datenvertrags-Slice vorbereitet werden, darf Co-Location aber zunächst im degraded/fallback-Modus betreiben.
   3. Produktiv geht erst auf vollen Forecast-Fokus über, wenn `plan-price-forecast-adapters.md` im
-     Betriebsmodus mit aktivierter Qualitätsakzeptanz konform ist (`series_status == SOURCE_OK`).
+     Betriebsmodus mit aktivierter Qualitätsakzeptanz konform ist (`series_status == SOURCE_OK` bei
+     `quality_mode=strict` oder `series_status == SOURCE_FALLBACK_USED` bei
+     `quality_mode=degraded_ok`).
      `SOURCE_DEGRADED` bleibt ein kontrollierter Degraded/Fallback-Modus.
   4. Bei Konflikten gilt als harte Regel: neue Betriebslogik darf nicht ohne definierte
      `series_status`-Entscheidung in den Markt- und Optimierungsworkflow starten.

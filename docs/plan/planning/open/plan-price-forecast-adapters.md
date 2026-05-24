@@ -143,8 +143,9 @@ Kanonische Ableitungsregeln (deterministisch):
 
 - `source_eval_status=SOURCE_AUTH_ERROR` -> `series_status=SOURCE_REJECTED`, harte Abweisung.
 - `source_eval_status=SOURCE_SCHEMA_MISMATCH` -> `series_status=SOURCE_REJECTED`, harte Abweisung.
-- `source_eval_status=SOURCE_GAP` -> `series_status=SOURCE_REJECTED`, harte Abweisung
-  (nur wenn nicht durch kompatiblen Backfill vollständig behoben).
+- `source_eval_status=SOURCE_GAP`:
+  - falls Lücken mit kompatiblem Backfill vollständig geschlossen werden können, resultiert der Zustand als `series_status=SOURCE_DEGRADED` mit `status_flags=[SOURCE_BACKFILL]`.
+  - ist eine vollständige Schließung nicht möglich (oder `n_intervals <= 48`), wird `series_status=SOURCE_REJECTED`.
 - `source_eval_status=SOURCE_EMPTY` -> `series_status=SOURCE_REJECTED`, harte Abweisung.
 - `source_eval_status` aus `{SOURCE_STALE, SOURCE_RATE_LIMIT, SOURCE_UNAVAILABLE, SOURCE_RETRY_EXHAUSTED}`:
   - Bei vorhandenem kompatiblem Fallback folgt die Fallback-Evaluierung.
@@ -217,9 +218,10 @@ Empfohlene Integrationskonvention (API/Operator):
   - Für `n_intervals > 48` sind Rohdaten mit Lücken vor Backfill zulässig, solange `raw_values_coverage` die Mindestquote erreicht.
   - kontrollierter Backfill darf maximal 2 aufeinanderfolgende Intervalle pro Lücke schließen.
   - bei Backfill gilt der finale Datenvertrag weiterhin (keine offenen Restlücken).
-  - Serien mit Backfill markieren Ergebnisqualität als `SOURCE_DEGRADED`.
-  - In `quality_mode=strict` dürfen diese Serien nicht akzeptiert werden.
-  - `SOURCE_GAP` gilt nur für nicht behebbare Restlücken nach abgeschlossener Backfill-Behandlung.
+  - Vollständig behobene Lücken werden als qualitätsgemindert markiert:
+    - `series_status=SOURCE_DEGRADED` mit `status_flags=[SOURCE_BACKFILL]`.
+  - In `quality_mode=strict` werden diese Serien nicht akzeptiert.
+  - `SOURCE_GAP` gilt als harte Ablehnung nur für nicht vollständig behebbaren oder noch offenen Restlücken nach abgeschlossener Backfill-Behandlung.
 
 ### Qualitätsentscheidungen bei `SOURCE_*` (verbindlich)
 
@@ -235,14 +237,16 @@ Die `SOURCE_*`-Auswertung ist für jede Serie deterministisch:
 2) Rohcode-Auswertung
 - `source_eval_status=SOURCE_OK` → direkt in Schritt 3.
 - `source_eval_status=SOURCE_AUTH_ERROR` → harte Ablehnung (`series_status=SOURCE_REJECTED`), kein Retry/Fallback.
-- `source_eval_status=SOURCE_GAP` → harte Ablehnung (`series_status=SOURCE_REJECTED`) für nicht behebbare Restlücken nach Backfill, kein Retry/Fallback.
+- `source_eval_status=SOURCE_GAP`:
+  - bei vollständig behebbaren Gaps (`n_intervals > 48` und Backfill-Quote innerhalb Limit): Übergang in Qualitätsmodus mit `series_status=SOURCE_DEGRADED` und `status_flags=[SOURCE_BACKFILL]`.
+  - bei nicht behebbaren Gaps: harte Ablehnung (`series_status=SOURCE_REJECTED`), kein Retry/Fallback.
 - `source_eval_status=SOURCE_EMPTY` → harte Ablehnung (`series_status=SOURCE_REJECTED`), kein Retry/Fallback.
 - `source_eval_status` in `{SOURCE_STALE, SOURCE_RATE_LIMIT, SOURCE_UNAVAILABLE, SOURCE_RETRY_EXHAUSTED}` → Schritt 3.
 
 3) Fallback- und Qualitätsmoduslogik
 - Fallback ist versuchsweise nur für diese Codes:
   - `SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_RETRY_EXHAUSTED`
-- `SOURCE_AUTH_ERROR`, `SOURCE_SCHEMA_MISMATCH`, `SOURCE_GAP` sind nicht fallback-fähig.
+- `SOURCE_AUTH_ERROR`, `SOURCE_SCHEMA_MISMATCH` sind nicht fallback-fähig.
 - Sind Primärcode + kompatible Fallback-Quelle vorhanden:
   - Der Fallback wird synchron ausgewertet.
   - Ist Fallback erfolgreich:
@@ -390,7 +394,7 @@ Aktivierungslogik:
    - derselbe `SeriesEnvelope`-Vertrag eingehalten wird
    - Lücke/Abweichung im Fallback innerhalb definierter Konfigurationsgrenzen bleibt
    - Operator den Fallbackstatus explizit akzeptiert
-  - `SOURCE_GAP` bleibt harte Ablehnung (`SOURCE_REJECTED`) und ist nicht per fallback-degradiert.
+  - `SOURCE_GAP` wird nur als harte Ablehnung (`SOURCE_REJECTED`) geführt, wenn die Gaps nicht vollständig durch Backfill geschlossen werden konnten oder wenn `n_intervals <= 48`.
   - Ohne akzeptablen Fallback gilt:
     - `SOURCE_STALE`:
       - bei `quality_mode=degraded_ok`: `SOURCE_DEGRADED`
