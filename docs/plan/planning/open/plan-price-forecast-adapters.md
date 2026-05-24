@@ -152,7 +152,7 @@ Die `SOURCE_*`-Auswertung ist für jede Serie deterministisch:
     - `strict`: harte Ablehnung (`SOURCE_REJECTED`).
     - `degraded_ok`: nur akzeptierbare Backfill/Degradation zulassen (`SOURCE_DEGRADED`), sonst `SOURCE_REJECTED`.
 - Kein kompatibler Fallback:
-  - `strict`: harte Ablehnung bei `SOURCE_STALE`, `SOURCE_RETRY_EXHAUSTED`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_EMPTY`.
+  - `strict`: harte Ablehnung bei `SOURCE_STALE`, `SOURCE_RETRY_EXHAUSTED`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`.
   - `degraded_ok`: `SOURCE_STALE` kann als `SOURCE_DEGRADED` akzeptiert werden; `SOURCE_EMPTY` bleibt `SOURCE_REJECTED`.
 
 4) Endstatuszuordnung bei akzeptierter Serie
@@ -253,7 +253,7 @@ Qualitätsminderung werden im Operator-Status separat als Ausführungsdetails er
       - `quality_mode=degraded_ok` und Primärcode `SOURCE_STALE`: degradierte Fortsetzung als `SOURCE_DEGRADED` möglich
       - sonst harte Ablehnung (`SOURCE_REJECTED`)
   - Fallback nicht verfügbar:
-    - `strict`: harte Ablehnung für `SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_RETRY_EXHAUSTED`, `SOURCE_EMPTY`
+- `strict`: harte Ablehnung für `SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_RETRY_EXHAUSTED`
     - `degraded_ok`: nur `SOURCE_STALE` als `SOURCE_DEGRADED` möglich; `SOURCE_EMPTY` bleibt `SOURCE_REJECTED`.
 
 ### Phase 2: Erste produktive Quelle
@@ -272,7 +272,7 @@ Aktivierungslogik:
   Fehlerklasse `SOURCE_REJECTED` behandelt.
 
 - Primärquelle wird standardmaessig genutzt.
-- Bei Qualitätsfehler (`SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_EMPTY`, `SOURCE_RETRY_EXHAUSTED`)
+- Bei Qualitätsfehler (`SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_RETRY_EXHAUSTED`)
     wird der Fallbackzugriff nur genutzt, wenn:
    - derselbe `SeriesEnvelope`-Vertrag eingehalten wird
    - Lücke/Abweichung im Fallback innerhalb definierter Konfigurationsgrenzen bleibt
@@ -283,7 +283,7 @@ Aktivierungslogik:
       - bei `quality_mode=degraded_ok`: `SOURCE_DEGRADED`
       - sonst `SOURCE_REJECTED`
     - `SOURCE_RATE_LIMIT` / `SOURCE_UNAVAILABLE` / `SOURCE_SCHEMA_MISMATCH`: `SOURCE_REJECTED`
-    - `SOURCE_EMPTY` / `SOURCE_RETRY_EXHAUSTED`: `SOURCE_REJECTED`
+  - `SOURCE_RETRY_EXHAUSTED`: `SOURCE_REJECTED`
     - `SOURCE_GAP`: `SOURCE_REJECTED`
     - `SOURCE_AUTH_ERROR`: `SOURCE_REJECTED` (ohne Fallback)
 

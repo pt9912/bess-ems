@@ -292,8 +292,14 @@ Pflichtregeln:
  steht, darf der Optimierer einen Intraday-Restaurationsfahrplan
  vorschlagen:
 
- - Laden, wenn Worst-Case-Up nicht gedeckt ist.
- - Entladen, wenn Worst-Case-Down nicht gedeckt ist.
+ - Zuerst wird je Zeitfenster berechnet, ob eine Wiederherstellung je Richtung nötig ist:
+   - `restore_up_kwh_t = max(0, required_up_kwh_t - available_up_kwh_t)`
+   - `restore_down_kwh_t = max(0, required_down_kwh_t - available_down_kwh_t)`
+ - Wenn `restore_up_kwh_t > 0` und `restore_down_kwh_t > 0` im selben Schritt gilt:
+   - `ReserveRobustnessResult` wird mit `ROBUST_INFEASIBLE` und `limiting_reason_code = NO_RECOVERY_PATH` geführt (ein Batteriekorridor kann pro Schritt nicht zugleich laden und entladen).
+ - Sonst:
+   - Laden, wenn `restore_up_kwh_t > 0` (Wird Worst-Case-Up nicht gedeckt).
+   - Entladen, wenn `restore_down_kwh_t > 0` (Wird Worst-Case-Down nicht gedeckt).
  - harte Begrenzung durch Asset-Leistung, Reservebaender,
    SOC-Grenzen und Gate-Closure-Zeit.
  - Restore ist nur dann ausgabe- und ausführungspfadfähig, wenn aktuell ein

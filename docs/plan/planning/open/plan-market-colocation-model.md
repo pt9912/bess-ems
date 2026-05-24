@@ -83,9 +83,14 @@ Moegliche Domain-/Application-Erweiterungen:
     - `unit` (z. B. `kW`)
     - `updated_at_utc`
     - `value_version`
-  - Validierung:
-    - gleiche Zeitachse wie `PriceSeries` (UTC, step-genau, gleiche Horizon-Länge)
-    - keine offenen Zeitlücken; zulässig: kontrollierte Backfill-Regel (max. 2 Intervalle)
+- Validierung:
+  - gleiche Zeitachse wie `PriceSeries` (UTC, step-genau, gleiche Horizon-Länge)
+  - in produktivem ADR-Modus `alignment_mode=reject` ist die Zeitachse hart identisch (gleiches Horizon, gleiche Schrittweite, gleiche Startzeit).
+  - bei Bedarf darf ein separater, operativ bewusst aktivierter Vorverarbeitungs-Mode `alignment_mode=trim-to-common` verwendet werden:
+    - Schnittmenge auf den gemeinsamen Zeithorizont
+    - deterministische Konvention bei Zeitachsen-Verschiebung
+    - lückenbehaftete Schritte müssen im Anschluss vollständig abgearbeitet werden
+  - keine offenen Zeitlücken; zulässig: kontrollierte Backfill-Regel (max. 2 Intervalle)
     - `value_kw` ist eine Produktionsleistung und für diese Serie standardmässig nicht negativ.
     - Negative Werte sind nur über einen separaten signierten Netzausgangs-Datensatz zulässig.
     - Metadatenpflicht fuer `source`, `product`, `updated_at_utc`, `value_version`
@@ -170,12 +175,13 @@ Interpretation:
 - Erlaubte Ladequelle: ausschliesslich lokale Erzeugung (`p_grid_import_t == 0`).
 - Einführung der herkunftsbezogenen Zwischengröße `e_local_t` (kWh), mit
   `Δt = resolution_minutes / 60`:
-  - `e_local_{t+1} = e_local_t - b_t * Δt` (bei Vorzeichenkonvention `b_t>0` Entladen, `b_t<0` Laden)
+  - `e_local_{t+1} = e_local_t + eta_charge * max(0, -b_t) * Δt - max(0, b_t) * Δt / eta_discharge`
+    (bei Vorzeichenkonvention `b_t>0` Entladen, `b_t<0` Laden; für `eta_charge = eta_discharge = 1` vereinfacht sich dies zu `e_local_t - b_t * Δt`)
   - `0 <= e_local_t <= local_origin_capacity_kwh`
   - `e_local_0` ist konfigurierbar (meist 0).
 - Harte Koppelregeln:
   - `-b_t <= (g_t - c_t)` (Laden nur solange lokaler Überschuss vorliegt)
-  - `b_t <= e_local_t / Δt` (Entladen nur aus vorhandener lokaler Herkunftsmasse)
+  - `b_t <= e_local_t * eta_discharge / Δt` (Entladen nur aus vorhandener lokaler Herkunftsmasse)
   - Ist kein Herkunftsnachweis oder keine ausreichende lokale Quelle vorhanden, gilt `CONFIG_INCONSISTENT`.
 - Abregelung `c_t` ist im Modus erlaubt und mindert damit lokal verfügbaren Strom.
 - Bei fehlender Herkunftstransparenz darf kein produktiver Lauf gestartet werden.
