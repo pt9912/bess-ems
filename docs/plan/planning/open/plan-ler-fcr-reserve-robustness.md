@@ -86,8 +86,8 @@ Nicht explizit modelliert:
     - Wenn kein `conservative_soc_headroom_kwh` gesetzt ist, wird bei `conservative` `conservative_soc_headroom_ratio` genutzt.
     - `t_min_fcr` (`FCR`-Pflichtfeld, falls FCR im gebuchten Portfolio aktiv)
   - `full_activation_time` (`FCR`-Pflichtfeld bei aktivem FCR-Produkt; bei inaktivem FCR kann `0` gesetzt werden)
-- optional `full_activation_time_afrr` (nur wenn sinnvoll gesetzt; bei gesetztem Wert `> 0`)
-- optional `full_activation_time_mfrr` (nur wenn sinnvoll gesetzt; bei gesetztem Wert `> 0`)
+- optional `full_activation_time_afrr` (nur bei produktiv aktivem aFRR; bei gesetztem Wert `> 0`)
+- optional `full_activation_time_mfrr` (nur bei produktiv aktivem mFRR; bei gesetztem Wert `> 0`)
   - optional `simultaneous_reserve_direction_allowed` (default `false`)
   - optional `restore_capability_up_kw` (optional, erlaubt zusätzliche obere Schranke für intraday Wiederherstellung in Up-Lade-Richtung)
   - optional `restore_capability_down_kw` (optional, erlaubt zusätzliche obere Schranke für intraday Wiederherstellung in Down-Entlade-Richtung)
@@ -144,9 +144,9 @@ Nicht explizit modelliert:
     - `soc_min_eff_kwh = soc_min_kwh + effective_soc_headroom_kwh`
     - `soc_max_eff_kwh = soc_max_kwh - effective_soc_headroom_kwh`
     - `soc_min_eff_kwh < soc_max_eff_kwh` muss gelten, sonst `ROBUST_POLICY_UNSUPPORTED`.
-  - Effektivzeiten je Produkt (Fallback auf `full_activation_time`):
-  - `full_activation_time_afrr_eff = coalesce(full_activation_time_afrr, full_activation_time)`
-  - `full_activation_time_mfrr_eff = coalesce(full_activation_time_mfrr, full_activation_time)`
+  - Effektivzeiten je Produkt:
+  - `full_activation_time_afrr_eff = full_activation_time_afrr` (bei aFRR-Aktivierung; sonst `0`)
+  - `full_activation_time_mfrr_eff = full_activation_time_mfrr` (bei mFRR-Aktivierung; sonst `0`)
   - Harte Schema-Validierung:
   - `self_discharge_mode` darf, soweit gesetzt, **nur** `absolute_kwh_per_hour` oder `relative_soc_per_hour` sein; alles andere -> `ROBUST_POLICY_UNSUPPORTED`.
   - `self_discharge_kwh_per_hour` darf nicht negativ sein.
@@ -162,7 +162,8 @@ Nicht explizit modelliert:
     kein gültiges Intraday-Restorefenster vor.
   - `market_time_unit` muss exakt `minute` sein und mit `resolution_minutes` konsistent sein.
   - `t_min_fcr`, `full_activation_time` und `max_recovery_time` müssen bei aktivem Anwendungsfall streng `> 0` sein; bei inaktivem FCR bzw. deaktiviertem Restore-Pfad darf `0` gesetzt werden.
-  - `full_activation_time_afrr` und `full_activation_time_mfrr` müssen, falls gesetzt, streng `> 0` sein.
+  - `full_activation_time_afrr` und `full_activation_time_mfrr` müssen bei produktiv aktivem aFRR bzw. mFRR strikt `> 0` sein.
+  - Ist das jeweilige Produkt aktiviert und der Wert fehlt oder ist `0`, gilt `ROBUST_POLICY_UNSUPPORTED` (`POLICY_MISMATCH`).
   - `simultaneous_reserve_direction_allowed` ist optional-boolean; fehlt/`false` wird als Default `false` interpretiert.
   - `simultaneous_reserve_direction_allowed=true` ist in Kombination mit nicht-linearer Kopplung nur mit klarer
     Reihenfolgeimplementierung in der Worst-Case-Rekursion erlaubt.

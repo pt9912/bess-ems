@@ -75,6 +75,7 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
 - Der minimale `SeriesEnvelope` enthält:
   - `series_id` (stabil)
   - `series_version` (stabil, monoton wachsend oder semantische Versionskennung)
+  - `series_family_alias` (optional, empfohlen): stabiler Alias für kontrollierte Migrationspfade; ein Wechsel der Familienkennung erfolgt nur über diesen Alias bzw. durch neue Serienkennung, nicht per stillschweigendem Wechsel derselben `series_id`.
   - Erforderlich und vergleichbar pro `(series_id, site_id?, market_bid_area?, series_product, series_type, source.provider_id)`.
   - Akzeptiert werden:
     - streng monoton wachsende numerische Versionen (int-kompatibel),
@@ -179,7 +180,9 @@ Kanonische Ableitungsregeln (deterministisch):
 - `source_eval_status=SOURCE_AUTH_ERROR` -> `series_status=SOURCE_REJECTED`, harte Abweisung.
 - `source_eval_status=SOURCE_SCHEMA_MISMATCH` -> `series_status=SOURCE_REJECTED`, harte Abweisung.
 - `source_eval_status=SOURCE_GAP`:
-  - falls Lücken mit kompatiblem Backfill vollständig geschlossen werden können, resultiert der Zustand als `series_status=SOURCE_DEGRADED` mit `status_flags=[SOURCE_BACKFILL]`.
+  - bei vollständig behebbaren Gaps:
+    - bei `quality_mode=degraded_ok`: `series_status=SOURCE_DEGRADED` mit `status_flags=[SOURCE_BACKFILL]`
+    - bei `quality_mode=strict`: harte Ablehnung als `series_status=SOURCE_REJECTED`
   - ist eine vollständige Schließung nicht möglich (oder `n_intervals <= 48`), wird `series_status=SOURCE_REJECTED`.
 - `source_eval_status=SOURCE_EMPTY` -> `series_status=SOURCE_REJECTED`, harte Abweisung.
 - `source_eval_status` aus `{SOURCE_STALE, SOURCE_RATE_LIMIT, SOURCE_UNAVAILABLE, SOURCE_RETRY_EXHAUSTED}`:
@@ -275,7 +278,9 @@ Die `SOURCE_*`-Auswertung ist für jede Serie deterministisch:
 - `source_eval_status=SOURCE_OK` → direkt in Schritt 3.
 - `source_eval_status=SOURCE_AUTH_ERROR` → harte Ablehnung (`series_status=SOURCE_REJECTED`), kein Retry/Fallback.
 - `source_eval_status=SOURCE_GAP`:
-  - bei vollständig behebbaren Gaps (`n_intervals > 48` und Backfill-Quote innerhalb Limit): Übergang in Qualitätsmodus mit `series_status=SOURCE_DEGRADED` und `status_flags=[SOURCE_BACKFILL]`.
+  - bei vollständig behebbaren Gaps (`n_intervals > 48` und Backfill-Quote innerhalb Limit):
+    - bei `quality_mode=degraded_ok`: Ergebnis wie bisher (`series_status=SOURCE_DEGRADED`, `status_flags=[SOURCE_BACKFILL]`).
+    - bei `quality_mode=strict`: harte Ablehnung als `series_status=SOURCE_REJECTED`.
   - bei nicht behebbaren Gaps: harte Ablehnung (`series_status=SOURCE_REJECTED`), kein Retry/Fallback.
 - `source_eval_status=SOURCE_EMPTY` → harte Ablehnung (`series_status=SOURCE_REJECTED`), kein Retry/Fallback.
 - `source_eval_status` in `{SOURCE_STALE, SOURCE_RATE_LIMIT, SOURCE_UNAVAILABLE, SOURCE_RETRY_EXHAUSTED}` → Schritt 3.
