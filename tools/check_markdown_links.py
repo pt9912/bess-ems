@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Validate local links in Markdown files.
+"""Validate local links and host-local path references in Markdown files.
 
 The checker is intentionally dependency-free so it can run in a slim Python
 container. It validates local file and directory targets, ignores external
-network URLs, and checks anchors for Markdown targets.
+network URLs, checks anchors for Markdown targets, and rejects host-local
+absolute paths such as /Development/... or C:\\Users\\... in prose.
 """
 
 from __future__ import annotations
@@ -50,6 +51,12 @@ FENCE_RE = re.compile(r"^\s*(```+|~~~+)")
 HEADING_RE = re.compile(r"^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$")
 REFERENCE_DEF_RE = re.compile(r"^\s{0,3}\[([^\]]+)\]:\s*(.+?)\s*$")
 HTML_ANCHOR_RE = re.compile(r"""<(?:a|[^>]+)\s+[^>]*(?:id|name)=["']([^"']+)["']""", re.IGNORECASE)
+HOST_UNIX_PATH_RE = re.compile(
+    r"(?<![A-Za-z0-9_.:/-])"
+    r"(/(?:Development|home|Users|Volumes|mnt|media|tmp)/[^\s<>)\]\"']*)"
+)
+WINDOWS_DRIVE_PATH_RE = re.compile(r"(?<![A-Za-z0-9_])([A-Za-z]:\\[^\s<>)\]\"']*)")
+WINDOWS_UNC_PATH_RE = re.compile(r"(?<![A-Za-z0-9_])(\\\\[A-Za-z0-9_.-]+\\[^\s<>)\]\"']*)")
 
 
 @dataclass(frozen=True)
@@ -181,6 +188,26 @@ def iter_links(markdown_file: Path) -> Iterable[Link]:
                 yield Link(markdown_file, line_no, target)
 
 
+def strip_trailing_path_punctuation(path: str) -> str:
+    return path.rstrip(".,;:")
+
+
+def iter_absolute_path_references(markdown_file: Path) -> Iterable[Link]:
+    in_fence = False
+    for line_no, line in enumerate(markdown_file.read_text(encoding="utf-8").splitlines(), start=1):
+        if FENCE_RE.match(line):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+
+        for pattern in (HOST_UNIX_PATH_RE, WINDOWS_DRIVE_PATH_RE, WINDOWS_UNC_PATH_RE):
+            for match in pattern.finditer(line):
+                target = strip_trailing_path_punctuation(match.group(1))
+                if target:
+                    yield Link(markdown_file, line_no, target)
+
+
 def is_external_or_special(target: str) -> bool:
     if target.startswith("//"):
         return True
@@ -294,10 +321,22 @@ def run(root: Path) -> int:
     anchor_cache: dict[Path, set[str]] = {}
     errors: list[LinkError] = []
     link_count = 0
+    absolute_path_count = 0
     file_count = 0
 
     for markdown_file in sorted(iter_markdown_files(root)):
         file_count += 1
+        for path_reference in iter_absolute_path_references(markdown_file):
+            absolute_path_count += 1
+            errors.append(
+                LinkError(
+                    path_reference.source,
+                    path_reference.line,
+                    path_reference.raw_target,
+                    "absolute host path reference is not allowed",
+                )
+            )
+
         for link in iter_links(markdown_file):
             link_count += 1
             error = validate_link(root, link, anchor_cache)
@@ -310,12 +349,16 @@ def run(root: Path) -> int:
 
     if errors:
         print(
-            f"[markdown-links] FAIL: {len(errors)} error(s) across {file_count} Markdown file(s), {link_count} link(s)",
+            f"[markdown-links] FAIL: {len(errors)} error(s) across {file_count} Markdown file(s), "
+            f"{link_count} link(s), {absolute_path_count} absolute path reference(s)",
             file=sys.stderr,
         )
         return 1
 
-    print(f"[markdown-links] OK: {file_count} Markdown file(s), {link_count} local/external link(s) scanned")
+    print(
+        f"[markdown-links] OK: {file_count} Markdown file(s), "
+        f"{link_count} local/external link(s), {absolute_path_count} absolute path reference(s) scanned"
+    )
     return 0
 
 
