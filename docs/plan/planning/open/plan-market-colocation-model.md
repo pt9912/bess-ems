@@ -39,7 +39,8 @@ Der operative Optimierungsrequest enthält genau eine Solver-Scope-Ausprägung.
 Entscheidungsreihenfolge je Request:
 
 1. Wenn **keine** aktivierte Co-Location-/Herkunftsrestriktion betroffen ist => `solver_scope=LP`.
-2. Sonst (produktiver MVP mit Co-Location-/Herkunftsrestriktion) => `solver_scope=MILP`.
+2. Sonst (produktiver MVP mit Co-Location-/Herkunftsrestriktion) => `solver_scope=MILP`,
+   außer ein ADR hat den unten beschriebenen LP-Sonderfall explizit freigegeben.
 3. Gemischte Requests aus LP- und MILP-relevanten Assets dürfen nur dann partitioniert werden,
    wenn ein Folge-ADR für homogene Solver-Scope-Partitionierung explizit aktiviert ist und
    die Partitionierung vollständig isolierbar sowie deterministisch reaggregierbar ist.
@@ -184,14 +185,16 @@ Mögliche Domain-/Application-Erweiterungen:
     - gleiche Zeitachse wie `PriceSeries` (UTC, step-genau, gleiche Horizon-Länge) bei produktiver Nutzung.
     - Ist `alignment_mode=reject` (Default im produktiven ADR): die Zeitachse muss hart identisch sein (gleiches Horizon, gleiche Schrittweite, gleiche Startzeit).
     - Ist `alignment_mode=trim-to-common` gesetzt:
-      - `alignment_prepared` darf nur zusammen mit `alignment_mode=trim-to-common` verwendet werden.
+      - `alignment_prepared` darf nur zusammen mit `alignment_mode=trim-to-common` verwendet werden;
+        `alignment_prepared=true` bei anderem `alignment_mode` ist `SCHEMA_INCONSISTENT`.
       - produktive Optimierung darf `trim-to-common` nur mit explizit abgeschlossenem Vorverarbeitungs-Pfad und nachweislicher Versionierung in den zugehörigen Vorverarbeitungsfeldern starten; ohne diese Voraussetzungen führt der Lauf zu `SCHEMA_INCONSISTENT`.
       - Schnittmenge auf den gemeinsamen Zeithorizont.
       - `alignment_prepared_by` und die vorbereiteten Horizon-Grenzen (`alignment_prepared_horizon_start_utc`, `alignment_prepared_horizon_end_utc`) müssen gesetzt sein.
       - deterministische Konvention bei Zeitachsen-Verschiebung.
       - lückenbehaftete Schritte müssen im Anschluss vollständig abgearbeitet werden.
       - nur im Forecast-/Preprocessing-Pfad, danach muss der Standardpfad (`reject`) mit lückenloser Zeitachse erhalten bleiben.
-      - keine offenen Zeitlücken; zulässig: kontrollierte Backfill-Regel (max. 2 Intervalle).
+      - keine offenen Zeitlücken; zulässig: kontrollierte Backfill-Regel
+        (max. 2 aufeinanderfolgende Intervalle pro Lücke).
     - `value_kw` ist eine Produktionsleistung und für diese Serie standardmäßig nicht negativ.
     - Negative Werte sind nur über einen separaten signierten Netzausgangs-Datensatz zulässig.
     - Metadatenpflicht für `source`, `product`, `updated_at_utc`, `value_version`.
@@ -374,12 +377,12 @@ Rollback-/Backout-Verhalten:
 
 Fehlerklassifikation für `GreenStorageRestricted`:
 
-| Auslöser | Coderraum | Grundcode |
-| --- | --- | --- |
-| Produktiver Routine-Run ohne explizite Validierungs-/Freigabeaktivierung | `CONFIG_INVALID` | `GREEN_STORAGE_RESTRICTED_PRODUCTIVE_BLOCKED` |
-| Fehlender oder nicht auditierbarer Herkunftsnachweis | `CONFIG_INCONSISTENT` | `GREEN_STORAGE_ORIGIN_PROOF_MISSING` |
-| Keine ausreichende lokale Quelle für geplantes Laden | `CONFIG_INCONSISTENT` | `GREEN_STORAGE_LOCAL_SOURCE_INSUFFICIENT` |
-| Versuchter Netzbezug (`p_grid_import_t > 0`) | `CONFIG_INCONSISTENT` | `GREEN_STORAGE_GRID_CHARGE_BLOCKED` |
+| Erkennungsschicht | Auslöser | Coderraum | Grundcode |
+| --- | --- | --- | --- |
+| Produktiv-Precheck | Produktiver Routine-Run ohne explizite Validierungs-/Freigabeaktivierung | `CONFIG_INVALID` | `GREEN_STORAGE_RESTRICTED_PRODUCTIVE_BLOCKED` |
+| Input-/Pre-Solver-Validierung | Fehlender oder nicht auditierbarer Herkunftsnachweis | `CONFIG_INCONSISTENT` | `GREEN_STORAGE_ORIGIN_PROOF_MISSING` |
+| Input-/Pre-Solver-Validierung | Request fordert Netzladung oder modelliert Netzbezug als zulässige Ladequelle | `CONFIG_INCONSISTENT` | `GREEN_STORAGE_GRID_CHARGE_BLOCKED` |
+| Solver-Ergebnis | Harte Constraints (`p_grid_import_t == 0`, lokale Quelle, `e_local_t`) machen den angefragten Fahrplan mathematisch unerfüllbar | `MODEL_INFEASIBLE` | `green-storage-model-infeasible` |
 
 ### Optimierungswirkung
 
@@ -489,7 +492,8 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
   - Abweichung ist ein hartes Release-Blocking; kein Slice darf unabhängig freigegeben werden.
 - Implementierungsvorgabe:
   - Vor Aktivierung dieses Slices ist ein eigener Pre-Slice
-    `Domain-Migration OptimizationRun.CanExecute` abzuschließen.
+    [`Domain-Migration OptimizationRun.CanExecute`](plan-domain-migration-optimization-run-can-execute.md)
+    abzuschließen.
   - Dieser Pre-Slice erweitert die Datenklasse für Optimierungsläufe um `CanExecute`
     als persistiertes Feld.
   - Da `OptimizationRun` ein immutables Objekt mit strikter Konstruktorinvariante ist,

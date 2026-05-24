@@ -57,7 +57,10 @@ Kompatibilitäts-/Migrationsprinzip:
 - Für den produktiven Slice ist die bestehende `PriceSeries`/Persistenzkette kompatibel zu erweitern:
   - bestehender Schlüsselaspekt in `InMemoryPriceSeriesStore.PriceSeriesKey`
     (Quelle: `src/hexagon/BatteryEms.Application/Markets/InMemoryPriceSeriesStore.cs`)
-    darf nicht nur auf Markt/Produkt/Bereich/Quelle/Timestep basieren.
+    darf nicht nur auf Markt/Produkt/Bereich/Quelle/Timestep basieren. Der heutige
+    Typ ist ein privater Store-Record; die Migration muss ihn entweder durch einen
+    expliziten, testbaren Serienidentitätstyp ersetzen oder den Store-Key vollständig
+    neu schneiden.
   - Die Persistenz muss mindestens `series_id`, `series_version` **und**
     `source.provider_id` als Teil der Identität tragen (oder einen deterministischen
     Ersatzschlüssel aus genau diesen Werten plus
@@ -120,9 +123,12 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
     - Während der Migrationsphase können beide Serienfolgen parallel aktiv sein; nach erfolgreichem Cutover wird die alte Folge deaktiviert.
     - Die Migrationsfreigabe ist an einen expliziten Release-Hinweis gebunden.
     - Empfohlener kontrollierter Cutover:
-      1. Neue Family unter expliziter Alias-Kennung einführen (`series_family_alias` oder neues `series_id`/`series_product`),
-         den alten und neuen Stream parallel beobachten.
-      2. Während der Übernahmephase auf Alias-Kennzeichnung in Operator-/Replay-Berichten prüfen; beide Familien müssen bis zum Cutover denselben fachlichen Wertbereich liefern.
+      1. Neue Family entweder unter expliziter Alias-Kennung (`series_family_alias`) oder
+         als neue Serienkennung (`series_id`/`series_product`) freigeben; beide Varianten
+         starten mit paralleler Beobachtung des alten und neuen Streams.
+      2. Während der Übernahmephase auf Alias- bzw. neue Serienkennzeichnung in
+         Operator-/Replay-Berichten prüfen; beide Familien müssen bis zum Cutover
+         denselben fachlichen Wertbereich liefern.
       3. Nach Freigabe wird die alte Family für den produktiven Pfad abgeschaltet, neue Family wird normativ aktiv.
     - Verbindlicher Cutover-/Rollback-SOP:
       1. **Vorbereitung**: Neue Family mit eigenem `series_family_alias` oder neuem (`series_id`, `series_product`) freigeben.
@@ -181,7 +187,9 @@ Hinweis zur Semantik:
 - `SOURCE_DEGRADED` ist ausschließlich ein finaler `series_status` und nicht als `source_eval_status` vorgesehen.
 - `status_message` (optional): menschenlesbar
 - `status_detail` (optional): strukturierte Zusatzinfo (z. B. `{ "source_code": "SOURCE_STALE", "backfill_intervals_closed": 2, "effective_source_id": "opsd-..." }`)
-- `value_hash` (optional, empfohlen): Repräsentations-Stabilisierung des payload für Idempotenzvergleiche.
+- `value_hash`: optional für reine Einmalimporte ohne Idempotenz-/Cutover-Vertrag;
+  verpflichtend, sobald Versions-Idempotenz, Re-Load-Vergleich, Family-Cutover oder
+  Rollback aktiviert ist. Der Hash stabilisiert den Payload-Vergleich.
 - Validierungspflicht:
   - strikte UTC-Zeitachse
   - Schrittweite exakt `resolution_minutes`
@@ -342,7 +350,8 @@ Die `SOURCE_*`-Auswertung ist für jede Serie deterministisch:
 - `source_eval_status=SOURCE_OK` → direkt in Schritt 3.
 - `source_eval_status=SOURCE_AUTH_ERROR` → harte Ablehnung (`series_status=SOURCE_REJECTED`), kein Retry/Fallback.
 - `source_eval_status=SOURCE_GAP`:
-  - bei vollständig behebbaren Gaps (`n_intervals > 48` und Backfill-Quote innerhalb Limit):
+  - bei vollständig behebbaren Gaps innerhalb der Coverage-Grenze
+    (`missing_raw_intervals <= max_missing_raw_intervals`):
     - bei `quality_mode=degraded_ok`: Ergebnis wie bisher (`series_status=SOURCE_DEGRADED`, `status_flags=[SOURCE_BACKFILL]`).
     - bei `quality_mode=strict`: harte Ablehnung als `series_status=SOURCE_REJECTED`.
   - bei nicht behebbaren Gaps: harte Ablehnung (`series_status=SOURCE_REJECTED`), kein Retry/Fallback.
@@ -454,6 +463,12 @@ Endgültige Serienendstatus sind:
   - Adapter-Bridge zwischen `SeriesEnvelope` und produktiven Forecast-/Price-Domainmodellen
   - verbindliches `SeriesEnvelope` gemäß obigem Datenvertrag
   - deterministisches Mapping in die bestehende Import-Pipeline (`IPriceSeriesSource`).
+- Persistenz-/Schema-Migration als Phase-1-Voraussetzung:
+  - `PriceSeries`/Import-Request erhalten die Serienidentitätsfelder oder einen
+    deterministisch äquivalenten Ersatzschlüssel.
+  - `InMemoryPriceSeriesStore` ersetzt den privaten Alt-Key durch die neue
+    Serienidentität; dauerhafte Stores folgen demselben Schlüsselvertrag.
+  - Ohne diese Migration dürfen neue Serienkennungen nicht produktiv aufgenommen werden.
 - Cache-/Refresh-Vertrag:
   - TTL
   - `max_stale_age_minutes`
@@ -480,11 +495,11 @@ Endgültige Serienendstatus sind:
       - `strict`: nur akzeptierte Daten ohne Backfill/Verfallung (`SOURCE_OK`, `SOURCE_FALLBACK_USED`)
       - `degraded_ok`: Fallback kann als `SOURCE_DEGRADED` geführt werden.
       - in strict ist Fallback mit Backfill weiterhin `SOURCE_REJECTED`.
-    - Bei Ausfall / Schemakonflikt des Fallbacks:
-      - `quality_mode=degraded_ok` und Primärcode `SOURCE_STALE`: degradierte Fortsetzung als `SOURCE_DEGRADED` möglich
-      - sonst harte Ablehnung (`SOURCE_REJECTED`)
+  - Bei Ausfall / Schemakonflikt des Fallbacks:
+    - `quality_mode=degraded_ok` und Primärcode `SOURCE_STALE`: degradierte Fortsetzung als `SOURCE_DEGRADED` möglich
+    - sonst harte Ablehnung (`SOURCE_REJECTED`)
   - Fallback nicht verfügbar:
-- `strict`: harte Ablehnung für `SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_RETRY_EXHAUSTED`
+    - `strict`: harte Ablehnung für `SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_RETRY_EXHAUSTED`
     - `degraded_ok`: nur `SOURCE_STALE` als `SOURCE_DEGRADED` möglich; `SOURCE_EMPTY` bleibt `SOURCE_REJECTED`.
 
 ### Phase 2: Erste produktive Quelle
@@ -537,7 +552,8 @@ Input-/Output-Vertrag für einen Forecast-Sidecar:
   - Kalenderfeatures
 - Output:
   - `PriceSeries` für Punktforecast
-- optional später: `ForecastSeries`/Quantile oder Szenariopfade in separatem Slice
+  - `ForecastSeries`-Schema für deterministische Nicht-Preis-Forecasts (Load/PV/Wind/Wetter)
+- optional später: Quantile oder Szenariopfade in separatem Slice
 
 Vertraglich gilt der gleiche `SeriesEnvelope` für den Sidecar-Output (Zeitachse, Einheit, Source-Metadaten, Qualitätscode).
 
@@ -643,7 +659,9 @@ arbeitet mit deterministischen Preiswerten.
 ## Abschlussentscheidungen
 
 - Wird in einem ersten produktiven Slice zusätzlich `ForecastSeries`-Schema eingeführt?
-  - Ja, als erweiterter Liefervertrag, solange es ein kompatibles `SeriesEnvelope` bleibt.
+  - Ja, als deterministisches Point-Forecast-Schema und erweiterter Liefervertrag,
+    solange es ein kompatibles `SeriesEnvelope` bleibt; Quantile und Szenariopfade
+    bleiben Folgeslice.
 - Sollen Forecast-Szenarien/Quantile direkt modelliert oder erst in einem
   separaten probabilistischen Optimierungsslice behandelt werden?
   - Entscheidung: Erst im ersten Slice sind nur point-forecast-Pfade relevant; Quantile/Probabilistik geht in ein Folge-Slice.

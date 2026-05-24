@@ -188,7 +188,7 @@ Nicht explizit modelliert:
     - `worst_down_kwh`
     - `available_up_kwh`
     - `available_down_kwh`
-    - `status`
+    - `step_status`
     - `limiting_reason`
     - `required_up_kwh` (optional, für Restore-Planung)
     - `required_down_kwh` (optional, für Restore-Planung)
@@ -207,6 +207,9 @@ Nicht explizit modelliert:
       - optionales Feld in Minuten als Operatorkontext.
       - dient in der Erstimplementierung rein auditierbar und ist nicht verpflichtender
         Steuerparameter.
+      - Wird das Feld später Steuerparameter, braucht es einen expliziten Migrationsschritt:
+        Validierung, Persistenz-/API-Ausgabe und Konsumenten müssen dann gemeinsam
+        eingeführt werden; bis dahin darf kein Laufverhalten davon abhängen.
 
 - `AlertStateTimeline`
   - Zeitreihe für FCR-Alert-State-Status, Reserve Mode,
@@ -214,14 +217,14 @@ Nicht explizit modelliert:
 
 - `ReserveRobustnessResult`
   - Ergebnis einer Prüfung:
-  - `status`:
+  - `result_status`:
     - `ROBUST_OK`
     - `ROBUST_NEEDS_INTRADAY_RESTORE`
     - `ROBUST_INFEASIBLE`
     - `ROBUST_SOURCE_DATA_MISSING`
     - `ROBUST_POLICY_UNSUPPORTED`
   - `limiting_reason_code`:
-  - `SOC_LIMIT`, `RESERVE_CAPACITY`, `RECOVERY_TIMEOUT`, `POLICY_MISMATCH`,
+    - `SOC_LIMIT`, `RESERVE_CAPACITY`, `RECOVERY_TIMEOUT`, `POLICY_MISMATCH`,
       `SOURCE_DATA_MISSING`, `NO_RECOVERY_PATH`, `INTRADAY_GATE_CLOSED`
   - `status_description` (optional, menschenlesbar)
   - `action` (optional, maschinenlesbares Operator-Token; erster Wert:
@@ -558,15 +561,17 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
     | Reiner Rechenfehler/Timeout/Solverfehler         | `Failed` oder bestehender Timeout-Status | Solver-spezifische harte Codes, z. B. `or-tools-abnormal`, `or-tools-model-invalid`, `or-tools-not-solved` | `false` |
     | Konfigurationsfehler (`CONFIG_*`)                | `Failed`                 | `config-invalid` oder `config-inconsistent` | `false` |
     | Schematafehler (`SCHEMA_INCONSISTENT`)          | `Failed`                 | `schema-inconsistent` | `false` |
+    | Restore erforderlich, Plan nicht ausführbar bis Restore erfolgt | `Feasible` | `reserve-robustness-needs-restore` | `false` |
     | Robustheits-/Reserve-Blockade                      | `Failed`                 | `reserve-robustness-*` | `false` |
     | Harte Source-/Policy-Abweisungen außerhalb Produktbereichs | `Failed`          | `source-*`/`policy-*` falls eingeführt | `false` |
   - Die verwendeten `TerminationCode` für robustheitsbezogene Sperren sind
-    `reserve-robustness-infeasible`, `reserve-robustness-recovery-timeout`,
-    `reserve-robustness-source-missing`, `reserve-robustness-policy-unsupported`.
+    `reserve-robustness-needs-restore`, `reserve-robustness-infeasible`,
+    `reserve-robustness-recovery-timeout`, `reserve-robustness-source-missing`,
+    `reserve-robustness-policy-unsupported`.
   - Keine impliziten Reserveverletzungen im produzierten Fahrplan.
   - Bestehender Pfad ohne LER/FCR-Robustheit bleibt unverändert.
 - Ergebnis-/Run-Mapping (verbindlich):
-  - `reserve_robustness_status = ReserveRobustnessResult.status`.
+  - `reserve_robustness_status = ReserveRobustnessResult.result_status`.
   - `reserve_robustness_limiting_reason = ReserveRobustnessResult.limiting_reason_code`.
   - `HasUsableSolution` wird in der aktuellen Codebasis weiterhin aus
     `OptimizationSolverStatus.{Optimal,Feasible}` abgeleitet; die produktive
@@ -577,15 +582,19 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
     in Wireobjekt + Datenhaltung + Mapping), damit das Feld die Invariante
     korrekt trägt.
   - Diese Migration ist ein eigener Pre-Slice
-    `Domain-Migration OptimizationRun.CanExecute` und umfasst alle Konstruktor-Aufrufer,
-    Repository-Implementierungen, Tests/Fixtures, Proto-/API-/Wire-Mappings sowie die
-    Umstellung aller Dispatch-/Scheduler-/API-Konsumenten von `HasUsableSolution` auf
-    `HasUsableSolution && CanExecute`.
+    [`Domain-Migration OptimizationRun.CanExecute`](plan-domain-migration-optimization-run-can-execute.md)
+    und umfasst alle Konstruktor-Aufrufer, Repository-Implementierungen, Tests/Fixtures,
+    Proto-/API-/Wire-Mappings sowie die Umstellung aller Dispatch-/Scheduler-/API-Konsumenten
+    von `HasUsableSolution` auf `HasUsableSolution && CanExecute`.
   - Bei `reserve_robustness_status != ROBUST_OK` ist
     `reserve_robustness_limiting_reason` als Pflichtfeld im `OptimizationRun`-`TerminationDetail`
     zu persistieren, inkl. optionaler `status_description`, damit Operator-/Replay-Sichten die Ursache eindeutig nachvollziehen.
-  - `CanExecute = (reserve_robustness_status == ROBUST_OK)` ist die einzige ausführbare
-    Betriebsart; bei allen anderen Statuswerten ist `CanExecute=false`.
+  - Aggregationsregel für den gemeinsamen Cross-Slice-Vertrag:
+    `CanExecute = robust_ok && config_ok && schema_ok && source_ok && solver_result_executable`.
+    Jeder Slice darf `CanExecute` nur von `true` auf `false` ziehen; kein Slice darf
+    ein durch einen anderen Slice gesetztes `false` wieder auf `true` setzen.
+  - Für diesen Slice gilt `robust_ok = (reserve_robustness_status == ROBUST_OK)`;
+    bei allen anderen Robustheitsstatuswerten ist `CanExecute=false`.
   - `CanExecute` ist harte Ausführungsbedingung im Dispatcher/Scheduler:
     `OptimizationSolverStatus.Feasible` bei `CanExecute=false` gilt weiterhin als nicht auszuführen.
   - `ROBUST_OK` => keine zusätzliche Hard-Stop-Sperre.
@@ -598,7 +607,8 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
   - `ROBUST_NEEDS_INTRADAY_RESTORE` =>
     - bei verfügbarem Restore-Fenster: Optimierung bleibt lauffähig,
       der Lauf wird mit `OptimizationSolverStatus.Feasible` persistiert,
-      `CanExecute=false` und Operator-Hinweis `action=intraday_restore_required`.
+      `TerminationCode=reserve-robustness-needs-restore`, `CanExecute=false`
+      und Operator-Hinweis `action=intraday_restore_required`.
     - bei geschlossenem Gate / keinem Wiederherstellungsfenster entsteht nach der
       verbindlichen Entscheidungslogik kein `ROBUST_NEEDS_INTRADAY_RESTORE`, sondern
       `ROBUST_INFEASIBLE` mit `limiting_reason_code=INTRADAY_GATE_CLOSED`.
@@ -615,7 +625,8 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
     `TerminationCode=reserve-robustness-policy-unsupported`.
 - `ROBUST_OK` wird mit dem eigentlichen Optimizerergebnis (`Optimal`/`Feasible`) persistiert.
 - `ROBUST_NEEDS_INTRADAY_RESTORE` wird immer als `OptimizationSolverStatus.Feasible`
-  mit `CanExecute=false` und explizitem Restore-Hinweis persistiert.
+  mit `TerminationCode=reserve-robustness-needs-restore`, `CanExecute=false`
+  und explizitem Restore-Hinweis persistiert.
 
 ### Phase 4: Operator- und Replay-Sicht
 
@@ -756,7 +767,8 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
     Up-/Down-Anforderungen im selben Zeitschritt hart `ROBUST_POLICY_UNSUPPORTED`
     mit `POLICY_MISMATCH` resultieren.
   - bei `simultaneous_reserve_direction_allowed=true` wird bei Gleichzeitigkeit
-    die gekoppelte Worst-Case-Rekursion über `worst_total_kwh_t` geprüft.
+    die sequentielle Rekursion geprüft (Up-Branch zuerst, danach Down auf dem SOC
+    nach Up); `worst_total_kwh_t` bleibt zusätzliche auditierbare Kennzahl.
 
 ## Abschlussentscheidungen
 
