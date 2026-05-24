@@ -422,12 +422,12 @@ Bestandsrouten nicht brechen:
 
 Die Ausführungsregeln für Status/Mappings (`OptimizationSolverStatus`,
 `TerminationCode`, `CanExecute`, `TerminationDetail`) sind in diesem Slice und im
-LER/FCR-Robustheitsslice **identisch** zu halten.
+LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
 
 - Autoritative Quelle für den gemeinsamen Vertrag ist
   [`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md).
-- Änderungen an `CanExecute` oder Laufkodierung sind nur gemeinsam und im selben
-  Release-Commit umzusetzen.
+- Änderungen an `CanExecute`, Laufkodierung oder Terminierungsdetails sind nur
+  gemeinsam und im selben Release-Commit umzusetzen.
 - Ein Slice darf erst freigegeben werden, wenn beide Dokumente semantisch
   übereinstimmen und die Cross-Checks bestanden sind.
 

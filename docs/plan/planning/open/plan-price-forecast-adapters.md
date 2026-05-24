@@ -287,7 +287,9 @@ Fallback-/Degradationsdetails werden zusätzlich in `status_flags` und optionale
 - `SOURCE_GAP` – nicht behebbare Zeitlücken
 - `SOURCE_SCHEMA_MISMATCH` – Zeitachse/Einheit/Schemafehler
 - `SOURCE_RETRY_EXHAUSTED` – Retries erfolglos
-- `SOURCE_REJECTED` – harte Qualitätsprüfung fehlgeschlagen
+
+- `SOURCE_REJECTED` ist ausschließlich Endstatus (`series_status`), kein Rohstatus aus
+  `source_eval_status`.
 
 Endgültige Serienendstatus sind:
 

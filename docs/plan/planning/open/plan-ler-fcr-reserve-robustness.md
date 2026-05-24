@@ -95,8 +95,8 @@ Nicht explizit modelliert:
   - optional `self_discharge_kwh_per_hour` (gültig nur bei `self_discharge_mode=absolute_kwh_per_hour`, optional nur bei `is_ler=true`)
   - optional `self_discharge_soc_per_hour` (gültig nur bei `self_discharge_mode=relative_soc_per_hour`, optional nur bei `is_ler=true`)
   - `max_recovery_time` (harte obere Grenze für die Wiederherstellungsdauer in Minuten)
-  - `intraday_gate_closure`
-  - `intraday_preparation_time`
+  - `intraday_gate_closure` (optional, Default `0`, wird für Restore-gesteuerte Läufe benötigt)
+  - `intraday_preparation_time` (optional, Default `0`, wird für Restore-gesteuerte Läufe benötigt)
   - `minutes_until_next_restore_window_start` (optional, `>= 0`)
   - `minutes_until_next_restore_window_end` (optional, wenn ein Fenster bekannt ist)
   - `market_time_unit`
@@ -113,7 +113,10 @@ Nicht explizit modelliert:
     - `eta_min` ist ein verbindlicher, kleiner positiver Toleranzwert: `eta_min = 1e-6`.
     - `eta_charge < eta_min` oder `eta_discharge < eta_min` führt zu `ROBUST_POLICY_UNSUPPORTED`.
   - Selbstentladung:
-  - Für `is_ler=true` gilt: Exakt einer der beiden Verlusteinstellungen muss gesetzt sein (`self_discharge_kwh_per_hour` oder `self_discharge_soc_per_hour`).
+  - Für `is_ler=true` gilt: Es muss nach Policy-/Asset-Auflösung ein effektiver LER-Verlustwert
+    eindeutig bestimmt werden (`self_discharge_kwh_per_hour` oder `self_discharge_soc_per_hour`).
+    - Policy-Werte gelten als vorrangig.
+    - Wenn die Policy keinen Wert liefert, darf als Fallback ein Asset-Mindestwert verwendet werden.
   - Für `is_ler=false` können die Werte gesetzt sein oder entfallen; fehlt jeder Wert, wird kein zusätzlicher LER-spezifischer Verlustfaktor verwendet.
   - `self_discharge_kwh_per_hour` und `self_discharge_soc_per_hour` können bei Bedarf aus dem Assetmodell geerbt werden.
   - `self_discharge_mode=absolute_kwh_per_hour`:
@@ -137,19 +140,19 @@ Nicht explizit modelliert:
   - `full_activation_time_mfrr_eff = coalesce(full_activation_time_mfrr, full_activation_time)`
   - Harte Schema-Validierung:
   - `self_discharge_mode` darf, soweit gesetzt, **nur** `absolute_kwh_per_hour` oder `relative_soc_per_hour` sein; alles andere -> `ROBUST_POLICY_UNSUPPORTED`.
-  - Für `is_ler=true`: ist keiner der beiden Werte gesetzt, ist der Fall ungültig (`ROBUST_POLICY_UNSUPPORTED`).
-  - Für `is_ler=true`: sind beide Werte gesetzt, ist der Fall ungültig (`ROBUST_POLICY_UNSUPPORTED`).
   - `self_discharge_kwh_per_hour` darf nicht negativ sein.
   - `self_discharge_soc_per_hour` muss in `[0,1]` liegen (als Anteil pro Stunde).
+  - Für `is_ler=true` ist ein effektiver LER-Wert erforderlich; fehlen beide Werte nach Policy/Asset-Auflösung,
+    oder sind beide gültig gesetzt, gilt `ROBUST_POLICY_UNSUPPORTED`.
   - `minutes_until_next_restore_window_start` ist optional, muss aber bei
-    benötigtem Intraday-Restore `>= 0` sein.
+    aktiviertem Restore-Szenario `>= 0` sein.
   - Wenn `minutes_until_next_restore_window_start` gesetzt ist, muss
     `minutes_until_next_restore_window_end` gesetzt und
     `minutes_until_next_restore_window_end > minutes_until_next_restore_window_start` sein.
   - Wenn `minutes_until_next_restore_window_start` `null` ist, liegt zum Bewertungszeitpunkt
     kein gültiges Intraday-Restorefenster vor.
   - `market_time_unit` muss exakt `minute` sein und mit `resolution_minutes` konsistent sein.
-  - `t_min_fcr`, `full_activation_time`, `max_recovery_time`, `intraday_gate_closure`, `intraday_preparation_time` und `resolution_minutes` müssen streng `> 0` sein.
+  - `t_min_fcr`, `full_activation_time` und `max_recovery_time` sowie `resolution_minutes` müssen streng `> 0` sein.
   - `full_activation_time_afrr` und `full_activation_time_mfrr` müssen, falls gesetzt, streng `> 0` sein.
   - `simultaneous_reserve_direction_allowed` ist optional-boolean; fehlt/`false` wird als Default `false` interpretiert.
   - `simultaneous_reserve_direction_allowed=true` ist in Kombination mit nicht-linearer Kopplung nur mit klarer
@@ -607,7 +610,7 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
   - `is_ler=true` und kein Moduswert gesetzt (beide optional Felder leer/nicht gesetzt) → `ROBUST_POLICY_UNSUPPORTED`.
   - negative/überschüssige Werte (`self_discharge_kwh_per_hour < 0`, `self_discharge_soc_per_hour < 0` oder `> 1`) → `ROBUST_POLICY_UNSUPPORTED`.
 - `market_time_unit` abseits von `minute` → `ROBUST_POLICY_UNSUPPORTED`.
-- Auflösungsfelder kleiner oder gleich 0 (`t_min_fcr`, `full_activation_time`, `max_recovery_time`, `intraday_gate_closure`, `intraday_preparation_time`, `resolution_minutes`) → `ROBUST_POLICY_UNSUPPORTED`.
+- Auflösungsfelder kleiner oder gleich 0 (`t_min_fcr`, `full_activation_time`, `max_recovery_time`, `resolution_minutes`) → `ROBUST_POLICY_UNSUPPORTED`.
 - `full_activation_time_afrr` / `full_activation_time_mfrr` werden nur bei gesetztem Feldwert geprüft:
   - gesetzt und `<= 0` → `ROBUST_POLICY_UNSUPPORTED`.
 - `conservative_soc_headroom` außerhalb `0..1` (ratio) bzw. `<0` (kwh) → `ROBUST_POLICY_UNSUPPORTED`.
