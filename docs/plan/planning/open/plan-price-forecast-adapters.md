@@ -75,6 +75,12 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
 - Der minimale `SeriesEnvelope` enthält:
   - `series_id` (stabil)
   - `series_version` (stabil, monoton wachsend oder semantische Versionskennung)
+  - Erforderlich und vergleichbar pro `(series_id, site_id?, market_bid_area?, series_product, series_type, source.provider_id)`.
+  - Akzeptiert werden:
+    - streng monoton wachsende numerische Versionen (int-kompatibel),
+    - oder Zeitstempel-basierte semantische Versionen (z. B. `2026-05-24T12:00:00Z-v3`).
+  - Für einen stabilen Tie-Break werden bei gleicher Klasse numerisch zuerst `series_version` (wie definiert),
+    dann bei gleicher Version der hash-basierte Payload-Fingerprint (`value_hash`) verwendet.
   - `site_id` (optional)
     - erforderlich für standortgebundene Forecast-/Erzeugungs-/Last-/Wetter-Reihen
     - optional oder leer für produktweite Forecast-Daten ohne Standortkontext
@@ -115,6 +121,7 @@ Hinweis zur Semantik:
 - `SOURCE_DEGRADED` ist ausschließlich ein finaler `series_status` und nicht als `source_eval_status` vorgesehen.
 - `status_message` (optional): menschenlesbar
 - `status_detail` (optional): strukturierte Zusatzinfo (z. B. `{ "source_code": "SOURCE_STALE", "backfill_intervals_closed": 2, "effective_source_id": "opsd-..." }`)
+- `value_hash` (optional, empfohlen): Repräsentations-Stabilisierung des payload für Idempotenzvergleiche.
 - Validierungspflicht:
   - strikte UTC-Zeitachse
   - Schrittweite exakt `resolution_minutes`
@@ -123,6 +130,14 @@ Hinweis zur Semantik:
   - gleiche Horizontlänge/Range je Request
   - Preisreihen haben konsistente Preis-Einheit
   - Forecastreihen haben konsistente physikalische Einheit
+- Replay-/Idempotenz- und Versionierungsregeln:
+  - Wird dieselbe Kombination aus `series_id` und `series_version` mehrfach geladen, muss der
+    vollständig gehashte Payload-identisch sein; andernfalls wird der Lauf als harten Fehler
+    (`source_eval_status=SOURCE_SCHEMA_MISMATCH`, `series_status=SOURCE_REJECTED`) geführt.
+  - Eine eingehende Serie mit älterer Version als der zuletzt akzeptierten Referenzversion für dieselbe
+    Signaturkombination wird als harte Versionsabweichung (`series_status=SOURCE_REJECTED`) abgewiesen.
+  - Für identische Serienversionen ist Verhalten idempotent: bestehende gültige Daten dürfen nur dann
+    aktualisiert werden, wenn sich die `series_version` oder der `value_hash` geändert hat.
 - Mapping-Regel:
 - `series_type=price` wird auf bestehende Preis-Produkte in `PriceSeries` abgebildet.
   - dafür ist `market_bid_area` verpflichtend und wird auf das entsprechende

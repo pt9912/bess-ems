@@ -123,6 +123,7 @@ Moegliche Domain-/Application-Erweiterungen:
   - `max_import_kw`
   - `max_export_kw`
   - optional `grid_connection_power_kw`
+  - optional `can_dispatch` (default `true` für produktive Slices; aktiv setzt der Operator gezielt auf `false`)
   - `site_grid_power_sign` (verpflichtend): `export_pos` oder `import_pos`
     - `export_pos`: positive Leistung bedeutet Export ans Netz
     - `import_pos`: positive Leistung bedeutet Import aus dem Netz
@@ -269,6 +270,9 @@ Für produktive Freischaltung ist ein deterministischer Migrationspfad für best
   - `migration_dry_run=false` (Standard für produktive Freischaltung): keine Änderung der Runtime-Lauflogik, nur deterministische Ergebnisklassen.
   - `migration_strict=true` (Standard): unklare oder inkompatible Datensätze werden in produktiven Co-Location-Requests blockiert.
   - `migration_strict=false` (nur mit explizitem Release-Governance): erlaubt die Koexistenz bis zur Bereinigung nicht-aktiver Sites; aktive Sites bleiben weiterhin blockiert.
+  - Aktivitätsdeterministik:
+    - Eine Site gilt als aktiv, wenn `can_dispatch` fehlt oder `true` ist.
+    - Nicht-aktive Sites werden explizit mit `can_dispatch=false` markiert.
 - Migrationsfenster (vor Aktivierung des Co-Location-MVP, nicht inline im operativen Lauf).
 - Kandidatenklassifikation je Datensatz:
   - `normalized`: `site_grid_power_sign` ist gesetzt oder eindeutig aus vorhandenen
@@ -304,6 +308,9 @@ Für produktive Freischaltung ist ein deterministischer Migrationspfad für best
 - `incompatible` Datensätze werden mit `CONFIG_INCONSISTENT` und spezifischem
   `limiting_reason` abgelehnt.
 - Unklare Datensätze dürfen nicht implizit in einen Default übernommen werden.
+- Bei `migration_strict=false` gilt:
+  - `unclear`-/`incompatible`-Datensätze mit `can_dispatch=true` (oder fehlendem Flag) blockieren produktive Runs weiterhin.
+  - `unclear`-/`incompatible`-Datensätze mit `can_dispatch=false` werden im Audit-Bundle erfasst, aber operativ nicht hart blockiert.
 - Alle Migrationsergebnisse sind in einem Audit-Bundle je Lauf zusammengefasst und
   für Operator-Replay verfügbar.
 
@@ -430,6 +437,13 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
   gemeinsam und im selben Release-Commit umzusetzen.
 - Ein Slice darf erst freigegeben werden, wenn beide Dokumente semantisch
   übereinstimmen und die Cross-Checks bestanden sind.
+- Co-Location folgt dem selben CanExecute-Vertrag:
+  - `CanExecute=true` nur bei validen Ergebnissen ohne harte Konfigurations- oder Schemaabweisung.
+  - `CanExecute=false` bei `OptimizationSolverStatus.Failed` mit `TerminationCode` aus
+    `config-invalid`, `config-inconsistent`, `schema-inconsistent`, bei harten
+    Robustheits- oder Validierungs-Blockaden.
+  - Operator-/Replay-Verbraucher dürfen einen Lauf nur im Zustand
+    `CanExecute=true` in den aktiv ausführbaren Pfad überführen.
 
 ---
 

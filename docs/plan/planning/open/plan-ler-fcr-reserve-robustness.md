@@ -245,9 +245,9 @@ Deterministische Berechnung (verbindlich):
     im selben Schritt wie folgt gekoppelt:
     - `worst_total_kwh_t = worst_up_kwh_t + worst_down_kwh_t`
     - `worst_total_kw_t = worst_total_kwh_t / Δt`
-    - Die Worst-Case-Rekursion wird deterministisch im Sequenzpfad geprüft:
+    - `worst_total_*` dient als auditierbare kombinierte Kennzahl für UI/Replay; für die harte Verifikation wird die konservative Reihenfolge deterministisch vorgegeben:
       1) Up-Branch auf `worst_up_kwh_t` (Absenkung),
-      2) Down-Branch auf `worst_down_kwh_t` auf dem SOC nach Up.
+      2) anschließend Down-Branch auf `worst_down_kwh_t` auf dem SOC nach Up.
     - Diese Kopplung ist bewusst konservativ und vollständig deterministisch.
   - Wenn simultanes Gegensignal laut Produktdefinition aktiv ist, aber `simultaneous_reserve_direction_allowed=false`,
     gilt hart `ROBUST_POLICY_UNSUPPORTED` mit `POLICY_MISMATCH`.
