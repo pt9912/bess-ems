@@ -109,7 +109,9 @@ Nicht explizit modelliert:
     - `resolution_minutes` und diese Policy-Felder müssen kompatibel sein.
   - Wirkungsgrade:
     - Wird `eta_charge`/`eta_discharge` in der Policy nicht gesetzt, sind sie aus dem Assetmodell zu lesen.
-    - Falls gesetzt, muss gelten: `0 < eta_charge <= 1` und `0 < eta_discharge <= 1`.
+    - Falls gesetzt, muss gelten: `eta_min <= eta_charge <= 1` und `eta_min <= eta_discharge <= 1`.
+    - `eta_min` ist ein verbindlicher, kleiner positiver Toleranzwert: `eta_min = 1e-6`.
+    - `eta_charge < eta_min` oder `eta_discharge < eta_min` führt zu `ROBUST_POLICY_UNSUPPORTED`.
   - Selbstentladung:
   - Für `is_ler=true` gilt: Exakt einer der beiden Verlusteinstellungen muss gesetzt sein (`self_discharge_kwh_per_hour` oder `self_discharge_soc_per_hour`).
   - Für `is_ler=false` können die Werte gesetzt sein oder entfallen; fehlt jeder Wert, wird kein zusätzlicher LER-spezifischer Verlustfaktor verwendet.
@@ -262,6 +264,7 @@ Deterministische Berechnung (verbindlich):
     - bei `self_discharge_mode=relative_soc_per_hour`:
       `self_discharge_loss_kwh_t = soc_t * self_discharge_soc_per_hour * Δt`.
 - Interner SOC-Rechnungszugang aus geplanter Fahrplanposition:
+  - `soc_{t+1,plan}` ist für gültige Laufparameter nur definiert, wenn `eta_charge >= eta_min` und `eta_discharge >= eta_min` gilt.
   - `soc_{t+1,plan} = soc_t - max(0, b_t) * Δt / eta_discharge + max(0, -b_t) * eta_charge * Δt - self_discharge_loss_kwh_t`.
 - Effektiver SOC für Worst-Case-Prüfung:
   - `soc_t` vor der Worst-Case-Prüfung hart validieren:
@@ -312,13 +315,16 @@ Restore- und Gate-Entscheidungslogik (verbindlich):
   - Down-Verstoß-Defizit:
     `restore_shortfall_down_kwh = max(0, worst_down_kwh_t - (soc_max_eff_kwh - soc_plan_down_t) / eta_charge)`
   - Verfügbare Wiederherstellungsleistung je Schritt:
-    - `required_activation_kw_candidate = max(worst_up_kw_t, worst_down_kw_t)`
+    - `required_activation_kw_candidate` folgt der aktiven Restore-Richtung:
+      - `required_activation_kw_candidate = worst_up_kw_t`, wenn `restore_up_kwh_t > 0`
+      - `required_activation_kw_candidate = worst_down_kw_t`, wenn `restore_down_kwh_t > 0`
+      - andernfalls `required_activation_kw_candidate = 0`
     - `required_activation_kw_used = coalesce(required_activation_kw, required_activation_kw_candidate)`
-  - Konservative Wiederherstellungsdauer:
     `restore_shortfall_kwh = max(restore_shortfall_up_kwh, restore_shortfall_down_kwh)`
-    `required_recovery_minutes = restore_shortfall_kwh / required_activation_kw_used * 60`
-  - Falls `required_activation_kw_used <= 0`: `ROBUST_INFEASIBLE` mit
+  - Wenn `required_activation_kw_used <= 0`: `ROBUST_INFEASIBLE` mit
     `limiting_reason_code=NO_RECOVERY_PATH`.
+  - Bei positiver Aktivierungsfähigkeit wird die konservative Wiederherstellungsdauer berechnet als:
+    `required_recovery_minutes = restore_shortfall_kwh / required_activation_kw_used * 60`
 - Falls `required_recovery_minutes > max_recovery_time` => `ROBUST_INFEASIBLE` mit
   `limiting_reason_code=RECOVERY_TIMEOUT`.
 - Falls kein zulässiges Window vorliegt:
