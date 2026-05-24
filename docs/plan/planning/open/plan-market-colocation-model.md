@@ -76,6 +76,9 @@ Moegliche Domain-/Application-Erweiterungen:
     - `site_id`
     - `timestamp_utc`
     - `resolution_minutes`
+    - optional `alignment_mode` (`reject` | `trim-to-common`)  
+      - `reject`: harte Ablehnung bei Zeitachsenabweichung (Default im produktiven ADR)
+      - `trim-to-common`: kontrollierte Trimmung auf gemeinsame Schnittmenge für Vorverarbeitung
     - `value_kw`
     - `value_type` (`forecast` | `actual`)
     - `source`
@@ -85,8 +88,8 @@ Moegliche Domain-/Application-Erweiterungen:
     - `value_version`
 - Validierung:
   - gleiche Zeitachse wie `PriceSeries` (UTC, step-genau, gleiche Horizon-Länge)
-  - in produktivem ADR-Modus `alignment_mode=reject` ist die Zeitachse hart identisch (gleiches Horizon, gleiche Schrittweite, gleiche Startzeit).
-  - bei Bedarf darf ein separater, operativ bewusst aktivierter Vorverarbeitungs-Mode `alignment_mode=trim-to-common` verwendet werden:
+  - Ist `alignment_mode=reject` (Default im produktiven ADR): die Zeitachse muss hart identisch sein (gleiches Horizon, gleiche Schrittweite, gleiche Startzeit).
+  - Ist `alignment_mode=trim-to-common` gesetzt:
     - Schnittmenge auf den gemeinsamen Zeithorizont
     - deterministische Konvention bei Zeitachsen-Verschiebung
     - lückenbehaftete Schritte müssen im Anschluss vollständig abgearbeitet werden
@@ -98,7 +101,10 @@ Moegliche Domain-/Application-Erweiterungen:
 - `LocalOriginState`
   - virtuelle Zwischenbilanz für herkunftsgebundene Energie (kWh)
   - `e_local_t` je Zeitschritt
+  - `eta_charge` (optional, default `1.0`)
+  - `eta_discharge` (optional, default `1.0`)
   - Begrenzung via `local_origin_capacity_kwh`
+  - Validierung (nur wenn von `1.0` abweichend): `0 < eta_charge <= 1` und `0 < eta_discharge <= 1`
 
 - `CoLocationMode`
   - Betriebsart nach obigem Arbeitsmodell

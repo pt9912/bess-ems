@@ -88,6 +88,8 @@ Nicht explizit modelliert:
     - `full_activation_time` (Fallback-Wert; produkt-spezifische Werte empfohlen)
     - optional `full_activation_time_afrr`
     - optional `full_activation_time_mfrr`
+    - optional `eta_charge` (default: `1.0`, falls nicht aus dem Assetmodell übernommen)
+    - optional `eta_discharge` (default: `1.0`, falls nicht aus dem Assetmodell übernommen)
     - `max_recovery_time`
     - `intraday_gate_closure`
     - `intraday_preparation_time`
@@ -98,6 +100,9 @@ Nicht explizit modelliert:
       `intraday_preparation_time`
     - `market_time_unit` muss `minute` sein.
     - `resolution_minutes` und diese Policy-Felder müssen kompatibel sein.
+  - Wirkungsgrade:
+    - Wird `eta_charge`/`eta_discharge` in der Policy nicht gesetzt, sind sie aus dem Assetmodell zu lesen.
+    - Falls gesetzt, muss gelten: `0 < eta_charge <= 1` und `0 < eta_discharge <= 1`.
   - Für `soc_strategy=conservative` gelten Zusatzregeln:
     - `conservative_soc_headroom_ratio` muss im Bereich `0..1` liegen.
     - `conservative_soc_headroom_kwh` muss `>= 0` sein.
@@ -224,7 +229,7 @@ Explizite Mappings zwischen Eingangsfehlern und Ergebniscodes:
 
 - `ROBUST_POLICY_UNSUPPORTED`
   - Policy fehlt oder ist inkompatibel (`market_time_unit`, Auflösungsinkonsistenzen,
-    unbekannte Produktparameter, fehlende `full_activation_time*`-Felder).
+    unbekannte Produktparameter, fehlende `full_activation_time*`-Felder, ungültige Wirkungsgrade).
   - `limiting_reason_code=POLICY_MISMATCH`
 - `ROBUST_SOURCE_DATA_MISSING`
   - Erforderliche Reserve-/Statusdaten (z. B. `fcr_*`, `afrr_*`, `mfrr_*`, Frequenz-/LER-Status) sind nicht verfügbar.
