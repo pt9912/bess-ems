@@ -52,7 +52,13 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
 
 ### Gemeinsame Serien-Typsignatur (verbindlich)
 
-- `LoadPriceSeriesAsync` und `LoadForecastSeriesAsync` liefern ein `SeriesEnvelope` mit:
+- Provider-Ports liefern ein einheitliches `SeriesEnvelope`:
+  - `LoadPriceSeriesAsync`
+  - `LoadForecastSeriesAsync` oder separater Forecast-Port
+- Der bestehende `PriceSeries`-/`IPriceSeriesSource`-Pfad bleibt die
+  Application-Grenze; `SeriesEnvelope`-Objekte müssen in bestehende Domain-Serien
+  überführt werden.
+- Der minimale `SeriesEnvelope` enthält:
   - `series_id` (stabil)
   - `site_id` (wo relevant)
   - `series_type` (`price` oder `forecast`)
@@ -80,6 +86,11 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
   - gleiche Horizontlänge/Range je Request
   - Preisreihen haben konsistente Preis-Einheit
   - Forecastreihen haben konsistente physikalische Einheit
+- Mapping-Regel:
+  - `series_type=price` wird auf bestehende Preis-Produkte in `PriceSeries` abgebildet.
+  - `series_type=forecast` dient in diesem Slice der Seitcar-/Inputlogik und darf nur in
+    der dort definierten Integrationslogik weiterverarbeitet werden, solange kein
+    produktiver Forecast-Domaintyp im EMS aktiv ist.
 
 ### Freshness- und Gap-Policy (verbindlich)
 
@@ -182,6 +193,7 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
   - `LoadPriceSeriesAsync`
   - `LoadForecastSeriesAsync` oder separater Forecast-Port
   - verbindliches `SeriesEnvelope` gemäß obigem Datenvertrag
+  - deterministisches Mapping in die bestehende Import-Pipeline (`IPriceSeriesSource`).
 - Cache-/Refresh-Vertrag:
   - TTL
   - `max_stale_age_minutes`

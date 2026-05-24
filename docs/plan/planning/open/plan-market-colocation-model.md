@@ -86,7 +86,8 @@ Moegliche Domain-/Application-Erweiterungen:
   - Validierung:
     - gleiche Zeitachse wie `PriceSeries` (UTC, step-genau, gleiche Horizon-Länge)
     - keine offenen Zeitlücken; zulässig: kontrollierte Backfill-Regel (max. 2 Intervalle)
-    - `value_kw` darf negativ sein, nur nach Modell-Konvention erlaubt
+    - `value_kw` ist eine Produktionsleistung und für diese Serie standardmässig nicht negativ.
+    - Negative Werte sind nur über einen separaten signierten Netzausgangs-Datensatz zulässig.
     - Metadatenpflicht fuer `source`, `product`, `updated_at_utc`, `value_version`
 
 - `LocalOriginState`
@@ -122,16 +123,17 @@ Gleichungen:
 
 - `site_power_t = (g_t - c_t) + b_t`
 - bei Konvention `site_grid_power_sign=export_pos`: `site_power_t = p_grid_export_t - p_grid_import_t`
-- bei `site_grid_power_sign=import_pos`: Vorzeichen invertiert
+- bei Konvention `site_grid_power_sign=import_pos`: `site_power_t = p_grid_import_t - p_grid_export_t`
 - `p_grid_import_t <= site.max_import_kw`
 - `p_grid_export_t <= site.max_export_kw`
 - simultane Netznutzung ist ausgeschlossen:
   - Formulierung: `p_grid_import_t * p_grid_export_t = 0`
-  - MILP-Linearisation (`site_grid_power_sign=export_pos`):
+  - MILP-Linearisation (`d_t`=Exportrichtung=1, `d_t`=Importrichtung=0):
     - `p_grid_import_t <= site.max_import_kw * (1 - d_t)`
     - `p_grid_export_t <= site.max_export_kw * d_t`
     - `d_t ∈ {0,1}`
-  - bei `site_grid_power_sign=import_pos`: Rollen vertauschen
+  - `d_t` ist für beide Konventionen identisch definiert; nur `site_power_t` ändert
+    seine Zuordnung.
 - optional, falls `grid_connection_power_kw` gesetzt:
   - `p_grid_import_t + p_grid_export_t <= site.grid_connection_power_kw`
 
@@ -149,7 +151,7 @@ Interpretation:
 - Erlaubte Ladequelle: ausschliesslich lokale Erzeugung (`p_grid_import_t == 0`).
 - Einführung der herkunftsbezogenen Zwischengröße `e_local_t` (kWh), mit
   `Δt = resolution_minutes / 60`:
-  - `e_local_{t+1} = e_local_t + ((g_t - c_t) - b_t) * Δt`
+  - `e_local_{t+1} = e_local_t - b_t * Δt` (bei Vorzeichenkonvention `b_t>0` Entladen, `b_t<0` Laden)
   - `0 <= e_local_t <= local_origin_capacity_kwh`
   - `e_local_0` ist konfigurierbar (meist 0).
 - Harte Koppelregeln:
@@ -208,6 +210,8 @@ Konvention festlegen, bevor Code umgesetzt wird.
    - Standalone bleibt bit-kompatibel zum heutigen Pfad.
    - PV-Ueberschuss kann Batterie laden, ohne Exportlimit zu verletzen.
    - Netzexportlimit begrenzt Batterieentladung plus lokale Erzeugung.
+   - `GreenStorageRestricted`: `e_local_0`-Randfall (`0` und >0) und `local_origin_capacity_kwh`-Randfall (`0`, Minimalreserve) werden explizit geprüft.
+   - `GreenStorageRestricted`: Lauf wird mit `CONFIG_INCONSISTENT` geblockt, wenn eine Netzladung (`p_grid_import_t > 0`) versucht wird.
    - Reservebaender reduzieren weiterhin verfuegbare Lade-/Entladeleistung.
    - `GreenStorageRestricted` lehnt unzulaessige Netzladung ab oder markiert
      den Run als unzulaessig.

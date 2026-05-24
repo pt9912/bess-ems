@@ -72,24 +72,30 @@ Nicht explizit modelliert:
   - Asset-Eigenschaft fuer Batterien, deren FCR-Lieferfaehigkeit durch
     Energieinhalt und Recovery-Regeln begrenzt ist.
 
-- `ReserveRobustnessPolicy`
-  - Produkt- und Standortregel fuer robuste Reservepruefung.
+  - `ReserveRobustnessPolicy`
+    - Produkt- und Standortregel fuer robuste Reservepruefung.
   - Mindestfelder:
     - `asset_id`
     - `reserve_product`
     - `is_ler`
     - `soc_strategy` (`active` | `conservative`)
     - `t_min_fcr`
-    - `full_activation_time`
+    - `full_activation_time` (Fallback-Wert; produkt-spezifische Werte empfohlen)
+    - optional `full_activation_time_afrr`
+    - optional `full_activation_time_mfrr`
     - `max_recovery_time`
     - `intraday_gate_closure`
     - `intraday_preparation_time`
     - `market_time_unit`
   - Zeiteinheiten (verbindlich, alle in Minuten):
-    - `t_min_fcr`, `full_activation_time`, `max_recovery_time`,
-      `intraday_gate_closure`, `intraday_preparation_time`
+    - `t_min_fcr`, `full_activation_time`, `full_activation_time_afrr`,
+      `full_activation_time_mfrr`, `max_recovery_time`, `intraday_gate_closure`,
+      `intraday_preparation_time`
     - `market_time_unit` muss `minute` sein.
     - `resolution_minutes` und diese Policy-Felder müssen kompatibel sein.
+  - Effektivzeiten je Produkt (Fallback auf `full_activation_time`):
+    - `full_activation_time_afrr_eff = coalesce(full_activation_time_afrr, full_activation_time)`
+    - `full_activation_time_mfrr_eff = coalesce(full_activation_time_mfrr, full_activation_time)`
 
 - `ReserveEnergyEnvelope`
   - Zeitschrittweise Worst-Case-Energiehuelle fuer Up- und Down-Richtung.
@@ -171,15 +177,27 @@ Deterministische Berechnung (verbindlich):
   - `available_up_kwh_base_t = max(0, soc_t^{eff} - soc_min_kwh) * eta_discharge`
   - `available_down_kwh_base_t = max(0, soc_max_kwh - soc_t^{eff}) / eta_charge`
 - Worst-Case-Energie je Richtung (kWh):
-  - `worst_up_kwh_t = min(Δt, t_min_fcr/60) * fcr_up_kw_t + min(Δt, full_activation_time/60) * (alpha_afrr_t * afrr_up_kw_t + alpha_mfrr_t * mfrr_up_kw_t)`
-  - `worst_down_kwh_t = min(Δt, t_min_fcr/60) * fcr_down_kw_t + min(Δt, full_activation_time/60) * (alpha_afrr_t * afrr_down_kw_t + alpha_mfrr_t * mfrr_down_kw_t)`
+  - `worst_up_kwh_t = min(Δt, t_min_fcr/60) * fcr_up_kw_t + min(Δt, full_activation_time_afrr_eff/60) * (alpha_afrr_t * afrr_up_kw_t) + min(Δt, full_activation_time_mfrr_eff/60) * (alpha_mfrr_t * mfrr_up_kw_t)`
+  - `worst_down_kwh_t = min(Δt, t_min_fcr/60) * fcr_down_kw_t + min(Δt, full_activation_time_afrr_eff/60) * (alpha_afrr_t * afrr_down_kw_t) + min(Δt, full_activation_time_mfrr_eff/60) * (alpha_mfrr_t * mfrr_down_kw_t)`
 - Normalisierte Worst-Case-Leistung:
   - `worst_up_kw_t = worst_up_kwh_t / Δt`
   - `worst_down_kw_t = worst_down_kwh_t / Δt`
-- Abgleich:
-  - `ROBUST_OK`, wenn `worst_up_kwh_t <= available_up_kwh_base_t` und
-    `worst_down_kwh_t <= available_down_kwh_base_t` für alle `t`.
-  - sonst `ROBUST_NEEDS_INTRADAY_RESTORE` bzw. `ROBUST_INFEASIBLE` anhand `limiting_reason_code`.
+- Abgleich (kumulativ, pro Richtungs-Szenario):
+  - Kumulativer SOC-Zustand für Up- und Down-Reserve wird je Schritt fortgeschrieben.
+  - Initialzustand pro Schrittreihenfolge:
+    - `soc_up_0 = soc_t`
+    - `soc_down_0 = soc_t`
+  - Zeitschrittweise Rekursion:
+    - `soc_plan_{t+1} = soc_t - max(0, b_t) * Δt / eta_discharge + max(0, -b_t) * eta_charge * Δt - self_discharge_loss_kwh_t`
+    - Up-Branch: `worst_up_kwh_t <= (soc_up_t - soc_min_kwh) * eta_discharge`
+      - falls ja: `soc_up_{t+1} = soc_plan_{t+1} - worst_up_kwh_t / eta_discharge`
+      - falls nein: `ROBUST_INFEASIBLE` mit `SOC_LIMIT`
+    - Down-Branch: `worst_down_kwh_t <= (soc_max_kwh - soc_down_t) / eta_charge`
+      - falls ja: `soc_down_{t+1} = soc_plan_{t+1} + worst_down_kwh_t * eta_charge`
+      - falls nein: `ROBUST_INFEASIBLE` mit `SOC_LIMIT`
+  - `ROBUST_OK`, wenn kein Schritt in beiden Branches versagt.
+  - Bei Grenz- und Dateninkonsistenzen: `ROBUST_NEEDS_INTRADAY_RESTORE` oder
+    `ROBUST_INFEASIBLE` anhand `limiting_reason_code`.
 
 Verbindliche Zeitscheiben-Definition:
 
@@ -210,7 +228,9 @@ Pflichtregeln:
 - Alert State wird aus Frequenzabweichung oder externem
   Regelleistungsstatus abgeleitet.
 - `t_min_fcr` zaehlt nur in zulaessigen Betriebsfenstern.
-- `full_activation_time` ist in derselben Zeiteinheit wie `t_min_fcr` anzugeben.
+- `full_activation_time` ist in derselben Zeiteinheit wie `t_min_fcr` anzugeben;
+  produkt-spezifische Werte `full_activation_time_afrr` und
+  `full_activation_time_mfrr` verwenden ebenfalls dieselbe Einheit.
 - Reserve Mode darf nur aktiviert werden, wenn der resultierende
   Robustheitszustand operator-faehig erklaert wird.
 - Recovery endet erst, wenn Worst-Case-Lieferfaehigkeit wieder
@@ -281,26 +301,36 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 - Intraday-Restauration:
   - optionaler Optimierungsinput fuer benötigte Up-/Down-Energiekorrektur.
 - Ergebnisverhalten:
-  - Robustheitsverletzung beendet den Run mit operator-faehigem Status.
+  - Robustheitsverletzung beendet den Lauf nicht direkt über neue Run-Statuswerte,
+    sondern über bestehende `OptimizationSolverStatus` + strukturierte Termination-Codes.
   - Keine impliziten Reserveverletzungen im produzierten Fahrplan.
   - Bestehender Pfad ohne LER/FCR-Robustheit bleibt unveraendert.
 - Ergebnis-/Run-Mapping (verbindlich):
   - `reserve_robustness_status = ReserveRobustnessResult.status`.
   - `reserve_robustness_limiting_reason = ReserveRobustnessResult.limiting_reason_code`.
-  - `ROBUST_OK` => `run_status=OK`, `can_execute=true`.
+  - `ROBUST_OK` => keine zusätzliche Hard-Stop-Sperre.
   - `ROBUST_NEEDS_INTRADAY_RESTORE` =>
-    - bei verfügbarem Restore-Fenster: `run_status=DEGRADED`,
-      `can_execute=true`, Operator-Hinweis `action=intraday_restore_required`.
-    - bei geschlossenem Gate / keinem Wiederherstellungsfenster: `run_status=BLOCKED`,
-      `can_execute=false`, `limiting_reason_code=INTRADAY_GATE_CLOSED`,
-      Operator-Hinweis `action=intraday_restore_not_executable`.
+    - bei verfügbarem Restore-Fenster: Optimierung bleibt lauffähig,
+      Operator-Hinweis `action=intraday_restore_required`.
+    - bei geschlossenem Gate / keinem Wiederherstellungsfenster:
+      `OptimizationSolverStatus.Failed` mit
+      `TerminationCode=reserve-robustness-not-executable`,
+      `TerminationDetail=INTRADAY_GATE_CLOSED`,
+      `can_execute=false` in Operator-/Replay-Ausgabe.
   - `ROBUST_INFEASIBLE`:
-    - bei `limiting_reason_code=RECOVERY_TIMEOUT` => `run_status=BLOCKED`,
-      `can_execute=false`, Eingriff notwendig.
-    - sonst => `run_status=FAILED`, `can_execute=false`.
-  - `ROBUST_SOURCE_DATA_MISSING` => `run_status=FAILED`, `can_execute=false`.
-  - `ROBUST_POLICY_UNSUPPORTED` => `run_status=BLOCKED`,
-    `can_execute=false`, Eingriff notwendig.
+    - bei `limiting_reason_code=RECOVERY_TIMEOUT` =>
+      `OptimizationSolverStatus.Failed` mit
+      `TerminationCode=reserve-robustness-recovery-timeout`,
+      `TerminationDetail=RECALL_TIMEOUT`.
+    - sonst => `OptimizationSolverStatus.Failed` mit
+      `TerminationCode=reserve-robustness-infeasible`.
+  - `ROBUST_SOURCE_DATA_MISSING` => `OptimizationSolverStatus.Failed`
+    mit `TerminationCode=reserve-robustness-source-missing`.
+  - `ROBUST_POLICY_UNSUPPORTED` => `OptimizationSolverStatus.Failed` mit
+    `TerminationCode=reserve-robustness-policy-unsupported`.
+  - `ROBUST_NEEDS_INTRADAY_RESTORE` und `ROBUST_OK` können beide als
+    `OptimizationSolverStatus.Feasible` oder `OptimizationSolverStatus.Optimal`
+    persistiert werden, je nach tatsächlichem Optimizergebnis.
 
 ### Phase 4: Operator- und Replay-Sicht
 
@@ -357,6 +387,8 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
   Entladebedarf oder einen klaren Infeasible-Status.
 - `t_min_fcr`, `full_activation_time` und `max_recovery_time` sind in
   Tests sichtbar und nicht nur Konfigurationsfelder.
+- `full_activation_time_afrr` / `full_activation_time_mfrr` sind in den
+  Akzeptanztests explizit belegt und nicht nur als Fallback-Default `full_activation_time`.
 - Alert-State-/Recovery-Transitions sind replaybar und deterministisch.
 - Keine Reserveverletzung wird durch stilles Clamping versteckt.
 - Operator-Ausgabe nennt limitierende Ursache, Zeitschritt und Richtung.
