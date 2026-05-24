@@ -84,8 +84,8 @@ Nicht explizit modelliert:
     - optional `conservative_soc_headroom_kwh` (default `0`, nur bei `soc_strategy=conservative`)
     - optional `conservative_soc_headroom_ratio` (default `0`, nur bei `soc_strategy=conservative`); Bereich `0..1`
     - Wenn kein `conservative_soc_headroom_kwh` gesetzt ist, wird bei `conservative` `conservative_soc_headroom_ratio` genutzt.
-    - `t_min_fcr`
-  - `full_activation_time` (Fallback-Wert; produkt-spezifische Werte empfohlen)
+    - `t_min_fcr` (`FCR`-Pflichtfeld, falls FCR im gebuchten Portfolio aktiv)
+  - `full_activation_time` (`FCR`-Pflichtfeld bei aktivem FCR-Produkt; bei inaktivem FCR kann `0` gesetzt werden)
 - optional `full_activation_time_afrr` (nur wenn sinnvoll gesetzt; bei gesetztem Wert `> 0`)
 - optional `full_activation_time_mfrr` (nur wenn sinnvoll gesetzt; bei gesetztem Wert `> 0`)
   - optional `simultaneous_reserve_direction_allowed` (default `false`)
@@ -97,7 +97,7 @@ Nicht explizit modelliert:
   - optional `self_discharge_kwh_per_hour` (gültig nur bei `self_discharge_mode=absolute_kwh_per_hour`, optional nur bei `is_ler=true`)
   - optional `self_discharge_soc_per_hour` (gültig nur bei `self_discharge_mode=relative_soc_per_hour`, optional nur bei `is_ler=true`)
   - Für `is_ler=true` gilt nach Policy-/Asset-Auflösung: genau ein Verlustwert ist zulässig (`self_discharge_kwh_per_hour` oder `self_discharge_soc_per_hour`). Sind beide vorhanden, ist die Konfiguration als inkompatibel zu behandeln (`ROBUST_POLICY_UNSUPPORTED`).
-  - `max_recovery_time` (harte obere Grenze für die Wiederherstellungsdauer in Minuten)
+  - `max_recovery_time` (harte obere Grenze für die Wiederherstellungsdauer in Minuten; bei aktivem Restore-Pfad erforderlich, sonst darf `0` gesetzt werden)
   - `intraday_gate_closure` (optional, Default `0`, wird für Restore-gesteuerte Läufe benötigt)
   - `intraday_preparation_time` (optional, Default `0`, wird für Restore-gesteuerte Läufe benötigt)
   - `minutes_until_next_restore_window_start` (optional, `>= 0`)
@@ -161,7 +161,7 @@ Nicht explizit modelliert:
   - Wenn `minutes_until_next_restore_window_start` `null` ist, liegt zum Bewertungszeitpunkt
     kein gültiges Intraday-Restorefenster vor.
   - `market_time_unit` muss exakt `minute` sein und mit `resolution_minutes` konsistent sein.
-  - `t_min_fcr`, `full_activation_time` und `max_recovery_time` sowie `resolution_minutes` müssen streng `> 0` sein.
+  - `t_min_fcr`, `full_activation_time` und `max_recovery_time` müssen bei aktivem Anwendungsfall streng `> 0` sein; bei inaktivem FCR bzw. deaktiviertem Restore-Pfad darf `0` gesetzt werden.
   - `full_activation_time_afrr` und `full_activation_time_mfrr` müssen, falls gesetzt, streng `> 0` sein.
   - `simultaneous_reserve_direction_allowed` ist optional-boolean; fehlt/`false` wird als Default `false` interpretiert.
   - `simultaneous_reserve_direction_allowed=true` ist in Kombination mit nicht-linearer Kopplung nur mit klarer
@@ -663,7 +663,9 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
   `CanExecute=false`, `reserve_robustness_status=ROBUST_NEEDS_INTRADAY_RESTORE` und
   `status_description/action=intraday_restore_required` im Replay-/Operator-Output.
 - `market_time_unit` abseits von `minute` → `ROBUST_POLICY_UNSUPPORTED`.
-- Auflösungsfelder kleiner oder gleich 0 (`t_min_fcr`, `full_activation_time`, `max_recovery_time`, `resolution_minutes`) → `ROBUST_POLICY_UNSUPPORTED`.
+- Auflösungsfelder kleiner oder gleich 0 (`resolution_minutes`) → `ROBUST_POLICY_UNSUPPORTED`.
+- Bei aktivem FCR gilt `t_min_fcr`/`full_activation_time <= 0` → `ROBUST_POLICY_UNSUPPORTED`.
+- Bei aktivem Restore-Pfad gilt `max_recovery_time <= 0` → `ROBUST_POLICY_UNSUPPORTED`.
 - `full_activation_time_afrr` / `full_activation_time_mfrr` werden nur bei gesetztem Feldwert geprüft:
   - gesetzt und `<= 0` → `ROBUST_POLICY_UNSUPPORTED`.
 - `conservative_soc_headroom` außerhalb `0..1` (ratio) bzw. `<0` (kwh) → `ROBUST_POLICY_UNSUPPORTED`.

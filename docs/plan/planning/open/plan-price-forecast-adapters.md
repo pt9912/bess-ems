@@ -92,6 +92,11 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
     - Produktiv ist ein Wechsel nur mit geplanter Migrationsfolge zulässig.
     - Die Umstellung muss explizit über neue Serienkennung/Alias erfolgen (z. B. neues `series_id`/`series_product`-Paar), nicht per stillschweigendem Familienwechsel derselben `series_id`.
     - Während der Migrationsphase können beide Serienfolgen parallel aktiv sein; nach erfolgreichem Cutover wird die alte Folge deaktiviert.
+    - Empfohlener kontrollierter Cutover:
+      1. Neue Family unter expliziter Alias-Kennung einführen (`series_family_alias` oder neues `series_id`/`series_product`),
+         den alten und neuen Stream parallel beobachten.
+      2. Während der Übernahmephase auf Alias-Kennzeichnung in Operator-/Replay-Berichten prüfen; beide Familien müssen bis zum Cutover denselben fachlichen Wertbereich liefern.
+      3. Nach Freigabe wird die alte Family für den produktiven Pfad abgeschaltet, neue Family wird normativ aktiv.
   - Für einen stabilen Tie-Break werden bei gleicher Klasse numerisch zuerst `series_version` (wie definiert),
     dann bei gleicher Version der hash-basierte Payload-Fingerprint (`value_hash`) verwendet.
     - „gleiche Klasse“ meint die normalisierte Vergleichsschicht der festen Versionsfamilie pro Serie/Provider.

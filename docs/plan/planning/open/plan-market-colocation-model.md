@@ -125,8 +125,13 @@ Moegliche Domain-/Application-Erweiterungen:
   - optional `grid_connection_power_kw`
   - optional `can_dispatch`
     - Semantik: `true` = aktive Teilnahme am Request, `false` = bewusst ausgeschaltet.
-    - Fehlende Angabe gilt als `false` (nicht aktiv).
-    - In Legacy-Migrationsfenstern ohne explizite Aktivierungsentscheidung darf die Site als inaktiv bewertet werden, damit der Migrationsvorlauf keine harte Blockade auslöst.
+    - Produktiver Scope:
+      - `true`/`false` ist bindend.
+      - Bei fehlendem `can_dispatch` wird der betroffene Site-Scope im produktiven Lauf als Konfigurationsfehler abgelehnt:
+        `CONFIG_INCONSISTENT` mit `SITE_CAN_DISPATCH_MISSING`.
+    - Legacy-Migrationsfenster:
+      - Im Migrations-Dry-Run darf das Feld als `can_dispatch=false` modelliert werden,
+        aber nur mit explizitem Migrations-Audit-Flag und sichtbar im Audit-Report.
     - Aktive Teilnahme am aktuellen Co-Location-Request erfordert `can_dispatch=true`.
   - `site_grid_power_sign` (verpflichtend): `export_pos` oder `import_pos`
     - `export_pos`: positive Leistung bedeutet Export ans Netz
@@ -276,7 +281,7 @@ Für produktive Freischaltung ist ein deterministischer Migrationspfad für best
   - `migration_strict=false` (nur mit explizitem Release-Governance): erlaubt die Koexistenz bis zur Bereinigung nicht-aktiver Sites; aktive Sites bleiben weiterhin blockiert.
   - Aktivitätsdeterministik:
     - Eine Site gilt für die Migrationsbewertung als aktiv, wenn sie explizit im Scope des aktuellen Co-Location-Requests aktiv ist.
-      Dafür ist `can_dispatch=true` erforderlich; bei `can_dispatch`-Fehlanzeige wird die Site als inaktiv bewertet, damit im Migrationsvorlauf keine harte Laufblockade ausgelöst wird.
+      Dafür ist `can_dispatch=true` erforderlich; bei `can_dispatch`-Fehlanzeige ist der Scope im Produktivbetrieb blockiert, im Migrations-Dry-Run explizit als inaktiv markiert (mit Audit-Vermerk).
     - Nicht aktive Sites werden explizit mit `can_dispatch=false` markiert oder im Migrationsaudit ohne harte Blockade geführt, bis sie aktiv in Betrieb genommen werden.
 - Migrationsfenster (vor Aktivierung des Co-Location-MVP, nicht inline im operativen Lauf).
 - Kandidatenklassifikation je Datensatz:
