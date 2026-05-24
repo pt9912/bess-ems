@@ -1,8 +1,9 @@
 # Notiz: Markt-, Co-Location- und Forecast-Folgearbeiten
 
-**Dokumenttyp:** Vorabklaerung / Trigger-Watch
+**Dokumenttyp:** Vorabklärung / Trigger-Watch
 **Status:** Offen - Folgearbeiten aus externem Fachmaterial
 **Datum:** 2026-05-24
+**Quelle-Repo:** [`BESSelligence`](https://github.com/Ati-PK/BESSelligence) (Ordner `Docs`)
 **Bezug:**
 [`../in-progress/roadmap.md`](../in-progress/roadmap.md),
 [`../../../user/bess-ems-function.md`](../../../user/bess-ems-function.md),
@@ -14,22 +15,22 @@
 ## Zweck
 
 Diese Notiz sammelt fachliche Folgearbeiten, die aus der Sichtung der
-Dokumente unter `/Development/grid/BESSelligence/Docs` fuer `bess-ems`
+Dokumente aus dem Git-Repository `BESSelligence` (siehe **Quelle-Repo** oben) im Ordner `Docs`
 relevant sind. Sie ist kein aktiver Implementierungsplan, sondern ein
-Trigger-Watch-Artefakt fuer Marktmodell, Co-Location, Preisquellen und
+Trigger-Watch-Artefakt für Marktmodell, Co-Location, Preisquellen und
 Forecast-Inputs.
 
 Die vorhandene `bess-ems`-Basis deckt bereits zentrale Bausteine ab:
 
-- Day-Ahead- und Intraday-Fahrplaene
+- Day-Ahead- und Intraday-Fahrpläne
 - Horizon-Optimierung mit OR-Tools/GLOP
-- Regelleistungsreserve ueber `ReserveBand`
-- Aktivierungspfad fuer Regelleistung
+- Regelleistungsreserve über `ReserveBand`
+- Aktivierungspfad für Regelleistung
 - source-neutraler `PriceSeries`-/`IPriceSeriesSource`-Pfad
 - Operator-UI-Grundlagen
 
 Die Dokumente sind daher nicht als Codequelle zu verwenden, sondern als
-Fachvalidierung und als Input fuer produktnahe Folge-Slices.
+Fachvalidierung und als Input für produktnahe Folge-Slices.
 
 ---
 
@@ -37,48 +38,48 @@ Fachvalidierung und als Input fuer produktnahe Folge-Slices.
 
 ### Hohe Relevanz
 
-- `/Development/grid/BESSelligence/Docs/DFBEW_HP_extern_Batteriespeicher_Frontier_Economics_2602.pdf`
-  - Geschaeftsmodelle, regulatorischer Rahmen, Deutschland/Frankreich,
+- `DFBEW_HP_extern_Batteriespeicher_Frontier_Economics_2602.pdf` (liegt im Repo `BESSelligence`, Ordner `Docs`)
+  - Geschäftsmodelle, regulatorischer Rahmen, Deutschland/Frankreich,
     Co-Location, Day-Ahead, Intraday, Systemdienstleistungen und Risiken.
   - Nutzen: Validierung von `LH-MKT-*`, Regelleistungsfolgearbeiten,
     Produkt-/Compliance-Gates und Betreiber-Risiken.
 
-- `/Development/grid/BESSelligence/Docs/suena_energy_Whitepaper_Co-Location.pdf`
+- `suena_energy_Whitepaper_Co-Location.pdf` (liegt im Repo `BESSelligence`, Ordner `Docs`)
   - Co-Located-Speicher, Hybridmodelle mit Netzbezug, Speicher-
-    Ueberbauung, Gruenstromspeicher, Multi-Market-Optimierung und
+    Überbauung, Grünstromspeicher, Multi-Market-Optimierung und
     Netzrestriktionen.
-  - Nutzen: fachliche Vorlage fuer einen Co-Location-/Hybrid-BESS-Slice.
+  - Nutzen: Fachliche Vorlage für einen Co-Location-/Hybrid-BESS-Slice.
 
-- `/Development/grid/BESSelligence/Docs/BESS_Forecasting_Trading_Strategies.pptx`
+- `BESS_Forecasting_Trading_Strategies.pptx` (liegt im Repo `BESSelligence`, Ordner `Docs`)
   - Revenue Streams, Day-Ahead-only-Grenzen, Intraday-/Balancing-
-    Opportunitaeten, Multi-Day Planning, negative Preise, RL-Ausblick.
-  - Nutzen: Produkt-/Roadmap-Input fuer Marktlogik, Operator-UI und
+    Opportunitäten, Multi-Day-Planning, negative Preise, RL-Ausblick.
+  - Nutzen: Produkt-/Roadmap-Input für Marktlogik, Operator-UI und
     Forecast-/Optimierungsgrenzen.
 
 ### Mittlere Relevanz
 
-- `/Development/grid/BESSelligence/Docs/Data_sources_list.docx`
+- `Data_sources_list.docx` (liegt im Repo `BESSelligence`, Ordner `Docs`)
   - EPEX, ENTSO-E, TSO-Daten, Wetter, Fuel, CO2, OPSD.
-  - Nutzen: Quellenkatalog fuer Preis- und Forecast-Adapter.
+  - Nutzen: Quellenkatalog für Preis- und Forecast-Adapter.
 
-- `/Development/grid/BESSelligence/Docs/Feature_selection.docx`
-  und `/Development/grid/BESSelligence/Docs/WattWise Feature Selection_20260310.docx`
+- `Feature_selection.docx` und
+  `WattWise Feature Selection_20260310.docx` (liegen im Repo `BESSelligence`, Ordner `Docs`)
   - Lag-Features, residual load, Wind-/Solar-Forecast, Load-Forecast,
     Wetter, Gas, Coal, CO2, Kalenderfeatures.
-  - Nutzen: Input-Vertrag fuer Forecast-Sidecar oder externe
-    Forecast-Provider, nicht fuer den technischen Regelkreis.
+  - Nutzen: Input-Vertrag für Forecast-Sidecar oder externe
+    Forecast-Provider, nicht für den technischen Regelkreis.
 
-- `/Development/grid/BESSelligence/Docs/European_BESS_Optimizers_Landscape.pptx`
+- `European_BESS_Optimizers_Landscape.pptx` (liegt im Repo `BESSelligence`, Ordner `Docs`)
   - Wettbewerbs-/Produktpositionierung.
-  - Nutzen: Benchmarking fuer Feature-Scope und UI-Sprache; Aussagen zu
-    Firmen, Funding und Uplift muessen vor externer Verwendung
+  - Nutzen: Benchmarking für Feature-Scope und UI-Sprache; Aussagen zu
+    Firmen, Funding und Uplift müssen vor externer Verwendung
     verifiziert werden.
 
 ### Hintergrund
 
 - Forecasting-Papers zu Day-Ahead, Intraday, probabilistischen Forecasts,
   SHAP und Deep Learning.
-  - Nutzen: spaetere Forecast- oder Sidecar-Architektur, nicht direkter
+  - Nutzen: spätere Forecast- oder Sidecar-Architektur, nicht direkter
     EMS-Core-Scope.
 
 ---
@@ -91,19 +92,29 @@ Fachvalidierung und als Input fuer produktnahe Folge-Slices.
 **Problem heute:** `bess-ems` optimiert und dispatcht Batterie-Assets,
 aber das Marktmodell unterscheidet noch nicht explizit zwischen
 Standalone-BESS, klassischer Co-Location, Hybridmodell mit Netzbezug und
-foerder-/herkunftsgebundenem Gruenstromspeicher.
+förder-/herkunftsgebundenem Grünstromspeicher.
 
 **Trigger** (eines reicht):
 
 - Ein Standort kombiniert PV/Wind und BESS hinter einem gemeinsamen
   Netzanschlusspunkt.
 - Ein Betreiber verlangt Optimierung unter Netzanschlusslimit,
-  Einspeiselimit, lokalen Erzeugungsprognosen und Speicherueberbauung.
+  Einspeiselimit, lokalen Erzeugungsprognosen und Speicherüberbauung.
 - Ein Vermarktungsmodell verlangt getrennte Behandlung von Standalone,
-  Hybrid mit Netzbezug und foerdergebundenem Gruenstromspeicher.
+  Hybrid mit Netzbezug und fördergebundenem Grünstromspeicher.
 
 **Aktivierungs-Pfad:** eigener Slice-Plan
 [`plan-market-colocation-model.md`](plan-market-colocation-model.md).
+
+**Abnahmekriterien:**
+
+- Marktmodell unterscheidet klar die drei Betriebsformen
+  (Standalone, klassische Co-Location, Hybrid mit Netzbezug).
+- Für jede Form ist ein Constraint-Satz definiert
+  (Netzanschlussleistung, Einspeisung, lokale Erzeugung, Speicher
+  Überbauung).
+- Für den ersten Slice existiert mindestens ein validierter Testfall je
+  Betriebsform inkl. Rechen- und Ergebnisbericht.
 
 ---
 
@@ -114,27 +125,35 @@ Papers, `BESS_Forecasting_Trading_Strategies.pptx`
 
 **Problem heute:** `bess-ems` besitzt einen source-neutralen
 `PriceSeries`-Pfad und einen Import-Endpunkt, aber keine produktiven
-externen Quellenadapter fuer EPEX/ENTSO-E/Open-Meteo oder fuer
+externen Quellenadapter für EPEX/ENTSO-E/Open-Meteo oder für
 Forecast-Serien.
 
 **Trigger** (eines reicht):
 
 - Produktiver Day-Ahead-/Intraday-Workflow soll Preise nicht mehr
   manuell importieren.
-- Ein Co-Location-Slice braucht PV-/Wind-/Load-Forecasts fuer den
+- Ein Co-Location-Slice braucht PV-/Wind-/Load-Forecasts für den
   Optimierungshorizont.
 - Ein Betreiber verlangt auditierbare Quellenmetadaten und Refresh-
-  Status fuer Markt- und Forecast-Daten.
+  Status für Markt- und Forecast-Daten.
 
 **Aktivierungs-Pfad:** eigener Slice-Plan
 [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md).
+
+**Abnahmekriterien:**
+
+- Mindestens zwei produktive Preis-Adapter (z. B. EPEX + ENTSO-E) mit
+  dokumentiertem Fallback-Verhalten, Quellenmetadaten und Refresh-Status.
+- Mindestens zwei Forecast-Adapter (z. B. Wetter + Lastprognose) mit
+  Zeitstempelung, Versionskennzeichen und Qualitätskennzahlen.
+- Operativer Importpfad mit automatischer Aktualisierung, Toleranzgrenzen
+  und Alarmierung bei Datenlücken.
 
 ---
 
 ## Copyright- und Nutzungsgrenze
 
 Die Dokumente werden fachlich ausgewertet, aber nicht textlich
-uebernommen. Fuer externe Doku, Produktmaterial oder oeffentliche
-Claims muessen Quellenstatus, Nutzungsrechte und Aktualitaet separat
-geprueft werden.
-
+übernommen. Für externe Dokumente, Produktmaterial oder öffentliche
+Claims müssen Quellenstatus, Nutzungsrechte und Aktualität separat
+überprüft werden.
