@@ -84,7 +84,7 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
   - `series_type` (`price` oder `forecast`)
   - `series_product` (z. B. `day_ahead`, `intraday`, `load`, `pv`, `wind`, `weather-temp`)
   - `unit` (z. B. `EUR/MWh`, `kW`, `kWh`, etc.)
-  - `resolution_minutes` (ganzzahlig)
+- `resolution_minutes` (`> 0`, ganzzahlig)
   - `timezone` (muss `UTC` sein)
   - `horizon_start_utc`, `horizon_end_utc`
   - optionale Co-Location-Vorverarbeitungsmetadaten:
