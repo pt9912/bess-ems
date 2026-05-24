@@ -34,12 +34,19 @@ Optimierung -> Fahrplan -> State Machine -> Prioritaeten -> Limiter -> Command
 
 ### Architektur- und Solver-Scope für LP/MILP
 
-Der operative Optimierungsrequest enthält genau eine Solver-Scope-Ausprägung:
+Der operative Optimierungsrequest enthält genau eine Solver-Scope-Ausprägung.
 
-- `solver_scope=LP`, wenn **keine** aktivierte Co-Location-/Herkunftsrestriktion betroffen ist.
-- `solver_scope=MILP`, wenn mindestens ein Constraint nur MILP-abbildbar ist (z. B. Co-Location-Schnittstelle, Herkunftsrestriktion, Nichtgleichzeitigkeit Import/Export).
+Entscheidungsreihenfolge je Request:
 
-Die Umschaltung erfolgt per Request und ist nicht global. Ein Request mit mindestens einem betroffenen Asset (`ClassicalCoLocation`, `HybridWithGridImport`, `GreenStorageRestricted` oder aktivierter `OriginConstraint`) muss MILP verwenden.
+1. Wenn **keine** aktivierte Co-Location-/Herkunftsrestriktion betroffen ist => `solver_scope=LP`.
+2. Sonst (zumindest eine nicht LP-abbildbare Restriktion vorhanden) => `solver_scope=MILP`.
+3. Gemischte Requests aus LP- und MILP-relevanten Assets dürfen nur dann partitioniert werden,
+   wenn die ADR-seitige Sonderlogik explizit aktiviert ist und die Partitionierung vollständig
+   isolierbar sowie deterministisch reaggregierbar ist.
+
+Die Umschaltung erfolgt per Request und ist nicht global. Ein Request mit mindestens einem betroffenen
+Asset (`ClassicalCoLocation`, `HybridWithGridImport`, `GreenStorageRestricted` oder aktivierter `OriginConstraint`)
+wird standardmäßig als `MILP` ausgeführt.
 
 Kompatibilitätsprinzip:
 

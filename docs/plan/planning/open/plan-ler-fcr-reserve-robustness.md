@@ -256,9 +256,10 @@ Deterministische Berechnung (verbindlich):
   - `soc_t` vor der Worst-Case-Prüfung hart validieren:
     - `soc_min_eff_kwh <= soc_t <= soc_max_eff_kwh`, sonst `ROBUST_POLICY_UNSUPPORTED`.
   - `soc_t^{eff} = soc_t - self_discharge_loss_kwh_t`.
-- Verfügbare Energiemengen für die Verfügbarkeitsprüfung am Schrittanfang:
-  - `available_up_kwh_base_t = max(0, soc_t^{eff} - soc_min_eff_kwh) * eta_discharge`
-  - `available_down_kwh_base_t = max(0, soc_max_eff_kwh - soc_t^{eff}) / eta_charge`
+- Verfügbare Energiemengen für die Verfügbarkeitsprüfung am Schrittanfang auf Basis der geplan­ten Fahrplanwirkung:
+  - `soc_plan_base_t = soc_t^{eff} - max(0, b_t) * Δt / eta_discharge + max(0, -b_t) * eta_charge * Δt`
+  - `available_up_kwh_t = max(0, soc_plan_base_t - soc_min_eff_kwh) * eta_discharge`
+  - `available_down_kwh_t = max(0, soc_max_eff_kwh - soc_plan_base_t) / eta_charge`
 - Worst-Case-Energie je Richtung (kWh):
   - `fcr_remaining_t`-abhängiger FCR-Term:
     - `fcr_term_up_t = min(Δt, fcr_remaining_t/60) * fcr_up_kw_t`
