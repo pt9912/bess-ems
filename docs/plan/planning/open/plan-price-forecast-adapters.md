@@ -82,7 +82,11 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
     - oder Zeitstempel-basierte semantische Versionen (z. B. `2026-05-24T12:00:00Z-v3`).
   - Andere Formate sind unzulässig und führen auf dem Importpfad zu
     `source_eval_status=SOURCE_SCHEMA_MISMATCH` und `series_status=SOURCE_REJECTED`.
-- Repräsentationsstabilität: die Versionsfamilie pro `(series_id, ... , source.provider_id)` ist verbindlich.
+- Repräsentationsstabilität ist für die vollständige Serien-Signatur verpflichtend.
+  - Die Vergleichbarkeit verwendet die Signatur:
+    `series_id`, `source.provider_id`, `series_type`, `series_product`,
+    `market_bid_area` (falls gesetzt), `site_id` (falls gesetzt), `unit`,
+    `resolution_minutes`.
   - `series_version_family` (optional, empfohlen): `numeric` oder `timestamp`, zur
     verbindlichen Normalisierung der `series_version`.
     - Bei ausbleibender Angabe wird die Familie aus dem Versionsformat deterministisch abgeleitet.
@@ -151,12 +155,21 @@ Hinweis zur Semantik:
   - Preisreihen haben konsistente Preis-Einheit
   - Forecastreihen haben konsistente physikalische Einheit
 - Replay-/Idempotenz- und Versionierungsregeln:
-  - Wird dieselbe Kombination aus `series_id`, `series_version` und `source.provider_id` mehrfach geladen, muss der
-    vollständig gehashte Payload-identisch sein; andernfalls wird der Lauf als harten Fehler
-    (`source_eval_status=SOURCE_SCHEMA_MISMATCH`, `series_status=SOURCE_REJECTED`) geführt.
+  - Die Idempotenzprüfung verwendet die komplette Serien-Signatur plus `series_version`:
+    `series_id`, `source.provider_id`, `series_type`, `series_product`,
+    `market_bid_area` (falls gesetzt), `site_id` (falls gesetzt),
+    `unit`, `resolution_minutes`, `series_version`.
+  - Wird dieselbe Signatur-Vollmenge mehrfach geladen, muss der vollständig gehashte
+    Payload identisch sein; andernfalls wird der Lauf als harter Fehler
+    (`source_eval_status=SOURCE_SCHEMA_MISMATCH`, `series_status=SOURCE_REJECTED`) behandelt.
   - Eine eingehende Serie mit älterer Version als die letzte akzeptierte Referenzversion für dieselbe
-    Signaturkombination wird nach dem stabilisierten Vergleich als harte Versionsabweichung (`series_status=SOURCE_REJECTED`) abgewiesen.
+    Serien-Signatur wird nach dem stabilisierten Vergleich als harte Versionsabweichung
+    (`series_status=SOURCE_REJECTED`) abgewiesen.
     - Der stabile Vergleich nutzt zuerst die Versionsfamilie (`int` oder `timestamp`), danach den normalisierten Fortschritt in dieser Familie.
+  - Signaturänderungen bei optionalen Feldern sind harte Inkompatibilitäten:
+    Wenn `market_bid_area`, `site_id`, `unit` oder `resolution_minutes` für dieselbe
+    `series_id`/`source.provider_id`/`series_type`/`series_product`-Kombination variieren,
+    ergibt sich `source_eval_status=SOURCE_SCHEMA_MISMATCH` / `series_status=SOURCE_REJECTED`.
   - Für identische Serienversionen ist Verhalten idempotent: bestehende gültige Daten dürfen nur dann
     aktualisiert werden, wenn sich die `series_version` oder der `value_hash` geändert hat.
 - Mapping-Regel:
@@ -242,7 +255,8 @@ Empfohlene Integrationskonvention (API/Operator):
   - Forecastreihen: 720 Minuten (default, pro Feature konfigurierbar)
 - `quality_mode`:
   - `strict` (Default): Keine Degradation erlaubt. Fallback ist nur zulässig,
-    wenn daraus `SOURCE_OK` oder `SOURCE_FALLBACK_USED` resultiert.
+    wenn daraus `SOURCE_OK` oder `SOURCE_FALLBACK_USED` resultiert und kein
+    zusätzliches Qualitätsflag (`SOURCE_BACKFILL`) gesetzt ist.
   - `degraded_ok`: Degradierte Nutzung erlaubt, Ergebnis muss als `SOURCE_DEGRADED` gekennzeichnet werden.
 - `min_coverage_ratio` Pflicht:
   - mindestens 99,5 %
@@ -295,6 +309,8 @@ Die `SOURCE_*`-Auswertung ist für jede Serie deterministisch:
   - bei `quality_mode=strict`:
     - finaler Zustand darf nur `series_status=SOURCE_OK` oder `series_status=SOURCE_FALLBACK_USED` sein.
     - führt der Fallback zusätzliche Qualitätsminderung (`SOURCE_BACKFILL` o. ä.), ist das Ergebnis `SOURCE_REJECTED`.
+    - explizit mit der Ausnahme: `SOURCE_FALLBACK_USED` ist in `strict` nur ohne
+      `SOURCE_BACKFILL` erlaubt.
   - bei `quality_mode=degraded_ok`: finaler Zustand darf `series_status=SOURCE_DEGRADED` oder `series_status=SOURCE_FALLBACK_USED` sein; kombinierte Ereignisse werden in `status_flags` gehalten.
     - Wenn Fallback erfolgreich und keine zusätzliche Qualitätsminderung vorliegt: `series_status=SOURCE_FALLBACK_USED`, `status_flags=[SOURCE_FALLBACK_USED]`.
     - Wenn Fallback erfolgreich mit Backfill/Degradation: `series_status=SOURCE_DEGRADED`, `status_flags=[SOURCE_FALLBACK_USED, SOURCE_BACKFILL]`.

@@ -125,9 +125,11 @@ Nicht explizit modelliert:
   - `self_discharge_mode=absolute_kwh_per_hour`:
       - für `is_ler=true`: `self_discharge_kwh_per_hour` ist Pflichtfeld (`>= 0`),
       - `self_discharge_soc_per_hour` darf nicht gesetzt sein.
-    - `self_discharge_mode=relative_soc_per_hour`:
+  - `self_discharge_mode=relative_soc_per_hour`:
       - für `is_ler=true`: `self_discharge_soc_per_hour` ist Pflichtfeld (`>= 0`, Anteil SOC-Verlust pro Stunde),
       - `self_discharge_kwh_per_hour` darf nicht gesetzt sein.
+    - Verlustberechnung ist deterministisch: `self_discharge_loss_kwh_t = soc_t * self_discharge_soc_per_hour * Δt`,
+      wobei `soc_t` der SOC zu Beginn der Zeitscheibe ist und `Δt = resolution_minutes / 60`.
   - Restore-Leistung:
     - Wenn gesetzt, begrenzt `restore_capability_up_kw` den maximal nutzbaren Restore-Leistungsfluss der Up-Richtung (Lade-Richtung) und `restore_capability_down_kw` die Down-Richtung (Entlade-Richtung).
     - `restore_capability_up_kw` und `restore_capability_down_kw` müssen, falls gesetzt, strikt `> 0` sein.

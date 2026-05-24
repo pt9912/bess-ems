@@ -111,16 +111,17 @@ förder-/herkunftsgebundenem Grünstromspeicher.
 
 **Abnahmekriterien:**
 
-- Marktmodell unterscheidet klar die drei Betriebsformen
-  (Standalone, klassische Co-Location, Hybrid mit Netzbezug).
+- Marktmodell unterscheidet klar mindestens die drei produktiven Betriebsformen
+  (Standalone, klassische Co-Location, Hybrid mit Netzbezug) und behandelt
+  `GreenStorageRestricted` als optionalen Sondermodus.
 - Für jede Form ist ein Constraint-Satz definiert
   (Netzanschlussleistung, Einspeisung, lokale Erzeugung, Speicher
   Überbauung).
-- Für den ersten Slice existiert mindestens ein validierter Testfall je
-  Betriebsform inkl. Rechen- und Ergebnisbericht.
-- `GreenStorageRestricted` ist im gleichen Slice nur im **Validierungsmodus**
-  erlaubt und dient zunächst nur zur Eingangskonformität (kein produktiver
-  Förderlogik-Umfang im Regelkreis).
+- Für den ersten Slice existieren mindestens je ein validierter Testfall für die
+  drei produktiven Betriebsformen inkl. Rechen- und Ergebnisbericht.
+- Für `GreenStorageRestricted` sind im ersten Slice eigene Validierungsfälle im
+  selben Slice erforderlich (Validierungsmodus), ohne produktive Förderlogik im
+  Regelkreis (Eingangskonformität nur).
 
 ---
 
@@ -161,7 +162,10 @@ sowie Forecast-Serien.
 ## Definition of Done (DoD)
 
 - [ ] Externe Quellenanalyse abgeschlossen (DFBEW, Co-Location, Forecast-Trading, zusätzliche Medium-Quellen) und fachlich klassifiziert.
-- [ ] F-MKT-01-Abnahmebedingungen sind dokumentiert und für alle drei Betriebsformen (Standalone, Classical Co-Location, Hybrid mit Netzbezug) definiert.
+- [ ] F-MKT-01-Abnahmebedingungen sind dokumentiert und für mindestens diese drei
+  produktiven Betriebsformen (Standalone, Classical Co-Location, Hybrid mit Netzbezug) definiert.
+- [ ] `GreenStorageRestricted` ist als separater Sondermodus im selben Slice als
+  Validierungsmodus dokumentiert.
 - [ ] F-MKT-02-Abnahmebedingungen sind dokumentiert (mind. 2 Preis-Adapter + 2 Forecast-Adapter, Fallback-/Degradation-Modell, Aktualisierung + Alarmierung).
 - [ ] Trigger-Koordination bei parallelen Auslösern ist definiert und konfliktfrei:
   - Reihenfolge der Freigabe ist festgelegt,
