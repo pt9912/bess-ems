@@ -4,9 +4,9 @@
 **Status:** Aktiv für `optimization-core` Contract-Version 1.x
 **Bezug:**
 [`optimization_core.proto`](optimization_core.proto) (Service-Vertrag),
-[`../../../docs/plan/planning/in-progress/plan-RM-M5.md`](../../../docs/plan/planning/in-progress/plan-RM-M5.md)
+[`../../../docs/plan/planning/done/plan-RM-M5.md`](../../../docs/plan/planning/done/plan-RM-M5.md)
 §Sidecar-Status-Taxonomie + §Fallback-Matrix,
-[`../../../docs/plan/planning/in-progress/plan-RM-M5-01.md`](../../../docs/plan/planning/in-progress/plan-RM-M5-01.md)
+[`../../../docs/plan/planning/done/plan-RM-M5-01.md`](../../../docs/plan/planning/done/plan-RM-M5-01.md)
 D-04 (versioniertes Mapping-Artefakt),
 [`../../../docs/plan/adr/0005-optimization-core-sidecar-transport.md`](../../../docs/plan/adr/0005-optimization-core-sidecar-transport.md)
 §8 Konsequenzen (`OK/DEADLINE_EXCEEDED/UNAVAILABLE/…`-Mapping als Standard).

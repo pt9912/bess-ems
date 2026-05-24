@@ -3,7 +3,7 @@
 **Dokumenttyp:** Detailplan / DoD-Tracking
 **Status:** In Arbeit
 **Meilenstein:** RM-M1
-**Bezug:** [`roadmap.md`](roadmap.md),
+**Bezug:** [`roadmap.md`](../in-progress/roadmap.md),
 [`plan-RM-M1-simulator.md`](plan-RM-M1-simulator.md),
 [`spec/lastenheft.md`](../../../../spec/lastenheft.md),
 [`spec/architecture.md`](../../../../spec/architecture.md),

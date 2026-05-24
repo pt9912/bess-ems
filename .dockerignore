@@ -18,12 +18,3 @@
 .agents
 .codex
 .claude
-
-docs
-spec
-*.md
-LICENSE
-
-Dockerfile
-.dockerignore
-Makefile

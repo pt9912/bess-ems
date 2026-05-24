@@ -2,6 +2,7 @@
 
 ARG DOTNET_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0
 ARG DOTNET_RUNTIME_IMAGE=mcr.microsoft.com/dotnet/aspnet:10.0
+ARG PYTHON_IMAGE=python:3.12-slim
 ARG BUILD_CONFIGURATION=Release
 
 # ---------------------------------------------------------------------------
@@ -36,6 +37,16 @@ COPY config/ config/
 # Material beim Codegen.
 COPY proto/ proto/
 RUN dotnet restore BatteryEms.sln --locked-mode
+
+# ---------------------------------------------------------------------------
+# docs-check: dependency-free Markdown local-link validation.
+# External URLs are not fetched; the gate checks repo-local paths and Markdown
+# anchors so documentation changes cannot leave broken local references behind.
+# ---------------------------------------------------------------------------
+FROM ${PYTHON_IMAGE} AS docs-check
+WORKDIR /src
+COPY . .
+RUN python tools/check_markdown_links.py --root /src
 
 # ---------------------------------------------------------------------------
 # lint: dotnet build -warnaserror (RM-M1-01, RM-M1-21)

@@ -78,6 +78,7 @@ jobs:
           copy_from_image "bess-ems-test-replay:latest" "/tmp/bess-ems-replay-reports" "artifacts/ci/replay-reports/test-replay"
           run_gate coverage-gate coverage-gate
           copy_from_image "bess-ems-coverage-gate:latest" "/src/coverage" "artifacts/ci/dotnet-coverage"
+          run_gate docs-check docs-check
           run_gate simulator-lint
           run_gate simulator-test
           run_gate simulator-race

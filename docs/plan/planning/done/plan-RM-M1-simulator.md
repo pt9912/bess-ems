@@ -3,7 +3,7 @@
 **Dokumenttyp:** Detailplan / Simulator-Spezifikation
 **Status:** In Arbeit
 **Meilenstein:** RM-M1
-**Bezug:** [`plan-RM-M1.md`](plan-RM-M1.md), [`roadmap.md`](roadmap.md),
+**Bezug:** [`plan-RM-M1.md`](plan-RM-M1.md), [`roadmap.md`](../in-progress/roadmap.md),
 [`spec/lastenheft.md`](../../../../spec/lastenheft.md),
 [`spec/architecture.md`](../../../../spec/architecture.md),
 [`docs/user/quality.md`](../../../user/quality.md)
