@@ -90,8 +90,8 @@ Nicht explizit modelliert:
     - optional `full_activation_time_mfrr`
     - optional `eta_charge` (default: `1.0`, falls nicht aus dem Assetmodell übernommen)
     - optional `eta_discharge` (default: `1.0`, falls nicht aus dem Assetmodell übernommen)
-    - optional `self_discharge_mode` (Standard: `absolute_kwh_per_hour`, Werte: `absolute_kwh_per_hour` | `relative_soc_per_hour`)
-    - optional `self_discharge_kwh_per_hour` (Standard: `0`, gültig nur bei `self_discharge_mode=absolute_kwh_per_hour`)
+    - optional `self_discharge_mode` (Werte: `absolute_kwh_per_hour` | `relative_soc_per_hour`)
+    - optional `self_discharge_kwh_per_hour` (gültig nur bei `self_discharge_mode=absolute_kwh_per_hour`)
   - optional `self_discharge_soc_per_hour` (gültig nur bei `self_discharge_mode=relative_soc_per_hour`)
   - `max_recovery_time`
     - `intraday_gate_closure`
@@ -108,6 +108,7 @@ Nicht explizit modelliert:
     - Falls gesetzt, muss gelten: `0 < eta_charge <= 1` und `0 < eta_discharge <= 1`.
   - Selbstentladung:
   - Exakt einer der beiden Verlusteinstellungen muss gesetzt sein: `self_discharge_kwh_per_hour` oder `self_discharge_soc_per_hour`.
+  - `self_discharge_kwh_per_hour` und `self_discharge_soc_per_hour` können optional sein und werden bei Bedarf aus dem Assetmodell geerbt; falls danach kein Wert gesetzt ist, ist die Policy ungültig (`ROBUST_POLICY_UNSUPPORTED`).
   - `self_discharge_mode=absolute_kwh_per_hour`:
       - `self_discharge_kwh_per_hour` ist Pflichtfeld (`>= 0`),
       - `self_discharge_soc_per_hour` wird ignoriert.
@@ -213,12 +214,19 @@ Deterministische Berechnung (verbindlich):
   - Default: `1.0`, wenn das Produkt gebucht ist, sonst `0.0` bei nicht gebuchtem Produkt.
   - Bereich: `0 <= alpha_* <= 1` (numerisch stabiler Toleranzbereich in der Umsetzung, z. B. `1e-9`).
  - `Δt = resolution_minutes / 60` (in Stunden).
+- Für jede Richtungsberechnung wird konservativ davon ausgegangen, dass Up- und Down-Aktivierung nicht
+  simultan in derselben Zeitscheibe als Primärfall auftreten; falls das Produkt oder die
+  Systemdefinition simultanes Gegensignal vorsieht, ist der ADR um eine gekoppelte
+  Richtungslogik zu erweitern.
 - FCR-Worst-Case-Konsistenz bei Mindestzeit:
   - Für FCR wird die Mindestaktivierungszeit als Zustandsgröße geführt:
-    - `fcr_remaining_{t+1} = fcr_min_t` nach einem Neustart/Non-Alert, sonst
-      `fcr_remaining_{t+1} = max(0, fcr_remaining_t - Δt*60)` während fortlaufender Alert-Phasen.
+    - `fcr_remaining_t` ist der verbleibende Restbedarf in Minuten.
     - `fcr_remaining_0 = t_min_fcr`.
-    - Bei Alert-Start in Schritt `t` ist die zunächst zu reservierende FCR-Energie auf `min(Δt, fcr_remaining_t/60)` h zu skalieren.
+    - Bei Schrittübergang in Alert wird `fcr_remaining_t` auf `t_min_fcr` gesetzt.
+    - Während fortlaufender Alert-Phasen:
+      `fcr_remaining_{t+1} = max(0, fcr_remaining_t - Δt*60)`.
+    - Bei Alert in Schritt `t` ist die zunächst zu reservierende FCR-Energie auf
+      `min(Δt, fcr_remaining_t/60)` h zu skalieren.
     - Mit dem obigen stateful Ansatz wird bei kleinen `Δt` die volle Mindestdauer konservativ über Folgeintervalle berücksichtigt.
 - Hilfsgröße:
   - `self_discharge_loss_kwh_t` ist deterministisch zu berechnen:

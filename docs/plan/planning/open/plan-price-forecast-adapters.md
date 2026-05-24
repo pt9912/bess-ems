@@ -106,6 +106,7 @@ Hinweis zur Semantik:
 - `source_eval_status` ist der interne Rohstatus pro Providerlauf (inkl. Primär- und Fallback-Pfad, vor Qualitätsentscheidung).
 - `series_status` ist der externe Endstatus für Operator/API-Verträge (single-value).
 - Kombinierte Ereignisse werden weiterhin nur in `status_flags` kodiert.
+- `SOURCE_DEGRADED` ist ausschließlich ein finaler `series_status` und nicht als `source_eval_status` vorgesehen.
 - `status_message` (optional): menschenlesbar
 - `status_detail` (optional): strukturierte Zusatzinfo (z. B. `{ "source_code": "SOURCE_STALE", "backfill_intervals_closed": 2, "effective_source_id": "opsd-..." }`)
 - Validierungspflicht:
@@ -220,7 +221,6 @@ Fallback-/Degradationsdetails werden zusätzlich in `status_flags` und optionale
 - `SOURCE_SCHEMA_MISMATCH` – Zeitachse/Einheit/Schemafehler
 - `SOURCE_RETRY_EXHAUSTED` – Retries erfolglos
 - `SOURCE_REJECTED` – harte Qualitätsprüfung fehlgeschlagen
-- `SOURCE_DEGRADED` – kontrollierter Backfill oder andere Teilqualitätsminderung
 
 Endgültige Serienendstatus sind:
 

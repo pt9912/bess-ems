@@ -101,7 +101,8 @@ Moegliche Domain-/Application-Erweiterungen:
   - `alignment_mode` (`reject` | `trim-to-common`)  
       - `reject`: harte Ablehnung bei Zeitachsenabweichung (Default im produktiven ADR)
       - `trim-to-common`: kontrollierte Trimmung auf gemeinsame Schnittmenge für Vorverarbeitung;
-        nicht im produktiven Optimierungs-Request zulässig.
+        nur zulässig bei abgeschlossenem Forecast-Preprocessing und nur dann als
+        vorbereiteter Input (`alignment_prepared=true`).
     - `alignment_prepared` (verpflichtend bei `trim-to-common`):
       Kennzeichen, dass die Trimmung bereits vollständig deterministisch
       durchgeführt wurde (inkl. Reihenfolge- und Segmentierungsvorschrift).
@@ -119,10 +120,13 @@ Moegliche Domain-/Application-Erweiterungen:
 - Validierung:
 - gleiche Zeitachse wie `PriceSeries` (UTC, step-genau, gleiche Horizon-Länge) bei produktiver Nutzung
 - Ist `alignment_mode=reject` (Default im produktiven ADR): die Zeitachse muss hart identisch sein (gleiches Horizon, gleiche Schrittweite, gleiche Startzeit).
-- Ist `alignment_mode=trim-to-common` gesetzt:
+  - Ist `alignment_mode=trim-to-common` gesetzt:
   - `alignment_prepared` muss `true` sein; ohne abgeschlossene Vorverarbeitung führt der produktive Lauf zu `SCHEMA_INCONSISTENT`.
   - `alignment_prepared` darf nur zusammen mit `alignment_mode=trim-to-common` verwendet werden.
-  - produktive Optimierung darf den Modus sonst nicht starten; dies führt zu `SCHEMA_INCONSISTENT`, solange keine Vorverarbeitung (`trim`-Pfad) explizit abgeschlossen wurde.
+  - produktive Optimierung darf `trim-to-common` nur mit explizit abgeschlossenem
+    Vorverarbeitungs-Pfad und nachweislicher Versionierung in den zugehörigen
+    Vorverarbeitungsfeldern starten; ohne diese Voraussetzungen führt der Lauf zu
+    `SCHEMA_INCONSISTENT`.
   - Schnittmenge auf den gemeinsamen Zeithorizont
   - `alignment_prepared_by` und die vorbereiteten Horizon-Grenzen (`alignment_prepared_horizon_start_utc`, `alignment_prepared_horizon_end_utc`) müssen gesetzt sein.
   - deterministische Konvention bei Zeitachsen-Verschiebung
