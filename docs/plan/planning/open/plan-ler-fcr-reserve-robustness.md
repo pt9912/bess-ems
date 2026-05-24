@@ -513,6 +513,8 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 - `conservative_soc_headroom` außerhalb `0..1` (ratio) bzw. `<0` (kwh) → `ROBUST_POLICY_UNSUPPORTED`.
 - FCR-Worst-Case fuer nicht-LER: volle FCR-Leistung ueber Horizont.
 - LER-konservative FCR-Huelle mit `t_min_fcr`.
+- Voller Aktivierungszeitraum deutlich größer als Horizon (`full_activation_time`, `full_activation_time_afrr`, `full_activation_time_mfrr`) nutzt deterministisch den `Δt`-clip ohne Negative oder unzulässige Reserve-Anforderung.
+- Grenzwert-Effizienz `eta_charge` / `eta_discharge` nahe Null (z. B. `1e-9`) wird explizit getestet auf deterministische Behandlung (entweder clamp/bounding oder klare Verfahrens-Fehlerklasse, kein implizites Clampen in `NaN`/`inf`).
 - Alert State startet bei definierter Frequenzabweichung und endet erst
   bei Rueckkehr in den Normalbereich.
 - Recovery scheitert nach `max_recovery_time` mit operator-faehigem

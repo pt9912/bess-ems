@@ -46,10 +46,13 @@ Kompatibilitätsprinzip:
 - Bestehende Standalone-only-Requests bleiben LP.
 - Bei nicht kompatibler `solver_scope`-Zuordnung endet der Lauf mit `CONFIG_INVALID`, nicht mit stiller Downgrade-Logik.
 - Für gemischte Multi-Site-/Multi-Asset-Fälle gilt:
-  - entweder explizite Request-Partitionierung vor dem Optimierer,
-  - oder ein bewusst einheitlicher MILP-Request für alle betroffenen Assets.
+  - deterministische Default-Regel: vollständiger Request wird als MILP-Request ausgeführt.
+  - optional (explizit freigeschalteter ADR-Pfad): Request-Partitionierung in homogene Solver-Scope-Gruppen vor dem Optimierer.
 - Der Scope bleibt pro Request eindeutig; innerhalb einer einzelnen Anfrage gibt es keinen partiellen LP/MILP-Mix.
 - Für den ersten produktiven Slice ist die Partitionierungsentscheidung im ADR festzuhalten.
+- Partitionierung ist nur zulässig, wenn der Request-Builder alle Unterrequests vollständig
+  isoliert und im Anschluss deterministisch reaggregiert. Andernfalls ist bei gemischten
+  Scope-Anforderungen ein `CONFIG_INVALID` mit Grundcode `SCHEMA_INCONSISTENT` zu werfen.
 
 ### Projekt-/Standorttypen
 
@@ -264,7 +267,8 @@ Bestandsrouten nicht brechen:
   `CoLocationMode`-/Modellschalter auf MILP-Profil gestellt.
 - Für gemischte Szenarien ist der komplette Request auf MILP zu setzen oder
   vor dem Solver fachlich zu partitionieren; ein partieller Scope-Mix
-  innerhalb eines Requests ist nicht erlaubt.
+  innerhalb eines Requests ist nicht erlaubt. Default bleibt dabei ein
+  einheitlicher MILP-Pfad.
 - Regressionstest ist als Matrix verbindlich:
   - LP-basierter Standalone-Fall bleibt bit-kompatibel.
   - Co-Location mit aktivem Import/Export-/Herkunftsmodell muss auf MILP laufen.

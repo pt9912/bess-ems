@@ -158,6 +158,16 @@ sowie Forecast-Serien.
 - Qualitätsschema enthält kombinierte Status-Sichtbarkeit (Fallback + Degradation)
   ohne Informationsverlust für Operator/Rückverfolgbarkeit.
 
+## Trigger-Koordination bei gleichzeitigen Auslösern
+
+- Wenn beide Trigger (F-MKT-01 und F-MKT-02) im selben Release-Fenster ausgelöst werden:
+  1. `F-MKT-01` (Markt-/Co-Location-Modell) wird zuerst im operativen Produktivpfad freigegeben.
+  2. `F-MKT-02` kann parallel als Datenvertrags-Slice vorbereitet werden, darf Co-Location aber zunächst im degraded/fallback-Modus betreiben.
+  3. Produktiv geht erst auf vollen Forecast-Fokus über, wenn `plan-price-forecast-adapters.md` im
+     Betriebsmodus mit aktivierter Qualitätsakzeptanz konform ist (`degraded_ok`).
+  4. Bei Konflikten gilt als harte Regel: neue Betriebslogik darf nicht ohne definierte
+     `series_status`-Entscheidung in den Markt- und Optimierungsworkflow starten.
+
 ---
 
 ## Copyright- und Nutzungsgrenze

@@ -132,7 +132,8 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
   - Preisreihen: 90 Minuten (default, pro Serie konfigurierbar)
   - Forecastreihen: 720 Minuten (default, pro Feature konfigurierbar)
 - `quality_mode`:
-  - `strict` (Default): Keine Degradation erlaubt.
+  - `strict` (Default): Keine Degradation erlaubt. Fallback ist nur zulässig,
+    wenn daraus `SOURCE_OK` oder `SOURCE_FALLBACK_USED` resultiert.
   - `degraded_ok`: Degradierte Nutzung erlaubt, Ergebnis muss als `SOURCE_DEGRADED` gekennzeichnet werden.
 - `min_coverage_ratio` Pflicht:
   - mindestens 99,5 %
@@ -149,6 +150,7 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
   - kontrollierter Backfill darf maximal 2 aufeinanderfolgende Intervalle pro Lücke schließen.
   - bei Backfill gilt der finale Datenvertrag weiterhin (keine offenen Restlücken).
   - Serien mit Backfill markieren Ergebnisqualität als `SOURCE_DEGRADED`.
+  - In `quality_mode=strict` dürfen diese Serien nicht akzeptiert werden.
   - `SOURCE_GAP` gilt nur für nicht behebbare Restlücken nach abgeschlossener Backfill-Behandlung.
 
 ### Qualitätsentscheidungen bei `SOURCE_*` (verbindlich)
@@ -172,7 +174,9 @@ Die `SOURCE_*`-Auswertung ist für jede Serie deterministisch:
 - Sind Primärcode + kompatible Fallback-Quelle vorhanden:
   - Der Fallback wird synchron ausgewertet.
 - Ist Fallback erfolgreich:
-  - bei `quality_mode=strict`: finaler Zustand darf nur `SOURCE_OK` oder `SOURCE_FALLBACK_USED` sein.
+  - bei `quality_mode=strict`:
+    - finaler Zustand darf nur `SOURCE_OK` oder `SOURCE_FALLBACK_USED` sein.
+    - führt der Fallback zusätzliche Qualitätsminderung (`SOURCE_BACKFILL` o. ä.), ist das Ergebnis `SOURCE_REJECTED`.
   - bei `quality_mode=degraded_ok`: finaler Zustand darf `SOURCE_DEGRADED` oder `SOURCE_FALLBACK_USED` sein; kombinierte Ereignisse werden in `status_flags` gehalten.
     - Wenn Fallback erfolgreich und keine zusätzliche Qualitätsminderung vorliegt: `series_status=SOURCE_FALLBACK_USED`, `status_flags=[SOURCE_FALLBACK_USED]`.
     - Wenn Fallback erfolgreich mit Backfill/Degradation: `series_status=SOURCE_DEGRADED`, `status_flags=[SOURCE_FALLBACK_USED, SOURCE_BACKFILL]`.
@@ -188,6 +192,7 @@ Die `SOURCE_*`-Auswertung ist für jede Serie deterministisch:
 - Mit Ersatzquelle: `SOURCE_FALLBACK_USED`.
 - Qualitätsminderung: `SOURCE_DEGRADED`.
 - Kombinationsregel: Ist Fallback erfolgreich **und** Backfill aktiv, ist der `series_status` `SOURCE_DEGRADED` mit `status_flags` inklusive `SOURCE_FALLBACK_USED` und `SOURCE_BACKFILL`.
+  - Diese Kombination ist in `quality_mode=strict` nicht zulässig.
 - harte Ablehnung: `SOURCE_REJECTED`.
 
 Hinweis:
@@ -280,6 +285,7 @@ Fallback-/Degradationsdetails werden zusätzlich in `status_flags` und optionale
     - Bei Fallback Erfolg gilt Fallback-Ergebnis nach `quality_mode`:
       - `strict`: nur akzeptierte Daten ohne Backfill/Verfallung (`SOURCE_OK`, `SOURCE_FALLBACK_USED`)
       - `degraded_ok`: Fallback kann als `SOURCE_DEGRADED` geführt werden.
+      - in strict ist Fallback mit Backfill weiterhin `SOURCE_REJECTED`.
     - Bei Ausfall / Schemakonflikt des Fallbacks:
       - `quality_mode=degraded_ok` und Primärcode `SOURCE_STALE`: degradierte Fortsetzung als `SOURCE_DEGRADED` möglich
       - sonst harte Ablehnung (`SOURCE_REJECTED`)
