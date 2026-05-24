@@ -464,6 +464,10 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
   `resolution_minutes`, `series_version`.
 - Änderungen an `CanExecute`, Laufkodierung oder Terminierungsdetails sind nur
   gemeinsam und im selben Release-Commit umzusetzen.
+- Cross-Slice-Contract ist verbindlich und prüfpflichtig:
+  - Die Mapping-Matrix (`OptimizationSolverStatus` + `TerminationCode` + `CanExecute`) ist zwischen diesem Plan und
+    [`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md) exakt identisch festzulegen.
+  - Abweichung ist ein hartes Release-Blocking; kein Slice darf unabhängig freigegeben werden.
 - Implementierungsvorgabe:
   - Die Datenklasse für Optimierungsruns muss `CanExecute` als persistiertes Feld erhalten.
   - Solange `HasUsableSolution` in der vorhandenen Codebasis weiterhin auf
@@ -518,7 +522,7 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
   - `migration_strict=false` ist ein dokumentierter Sonderbetrieb mit aktivitätsbasierter Isolation (`can_dispatch`).
 - [ ] Netzanbindung ist für beide `site_grid_power_sign`-Varianten verbindlich spezifiziert (`export_pos`, `import_pos`) inkl. Sign-Konventionstests.
 - [ ] `GreenStorageRestricted`-Regeln sind als harte Validierung umgesetzt (`p_grid_import_t == 0`, `e_local`-Kopplung, Konfigurationsgrenzen).
-- [ ] Gemeinsamer Fehler-/Ausführungsvertrag zu [plan-ler-fcr-reserve-robustness.md](plan-ler-fcr-reserve-robustness.md) ist abgeglichen (unter anderem `CanExecute`, `TerminationCode`, `TerminationDetail`, Cross-Checks).
+- [ ] Gemeinsamer Fehler-/Ausführungsvertrag zu [plan-ler-fcr-reserve-robustness.md](plan-ler-fcr-reserve-robustness.md) ist abgeglichen (unter anderem `CanExecute`, `TerminationCode`, `TerminationDetail`, Cross-Checks, Mapping-Matrix) und durch mindestens einen Golden-Fixture-Test abgesichert.
 - [ ] Liefergegenstände bei Aktivierung sind vollständig umgesetzt:
   - ADR/ADR-Schaerfung,
   - Domain-/Application-Erweiterungen,
@@ -528,15 +532,17 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
 
 ---
 
-## Offene Entscheidungen
+## Abschlussentscheidungen
 
 - Reicht ein LP-Modell oder braucht der erste produktive Co-Location-Scope
   MILP-Binaervariablen fuer Lade-/Entlade-/Herkunftsentscheidungen?
   - Entschieden: Für den ersten produktiven Co-Location-Scope wird MILP genutzt, um
     Simultanfluss- und Herkunftskontrollen formal erzwingbar zu machen.
-- Wird `LocalGenerationSeries` als eigener Application-Typ eingefuehrt oder
-  als spezialisierte `PriceSeries`-aehnliche Zeitreihe modelliert?
+- Ist `LocalGenerationSeries` eigener Application-Typ oder spezialisierte Preiszeitreihe?
+  - Entschieden: `LocalGenerationSeries` als eigener Application-Typ im Co-Location-Scope.
 - Soll Abregelung als Kostenkomponente, Constraint-Violation oder eigene
   Fahrplanzeitreihe materialisiert werden?
+  - Entschieden: Abregelung wird als Constraint (`c_t`) mit Kostenmodell (`CurtailmentCost`) umgesetzt; eigene Fahrplanzeitreihe ist für den ersten Scope nicht erforderlich.
 - Welche Netzanschlusspunkt-Vorzeichenkonvention wird fuer Site-Level-
   Leistung normativ?
+  - Entschieden: `site_grid_power_sign` ist der normative Site-Parameter (`export_pos` oder `import_pos`), ohne globalen Default und ohne impliziten Fallback.

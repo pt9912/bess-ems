@@ -730,15 +730,21 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
   - bei `simultaneous_reserve_direction_allowed=true` wird bei Gleichzeitigkeit
     die gekoppelte Worst-Case-Rekursion über `worst_total_kwh_t` geprüft.
 
-## Offene Entscheidungen
+## Abschlussentscheidungen
 
-- Wird Alert State intern aus Frequenzdaten abgeleitet oder als externer
-  Status importiert?
-- Liegt `IReserveRobustnessCheck` im Optimization-Umfeld oder in einem
-  eigenen Markets-/Reserve-Modul?
-- Soll LER-Robustheit nur Precheck sein oder als harte Constraint in den
-  Horizon-Optimierer eingehen?
-- Wie detailliert muss aFRR-/mFRR-Aktivierungsenergie im ersten Slice
-  modelliert werden?
-- Welche Operator-Sicht ist zuerst relevant: API-only, UI oder Replay-
-  Bericht?
+- Abschlussentscheidungen für Release-Umsetzung:
+  - Alert State wird als externer Input geliefert (`AlertStateTimeline` als
+    partielle Laufzeit-Repräsentation); interne Frequenzableitung ist für den
+    ersten Slice **nicht** vorgesehen.
+  - `IReserveRobustnessCheck` befindet sich in einem eigenen
+    Markets-/Reserve-Modul als Anwendungskomponente; der Optimierungs-Lauf nutzt nur
+    das Ergebnis als `CanExecute`-/Robustheits-Guard.
+  - LER-Robustheit ist verbindlich als Produktiv-Precheck mit hartem
+    Dispatch-Guard (`CanExecute=false` bei Nicht-`ROBUST_OK`), nicht als direkter harter
+    Optimierungs-Constraint in den LP/MILP-Kern eingefügt.
+  - aFRR-/mFRR-Aktivierungsenergie ist im ersten produktiven Slice voll modelliert
+    inkl. `full_activation_time_afrr` / `full_activation_time_mfrr` und Tests dafür.
+- Operator-Sicht ist entschieden:
+  - API ist Primärkanal für Aktivierungsentscheidungen (`CanExecute`, Status, Limiting Reason, Restore-Hinweis).
+  - UI zeigt denselben operativen Zustand für Bedienung.
+  - Replay ist Sekundäransicht mit identischen Kernwerten plus Zeitachsen-Nachvollziehbarkeit.

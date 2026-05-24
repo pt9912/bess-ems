@@ -95,12 +95,16 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
     verbindlichen Normalisierung der `series_version`.
     - Bei ausbleibender Angabe wird die Familie aus dem Versionsformat deterministisch abgeleitet.
     - Die Familie wird beim ersten gültigen Write bestimmt (`int` oder `timestamp`-basiert).
-  - Ein späterer Wechsel der Versionsfamilie wird im Normalbetrieb als harte
+    - Die Familie ist Teil der persistierbaren Serienidentität; der produktive
+      Wechsel der Familie ist **nur** über gesteuerten Migrationsschnittpunkt zulässig
+      (kein stiller Wechsel derselben `series_id`/`series_product`-Paarung).
+  - Ein späterer unkontrollierter Wechsel der Versionsfamilie im produktiven Modus wird als harte
     Schemaabweichung (`source_eval_status=SOURCE_SCHEMA_MISMATCH`, `series_status=SOURCE_REJECTED`) bewertet.
   - Migrationsprinzip bei `series_version_family`-Wechsel:
     - Produktiv ist ein Wechsel nur mit geplanter Migrationsfolge zulässig.
     - Die Umstellung muss explizit über neue Serienkennung/Alias erfolgen (z. B. neues `series_id`/`series_product`-Paar), nicht per stillschweigendem Familienwechsel derselben `series_id`.
     - Während der Migrationsphase können beide Serienfolgen parallel aktiv sein; nach erfolgreichem Cutover wird die alte Folge deaktiviert.
+    - Die Migrationsfreigabe ist an einen expliziten Release-Hinweis gebunden.
     - Empfohlener kontrollierter Cutover:
       1. Neue Family unter expliziter Alias-Kennung einführen (`series_family_alias` oder neues `series_id`/`series_product`),
          den alten und neuen Stream parallel beobachten.
@@ -562,6 +566,7 @@ arbeitet mit deterministischen Preiswerten.
 - [ ] Persistenzkompatibilität hergestellt:
   - bestehende Serie- und Import-Speicher (InMemory + dauerhafte Stores, soweit vorhanden) führen `series_id`/`series_version` in der Serien-Identität oder einem deterministisch äquivalenten Ersatzschlüssel.
   - ohne diese Erweiterung bleibt eine produktive Aufnahme neuer Serienkennungen im Slice gesperrt (Fallback-Pfad definiert).
+  - Produktive Familie-/Versionswechsel sind nur per dokumentiertem Cutover erlaubt; ein stiller `series_version_family`- oder Revisionsfamilienwechsel ohne Release-Freigabe führt zu harter Ablehnung.
 - [ ] Import-Adapter sind bereit für produktive Nutzung:
   - mindestens ein primärer und ein fallbackfähiger Preisadapter,
   - mindestens ein primärer und ein fallbackfähiger Forecastadapter,
@@ -584,11 +589,13 @@ arbeitet mit deterministischen Preiswerten.
 
 ---
 
-## Offene Entscheidungen
+## Abschlussentscheidungen
 
 - Wird in einem ersten produktiven Slice zusätzlich `ForecastSeries`-Schema eingeführt?
   - Ja, als erweiterter Liefervertrag, solange es ein kompatibles `SeriesEnvelope` bleibt.
 - Sollen Forecast-Szenarien/Quantile direkt modelliert oder erst in einem
   separaten probabilistischen Optimierungsslice behandelt werden?
+  - Entscheidung: Erst im ersten Slice sind nur point-forecast-Pfade relevant; Quantile/Probabilistik geht in ein Folge-Slice.
 - Wo lebt langfristiger Quellen-Cache: In-Memory, Postgres/Timescale oder
   externer Datenservice?
+  - Entscheidung für produktiv: bestehende Persistenz/Store des Kernsystems wird genutzt, ergänzt durch optionales dediziertes Forecast-Cache-Modul im zweiten Phase.
