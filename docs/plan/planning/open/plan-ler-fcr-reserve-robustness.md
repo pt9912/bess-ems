@@ -180,8 +180,15 @@ Nicht explizit modelliert:
     - `required_up_kwh` (optional, fuer Restore-Planung)
     - `required_down_kwh` (optional, fuer Restore-Planung)
   - Optional:
-    - `required_activation_kw`
-    - `required_activation_minutes`
+    - `required_activation_kw`:
+      - optionales Override in kW pro Zeitschritt auf Basis der betrachteten Reservezelle;
+      - muss `> 0` sein.
+      - wird in der Restore-Rekonstruktion als harte Begrenzung verwendet, falls gesetzt.
+      - bei Wert `<= 0` oder fehlendem Wert wird kein Override angenommen.
+    - `required_activation_minutes`:
+      - optionales Feld in Minuten als Operatorkontext.
+      - dient in der Erstimplementierung rein auditierbar und ist nicht verpflichtender
+        Steuerparameter.
 
 - `AlertStateTimeline`
   - Zeitreihe fuer FCR-Alert-State-Status, Reserve Mode,
@@ -337,7 +344,8 @@ Restore- und Gate-Entscheidungslogik (verbindlich):
     - `restore_shortfall_kwh = max(restore_shortfall_up_kwh, restore_shortfall_down_kwh)`
     - Falls ein aktiver Branch (`restore_shortfall_*_kwh > 0`) jedoch `required_activation_kw_* <= 0` hat:
       `ROBUST_INFEASIBLE` mit `limiting_reason_code=NO_RECOVERY_PATH`.
-    - Mit manuellem Override `required_activation_kw > 0`:
+    - Mit manuellem Override `required_activation_kw > 0` (aus der aktuellen Zeile von
+      `ReserveEnergyEnvelope`):
       `required_recovery_minutes = restore_shortfall_kwh / required_activation_kw * 60`.
     - Ohne Override:
       `required_recovery_minutes = max(restore_time_up, restore_time_down)` (konservativster Branch).
