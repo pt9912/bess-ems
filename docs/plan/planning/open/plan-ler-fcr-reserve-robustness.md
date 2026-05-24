@@ -633,6 +633,9 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
   - beide Moduswerte gesetzt (`self_discharge_kwh_per_hour` und `self_discharge_soc_per_hour`) → `ROBUST_POLICY_UNSUPPORTED`.
   - `is_ler=true` und kein Moduswert gesetzt (beide optional Felder leer/nicht gesetzt) → `ROBUST_POLICY_UNSUPPORTED`.
   - negative/überschüssige Werte (`self_discharge_kwh_per_hour < 0`, `self_discharge_soc_per_hour < 0` oder `> 1`) → `ROBUST_POLICY_UNSUPPORTED`.
+- `ROBUST_NEEDS_INTRADAY_RESTORE`-Pfad erzeugt `OptimizationSolverStatus.Feasible` mit
+  `CanExecute=false`, `reserve_robustness_status=ROBUST_NEEDS_INTRADAY_RESTORE` und
+  `status_description/action=intraday_restore_required` im Replay-/Operator-Output.
 - `market_time_unit` abseits von `minute` → `ROBUST_POLICY_UNSUPPORTED`.
 - Auflösungsfelder kleiner oder gleich 0 (`t_min_fcr`, `full_activation_time`, `max_recovery_time`, `resolution_minutes`) → `ROBUST_POLICY_UNSUPPORTED`.
 - `full_activation_time_afrr` / `full_activation_time_mfrr` werden nur bei gesetztem Feldwert geprüft:

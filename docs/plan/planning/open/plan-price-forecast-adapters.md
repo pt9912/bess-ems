@@ -79,6 +79,8 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
   - Akzeptiert werden:
     - streng monoton wachsende numerische Versionen (int-kompatibel),
     - oder Zeitstempel-basierte semantische Versionen (z. B. `2026-05-24T12:00:00Z-v3`).
+  - Andere Formate sind unzulässig und führen auf dem Importpfad zu
+    `source_eval_status=SOURCE_SCHEMA_MISMATCH` und `series_status=SOURCE_REJECTED`.
 - Repräsentationsstabilität: die Versionsfamilie pro `(series_id, ... , source.provider_id)` ist verbindlich.
   - `series_version_family` (optional, empfohlen): `numeric` oder `timestamp`, zur
     verbindlichen Normalisierung der `series_version`.
@@ -143,7 +145,7 @@ Hinweis zur Semantik:
   - Preisreihen haben konsistente Preis-Einheit
   - Forecastreihen haben konsistente physikalische Einheit
 - Replay-/Idempotenz- und Versionierungsregeln:
-  - Wird dieselbe Kombination aus `series_id` und `series_version` mehrfach geladen, muss der
+  - Wird dieselbe Kombination aus `series_id`, `series_version` und `source.provider_id` mehrfach geladen, muss der
     vollständig gehashte Payload-identisch sein; andernfalls wird der Lauf als harten Fehler
     (`source_eval_status=SOURCE_SCHEMA_MISMATCH`, `series_status=SOURCE_REJECTED`) geführt.
   - Eine eingehende Serie mit älterer Version als die letzte akzeptierte Referenzversion für dieselbe
@@ -485,6 +487,8 @@ arbeitet mit deterministischen Preiswerten.
 6. Tests:
    - erfolgreiche Serienladung
    - fehlende Credentials
+   - identische `(series_id, series_version, source.provider_id)` mehrfach laden mit identischem Payload bleibt idempotent
+   - gleicher `(series_id, series_version)` mit anderem `provider_id` wird als separater Provider-Kontext bewertet
    - Primary-Validierung gegen Secondary-Adapter bei Primary-Ausfall
    - Rate-Limit-/Providerfehler
    - stale Daten werden je nach `quality_mode` korrekt gefuehrt (`SOURCE_DEGRADED` vs `SOURCE_REJECTED`)

@@ -427,6 +427,9 @@ Bestandsrouten nicht brechen:
    - Reservebaender reduzieren weiterhin verfuegbare Lade-/Entladeleistung.
    - `GreenStorageRestricted` lehnt unzulaessige Netzladung ab oder markiert
      den Run als unzulaessig.
+   - `migration_strict=false` erlaubt nicht-aktive `can_dispatch=false`-Sites mit
+     `unclear`/`incompatible` im Migrationsfenster, blockiert aber aktive Sites
+     mit `can_dispatch=true` konsistent auf `CONFIG_INCONSISTENT`.
 6. Operator-/API-Doku fuer die neuen Eingaben und Fehlermodi.
 
 ## Gemeinsamer Ausführungs-/Fehlermodus-Vertrag
