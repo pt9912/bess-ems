@@ -478,6 +478,27 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
   - Der technische Dispatch-Pfad bleibt Safety-First und kennt keine
   externen Marktdetails.
 
+## Definition of Done (DoD)
+
+- [ ] LP/MILP-Switching ist deterministisch und produktiv dokumentiert:
+  - Standalone bleibt LP,
+  - Co-Location-/Herkunftsfälle laufen in MILP,
+  - kein partieller LP/MILP-Mix innerhalb eines Requests.
+- [ ] Neue Domänen-/Anwendungsobjekte sind eingeführt und validiert (`SiteConstraint`, `LocalGenerationSeries`, `LocalOriginState`, `CoLocationMode`, `OriginConstraint`, `CurtailmentCost`).
+- [ ] Migrationsvertrag ist in beiden Modi abgeschlossen:
+  - Deterministische Klassifikation (`normalized`/`repairable`/`unclear`/`incompatible`) ist implementiert,
+  - `migration_strict=true` blockiert harte Fehlerfälle im produktiven Scope,
+  - `migration_strict=false` ist ein dokumentierter Sonderbetrieb mit aktivitätsbasierter Isolation (`can_dispatch`).
+- [ ] Netzanbindung ist für beide `site_grid_power_sign`-Varianten verbindlich spezifiziert (`export_pos`, `import_pos`) inkl. Sign-Konventionstests.
+- [ ] `GreenStorageRestricted`-Regeln sind als harte Validierung umgesetzt (`p_grid_import_t == 0`, `e_local`-Kopplung, Konfigurationsgrenzen).
+- [ ] Gemeinsamer Fehler-/Ausführungsvertrag zu [plan-ler-fcr-reserve-robustness.md](plan-ler-fcr-reserve-robustness.md) ist abgeglichen (unter anderem `CanExecute`, `TerminationCode`, `TerminationDetail`, Cross-Checks).
+- [ ] Liefergegenstände bei Aktivierung sind vollständig umgesetzt:
+  - ADR/ADR-Schaerfung,
+  - Domain-/Application-Erweiterungen,
+  - Solver/Modellerweiterung,
+  - Regressionsmatrix + Migrationstestfälle,
+  - Operator-/API-Dokumentation.
+
 ---
 
 ## Offene Entscheidungen

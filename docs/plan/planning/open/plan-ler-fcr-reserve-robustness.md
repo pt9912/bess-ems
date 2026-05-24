@@ -623,6 +623,31 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 - Alle Golden-Fixtures laufen ohne Netzwerk, ohne Python-Runtime und ohne
   Excel-Abhaengigkeit im `bess-ems`-Testpfad.
 
+## Definition of Done (DoD)
+
+- [ ] Reserve-Robustheitskontrakt ist formalisiert:
+  - `ReserveRobustnessPolicy`, `ReserveEnergyEnvelope`, `ReserveRobustnessResult`,
+    `AlertStateTimeline` fachlich vollständig definiert,
+  - Last-Validierung/Status- und Übergänge (Alert/Reserve/Recovery) dokumentiert.
+- [ ] Berechnungslogik ist implementiert (oder vertraglich festgehalten) für:
+  - Worst-Case-Bandbrechung je Schritt (UP/DOWN),
+  - FCR `t_min_fcr`-Dynamik,
+  - LER-Zustandsbezug/`is_ler`-Pfad,
+  - konservative `simultaneous_reserve_direction_allowed`-Semantik.
+- [ ] Wiederherstellungslogik ist implementiert:
+  - `ROBUST_NEEDS_INTRADAY_RESTORE`-Routing,
+  - Intraday-Gateway-/Fensterlogik,
+  - harte `CanExecute`-Abgrenzung im Dispatcher.
+- [ ] Ergebnis-Mapping ist aktiv:
+  - `reserve_robustness_status` + `reserve_robustness_limiting_reason`,
+  - Mapping auf `OptimizationSolverStatus`/`TerminationCode` inkl. `CanExecute=false` bei Nicht-`ROBUST_OK`.
+- [ ] Liefergegenstände bei Aktivierung umgesetzt:
+  - ADR/Schärfung,
+  - Domain-/Application-Typen,
+  - Optimierungsintegration + Golden-Fixtures,
+  - Operator-/Replay-Output inkl. Restore-Hinweis.
+- [ ] Akzeptanzkriterien und Testideen sind grün inklusive Replay-/Golden-Fixtures ohne Netzwerk/Excel/Python.
+
 ---
 
 ## Testideen

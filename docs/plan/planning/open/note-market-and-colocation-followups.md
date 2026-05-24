@@ -158,6 +158,17 @@ sowie Forecast-Serien.
 - Qualitätsschema enthält kombinierte Status-Sichtbarkeit (Fallback + Degradation)
   ohne Informationsverlust für Operator/Rückverfolgbarkeit.
 
+## Definition of Done (DoD)
+
+- [ ] Externe Quellenanalyse abgeschlossen (DFBEW, Co-Location, Forecast-Trading, zusätzliche Medium-Quellen) und fachlich klassifiziert.
+- [ ] F-MKT-01-Abnahmebedingungen sind dokumentiert und für alle drei Betriebsformen (Standalone, Classical Co-Location, Hybrid mit Netzbezug) definiert.
+- [ ] F-MKT-02-Abnahmebedingungen sind dokumentiert (mind. 2 Preis-Adapter + 2 Forecast-Adapter, Fallback-/Degradation-Modell, Aktualisierung + Alarmierung).
+- [ ] Trigger-Koordination bei parallelen Auslösern ist definiert und konfliktfrei:
+  - Reihenfolge der Freigabe ist festgelegt,
+  - degraded/fallback Verhalten ist begrenzt dokumentiert,
+  - harte Start-Blockade ohne `series_status`-Entscheidung ist festgelegt.
+- [ ] Copyright- und Nutzungsgrenzen sind explizit dokumentiert und für externe Claims verifiziert.
+
 ## Trigger-Koordination bei gleichzeitigen Auslösern
 
 - Wenn beide Trigger (F-MKT-01 und F-MKT-02) im selben Release-Fenster ausgelöst werden:

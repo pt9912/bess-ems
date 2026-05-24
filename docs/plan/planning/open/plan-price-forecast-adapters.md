@@ -516,6 +516,32 @@ arbeitet mit deterministischen Preiswerten.
 - Fallback-Verhalten ist vor Aktivierung je Serie konfiguriert (erlaubt/unterbunden)
   und dokumentiert.
 
+## Definition of Done (DoD)
+
+- [ ] Daten-/Fehlervertrag ist vollständig definiert:
+  - `SeriesEnvelope` inkl. `series_status`, `source_eval_status`, `status_flags`, `status_detail`,
+  - `source_metadata` mit Versions-/Zeit-/Provider-Informationen,
+  - klare Trennschärfe Producer- und Operator-Sichten.
+- [ ] Import-Adapter sind bereit für produktive Nutzung:
+  - mindestens ein primärer und ein fallbackfähiger Preisadapter,
+  - mindestens ein primärer und ein fallbackfähiger Forecastadapter,
+  - klare Refresh-/Staleness-/Rate-Limit-Politik.
+- [ ] Fallback-/Degradationslogik ist deterministisch umgesetzt:
+  - harte Fehler (`SOURCE_REJECTED`) vs. degradierte Nutzung (`SOURCE_DEGRADED`) klar getrennt,
+  - kombinierte Qualitätsereignisse via `status_flags`,
+  - `SOURCE_EMPTY` ohne expliziten degraded-Zulassungsweg bleibt hart abweisend.
+- [ ] Versions- und Idempotenzregeln umgesetzt:
+  - eindeutiger Revisionsvergleich pro `(series_id, series_version, source.provider_id)`,
+  - payload-identisches Re-Load ist idempotent,
+  - Provider-Kontexte trennscharf unabhängig von identischem `series_id`/`series_version`.
+- [ ] Liefergegenstände bei Aktivierung umgesetzt:
+  - ADR/Architektur-Spezifikation,
+  - Source-Port- und Statusmodell,
+  - Replay-/Mock-Testpfad,
+  - API-/Operator-Status,
+  - Runbook (Credentials, Limits, Ausfälle).
+- [ ] Akzeptanzkriterien aus diesem Dokument vollständig erfüllt.
+
 ---
 
 ## Offene Entscheidungen
