@@ -95,9 +95,10 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
 - `series_type=price` wird auf bestehende Preis-Produkte in `PriceSeries` abgebildet.
   - dafür ist `market_bid_area` verpflichtend und wird auf das entsprechende
     `PriceSeries`-Feld gemappt.
-- `series_type=forecast` dient in diesem Slice der Seitcar-/Inputlogik und darf nur in
-  der dort definierten Integrationslogik weiterverarbeitet werden, solange kein
-  produktiver Forecast-Domaintyp im EMS aktiv ist.
+- `series_type=forecast` dient in diesem Slice der Seitcar-/Inputlogik und darf bis zur Aktivierung
+  eines produktiven Forecast-Domaintypen im EMS ausschließlich über den Sidecar-Integrationspfad
+  weiterverarbeitet werden. In späteren Slices kann derselbe Contract in ein produktives
+  Forecast-Domain-Format überführt werden.
 - Konsistenz-Regel:
   - Wenn `series_type=price`, ist `market_bid_area` Pflichtfeld; `site_id` optional.
   - Wenn `series_type=forecast` und Standorttrennung aktiv ist, ist `site_id` Pflicht.

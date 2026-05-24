@@ -59,7 +59,7 @@ Fachvalidierung und als Input für produktnahe Folge-Slices.
 ### Mittlere Relevanz
 
 - `Data_sources_list.docx` (liegt im Repo `BESSelligence`, Ordner `Docs`)
-  - EPEX, ENTSO-E, TSO-Daten, Wetter, Fuel, CO2, OPSD.
+  - EPEX, TSO-Daten, Wetter, Fuel, CO2, OPSD.
   - Nutzen: Quellenkatalog für Preis- und Forecast-Adapter.
 
 - `Feature_selection.docx` und
@@ -131,8 +131,8 @@ Papers, `BESS_Forecasting_Trading_Strategies.pptx`
 
 **Problem heute:** `bess-ems` besitzt einen source-neutralen
 `PriceSeries`-Pfad und einen Import-Endpunkt, aber keine produktiven
-externen Quellenadapter für EPEX/ENTSO-E/Open-Meteo oder für
-Forecast-Serien.
+externen Quellenadapter für EPEX/OPSD (Preis) oder ENTSO-E/Open-Meteo (Forecast),
+sowie Forecast-Serien.
 
 **Trigger** (eines reicht):
 
@@ -148,7 +148,8 @@ Forecast-Serien.
 
 **Abnahmekriterien:**
 
-- Mindestens zwei produktive Preis-Adapter (z. B. EPEX + ENTSO-E) mit
+- Mindestens zwei produktive Preis-Adapter (z. B. EPEX + OPSD
+  Open-Power-System-Data) mit
   dokumentiertem Fallback-Verhalten, Quellenmetadaten und Refresh-Status.
 - Mindestens zwei Forecast-Adapter (z. B. Wetter + Lastprognose) mit
   Zeitstempelung, Versionskennzeichen und Qualitätskennzahlen.

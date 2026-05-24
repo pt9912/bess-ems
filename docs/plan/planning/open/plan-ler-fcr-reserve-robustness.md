@@ -379,7 +379,7 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
     - bei `limiting_reason_code=RECOVERY_TIMEOUT` =>
       `OptimizationSolverStatus.Failed` mit
       `TerminationCode=reserve-robustness-recovery-timeout`,
-      `TerminationDetail=RECALL_TIMEOUT`.
+      `TerminationDetail=RECOVERY_TIMEOUT`.
     - sonst => `OptimizationSolverStatus.Failed` mit
       `TerminationCode=reserve-robustness-infeasible`.
   - `ROBUST_SOURCE_DATA_MISSING` => `OptimizationSolverStatus.Failed`
