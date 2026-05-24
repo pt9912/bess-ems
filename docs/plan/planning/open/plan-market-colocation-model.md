@@ -98,10 +98,17 @@ Moegliche Domain-/Application-Erweiterungen:
     - `site_id`
     - `timestamp_utc`
     - `resolution_minutes`
-    - `alignment_mode` (`reject` | `trim-to-common`)  
+  - `alignment_mode` (`reject` | `trim-to-common`)  
       - `reject`: harte Ablehnung bei Zeitachsenabweichung (Default im produktiven ADR)
       - `trim-to-common`: kontrollierte Trimmung auf gemeinsame Schnittmenge für Vorverarbeitung;
         nicht im produktiven Optimierungs-Request zulässig.
+    - `alignment_prepared` (verpflichtend bei `trim-to-common`):
+      Kennzeichen, dass die Trimmung bereits vollständig deterministisch
+      durchgeführt wurde (inkl. Reihenfolge- und Segmentierungsvorschrift).
+    - `alignment_prepared_by` (verpflichtend bei `alignment_prepared=true`):
+      Präfix/Komponente, die den Vorverarbeitungslauf ausgeführt hat (`forecast-preprocessor/v1`, `batch-trimmer/...`).
+    - `alignment_prepared_horizon_start_utc` und `alignment_prepared_horizon_end_utc` (verpflichtend bei `alignment_prepared=true`):
+      Resultierende harte Zeitschnittgrenzen nach Trimming.
     - `value_kw`
     - `value_type` (`forecast` | `actual`)
     - `source`
@@ -113,8 +120,11 @@ Moegliche Domain-/Application-Erweiterungen:
 - gleiche Zeitachse wie `PriceSeries` (UTC, step-genau, gleiche Horizon-Länge) bei produktiver Nutzung
 - Ist `alignment_mode=reject` (Default im produktiven ADR): die Zeitachse muss hart identisch sein (gleiches Horizon, gleiche Schrittweite, gleiche Startzeit).
 - Ist `alignment_mode=trim-to-common` gesetzt:
-  - produktive Optimierung darf diese Zeitachsenform nicht starten; dies führt zu `SCHEMA_INCONSISTENT`, solange keine Vorverarbeitung (`trim`-Pfad) explizit abgeschlossen wurde.
+  - `alignment_prepared` muss `true` sein; ohne abgeschlossene Vorverarbeitung führt der produktive Lauf zu `SCHEMA_INCONSISTENT`.
+  - `alignment_prepared` darf nur zusammen mit `alignment_mode=trim-to-common` verwendet werden.
+  - produktive Optimierung darf den Modus sonst nicht starten; dies führt zu `SCHEMA_INCONSISTENT`, solange keine Vorverarbeitung (`trim`-Pfad) explizit abgeschlossen wurde.
   - Schnittmenge auf den gemeinsamen Zeithorizont
+  - `alignment_prepared_by` und die vorbereiteten Horizon-Grenzen (`alignment_prepared_horizon_start_utc`, `alignment_prepared_horizon_end_utc`) müssen gesetzt sein.
   - deterministische Konvention bei Zeitachsen-Verschiebung
   - lückenbehaftete Schritte müssen im Anschluss vollständig abgearbeitet werden
   - nur im Forecast-/Preprocessing-Pfad, danach muss der Standardpfad (`reject`) mit lückenloser Zeitachse erhalten bleiben.

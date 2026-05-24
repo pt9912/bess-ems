@@ -99,7 +99,13 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
     - `valid_from_utc`, `valid_to_utc`
     - `provider_request_id`
 - `series_status` (finaler Endstatus je Serie): `SOURCE_OK`, `SOURCE_DEGRADED`, `SOURCE_FALLBACK_USED`, `SOURCE_REJECTED`
+- `source_eval_status` (Rohstatus je Providerlauf, vor Fallback-/Degradationsentscheidung): `SOURCE_OK`, `SOURCE_AUTH_ERROR`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_EMPTY`, `SOURCE_STALE`, `SOURCE_GAP`, `SOURCE_SCHEMA_MISMATCH`, `SOURCE_RETRY_EXHAUSTED`
 - `status_flags` (array, optional): `SOURCE_FALLBACK_USED`, `SOURCE_BACKFILL`, `SOURCE_RATE_LIMIT`, ...
+
+Hinweis zur Semantik:
+- `source_eval_status` ist der interne Rohstatus pro Providerlauf (inkl. Primär- und Fallback-Pfad, vor Qualitätsentscheidung).
+- `series_status` ist der externe Endstatus für Operator/API-Verträge (single-value).
+- Kombinierte Ereignisse werden weiterhin nur in `status_flags` kodiert.
 - `status_message` (optional): menschenlesbar
 - `status_detail` (optional): strukturierte Zusatzinfo (z. B. `{ "source_code": "SOURCE_STALE", "backfill_intervals_closed": 2, "effective_source_id": "opsd-..." }`)
 - Validierungspflicht:
@@ -155,17 +161,21 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
 
 ### Qualitätsentscheidungen bei `SOURCE_*` (verbindlich)
 
+Die Entscheidungslogik ist zweistufig:
+- `source_eval_status` wird zuerst berechnet (`OK`, harte oder degradierende Rohcodes).
+- Daraus wird deterministisch ein externer `series_status` abgeleitet (`SOURCE_OK`, `SOURCE_DEGRADED`, `SOURCE_FALLBACK_USED`, `SOURCE_REJECTED`).
+
 Die `SOURCE_*`-Auswertung ist für jede Serie deterministisch:
 
 1) Vorvalidierung
-- bei Schema-, Zeitachsen- oder Horizonabweichungen: sofort `SOURCE_SCHEMA_MISMATCH` → `SOURCE_REJECTED` (kein Fallback).
+- bei Schema-, Zeitachsen- oder Horizonabweichungen: sofort `source_eval_status=SOURCE_SCHEMA_MISMATCH` → `series_status=SOURCE_REJECTED` (kein Fallback).
 
 2) Rohcode-Auswertung
-- `SOURCE_OK` → direkt in Schritt 3.
-- `SOURCE_AUTH_ERROR` → harte Ablehnung (`SOURCE_REJECTED`), kein Retry/Fallback.
-- `SOURCE_GAP` → harte Ablehnung (`SOURCE_REJECTED`) für nicht behebbare Restlücken nach Backfill, kein Retry/Fallback.
-- `SOURCE_EMPTY` → harte Ablehnung (`SOURCE_REJECTED`), kein Retry/Fallback.
-- `SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_RETRY_EXHAUSTED` → Schritt 3.
+- `source_eval_status=SOURCE_OK` → direkt in Schritt 3.
+- `source_eval_status=SOURCE_AUTH_ERROR` → harte Ablehnung (`series_status=SOURCE_REJECTED`), kein Retry/Fallback.
+- `source_eval_status=SOURCE_GAP` → harte Ablehnung (`series_status=SOURCE_REJECTED`) für nicht behebbare Restlücken nach Backfill, kein Retry/Fallback.
+- `source_eval_status=SOURCE_EMPTY` → harte Ablehnung (`series_status=SOURCE_REJECTED`), kein Retry/Fallback.
+- `source_eval_status` in `{SOURCE_STALE, SOURCE_RATE_LIMIT, SOURCE_UNAVAILABLE, SOURCE_RETRY_EXHAUSTED}` → Schritt 3.
 
 3) Fallback- und Qualitätsmoduslogik
 - Fallback ist versuchsweise nur für diese Codes:
@@ -173,35 +183,34 @@ Die `SOURCE_*`-Auswertung ist für jede Serie deterministisch:
 - `SOURCE_AUTH_ERROR`, `SOURCE_SCHEMA_MISMATCH`, `SOURCE_GAP` sind nicht fallback-fähig.
 - Sind Primärcode + kompatible Fallback-Quelle vorhanden:
   - Der Fallback wird synchron ausgewertet.
-- Ist Fallback erfolgreich:
+  - Ist Fallback erfolgreich:
   - bei `quality_mode=strict`:
-    - finaler Zustand darf nur `SOURCE_OK` oder `SOURCE_FALLBACK_USED` sein.
+    - finaler Zustand darf nur `series_status=SOURCE_OK` oder `series_status=SOURCE_FALLBACK_USED` sein.
     - führt der Fallback zusätzliche Qualitätsminderung (`SOURCE_BACKFILL` o. ä.), ist das Ergebnis `SOURCE_REJECTED`.
-  - bei `quality_mode=degraded_ok`: finaler Zustand darf `SOURCE_DEGRADED` oder `SOURCE_FALLBACK_USED` sein; kombinierte Ereignisse werden in `status_flags` gehalten.
+  - bei `quality_mode=degraded_ok`: finaler Zustand darf `series_status=SOURCE_DEGRADED` oder `series_status=SOURCE_FALLBACK_USED` sein; kombinierte Ereignisse werden in `status_flags` gehalten.
     - Wenn Fallback erfolgreich und keine zusätzliche Qualitätsminderung vorliegt: `series_status=SOURCE_FALLBACK_USED`, `status_flags=[SOURCE_FALLBACK_USED]`.
     - Wenn Fallback erfolgreich mit Backfill/Degradation: `series_status=SOURCE_DEGRADED`, `status_flags=[SOURCE_FALLBACK_USED, SOURCE_BACKFILL]`.
   - Ist Fallback fehlgeschlagen:
-    - `strict`: harte Ablehnung (`SOURCE_REJECTED`).
-    - `degraded_ok`: nur akzeptierbare Backfill/Degradation zulassen (`SOURCE_DEGRADED`), sonst `SOURCE_REJECTED`.
+    - `strict`: harte Ablehnung (`series_status=SOURCE_REJECTED`).
+    - `degraded_ok`: nur akzeptierbare Backfill/Degradation zulassen (`series_status=SOURCE_DEGRADED`), sonst `series_status=SOURCE_REJECTED`.
 - Kein kompatibler Fallback:
-  - `strict`: harte Ablehnung bei `SOURCE_STALE`, `SOURCE_RETRY_EXHAUSTED`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`.
-  - `degraded_ok`: `SOURCE_STALE` kann als `SOURCE_DEGRADED` akzeptiert werden; `SOURCE_EMPTY` bleibt `SOURCE_REJECTED`.
+  - `strict`: harte Ablehnung bei `source_eval_status in {SOURCE_STALE, SOURCE_RETRY_EXHAUSTED, SOURCE_RATE_LIMIT, SOURCE_UNAVAILABLE}`.
+  - `degraded_ok`: `source_eval_status=SOURCE_STALE` kann als `series_status=SOURCE_DEGRADED` akzeptiert werden; `SOURCE_EMPTY` bleibt `series_status=SOURCE_REJECTED`.
 
 4) Endstatuszuordnung bei akzeptierter Serie
 - Primär: `SOURCE_OK`.
-- Mit Ersatzquelle: `SOURCE_FALLBACK_USED`.
-- Qualitätsminderung: `SOURCE_DEGRADED`.
+  - Mit Ersatzquelle: `series_status=SOURCE_FALLBACK_USED`.
+  - Qualitätsminderung: `series_status=SOURCE_DEGRADED`.
 - Kombinationsregel: Ist Fallback erfolgreich **und** Backfill aktiv, ist der `series_status` `SOURCE_DEGRADED` mit `status_flags` inklusive `SOURCE_FALLBACK_USED` und `SOURCE_BACKFILL`.
   - Diese Kombination ist in `quality_mode=strict` nicht zulässig.
-- harte Ablehnung: `SOURCE_REJECTED`.
+- harte Ablehnung: `series_status=SOURCE_REJECTED`.
 
 Hinweis:
 Endstatus ist ein einzelner Wert (`single-value`) je Serie (`series_status`).
 Fallback-/Degradationsdetails werden zusätzlich in `status_flags` und optionalem `status_detail` erfasst.
 
-### Fehler- und Ablaufcodes
+### Fehler-/Rohcodes und Endstatus (verbindlich)
 
-- `SOURCE_OK` – erfolgreich und validiert
 - `SOURCE_AUTH_ERROR` – Authentifizierung fehlt/fehlerhaft
 - `SOURCE_RATE_LIMIT` – Rate-Limit erreicht / Retry empfohlen
 - `SOURCE_UNAVAILABLE` – Provider temporär nicht erreichbar
@@ -210,9 +219,15 @@ Fallback-/Degradationsdetails werden zusätzlich in `status_flags` und optionale
 - `SOURCE_GAP` – nicht behebbare Zeitlücken
 - `SOURCE_SCHEMA_MISMATCH` – Zeitachse/Einheit/Schemafehler
 - `SOURCE_RETRY_EXHAUSTED` – Retries erfolglos
-- `SOURCE_FALLBACK_USED` – kontrollierter Fallback aktiv
 - `SOURCE_REJECTED` – harte Qualitätsprüfung fehlgeschlagen
 - `SOURCE_DEGRADED` – kontrollierter Backfill oder andere Teilqualitätsminderung
+
+Endgültige Serienendstatus sind:
+
+- `SOURCE_OK`
+- `SOURCE_DEGRADED`
+- `SOURCE_FALLBACK_USED`
+- `SOURCE_REJECTED`
 
 ---
 

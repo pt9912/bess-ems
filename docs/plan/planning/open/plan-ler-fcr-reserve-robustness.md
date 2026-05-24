@@ -213,6 +213,13 @@ Deterministische Berechnung (verbindlich):
   - Default: `1.0`, wenn das Produkt gebucht ist, sonst `0.0` bei nicht gebuchtem Produkt.
   - Bereich: `0 <= alpha_* <= 1` (numerisch stabiler Toleranzbereich in der Umsetzung, z. B. `1e-9`).
  - `Δt = resolution_minutes / 60` (in Stunden).
+- FCR-Worst-Case-Konsistenz bei Mindestzeit:
+  - Für FCR wird die Mindestaktivierungszeit als Zustandsgröße geführt:
+    - `fcr_remaining_{t+1} = fcr_min_t` nach einem Neustart/Non-Alert, sonst
+      `fcr_remaining_{t+1} = max(0, fcr_remaining_t - Δt*60)` während fortlaufender Alert-Phasen.
+    - `fcr_remaining_0 = t_min_fcr`.
+    - Bei Alert-Start in Schritt `t` ist die zunächst zu reservierende FCR-Energie auf `min(Δt, fcr_remaining_t/60)` h zu skalieren.
+    - Mit dem obigen stateful Ansatz wird bei kleinen `Δt` die volle Mindestdauer konservativ über Folgeintervalle berücksichtigt.
 - Hilfsgröße:
   - `self_discharge_loss_kwh_t` ist deterministisch zu berechnen:
     - bei `self_discharge_mode=absolute_kwh_per_hour`:
@@ -227,8 +234,11 @@ Deterministische Berechnung (verbindlich):
   - `available_up_kwh_base_t = max(0, soc_t^{eff} - soc_min_eff_kwh) * eta_discharge`
   - `available_down_kwh_base_t = max(0, soc_max_eff_kwh - soc_t^{eff}) / eta_charge`
 - Worst-Case-Energie je Richtung (kWh):
-  - `worst_up_kwh_t = min(Δt, t_min_fcr/60) * fcr_up_kw_t + min(Δt, full_activation_time_afrr_eff/60) * (alpha_afrr_up_t * afrr_up_kw_t) + min(Δt, full_activation_time_mfrr_eff/60) * (alpha_mfrr_up_t * mfrr_up_kw_t)`
-  - `worst_down_kwh_t = min(Δt, t_min_fcr/60) * fcr_down_kw_t + min(Δt, full_activation_time_afrr_eff/60) * (alpha_afrr_down_t * afrr_down_kw_t) + min(Δt, full_activation_time_mfrr_eff/60) * (alpha_mfrr_down_t * mfrr_down_kw_t)`
+  - `fcr_remaining_t`-abhängiger FCR-Term:
+    - `fcr_term_up_t = min(Δt, fcr_remaining_t/60) * fcr_up_kw_t`
+    - `fcr_term_down_t = min(Δt, fcr_remaining_t/60) * fcr_down_kw_t`
+  - `worst_up_kwh_t = fcr_term_up_t + min(Δt, full_activation_time_afrr_eff/60) * (alpha_afrr_up_t * afrr_up_kw_t) + min(Δt, full_activation_time_mfrr_eff/60) * (alpha_mfrr_up_t * mfrr_up_kw_t)`
+  - `worst_down_kwh_t = fcr_term_down_t + min(Δt, full_activation_time_afrr_eff/60) * (alpha_afrr_down_t * afrr_down_kw_t) + min(Δt, full_activation_time_mfrr_eff/60) * (alpha_mfrr_down_t * mfrr_down_kw_t)`
 - Normalisierte Worst-Case-Leistung:
   - `worst_up_kw_t = worst_up_kwh_t / Δt`
   - `worst_down_kw_t = worst_down_kwh_t / Δt`
