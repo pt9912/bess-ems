@@ -89,6 +89,8 @@ Nicht explizit modelliert:
 - optional `full_activation_time_afrr` (nur wenn sinnvoll gesetzt; bei gesetztem Wert `> 0`)
 - optional `full_activation_time_mfrr` (nur wenn sinnvoll gesetzt; bei gesetztem Wert `> 0`)
   - optional `simultaneous_reserve_direction_allowed` (default `false`)
+  - optional `restore_capability_up_kw` (optional, erlaubt zusätzliche obere Schranke für intraday Wiederherstellung in Up-Lade-Richtung)
+  - optional `restore_capability_down_kw` (optional, erlaubt zusätzliche obere Schranke für intraday Wiederherstellung in Down-Entlade-Richtung)
   - optional `eta_charge` (default: `1.0`, falls nicht aus dem Assetmodell übernommen)
   - optional `eta_discharge` (default: `1.0`, falls nicht aus dem Assetmodell übernommen)
   - optional `self_discharge_mode` (Werte: `absolute_kwh_per_hour` | `relative_soc_per_hour`, optional nur relevant wenn `is_ler=true`)
@@ -125,6 +127,10 @@ Nicht explizit modelliert:
     - `self_discharge_mode=relative_soc_per_hour`:
       - für `is_ler=true`: `self_discharge_soc_per_hour` ist Pflichtfeld (`>= 0`, Anteil SOC-Verlust pro Stunde),
       - `self_discharge_kwh_per_hour` wird ignoriert.
+  - Restore-Leistung:
+    - Wenn gesetzt, begrenzt `restore_capability_up_kw` den maximal nutzbaren Restore-Leistungsfluss der Up-Richtung (Lade-Richtung) und `restore_capability_down_kw` die Down-Richtung (Entlade-Richtung).
+    - `restore_capability_up_kw` und `restore_capability_down_kw` müssen, falls gesetzt, strikt `> 0` sein.
+    - Wenn ein Feld fehlt, gilt im ersten Slice der konservative Default `restore_capability_* = worst_*_kw_t` der jeweiligen Schrittzeitreihe.
   - Für `soc_strategy=conservative` gelten Zusatzregeln:
     - `conservative_soc_headroom_ratio` muss im Bereich `0..1` liegen.
     - `conservative_soc_headroom_kwh` muss `>= 0` sein.
@@ -319,10 +325,12 @@ Restore- und Gate-Entscheidungslogik (verbindlich):
   - Down-Verstoß-Defizit:
     `restore_shortfall_down_kwh = max(0, worst_down_kwh_t - (soc_max_eff_kwh - soc_plan_down_t) / eta_charge)`
 - Verfügbare Wiederherstellungsleistung je Schritt:
-    - Up-Branch: `restore_shortfall_up_kwh` kann durch `worst_up_kw_t` rückgewonnen werden:
-      `required_activation_kw_up = if restore_shortfall_up_kwh > 0 then worst_up_kw_t else 0`
+    - Up-Branch:
+      `restore_capability_up_t = if restore_capability_up_kw is set then restore_capability_up_kw else worst_up_kw_t`
+      `required_activation_kw_up = if restore_shortfall_up_kwh > 0 then restore_capability_up_t else 0`
     - Down-Branch:
-      `required_activation_kw_down = if restore_shortfall_down_kwh > 0 then worst_down_kw_t else 0`
+      `restore_capability_down_t = if restore_capability_down_kw is set then restore_capability_down_kw else worst_down_kw_t`
+      `required_activation_kw_down = if restore_shortfall_down_kwh > 0 then restore_capability_down_t else 0`
     - Richtungsbasierte Mindest-Rekonstruktionsdauer:
       - `restore_time_up = if restore_shortfall_up_kwh > 0 and required_activation_kw_up > 0 then restore_shortfall_up_kwh / required_activation_kw_up * 60 else 0`
       - `restore_time_down = if restore_shortfall_down_kwh > 0 and required_activation_kw_down > 0 then restore_shortfall_down_kwh / required_activation_kw_down * 60 else 0`

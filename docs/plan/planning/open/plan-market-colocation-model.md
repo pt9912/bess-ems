@@ -271,8 +271,9 @@ Für produktive Freischaltung ist ein deterministischer Migrationspfad für best
   - `migration_strict=true` (Standard): unklare oder inkompatible Datensätze werden in produktiven Co-Location-Requests blockiert.
   - `migration_strict=false` (nur mit explizitem Release-Governance): erlaubt die Koexistenz bis zur Bereinigung nicht-aktiver Sites; aktive Sites bleiben weiterhin blockiert.
   - Aktivitätsdeterministik:
-    - Eine Site gilt als aktiv, wenn `can_dispatch` fehlt oder `true` ist.
-    - Nicht-aktive Sites werden explizit mit `can_dispatch=false` markiert.
+    - Eine Site gilt für die Migrationsbewertung als aktiv, wenn sie explizit im Scope des aktuellen Co-Location-Requests aktiv ist.
+      Dafür ist `can_dispatch=true` erforderlich; bei Legacy-Datensätzen ohne explizite Aktivierungsentscheidung wird im Migrationsvorlauf keine harte Laufblockade ausgelöst.
+    - Nicht aktive Sites werden explizit mit `can_dispatch=false` markiert oder im Migrationsaudit ohne harte Blockade geführt, bis sie aktiv in Betrieb genommen werden.
 - Migrationsfenster (vor Aktivierung des Co-Location-MVP, nicht inline im operativen Lauf).
 - Kandidatenklassifikation je Datensatz:
   - `normalized`: `site_grid_power_sign` ist gesetzt oder eindeutig aus vorhandenen
@@ -309,7 +310,7 @@ Für produktive Freischaltung ist ein deterministischer Migrationspfad für best
   `limiting_reason` abgelehnt.
 - Unklare Datensätze dürfen nicht implizit in einen Default übernommen werden.
 - Bei `migration_strict=false` gilt:
-  - `unclear`-/`incompatible`-Datensätze mit `can_dispatch=true` (oder fehlendem Flag) blockieren produktive Runs weiterhin.
+  - `unclear`-/`incompatible`-Datensätze blockieren produktive Runs weiterhin nur, wenn sie im aktuellen aktiven Co-Location-Request-Scope liegen.
   - `unclear`-/`incompatible`-Datensätze mit `can_dispatch=false` werden im Audit-Bundle erfasst, aber operativ nicht hart blockiert.
 - Alle Migrationsergebnisse sind in einem Audit-Bundle je Lauf zusammengefasst und
   für Operator-Replay verfügbar.

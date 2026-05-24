@@ -79,8 +79,12 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
   - Akzeptiert werden:
     - streng monoton wachsende numerische Versionen (int-kompatibel),
     - oder Zeitstempel-basierte semantische Versionen (z. B. `2026-05-24T12:00:00Z-v3`).
+  - Repräsentationsstabilität: die Versionsfamilie pro `(series_id, ... , source.provider_id)` ist verbindlich.
+    - Die Familie wird beim ersten gültigen Write bestimmt (`int` oder `timestamp`-basiert).
+    - Ein späterer Wechsel der Versionsfamilie wird als harte Schemaabweichung (`source_eval_status=SOURCE_SCHEMA_MISMATCH`, `series_status=SOURCE_REJECTED`) bewertet und muss migriert werden.
   - Für einen stabilen Tie-Break werden bei gleicher Klasse numerisch zuerst `series_version` (wie definiert),
     dann bei gleicher Version der hash-basierte Payload-Fingerprint (`value_hash`) verwendet.
+    - „gleiche Klasse“ meint die normalisierte Vergleichsschicht der festen Versionsfamilie pro Serie/Provider.
   - `site_id` (optional)
     - erforderlich für standortgebundene Forecast-/Erzeugungs-/Last-/Wetter-Reihen
     - optional oder leer für produktweite Forecast-Daten ohne Standortkontext
@@ -134,8 +138,9 @@ Hinweis zur Semantik:
   - Wird dieselbe Kombination aus `series_id` und `series_version` mehrfach geladen, muss der
     vollständig gehashte Payload-identisch sein; andernfalls wird der Lauf als harten Fehler
     (`source_eval_status=SOURCE_SCHEMA_MISMATCH`, `series_status=SOURCE_REJECTED`) geführt.
-  - Eine eingehende Serie mit älterer Version als der zuletzt akzeptierten Referenzversion für dieselbe
-    Signaturkombination wird als harte Versionsabweichung (`series_status=SOURCE_REJECTED`) abgewiesen.
+  - Eine eingehende Serie mit älterer Version als die letzte akzeptierte Referenzversion für dieselbe
+    Signaturkombination wird nach dem stabilisierten Vergleich als harte Versionsabweichung (`series_status=SOURCE_REJECTED`) abgewiesen.
+    - Der stabile Vergleich nutzt zuerst die Versionsfamilie (`int` oder `timestamp`), danach den normalisierten Fortschritt in dieser Familie.
   - Für identische Serienversionen ist Verhalten idempotent: bestehende gültige Daten dürfen nur dann
     aktualisiert werden, wenn sich die `series_version` oder der `value_hash` geändert hat.
 - Mapping-Regel:
