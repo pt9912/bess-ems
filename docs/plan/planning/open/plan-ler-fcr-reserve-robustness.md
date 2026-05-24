@@ -256,6 +256,11 @@ Deterministische Berechnung (verbindlich):
   - `alpha_afrr_up_t`, `alpha_afrr_down_t`
   - `alpha_mfrr_up_t`, `alpha_mfrr_down_t`
   - Default: `1.0`, wenn das Produkt gebucht ist, sonst `0.0` bei nicht gebuchtem Produkt.
+  - Vor der Rechnung ist hart zu validieren:
+    - Alle Reserve- und Alphafelder pro Zeitschritt sind endlich und nicht negativ.
+    - `fcr_*`, `afrr_*`, `mfrr_*` und die optionalen `required_*`-Felder sind `>= 0`.
+    - Bei `alpha_*` gilt `0 <= alpha_* <= 1` mit Toleranz; `alpha_* < 0` oder `> 1` führt auf
+      `ROBUST_POLICY_UNSUPPORTED` (`POLICY_MISMATCH`).
   - Bereich: `0 <= alpha_* <= 1` (numerisch stabiler Toleranzbereich in der Umsetzung, z. B. `1e-9`).
  - `Δt = resolution_minutes / 60` (in Stunden).
   - Sofern `simultaneous_reserve_direction_allowed=false`, wird konservativ angenommen, dass Up- und Down-Aktivierung nicht
@@ -452,6 +457,9 @@ Pflichtregeln:
    - `required_restore_down_kwh_t = coalesce(required_down_kwh_t, worst_down_kwh_t)`
    - `restore_up_kwh_t = max(0, required_restore_up_kwh_t - available_up_kwh_t)`
    - `restore_down_kwh_t = max(0, required_restore_down_kwh_t - available_down_kwh_t)`
+  - Vor der Berechnung gilt hart:
+    - `required_restore_up_kwh_t` und `required_restore_down_kwh_t` müssen `>= 0` sein.
+    - Wird ein negativer Rohwert übermittelt (`coalesce` nicht möglich), gilt `ROBUST_POLICY_UNSUPPORTED` mit `POLICY_MISMATCH` als harte Vorvalidierung.
  - Wenn `restore_up_kwh_t > 0` und `restore_down_kwh_t > 0` im selben Schritt gilt:
    - `ReserveRobustnessResult` wird mit `ROBUST_INFEASIBLE` und `limiting_reason_code = NO_RECOVERY_PATH` geführt (ein Batteriekorridor kann pro Schritt nicht zugleich laden und entladen).
  - Sonst:
@@ -531,6 +539,9 @@ Order-Routing oder Boersenanbindung bleibt ausserhalb.
 - Ergebnis-/Run-Mapping (verbindlich):
   - `reserve_robustness_status = ReserveRobustnessResult.status`.
   - `reserve_robustness_limiting_reason = ReserveRobustnessResult.limiting_reason_code`.
+  - `HasUsableSolution` wird in der aktuellen Codebasis weiterhin aus
+    `OptimizationSolverStatus.{Optimal,Feasible}` abgeleitet; die produktive
+    Ausführungssteuerung nutzt darüber hinaus das neue harte Gate `CanExecute`.
   - Bei `reserve_robustness_status != ROBUST_OK` ist
     `reserve_robustness_limiting_reason` als Pflichtfeld im `OptimizationRun`-`TerminationDetail`
     zu persistieren, inkl. optionaler `status_description`, damit Operator-/Replay-Sichten die Ursache eindeutig nachvollziehen.

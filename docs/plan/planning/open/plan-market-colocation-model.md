@@ -123,16 +123,21 @@ Moegliche Domain-/Application-Erweiterungen:
   - `max_import_kw`
   - `max_export_kw`
   - optional `grid_connection_power_kw`
-  - optional `can_dispatch`
+  - `can_dispatch` (produktiver Scope: required, migrationsfähig mit Standardisierung)
     - Semantik: `true` = aktive Teilnahme am Request, `false` = bewusst ausgeschaltet.
     - Produktiver Scope:
       - `true`/`false` ist bindend.
+      - Bei expliziter Site-Beteiligung in einem produktiven Co-Location-Request muss `can_dispatch=true` gelten.
       - Bei fehlendem `can_dispatch` wird der betroffene Site-Scope im produktiven Lauf als Konfigurationsfehler abgelehnt:
         `CONFIG_INCONSISTENT` mit `SITE_CAN_DISPATCH_MISSING`.
     - Legacy-Migrationsfenster:
       - Im Migrations-Dry-Run darf das Feld als `can_dispatch=false` modelliert werden,
         aber nur mit explizitem Migrations-Audit-Flag und sichtbar im Audit-Report.
-    - Aktive Teilnahme am aktuellen Co-Location-Request erfordert `can_dispatch=true`.
+    - Produktiver Zugriff außerhalb eines Migrationsfensters:
+      - `can_dispatch` muss gesetzt sein.
+      - `can_dispatch=false` markiert die Site als inaktiv; inaktive Sites werden bei aktiven Requests nicht ausgewertet.
+      - `can_dispatch=false` ohne aktive Request-Beteiligung ist zulässig und blockiert nicht per se produktive Co-Location-Runs anderer aktiver Sites.
+      - `can_dispatch=true` und `site_grid_power_sign` nicht gesetzt bleibt weiterhin hart blockiert (`CONFIG_INCONSISTENT`).
   - `site_grid_power_sign` (verpflichtend): `export_pos` oder `import_pos`
     - `export_pos`: positive Leistung bedeutet Export ans Netz
     - `import_pos`: positive Leistung bedeutet Import aus dem Netz
@@ -255,7 +260,9 @@ Verbindliche Defaults (Phase-1-ADR):
     - Migrations-Release: bestehende `SiteConstraint`-Datensätze, deren Vorzeichenkonvention aus vorhandenen Feldern eindeutig bestimmt werden kann, werden deterministisch auf den abgeleiteten Wert normalisiert und mit `site_grid_power_sign_normalized=true` markiert.
     - Folge-Release: unmarkierte `site_grid_power_sign`-freie Datensätze werden als `CONFIG_INCONSISTENT` abgewiesen.
     - Nach der Migrationsphase ist `site_grid_power_sign` ohne Ausnahmekodex Pflichtfeld.
-- `max_import_kw` und `max_export_kw` sind harte Pflichtfelder (`>= 0`) je Site.
+  - Es gilt kein impliziter Default auf `export_pos` oder `import_pos`.
+  - Nicht-aktive Sites (`can_dispatch=false`) dürfen im `migration_strict=false`-Modus als betrieblich freigestellt betrachtet werden, bis der Betreiber die Sign-Konvention aktiv bestätigt.
+  - `max_import_kw` und `max_export_kw` sind harte Pflichtfelder (`>= 0`) je Site.
 - `grid_connection_power_kw` ist optional; wenn nicht gesetzt, ist nur die Einzelgrenze über `max_import_kw`/`max_export_kw` aktiv.
 - `d_t` ist Richtungs-Binärvariable entsprechend der Site-Konvention; für beide
   Sign-Konventionen identisch definiert, nur die Vorzeichenzuordnung in
@@ -448,6 +455,11 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
   [`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md).
 - Änderungen an `CanExecute`, Laufkodierung oder Terminierungsdetails sind nur
   gemeinsam und im selben Release-Commit umzusetzen.
+- Implementierungsvorgabe:
+  - Die Datenklasse für Optimierungsruns muss `CanExecute` als persistiertes Feld erhalten.
+  - Solange `HasUsableSolution` in der vorhandenen Codebasis weiterhin auf
+    `OptimizationSolverStatus.{Optimal,Feasible}` basiert, gilt `CanExecute` als harte
+    Betriebs-Gate-Quelle für den Dispatcher/Scheduler, nicht umgekehrt.
 - Ein Slice darf erst freigegeben werden, wenn beide Dokumente semantisch
   übereinstimmen und die Cross-Checks bestanden sind.
 - Co-Location folgt dem selben CanExecute-Vertrag:

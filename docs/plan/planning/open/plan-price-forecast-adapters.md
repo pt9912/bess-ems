@@ -54,6 +54,10 @@ Kompatibilitäts-/Migrationsprinzip:
   - bestehende Preisimporte nutzen weiterhin `IPriceSeriesSource`,
   - Forecast/Forecast-Adapter nutzen `IForecastSeriesSource`,
   - beide werden vor dem Optimierer über denselben Mapping-Layer auf die aktuelle Domäne projiziert.
+- Für den produktiven Slice ist die bestehende `PriceSeries`/Persistenzkette kompatibel zu erweitern:
+  - bestehender `IPriceSeriesStore`- und Import-Schlüssel darf nicht nur auf Markt/Produkt/Bereich/Quelle/Timestep basieren.
+  - Die Persistenz muss mindestens `series_id` und `series_version` als Teil der Identität tragen (oder einen deterministischen Ersatzschlüssel aus genau diesen Werten plus `series_type/product/site_id/area`).
+  - Ohne diese Erweiterung bleibt F-MKT-02 im produktiven Modus auf den bisherigen Altpfad beschränkt, bis ein dedizierter Speicher-Migrationspfad freigegeben wurde.
 - In der Einführungsphase gilt "Dual-Path":
   - Altpfad unverändert lauffähig,
   - Neupfade können aktiv/inaktiv geschaltet werden,
@@ -554,6 +558,9 @@ arbeitet mit deterministischen Preiswerten.
   - `SeriesEnvelope` inkl. `series_status`, `source_eval_status`, `status_flags`, `status_detail`,
   - `source_metadata` mit Versions-/Zeit-/Provider-Informationen,
   - klare Trennschärfe Producer- und Operator-Sichten.
+- [ ] Persistenzkompatibilität hergestellt:
+  - bestehende Serie- und Import-Speicher (InMemory + dauerhafte Stores, soweit vorhanden) führen `series_id`/`series_version` in der Serien-Identität oder einem deterministisch äquivalenten Ersatzschlüssel.
+  - ohne diese Erweiterung bleibt eine produktive Aufnahme neuer Serienkennungen im Slice gesperrt (Fallback-Pfad definiert).
 - [ ] Import-Adapter sind bereit für produktive Nutzung:
   - mindestens ein primärer und ein fallbackfähiger Preisadapter,
   - mindestens ein primärer und ein fallbackfähiger Forecastadapter,

@@ -168,7 +168,9 @@ sowie Forecast-Serien.
   Validierungsmodus dokumentiert.
 - [ ] F-MKT-02-Abnahmebedingungen sind dokumentiert (mind. 2 Preis-Adapter + 2 Forecast-Adapter, Fallback-/Degradation-Modell, Aktualisierung + Alarmierung).
 - [ ] Trigger-Koordination bei parallelen Auslösern ist definiert und konfliktfrei:
-  - Reihenfolge der Freigabe ist festgelegt,
+  - Reihenfolge der Freigabe ist festgelegt:
+    - Produktiv-Freigaben mit neuer Markt-/Co-Location-Logik vor Forecast-/Adapter-Produktivpfad.
+    - Forecast-/Adapter-Produktivfreigabe hängt von erfolgreicher Serien-Identitätsintegration in die bestehende `PriceSeries`-Persistenz ab.
   - degraded/fallback Verhalten ist begrenzt dokumentiert,
   - harte Start-Blockade ohne `series_status`-Entscheidung ist festgelegt.
 - [ ] Copyright- und Nutzungsgrenzen sind explizit dokumentiert und für externe Claims verifiziert.
@@ -184,7 +186,10 @@ sowie Forecast-Serien.
     `quality_mode=degraded_ok`).
     In `quality_mode=strict` ist `SOURCE_FALLBACK_USED` nur dann zulässig, wenn kein zusätzlicher Qualitätsverlust
     dokumentiert ist (also `status_flags` ohne `SOURCE_BACKFILL`).
-  4. Bei Konflikten gilt als harte Regel: neue Betriebslogik darf nicht ohne definierte
+  4. Parallelbetrieb ist erst freigegeben, wenn `CanExecute`-Semantik zwischen
+     `plan-market-colocation-model.md` und
+     `plan-ler-fcr-reserve-robustness.md` verbindlich abgeglichen ist.
+  5. Bei Konflikten gilt als harte Regel: neue Betriebslogik darf nicht ohne definierte
      `series_status`-Entscheidung in den Markt- und Optimierungsworkflow starten.
 
 ---
