@@ -188,13 +188,19 @@ Deterministische Berechnung (verbindlich):
     - `soc_up_0 = soc_t`
     - `soc_down_0 = soc_t`
   - Zeitschrittweise Rekursion:
-    - `soc_plan_{t+1} = soc_t - max(0, b_t) * Δt / eta_discharge + max(0, -b_t) * eta_charge * Δt - self_discharge_loss_kwh_t`
-    - Up-Branch: `worst_up_kwh_t <= (soc_up_t - soc_min_kwh) * eta_discharge`
-      - falls ja: `soc_up_{t+1} = soc_plan_{t+1} - worst_up_kwh_t / eta_discharge`
+    - `soc_plan_up_t = soc_up_t - max(0, b_t) * Δt / eta_discharge + max(0, -b_t) * eta_charge * Δt - self_discharge_loss_kwh_t`
+    - `soc_plan_down_t = soc_down_t - max(0, b_t) * Δt / eta_discharge + max(0, -b_t) * eta_charge * Δt - self_discharge_loss_kwh_t`
+    - Sicherheitsanker:
+      - Falls `soc_plan_up_t < soc_min_kwh` oder `soc_plan_up_t > soc_max_kwh`, gilt `ROBUST_INFEASIBLE` mit `SOC_LIMIT`.
+      - Falls `soc_plan_down_t < soc_min_kwh` oder `soc_plan_down_t > soc_max_kwh`, gilt `ROBUST_INFEASIBLE` mit `SOC_LIMIT`.
+    - Up-Branch: `worst_up_kwh_t <= (soc_plan_up_t - soc_min_kwh) * eta_discharge`
+      - falls ja: `soc_up_{t+1} = soc_plan_up_t - worst_up_kwh_t / eta_discharge`
       - falls nein: `ROBUST_INFEASIBLE` mit `SOC_LIMIT`
-    - Down-Branch: `worst_down_kwh_t <= (soc_max_kwh - soc_down_t) / eta_charge`
-      - falls ja: `soc_down_{t+1} = soc_plan_{t+1} + worst_down_kwh_t * eta_charge`
+      - Nach dem Update: `soc_up_{t+1} >= soc_min_kwh` und `soc_up_{t+1} <= soc_max_kwh`, sonst `ROBUST_INFEASIBLE` mit `SOC_LIMIT`
+    - Down-Branch: `worst_down_kwh_t <= (soc_max_kwh - soc_plan_down_t) / eta_charge`
+      - falls ja: `soc_down_{t+1} = soc_plan_down_t + worst_down_kwh_t * eta_charge`
       - falls nein: `ROBUST_INFEASIBLE` mit `SOC_LIMIT`
+      - Nach dem Update: `soc_down_{t+1} >= soc_min_kwh` und `soc_down_{t+1} <= soc_max_kwh`, sonst `ROBUST_INFEASIBLE` mit `SOC_LIMIT`
   - `ROBUST_OK`, wenn kein Schritt in beiden Branches versagt.
   - Bei Grenz- und Dateninkonsistenzen: `ROBUST_NEEDS_INTRADAY_RESTORE` oder
     `ROBUST_INFEASIBLE` anhand `limiting_reason_code`.

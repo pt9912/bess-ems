@@ -137,6 +137,14 @@ Gleichungen:
 - optional, falls `grid_connection_power_kw` gesetzt:
   - `p_grid_import_t + p_grid_export_t <= site.grid_connection_power_kw`
 
+Verbindliche Defaults (Phase-1-ADR):
+
+- `site_grid_power_sign` ist ein Pflichtfeld für den produktiven `SiteConstraint`; fehlt es, gilt standardisiert `export_pos`.
+- `max_import_kw` und `max_export_kw` sind harte Pflichtfelder (`>= 0`) je Site.
+- `grid_connection_power_kw` ist optional; wenn nicht gesetzt, ist nur die Einzelgrenze über `max_import_kw`/`max_export_kw` aktiv.
+- `d_t` bleibt für beide Sign-Konventionen die Exportrichtungs-Binärvariable.
+- Die Ziellogik ist zeitscheibenweise identisch in beiden Konventionen; es wird ausschließlich die Vorzeichenzuordnung von `site_power_t` gewechselt.
+
 Interpretation:
 
 - `b_t` und `(g_t - c_t)` wirken auf denselben Punkt.
@@ -179,8 +187,9 @@ Die bestehende Vorzeichenkonvention bleibt unveraendert:
 - Batterie `> 0 kW` = Entladen
 - Batterie `< 0 kW` = Laden
 
-Fuer den Netzanschlusspunkt muss der Slice eine eigene, explizite
-Konvention festlegen, bevor Code umgesetzt wird.
+Für den Netzanschlusspunkt ist die Konvention in diesem Slice vollständig festgelegt
+(Produktivmodus: `site_grid_power_sign=export_pos` als Default, umsetzungsseitig
+pro Site optional overridebar).
 
 ---
 

@@ -60,7 +60,9 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
   überführt werden.
 - Der minimale `SeriesEnvelope` enthält:
   - `series_id` (stabil)
-  - `site_id` (wo relevant)
+  - `site_id` (optional)
+    - erforderlich für standortgebundene Forecast-/Erzeugungs-/Last-/Wetter-Reihen
+    - optional oder leer für produktweite Preisreihen ohne Standortkontext
   - `series_type` (`price` oder `forecast`)
   - `series_product` (z. B. `day_ahead`, `intraday`, `load`, `pv`, `wind`, `weather-temp`)
   - `unit` (z. B. `EUR/MWh`, `kW`, `kWh`, etc.)
@@ -91,6 +93,9 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
   - `series_type=forecast` dient in diesem Slice der Seitcar-/Inputlogik und darf nur in
     der dort definierten Integrationslogik weiterverarbeitet werden, solange kein
     produktiver Forecast-Domaintyp im EMS aktiv ist.
+- Konsistenz-Regel:
+  - Wenn `series_type=price`, ist `site_id` optional.
+  - Wenn `series_type=forecast` und Standorttrennung aktiv ist, ist `site_id` Pflicht.
 
 ### Freshness- und Gap-Policy (verbindlich)
 
