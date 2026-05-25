@@ -176,6 +176,33 @@ sowie Forecast-Serien.
 - Qualitätsschema enthält kombinierte Status-Sichtbarkeit (Fallback + Degradation)
   ohne Informationsverlust für Operator/Rückverfolgbarkeit.
 
+## Item F-LER-01: Aktivierungsdauer als Steuerparameter
+
+**Quelle:** Regelleistungs-/LER-Robustheitsfolge aus
+[`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md)
+
+**Problem heute:** `required_activation_minutes` ist im ersten
+LER/FCR-Slice nur Operatorkontext und trägt `audit_only=true`. Kein
+Laufverhalten darf davon abhängen.
+
+**Trigger** (eines reicht):
+
+- Ein Produkt- oder Regelleistungsfall verlangt
+  `required_activation_minutes` als harte Optimierungs- oder
+  Dispatch-Constraint.
+- Operator-/Replay-Auswertung reicht nicht mehr aus, weil Aktivierungsdauer
+  direkt in Restore-, Reserve- oder Fahrplanentscheidungen eingehen muss.
+
+**Aktivierungs-Pfad:** eigener Migrations-/Folgeslice auf Basis von
+[`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md).
+
+**Abnahmekriterien:**
+
+- Feldvalidierung, Persistenz-/API-Ausgabe und alle Konsumenten werden gemeinsam
+  migriert.
+- Der Wechsel von `audit_only=true` zu steuerndem Verhalten ist explizit
+  versioniert und replaybar.
+
 ## Trigger-Readiness-Checkliste
 
 Legende: `[x]` bedeutet hier "Trigger-Spezifikation scharf genug", nicht
@@ -183,7 +210,9 @@ Legende: `[x]` bedeutet hier "Trigger-Spezifikation scharf genug", nicht
 
 - [x] Externe Quellenanalyse ist als Trigger-Spezifikation abgeschlossen (DFBEW,
   Co-Location, Forecast-Trading, zusätzliche Medium-Quellen) und fachlich
-  klassifiziert.
+  klassifiziert; interne Pflicht-Gates wie
+  [`Domain-Migration OptimizationRun.CanExecute`](plan-domain-migration-optimization-run-can-execute.md)
+  bleiben davon unberührt und müssen vor Slice-Aktivierung erfüllt sein.
 - [x] F-MKT-01-Abnahmebedingungen sind als Slice-Startkriterien dokumentiert und
   für mindestens diese drei produktiven Betriebsformen (`StandaloneBess`,
   `ClassicalCoLocation`, `HybridWithGridImport`) definiert.
@@ -196,13 +225,16 @@ Legende: `[x]` bedeutet hier "Trigger-Spezifikation scharf genug", nicht
   je aktivierter lokaler Erzeugungsfamilie oder ein expliziter
   `degraded_ok`-Übergangspfad; jeweils Fallback-/Degradation-Modell,
   Aktualisierung + Alarmierung).
+- [x] F-LER-01 ist als Trigger für den späteren Wechsel von
+  `required_activation_minutes` aus reinem Audit-Kontext in steuerndes
+  Laufverhalten dokumentiert.
 - [x] Trigger-Koordination bei parallelen Auslösern ist als Startregel definiert;
   autoritativ ist der folgende Abschnitt
-  [Trigger-Koordination bei gleichzeitigen Auslösern](#trigger-koordination-bei-gleichzeitigen-auslösern).
+  [Trigger-Koordination bei gleichzeitigen Ausloesern](#trigger-koordination-bei-gleichzeitigen-ausloesern).
 - [x] Copyright- und Nutzungsgrenzen sind als Prüfpunkte für spätere Slices
   explizit dokumentiert.
 
-## Trigger-Koordination bei gleichzeitigen Auslösern
+## Trigger-Koordination bei gleichzeitigen Ausloesern
 
 Aktivierungsreihenfolge mit Gates:
 
@@ -222,8 +254,8 @@ Aktivierungsreihenfolge mit Gates:
    "Import-Adapter sind bereit für produktive Nutzung".
 5. Produktive Replays ohne immutable Request-Snapshot sind vorerst nicht
    freigegeben. Dafür ist zuerst ein eigener Trigger-/Pre-Slice
-   `OptimizationRun.SolverScopeAudit` anzulegen. Dieser Name ist aktuell ein
-   noch nicht spezifizierter Folge-Pre-Slice; andernfalls bleibt der
+   [`OptimizationRun.SolverScopeAudit`](plan-domain-migration-optimization-run-solver-scope-audit.md)
+   abzuschließen; andernfalls bleibt der
    Request-Snapshot die kanonische `solver_scope`-Auditquelle.
 
 Laufende Betriebsregeln:

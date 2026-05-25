@@ -248,6 +248,10 @@ Nicht explizit modelliert:
       - Wird das Feld später Steuerparameter, braucht es einen expliziten Migrationsschritt:
         Validierung, Persistenz-/API-Ausgabe und Konsumenten müssen dann gemeinsam
         eingeführt werden; bis dahin darf kein Laufverhalten davon abhängen.
+        Trigger für diesen Folgeschritt ist eine Produktanforderung, die
+        `required_activation_minutes` als Optimierungs- oder Dispatch-Constraint
+        statt nur als Operator-Audit benötigt. Bis dahin bleibt der Trigger im
+        Aktivierungs-ADR bzw. Trigger-Watch zu diesem Slice zu dokumentieren.
 
 - `AlertStateTimeline`
   - Zeitreihe für FCR-Alert-State-Status, Reserve Mode,

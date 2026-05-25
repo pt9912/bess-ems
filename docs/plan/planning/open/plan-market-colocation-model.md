@@ -42,8 +42,9 @@ Erweiterung bzw. des daraus erzeugten Optimization-Core-Requests, nicht von
 Ablage für den gewählten `solver_scope` (`LP`/`MILP`) und eine mögliche
 Partitionierungsentscheidung. Produktive Replays ohne Request-Snapshot sind
 vorerst nicht freigegeben; falls sie später erlaubt werden sollen, ist vorher
-ein eigener, aktuell noch nicht spezifizierter Pre-Slice
-`OptimizationRun.SolverScopeAudit` erforderlich.
+der Pre-Slice
+[`OptimizationRun.SolverScopeAudit`](plan-domain-migration-optimization-run-solver-scope-audit.md)
+abzuschließen.
 `TerminationDetail` ist nicht die kanonische Ablage für diesen Scope.
 
 Entscheidungsreihenfolge je Request:
@@ -175,15 +176,22 @@ Mögliche Domain-/Application-Erweiterungen:
     - Legacy-Migrationsfenster:
       - Im Migrations-Dry-Run darf das Feld als `can_dispatch=false` modelliert werden,
         aber nur mit explizitem Migrations-Audit-Flag und sichtbar im Audit-Report.
-    - Fehlendes `can_dispatch` wird nach Modus eindeutig behandelt; diese Matrix
-      ist die kanonische Aktivitäts-/Migrationsmatrix für `can_dispatch`.
+    - Fehlendes `can_dispatch` wird nach Modus eindeutig behandelt; die folgende
+      Liste ist die kanonische Aktivitäts-/Migrationsmatrix für `can_dispatch`.
       `migration_dry_run=true` überschreibt `migration_strict` ausschließlich für
-      Run-Blockaden und erzeugt stattdessen ein Audit-Bundle.
-      | Modus | Aktivitätsbewertung | Ergebnis |
-      | --- | --- | --- |
-      | `migration_dry_run=true` | aktiv, inaktiv oder unklar | keine Laufblockade; Audit-Eintrag `SITE_CAN_DISPATCH_MISSING`, aktive Site gilt nicht als ausführbar, inaktive Site bleibt bis zur Bereinigung im Audit-Bundle |
-      | produktiv | aktiv oder unklar | harte Blockade mit `CONFIG_INCONSISTENT` / `SITE_CAN_DISPATCH_MISSING`, unabhängig von `migration_strict` |
-      | produktiv | nicht aktiv | bei `migration_strict=true` harte Blockade bis explizit `can_dispatch=false` modelliert oder im Dry-Run auditierbar bereinigt; bei `migration_strict=false` keine Laufblockade, Datensatz bleibt im Audit-Bundle bis zur Bereinigung |
+      Run-Blockaden und erzeugt stattdessen ein Audit-Bundle:
+      - `migration_dry_run=true`, Aktivitätsbewertung aktiv, inaktiv oder
+        unklar: keine Laufblockade; Audit-Eintrag
+        `SITE_CAN_DISPATCH_MISSING`, aktive Site gilt nicht als ausführbar,
+        inaktive Site bleibt bis zur Bereinigung im Audit-Bundle.
+      - produktiv, Aktivitätsbewertung aktiv oder unklar: harte Blockade mit
+        `CONFIG_INCONSISTENT` / `SITE_CAN_DISPATCH_MISSING`, unabhängig von
+        `migration_strict`.
+      - produktiv, Aktivitätsbewertung nicht aktiv: bei
+        `migration_strict=true` harte Blockade bis explizit
+        `can_dispatch=false` modelliert oder im Dry-Run auditierbar bereinigt;
+        bei `migration_strict=false` keine Laufblockade, Datensatz bleibt im
+        Audit-Bundle bis zur Bereinigung.
       Der `migration_strict`-Schalter wirkt damit ausschließlich für nicht aktive
       Sites; aktive Sites bleiben in beiden Produktivmodi hart blockiert.
     - Produktiver Zugriff außerhalb eines Migrationsfensters:
@@ -269,9 +277,11 @@ Mögliche Domain-/Application-Erweiterungen:
     `CONFIG_INCONSISTENT` mit `format=kv1;reason=GREEN_STORAGE_ORIGIN_CAPACITY_ZERO`.
   - Validierung (nur wenn von `1.0` abweichend): `eta_min <= eta_charge <= 1`
     und `eta_min <= eta_discharge <= 1`; `eta_min` ist die gemeinsame
-    Assetmodell-Invariante aus dem Robustheitspfad und muss aus einer zentralen
-    Assetmodell-Konstante bzw. einem gemeinsamen Validierungshelfer bezogen
-    werden, nicht aus einer planlokalen Kopie.
+    Assetmodell-Invariante aus dem Robustheitspfad
+    ([`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md))
+    und muss vor Slice-Aktivierung in einer zentralen Assetmodell-Konstante bzw.
+    einem gemeinsamen Validierungshelfer etabliert werden, nicht in
+    planlokalem Hilfscode.
 
 - `CoLocationMode`
   - Betriebsart nach obigem Arbeitsmodell
@@ -469,7 +479,7 @@ Rollback-/Backout-Verhalten:
 
 Fehlerklassifikation für `GreenStorageRestricted`:
 
-| Erkennungsschicht | Auslöser | Coderraum | Grundcode |
+| Erkennungsschicht | Auslöser | Coderaum | Grundcode |
 | --- | --- | --- | --- |
 | Produktiv-Precheck | Produktiver Routine-Run ohne `green_storage_validation_mode=true` | `CONFIG_INVALID` | `GREEN_STORAGE_RESTRICTED_PRODUCTIVE_BLOCKED` |
 | Input-/Pre-Solver-Validierung | Fehlender oder nicht auditierbarer Herkunftsnachweis | `CONFIG_INCONSISTENT` | `GREEN_STORAGE_ORIGIN_PROOF_MISSING` |

@@ -241,6 +241,9 @@ Hinweis zur Semantik:
 - `series_status` ist der externe Endstatus für Operator/API-Verträge (single-value).
 - Kombinierte Ereignisse werden weiterhin nur in `status_flags` kodiert.
 - `SOURCE_DEGRADED` ist ausschließlich ein finaler `series_status` und nicht als `source_eval_status` vorgesehen.
+  Operator-Audit muss degradierte Endstatus über `source_eval_status`,
+  `status_flags` und `status_detail.reason` unterscheiden können (z. B.
+  Backfill, Stale-Weiterbetrieb oder transitional input).
 - Validierungspflicht:
   - strikte UTC-Zeitachse
   - Schrittweite exakt `resolution_minutes`
@@ -436,10 +439,10 @@ Empfohlene Integrationskonvention (API/Operator):
   - In `quality_mode=degraded_ok` gilt `SOURCE_GAP` als harte Ablehnung nur für nicht
     vollständig behebbare oder noch offene Restlücken nach abgeschlossener
     Backfill-Behandlung.
-  - Operator-Hinweis: Behebbare Gaps bleiben in `strict` abgelehnt, weil Backfill
-    einen geänderten Datenbestand erzeugt. Stale-Daten dürfen in `degraded_ok` nur
-    kontrolliert weiterlaufen, weil ihre Zeitachse vollständig ist und die
-    Qualitätsminderung sichtbar markiert wird.
+  - Operator-Hinweis (Begründung, keine zweite Regel): Behebbare Gaps bleiben in
+    `strict` abgelehnt, weil Backfill einen geänderten Datenbestand erzeugt.
+    Stale-Daten dürfen in `degraded_ok` nur kontrolliert weiterlaufen, weil ihre
+    Zeitachse vollständig ist und die Qualitätsminderung sichtbar markiert wird.
 
 ### Qualitätsentscheidungen bei `SOURCE_*` (Ablauf)
 

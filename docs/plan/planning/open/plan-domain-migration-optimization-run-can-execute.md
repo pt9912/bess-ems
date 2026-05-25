@@ -275,10 +275,10 @@ Die Slices dürfen danach nur fachliche Gründe für `CanExecute=false` liefern,
 nicht mehr die Domain-/Persistenzmigration selbst besitzen.
 Solver-spezifische Audit-Metadaten wie `solver_scope` sind nicht Bestandteil
 dieses Pre-Slices; falls ein Slice sie ohne Request-Snapshot replayfähig im Run
-persistieren muss, braucht es einen separaten Audit-Pre-Slice. Der aktuell
-verwendete Name `OptimizationRun.SolverScopeAudit` ist ein noch nicht
-spezifizierter Folge-Pre-Slice; bis ein Stub oder Plan dafür angelegt ist, gilt:
-produktive Replays ohne immutable Request-Snapshot sind nicht freigegeben.
+persistieren muss, braucht es den separaten Audit-Pre-Slice
+[`OptimizationRun.SolverScopeAudit`](plan-domain-migration-optimization-run-solver-scope-audit.md).
+Bis dahin gilt: produktive Replays ohne immutable Request-Snapshot sind nicht
+freigegeben.
 
 ---
 
