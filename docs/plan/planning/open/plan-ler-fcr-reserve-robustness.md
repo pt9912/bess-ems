@@ -147,10 +147,11 @@ Nicht explizit modelliert:
     - Wird `eta_charge`/`eta_discharge` in der Policy nicht gesetzt, sind sie aus dem Assetmodell zu lesen.
     - Falls gesetzt, muss gelten: `eta_min <= eta_charge <= 1` und `eta_min <= eta_discharge <= 1`.
     - `eta_min` ist die gemeinsame Assetmodell-Invariante für alle Energiepfade
-      (Co-Location, lokale Herkunftsbilanz, Robustheitsprüfung): `eta_min = 1e-6`.
-      Die Umsetzung bezieht diesen Wert aus einer zentralen Assetmodell-Konstante
-      bzw. einem gemeinsamen Validierungshelfer, nicht aus einer planlokalen
-      Kopie.
+      (Co-Location, lokale Herkunftsbilanz, Robustheitsprüfung) aus dem
+      Pre-Slice
+      [`Domain-Migration AssetModel.ValidationHelper`](plan-domain-migration-asset-model-validation-helper.md):
+      `eta_min = 1e-6`. Vor Aktivierung muss dieser Pre-Slice abgeschlossen
+      sein; der Slice darf den Wert nicht planlokal duplizieren.
     - `eta_charge < eta_min` oder `eta_discharge < eta_min` führt zu `ROBUST_POLICY_UNSUPPORTED`.
   - Selbstentladung:
   - Für `is_ler=true` gilt: Es muss nach Policy-/Asset-Auflösung ein effektiver LER-Verlustwert
@@ -315,6 +316,9 @@ Deterministische Berechnung (verbindlich):
       - `self_discharge_kwh_per_hour` (absolute VerlustkWh/h) oder
       - `self_discharge_soc_per_hour` (SOC-Abschlag pro Stunde).
   - Vorzeichenkonvention wie im Optimierer: `b_t > 0` Entladen, `b_t < 0` Laden.
+    `b_t` ist die geplante Fahrplanleistung im Zeitschritt, nicht die
+    Reserveaktivierung; diese wird getrennt über `worst_up_kwh_t` und
+    `worst_down_kwh_t` geführt.
 - Reserve-Anforderungen je Zeitschritt:
   - `fcr_up_kw_t`, `fcr_down_kw_t`, `afrr_up_kw_t`, `afrr_down_kw_t`, `mfrr_up_kw_t`, `mfrr_down_kw_t`
   - optionale Pflichtanteile je Produkt und Richtung:
@@ -906,8 +910,9 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
 - FCR-Worst-Case für nicht-LER: volle FCR-Leistung über Horizont.
 - LER-konservative FCR-Huelle mit `t_min_fcr`.
 - Voller Aktivierungszeitraum deutlich größer als Horizon (`full_activation_time`, `full_activation_time_afrr`, `full_activation_time_mfrr`) nutzt deterministisch die jeweilige Produktsemantik:
-  FCR den `Δt`-Clip der Mindestzeit, aFRR/mFRR den Rampenenergie-Faktor ohne
-  Negative oder unzulässige Reserve-Anforderung.
+  FCR nutzt den `Δt`-Clip der Mindestzeit (`min(Δt, t_min_fcr/60)`),
+  aFRR/mFRR nutzen `ramp_energy_hours(Δt, full_activation_time_*_eff/60)` ohne
+  negative oder unzulässige Reserve-Anforderung.
 - Grenzwert-Effizienz `eta_charge` / `eta_discharge` nahe Null (z. B. `1e-9`) wird explizit als harte Verweigerung
   auf `ROBUST_POLICY_UNSUPPORTED` getestet (`eta_min`-Grenzprüfung), ohne implizite `clamp`-/`bounding`-Logik.
 - Alert State startet bei definierter Frequenzabweichung und endet erst

@@ -205,84 +205,54 @@ Laufverhalten darf davon abhängen.
 
 ## Trigger-Readiness-Checkliste
 
-Legende: `[x]` bedeutet hier "Trigger-Spezifikation scharf genug", nicht
-"Implementierung abgeschlossen".
+Legende: `[T]` bedeutet "Trigger-Spezifikation scharf genug". Es bedeutet
+nicht "Implementierung abgeschlossen"; offene DoD-Items bleiben in den
+verlinkten Plänen maßgeblich.
 
-- [x] Externe Quellenanalyse ist als Trigger-Spezifikation abgeschlossen (DFBEW,
+- [T] Externe Quellenanalyse ist als Trigger-Spezifikation abgeschlossen (DFBEW,
   Co-Location, Forecast-Trading, zusätzliche Medium-Quellen) und fachlich
   klassifiziert; interne Pflicht-Gates wie
   [`Domain-Migration OptimizationRun.CanExecute`](plan-domain-migration-optimization-run-can-execute.md)
   bleiben davon unberührt und müssen vor Slice-Aktivierung erfüllt sein.
-- [x] F-MKT-01-Abnahmebedingungen sind als Slice-Startkriterien dokumentiert und
+- [T] F-MKT-01-Abnahmebedingungen sind als Slice-Startkriterien dokumentiert und
   für mindestens diese drei produktiven Betriebsformen (`StandaloneBess`,
   `ClassicalCoLocation`, `HybridWithGridImport`) definiert.
-- [x] `GreenStorageRestricted` läuft im ersten Slice als Validierungsmodus mit
+- [T] `GreenStorageRestricted` läuft im ersten Slice als Validierungsmodus mit
   harten Constraints; produktive Förderautomatik bleibt einem späteren Slice
   vorbehalten.
-- [x] F-MKT-02-Abnahmebedingungen sind als Slice-Startkriterien dokumentiert
+- [T] F-MKT-02-Abnahmebedingungen sind als Slice-Startkriterien dokumentiert
   (Preis: 1 Primär + 1 Fallback; Forecast: je 2 Adapter für `load` und
   `weather-temp`; bei forecast-basierter Co-Location zusätzlich `pv`/`wind`
   je aktivierter lokaler Erzeugungsfamilie oder ein expliziter
   `degraded_ok`-Übergangspfad; jeweils Fallback-/Degradation-Modell,
   Aktualisierung + Alarmierung).
-- [x] F-LER-01 ist als Trigger für den späteren Wechsel von
+- [T] F-LER-01 ist als Trigger für den späteren Wechsel von
   `required_activation_minutes` aus reinem Audit-Kontext in steuerndes
   Laufverhalten dokumentiert.
-- [x] Trigger-Koordination bei parallelen Auslösern ist als Startregel definiert;
-  autoritativ ist der folgende Abschnitt
+- [T] Trigger-Koordination bei parallelen Auslösern verweist auf kanonische
+  Aktivierungsquellen; Übersicht steht im folgenden Abschnitt
   [Trigger-Koordination bei gleichzeitigen Ausloesern](#trigger-koordination-bei-gleichzeitigen-ausloesern).
-- [x] Copyright- und Nutzungsgrenzen sind als Prüfpunkte für spätere Slices
+- [T] Copyright- und Nutzungsgrenzen sind als Prüfpunkte für spätere Slices
   explizit dokumentiert.
 
 ## Trigger-Koordination bei gleichzeitigen Ausloesern
 
-Aktivierungsreihenfolge mit Gates:
+Diese Note ist kein normativer Gate-Vertrag. Sie verweist nur auf die
+kanonischen Quellen, wenn mehrere Trigger gleichzeitig aktiv werden:
 
-1. [`Domain-Migration OptimizationRun.CanExecute`](plan-domain-migration-optimization-run-can-execute.md)
-   ist zuerst abzuschließen; danach dürfen konsumierende Slices ihre
-   fachlichen `*_ok`-Beiträge anschließen.
-2. [`Domain-Migration PriceSeries.Identity`](plan-domain-migration-price-series-identity.md)
-   ist vor produktivem F-MKT-02-Betrieb und vor produktivem F-MKT-01-Betrieb
-   mit externen lokalen Erzeugungs- oder Forecast-Serien abzuschließen.
-   Die gemeinsame Assetmodell-Konstante bzw. der gemeinsame Validierungshelfer
-   für `eta_min` wird mit dem ersten aktivierten Slice eingeführt, der
-   Wirkungsgradvalidierung benötigt (`plan-market-colocation-model.md` oder
-   `plan-ler-fcr-reserve-robustness.md`), und danach vom jeweils anderen Slice
-   wiederverwendet.
-3. `F-MKT-01` darf vor F-MKT-02 nur dann produktiv starten, wenn es keine
-   externen Serien nutzt oder diese ausdrücklich als Übergangspfad mit
-   `quality_mode=degraded_ok` geführt werden.
-4. `F-MKT-02` darf parallel als Datenvertrags-Slice vorbereitet werden; volle
-   Forecast-/Adapter-Aktivierung braucht den PriceSeries.Identity-Pre-Slice,
-   den abgeschlossenen OptimizationRun.CanExecute-Pre-Slice für den
-   `source_ok`-Combiner-Beitrag und mindestens die Adapter-Plan-DoD-Punkte
-   "Persistenzkompatibilität hergestellt" und
-   "Import-Adapter sind bereit für produktive Nutzung".
-5. Produktive Replays ohne immutable Request-Snapshot sind vorerst nicht
-   freigegeben. Die erste Produkt- oder Betreiberanforderung nach Replay ohne
-   immutable Request-Snapshot aktiviert den Trigger für den Pre-Slice
-   [`OptimizationRun.SolverScopeAudit`](plan-domain-migration-optimization-run-solver-scope-audit.md);
-   andernfalls bleibt der Request-Snapshot die kanonische `solver_scope`-
-   Auditquelle.
-
-Laufende Betriebsregeln:
-- Produktiv geht erst auf Forecast-/Adapter-Vollaktivierung über, wenn alle DoD-
-  Items in [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md)
-  erfüllt sind und mindestens ein produktiver Refresh-Zyklus je aktivierter
-  Serie ohne `SOURCE_REJECTED` abgeschlossen wurde. Die Note wiederholt keine
-  Teilmenge des `SOURCE_*`-/`quality_mode`-Vertrags.
-  Für die Abgrenzung gelten die Serienbegriffe (`series_type`,
-  `series_product`, `market_bid_area`) exakt nach
-  [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md).
-- Bei Konflikten gilt als harte Regel: neue Betriebslogik darf nicht ohne
-  definierte `series_status`-Entscheidung in den Markt- und
-  Optimierungsworkflow starten.
-- Für nicht adapter-getragene Serien im bestehenden Altpfad verweist diese Note
-  ausschließlich auf den kanonischen Transitional-Input-Vertrag in
-  [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md). Dieser
-  Altpfad ist kein `quality_mode=strict`-Pfad und muss spätestens mit
-  produktiver F-MKT-02-Aktivierung abgelöst oder als eigener Legacy-Sunset-Slice
-  geführt werden.
+- Gemeinsame Ausführungsentscheidung und `*_ok`-Combiner:
+  [`Domain-Migration OptimizationRun.CanExecute`](plan-domain-migration-optimization-run-can-execute.md)
+- Gemeinsame Assetmodell-Grenze `eta_min`:
+  [`Domain-Migration AssetModel.ValidationHelper`](plan-domain-migration-asset-model-validation-helper.md)
+- Serienidentität und Store-/Mapper-Migration:
+  [`Domain-Migration PriceSeries.Identity`](plan-domain-migration-price-series-identity.md)
+- `solver_scope`-Audit für produktive Replays ohne immutable Request-Snapshot:
+  [`OptimizationRun.SolverScopeAudit`](plan-domain-migration-optimization-run-solver-scope-audit.md)
+- Forecast-/Adapter-Aktivierung, `source_ok`, Transitional-Input und
+  Legacy-Sunset:
+  [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md)
+- Co-Location-Produktivpfade und Übergangsadapter-Verbrauch:
+  [`plan-market-colocation-model.md`](plan-market-colocation-model.md)
 
 ---
 

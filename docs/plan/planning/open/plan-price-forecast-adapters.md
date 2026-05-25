@@ -60,23 +60,11 @@ Kompatibilitäts-/Migrationsprinzip:
 - Vor produktiver Aktivierung dieses Slices ist der Pre-Slice
   [`Domain-Migration PriceSeries.Identity`](plan-domain-migration-price-series-identity.md)
   abzuschließen.
-- Die bestehende `PriceSeries`/Persistenzkette ist dort kompatibel zu erweitern:
-  - bestehender Schlüsselaspekt in `InMemoryPriceSeriesStore.PriceSeriesKey`
-    (Quelle: `src/hexagon/BatteryEms.Application/Markets/InMemoryPriceSeriesStore.cs`)
-    darf nicht nur auf `MarketBidArea`/`Product`/`PriceKind`/`Source`/`HorizonStart`/
-    `HorizonEnd`/`TimeStep` basieren. Der heutige Typ ist ein privater Store-Record;
-    die Migration muss ihn entweder durch einen expliziten, testbaren Serienidentitätstyp
-    ersetzen oder den Store-Key vollständig neu schneiden.
-  - Die Persistenz muss mindestens `series_id`, `series_version` **und**
-    `source.provider_id` als Teil der Identität tragen (oder einen deterministischen
-    Ersatzschlüssel aus genau diesen Werten plus
-    `series_type/product/site_id/market_bid_area`).
-  - Liefergegenstand des Pre-Slices ist eine explizite Schema-Migration für
-    `PriceSeries` selbst: neue Serienidentitätsfelder am Domain-/Application-Record,
-    neuer Store-Key, Mapping zwischen `SeriesEnvelope` und `PriceSeriesRequest`,
-    Import-/API-Wire-Kompatibilität sowie Anpassung aller dauerhaften Stores, soweit
-    im Produktpfad vorhanden.
-  - Ohne diese Erweiterung bleibt F-MKT-02 im produktiven Modus auf den bisherigen Altpfad beschränkt, bis ein dedizierter Speicher-Migrationspfad freigegeben wurde.
+- Die bestehende `PriceSeries`-/Persistenzkette wird ausschließlich im
+  Identity-Pre-Slice migriert. Dieser Adapter-Slice konsumiert den dort
+  abgeschlossenen Identitätsvertrag; ohne diese Erweiterung bleibt F-MKT-02 im
+  produktiven Modus auf den bisherigen Altpfad beschränkt, bis ein dedizierter
+  Speicher-Migrationspfad freigegeben wurde.
 - In der Einführungsphase gilt "Dual-Path":
   - Altpfad unverändert lauffähig,
   - Neupfade können aktiv/inaktiv geschaltet werden,
@@ -185,6 +173,47 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
     1/2 ist `value_hash` Pflicht, außer der Adapter ist explizit als
     Einmalimport ohne Re-Load-Vertrag deklariert. Der Hash stabilisiert den
     Payload-Vergleich.
+
+### Kanonische `value_hash`-Berechnung (verbindlich)
+
+`value_hash` ist `sha256(canonical_bytes)` als lower-case Hex-String ohne
+Prefix. `canonical_bytes` sind UTF-8-Bytes eines kanonischen JSON-Objekts mit
+lexikografisch sortierten Property-Namen; Arrays behalten die unten definierte
+Reihenfolge. Es gibt keine weitere Byte-Order-/Endian-Interpretation.
+
+Eingabemenge:
+
+- `series_type`, `series_product`, `unit`, `resolution_minutes`
+- `horizon_start_utc`, `horizon_end_utc`
+- `alignment_mode`
+- falls gesetzt: `alignment_prepared`, `alignment_prepared_by`,
+  `alignment_prepared_horizon_start_utc`, `alignment_prepared_horizon_end_utc`
+- `values`
+
+Normalisierung:
+
+- Zeitstempel werden in UTC im Roundtrip-ISO-8601-Format mit `Z` serialisiert;
+  lokale Zeitzonen und Offset-Varianten sind vor dem Hash zu normalisieren.
+- `values` werden strikt aufsteigend nach `timestamp_utc` sortiert. Doppelte
+  Zeitstempel innerhalb derselben Serie sind `SOURCE_SCHEMA_MISMATCH`.
+- Jeder Wertpunkt enthält `timestamp_utc`, `value` und `value_type`.
+  `value_type` wird lower-case (`actual` oder `forecast`) serialisiert.
+- `value` wird als JSON-Zahl in invariant-culture Roundtrip-Repräsentation
+  serialisiert; `NaN`, `Infinity`, lokalisierte Dezimaltrennzeichen und
+  stringifizierte Zahlen sind unzulässig.
+- `confidence` ist im ersten Slice kein produktiver Hash-Bestandteil. Wird eine
+  spätere Extension dafür freigegeben, wird `confidence` genau dann je Punkt in
+  die kanonische Nutzlast aufgenommen, wenn es gesetzt ist, und nutzt dieselbe
+  numerische Repräsentation wie `value`.
+- `retrieved_at_utc`, `valid_from_utc`, `valid_to_utc`, `status_message`,
+  `status_detail`, `series_status`, `source_eval_status`, `status_flags`,
+  Credentials, Provider-Request-Metadaten und Lizenzmetadaten gehen nicht in den
+  Hash ein.
+
+Der Pre-Slice
+[`Domain-Migration PriceSeries.Identity`](plan-domain-migration-price-series-identity.md)
+implementiert denselben Algorithmus in Store-/Mapper-Tests; dieser Adapterplan
+ist die fachliche Eingabequelle für die Hash-Nutzlast.
 - Repräsentationsstabilität ist für die vollständige Serien-Signatur verpflichtend.
   - Die Vergleichbarkeit verwendet die Signatur:
     `series_id`, `source.provider_id`, `series_type`, `series_product`,
@@ -219,7 +248,9 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
          `dual_active_started_at` aus dem Release-Runbook und erstem
          akzeptiertem Dual-Active-Import, in dem alte und neue Family im selben
          Release-Fenster mindestens `SOURCE_OK` oder ausdrücklich zugelassenes
-         `SOURCE_DEGRADED` liefern. Der Default verlangt ab diesem Anker
+         `SOURCE_DEGRADED` liefern. Fehlt `dual_active_started_at` im Runbook,
+         gilt `first_accepted_dual_active_import_time` als Anker und wird im
+         Audit-Bundle festgehalten. Der Default verlangt ab diesem Anker
          mindestens zwei vollständige Release-Fenster. Ein Release-Fenster ist
          mindestens ein produktiver Import-/Refresh-Zyklus und mindestens
          7 Kalendertage.
@@ -599,8 +630,8 @@ Endgültige Serienendstatus sind:
 - Persistenz-/Schema-Migration als Phase-1-Voraussetzung:
   - `PriceSeries`/Import-Request erhalten die Serienidentitätsfelder oder einen
     deterministisch äquivalenten Ersatzschlüssel.
-  - `InMemoryPriceSeriesStore` ersetzt den privaten Alt-Key durch die neue
-    Serienidentität; dauerhafte Stores folgen demselben Schlüsselvertrag.
+  - Der Identity-Pre-Slice stellt den neuen Store-/Mapper-Schlüsselvertrag für
+    InMemory und dauerhafte Stores bereit.
   - Ohne diese Migration dürfen neue Serienkennungen nicht produktiv aufgenommen werden.
   - Die Umsetzung liegt im Pre-Slice
     [`Domain-Migration PriceSeries.Identity`](plan-domain-migration-price-series-identity.md);
@@ -667,6 +698,15 @@ Aktivierungslogik:
   Status-/Fallback-Matrix wird nicht hier dupliziert.
 - Ohne genehmigte Fallback-Quelle bleibt der produktive Pfad hart blockiert (kein
   Übergang über implizite Qualitätsdegradation).
+- Vollaktivierung eines Forecast-/Adapterpfads ist erst zulässig, wenn alle DoD-
+  Items dieses Plans erfüllt sind und mindestens ein produktiver Refresh-Zyklus
+  je aktivierter Serie ohne `SOURCE_REJECTED` abgeschlossen wurde.
+- Neue Betriebslogik darf nicht ohne definierte `series_status`-Entscheidung in
+  Markt- oder Optimierungsworkflows starten.
+- Nicht adapter-getragene Serien im Altpfad nutzen ausschließlich den
+  Transitional-Input-Vertrag dieses Plans. Dieser Altpfad ist kein
+  `quality_mode=strict`-Pfad und muss spätestens mit produktiver F-MKT-02-
+  Aktivierung abgelöst oder als eigener Legacy-Sunset-Slice geführt werden.
 
 Zusätzlich:
 
@@ -722,14 +762,10 @@ arbeitet mit deterministischen Preiswerten.
    Slice Contract-/DTO-Daten. Konsumierende Slices wie Co-Location projizieren
    sie deterministisch in eigene Domaintypen (`LocalGenerationSeries`), bis ein
    produktiver Forecast-Domaintyp aktiviert wird.
-3. Schema-Migration `PriceSeries`/Store-Identität:
-   - umgesetzt über
-     [`Domain-Migration PriceSeries.Identity`](plan-domain-migration-price-series-identity.md),
-   - `series_id`, `series_version`, `source.provider_id` und Serien-Signaturfelder am
-     produktiven Serienmodell oder deterministischem Ersatzschlüssel,
-   - neuer `PriceSeriesKey`/Store-Key für InMemory und dauerhafte Stores,
-   - Mapper `SeriesEnvelope` -> `PriceSeriesRequest`/Domain-Serie,
-   - Migrations-/Fallback-Verhalten für Altimporte.
+3. Abgeschlossene Schema-/Store-Migration aus
+   [`Domain-Migration PriceSeries.Identity`](plan-domain-migration-price-series-identity.md);
+   dieser Adapter-Slice konsumiert deren Serienidentitäts-, Store- und
+   Mapper-Vertrag nur als Voraussetzung.
 4. Quellenstatusmodell inklusive Refresh-/Fehlerstatus.
 5. Mindestens ein Adapter mit Mock-/Replay-fähigem Testpfad.
 6. API- oder Operator-UI-Status für Datenquellen.
@@ -740,6 +776,9 @@ arbeitet mit deterministischen Preiswerten.
      mit identischem Payload bleibt idempotent
    - identische kanonische Serien-Signatur plus `series_version` mit anderem
      `value_hash` führt deterministisch zu `SOURCE_REJECTED`
+   - `value_hash`-Kanonisierung verwendet die Eingabemenge, Sortier-/
+     Normalisierungsregel und `sha256(canonical_bytes)` aus
+     [Kanonische `value_hash`-Berechnung](#kanonische-value_hash-berechnung-verbindlich).
    - gleiche `series_id`/`series_version` mit anderem `provider_id` wird als
      separater Provider-Kontext innerhalb der kanonischen Signatur bewertet
    - Primary-Validierung gegen Secondary-Adapter bei Primary-Ausfall
@@ -793,8 +832,9 @@ arbeitet mit deterministischen Preiswerten.
   - der Pre-Slice
     [`Domain-Migration PriceSeries.Identity`](plan-domain-migration-price-series-identity.md)
     ist abgeschlossen.
-  - `PriceSeries` selbst, `PriceSeriesKey`, Import-Request-Mapping und alle Store-Pfade
-    sind Teil derselben Migration; reine Adapter-Vertragsänderungen reichen nicht.
+  - Der Identity-Pre-Slice deckt `PriceSeries`, Store-Key, Import-Request-
+    Mapping und dauerhafte Store-Pfade ab; reine Adapter-Vertragsänderungen
+    reichen nicht.
   - ohne diese Erweiterung bleibt eine produktive Aufnahme neuer Serienkennungen im Slice gesperrt (Fallback-Pfad definiert).
   - Produktive Familie-/Versionswechsel sind nur per dokumentiertem Cutover erlaubt; ein stiller `series_version_family`- oder Revisionsfamilienwechsel ohne Release-Freigabe führt zu harter Ablehnung.
 - [ ] Import-Adapter sind bereit für produktive Nutzung:

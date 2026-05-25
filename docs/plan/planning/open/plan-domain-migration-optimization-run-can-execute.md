@@ -112,7 +112,9 @@ Code-Konventionen:
 | Solver-seitige mathematische Infeasibility | `Infeasible` | bestehender Solver-Code, z. B. `or-tools-infeasible` | `false` |
 | Domain-spezifisch erklärbare Infeasibility (`MODEL_INFEASIBLE`) | `Infeasible` | bestehender Solver-Code, z. B. `or-tools-infeasible`; Domain-Grund in `TerminationDetail=format=kv1;reason=<DOMAIN_REASON>` | `false` |
 | Solver-seitig unbeschränktes Modell | `Unbounded` | bestehender Solver-Code, z. B. `or-tools-unbounded` | `false` |
+| Time Limit mit verwertbarer Lösung | `TimeLimit` | bestehender Timeout-Code, z. B. `or-tools-time-limit`; `TerminationDetail` muss die verwendete Solver-Provenienz und `solution_available=true` enthalten | `true`, sofern keine Guard-Beiträge sperren |
 | Time Limit ohne ausführbaren Plan | `TimeLimit` | bestehender Timeout-Code, z. B. `or-tools-time-limit` | `false` |
+| Iteration Limit mit verwertbarer Lösung | `IterationLimit` | bestehender Iterations-Code, sofern vom Solver geliefert; `TerminationDetail` muss die verwendete Solver-Provenienz und `solution_available=true` enthalten | `true`, sofern keine Guard-Beiträge sperren |
 | Iteration Limit ohne ausführbaren Plan | `IterationLimit` | bestehender Iterations-Code, sofern vom Solver geliefert | `false` |
 | Reiner Rechenfehler/Solverfehler | `Failed` | Solver-spezifische harte Codes, z. B. `or-tools-abnormal`, `or-tools-model-invalid`, `or-tools-not-solved` | `false` |
 | Konfigurationsfehler (`CONFIG_*`) | `Failed` | `config-invalid` oder `config-inconsistent` | `false` |

@@ -84,6 +84,20 @@ Normativ soll die Serienidentität mindestens tragen:
      Schema-/Signaturprüfungen; sie sind nicht Teil des eindeutigen Store-Keys,
      weil ein Wechsel unter gleicher Serienidentität als harter
      Schemafehler statt als zweite Serie behandelt wird.
+   - Bestehender Schlüsselaspekt in
+     `InMemoryPriceSeriesStore.PriceSeriesKey`
+     (Quelle:
+     `src/hexagon/BatteryEms.Application/Markets/InMemoryPriceSeriesStore.cs`)
+     darf nicht nur auf `MarketBidArea`/`Product`/`PriceKind`/`Source`/
+     `HorizonStart`/`HorizonEnd`/`TimeStep` basieren. Der heutige Typ ist ein
+     privater Store-Record; die Migration muss ihn entweder durch einen
+     expliziten, testbaren Serienidentitätstyp ersetzen oder den Store-Key
+     vollständig neu schneiden.
+   - Liefergegenstand dieses Pre-Slices ist eine explizite Schema-Migration für
+     `PriceSeries` selbst: neue Serienidentitätsfelder am Domain-/
+     Application-Record, neuer Store-Key, Mapping zwischen `SeriesEnvelope` und
+     `PriceSeriesRequest`, Import-/API-Wire-Kompatibilität sowie Anpassung aller
+     dauerhaften Stores, soweit im Produktpfad vorhanden.
    - Altimporte bleiben über einen Dual-Path lauffähig.
    - Bestehende In-Memory-/Legacy-Datensätze werden nicht still umgedeutet:
      - `series_id = legacy:<market_bid_area>:<product>:<price_kind>:<source>`
@@ -101,17 +115,11 @@ Normativ soll die Serienidentität mindestens tragen:
      `ForecastSeries`-Contract-Daten abgebildet.
    - Provider-ID, Version, Family und `value_hash` dürfen nicht im
      Mapping-Verlauf verloren gehen.
-   - `value_hash` wird kanonisch als SHA-256 über eine UTF-8-kodierte,
-     sort-key-stabile JSON-Nutzlast berechnet. Die Nutzlast enthält:
-     - geordnete Zeitstempel in UTC (`O`/ISO-8601, keine lokale Zeitzone),
-     - Werte in deterministischer Roundtrip-Decimal-/Double-Repräsentation,
-     - `unit`, `resolution_minutes`, `series_type`, `series_product`,
-     - Coverage-Metadaten (`horizon_start_utc`, `horizon_end_utc`),
-     - Alignment-Metadaten (`alignment_mode`, `alignment_prepared`,
-       `alignment_prepared_by`, `alignment_prepared_horizon_start_utc`,
-       `alignment_prepared_horizon_end_utc`), sofern sie gesetzt sind.
-     Provider-spezifische Abrufmetadaten, `retrieved_at_utc`, Statusmeldungen
-     und Credentials gehen nicht in den Hash ein.
+   - `value_hash` wird kanonisch nach
+     [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md#kanonische-value_hash-berechnung-verbindlich)
+     berechnet: `sha256(canonical_bytes)` über UTF-8-kodiertes kanonisches JSON
+     mit sortierten Properties, normalisierter UTC-Zeitachse, deterministischer
+     Zahlenrepräsentation und Alignment-Metadaten, sofern gesetzt.
    - Ein Mapping-Test fixiert Byte-für-Byte, dass identische Eingangszeitreihen
      unabhängig von Dictionary-/JSON-Feldreihenfolge denselben `value_hash`
      erzeugen.

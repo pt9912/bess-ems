@@ -314,11 +314,10 @@ Mögliche Domain-/Application-Erweiterungen:
     `OriginConstraint` aktiv ist.
   - Validierung (nur wenn von `1.0` abweichend): `eta_min <= eta_charge <= 1`
     und `eta_min <= eta_discharge <= 1`; `eta_min` ist die gemeinsame
-    Assetmodell-Invariante aus dem Robustheitspfad
-    ([`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md))
-    und muss vor Slice-Aktivierung in einer zentralen Assetmodell-Konstante bzw.
-    einem gemeinsamen Validierungshelfer etabliert werden, nicht in
-    planlokalem Hilfscode.
+    Assetmodell-Invariante aus dem Pre-Slice
+    [`Domain-Migration AssetModel.ValidationHelper`](plan-domain-migration-asset-model-validation-helper.md)
+    und muss vor Slice-Aktivierung dort abgeschlossen sein, nicht in planlokalem
+    Hilfscode.
 
 - `CoLocationMode`
   - Betriebsart nach obigem Arbeitsmodell
@@ -409,7 +408,9 @@ Verbindliche Defaults (Phase-1-ADR):
 - `d_t` ist Richtungs-Binärvariable entsprechend der Site-Konvention; für beide
   Sign-Konventionen identisch definiert, nur die Vorzeichenzuordnung in
   `site_power_t` wird umgeschaltet.
-- Die Ziellogik ist zeitscheibenweise identisch in beiden Konventionen; es wird ausschließlich die Vorzeichenzuordnung von `site_power_t` gewechselt.
+- Damit folgt aus den Gleichungen oben: Die Ziellogik ist zeitscheibenweise
+  symmetrisch; es wird ausschließlich die Vorzeichenzuordnung von
+  `site_power_t` gewechselt.
 
 Interpretation:
 
@@ -453,18 +454,12 @@ werden.
   - `incompatible`: harte Daten- oder Grenzverletzung (z. B. negative Limits, fehlende
     Pflichtwerte, inkonsistente Grenzdefinitionen).
 - Deterministische Ableitungsregeln für `repairable`:
-  - Die folgende Aliasliste ist ein Migrationskandidat und vor Slice-Aktivierung
-    gegen das reale Legacy-Schema zu verifizieren. Nicht vorhandene Felder werden
-    aus Fixtures und Migrationslogik entfernt; neue Felder dürfen nur mit
-    dokumentierter Schema-Herkunft ergänzt werden.
-  - Es werden nur explizite Aliasfelder ausgewertet, die nach dieser Verifikation
-    in historischen Datensätzen vorhanden und eindeutig gesetzt sind:
-    - `legacy_grid_power_sign`
-    - `legacy_site_grid_power_sign`
-    - `grid_power_sign`
-    - `grid_connection_direction`
-    - `site_network_power_sign`
-    - `site_grid_power_sign_raw`
+  - Die Aliasliste wird vor Slice-Aktivierung im Aktivierungs-ADR auf den per
+    Schema-/Fixture-Scan verifizierten Bestand reduziert. Dieser Plan legt keine
+    spekulativen Legacy-Feldnamen fest.
+  - Es werden nur explizite Aliasfelder ausgewertet, die nach dieser
+    Verifikation in historischen Datensätzen vorhanden und eindeutig gesetzt
+    sind; alle anderen Felder bleiben unsichtbar für die Migration.
   - Die Werte werden auf die Zielwerte normalisiert:
     - `export_pos` oder `import_pos` (case-insensitiv akzeptiert; alle anderen Werte
       sind inkonsistent).
