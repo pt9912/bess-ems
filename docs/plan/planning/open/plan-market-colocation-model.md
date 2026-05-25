@@ -38,10 +38,12 @@ Der operative Optimierungsrequest enthält genau eine Solver-Scope-Ausprägung.
 `solver_scope` wird Bestandteil der bestehenden `ScheduleOptimizationRequest`-
 Erweiterung bzw. des daraus erzeugten Optimization-Core-Requests, nicht von
 `OptimizationRun`; der Run persistiert nur Ergebnisstatus, Terminierung und
-`CanExecute`. Für Audit/Replays muss der immutable Request-Snapshot bzw. ein
-dediziertes Run-Audit-Metadatum den gewählten `solver_scope` (`LP`/`MILP`) und
-eine mögliche Partitionierungsentscheidung enthalten. `TerminationDetail` ist
-nicht die kanonische Ablage für diesen Scope.
+`CanExecute`. Für Audit/Replays ist der immutable Request-Snapshot die kanonische
+Ablage für den gewählten `solver_scope` (`LP`/`MILP`) und eine mögliche
+Partitionierungsentscheidung. Falls produktive Replays ohne Request-Snapshot
+freigegeben werden sollen, ist vorher ein eigener Pre-Slice
+`OptimizationRun.SolverScopeAudit` erforderlich; `TerminationDetail` ist nicht
+die kanonische Ablage für diesen Scope.
 
 Entscheidungsreihenfolge je Request:
 
@@ -99,6 +101,11 @@ die autoritative Matrix aus `OptimizationSolverStatus`, `TerminationCode` und
 
 Alle fachlichen Gründe werden zusätzlich in `TerminationDetail` geführt, damit
 Operator-/Replay-Pfade die Unterscheidung ohne Hilfskontext nachziehen können.
+Neue Co-Location-Details verwenden den gemeinsamen Detailvertrag
+`format=kv1;reason=<GROUND_CODE>` aus
+[`plan-domain-migration-optimization-run-can-execute.md`](plan-domain-migration-optimization-run-can-execute.md),
+z. B. `format=kv1;reason=SITE_GRID_POWER_SIGN_MISSING` oder
+`format=kv1;reason=SITE_CAN_DISPATCH_MISSING`.
 
 ### Projekt-/Standorttypen
 
@@ -222,6 +229,12 @@ Mögliche Domain-/Application-Erweiterungen:
       - Backfill ist nur in diesem vorbereiteten `trim-to-common`-Vorverarbeitungspfad
         zulässig. Bei `alignment_mode=reject` gibt es kein Backfill; jede
         Zeitachsenabweichung bleibt `SCHEMA_INCONSISTENT`.
+      - Wenn die Vorverarbeitung Werte auffüllt oder schätzt, muss das
+        resultierende `SeriesEnvelope` das Flag `SOURCE_BACKFILL` behalten. Solche
+        Serien sind im produktiven `quality_mode=strict` nicht zulässig und dürfen
+        nur mit explizit freigegebenem `quality_mode=degraded_ok` in Co-Location
+        eingehen. Reines deterministisches Trimming ohne aufgefüllte Werte setzt
+        kein `SOURCE_BACKFILL`-Flag.
     - `value_kw` ist eine Produktionsleistung und für diese Serie standardmäßig nicht negativ.
     - Negative Werte sind nur über einen separaten signierten Netzausgangs-Datensatz zulässig.
     - Last-Forecasts sind keine `LocalGenerationSeries`; sie laufen als
@@ -352,8 +365,12 @@ nebeneinander ausgewiesen werden.
   - `incompatible`: harte Daten- oder Grenzverletzung (z. B. negative Limits, fehlende
     Pflichtwerte, inkonsistente Grenzdefinitionen).
 - Deterministische Ableitungsregeln für `repairable`:
-  - Es werden nur explizite Aliasfelder ausgewertet, die bereits in historischen
-    Datensätzen vorhanden und eindeutig gesetzt sind:
+  - Die folgende Aliasliste ist ein Migrationskandidat und vor Slice-Aktivierung
+    gegen das reale Legacy-Schema zu verifizieren. Nicht vorhandene Felder werden
+    aus Fixtures und Migrationslogik entfernt; neue Felder dürfen nur mit
+    dokumentierter Schema-Herkunft ergänzt werden.
+  - Es werden nur explizite Aliasfelder ausgewertet, die nach dieser Verifikation
+    in historischen Datensätzen vorhanden und eindeutig gesetzt sind:
     - `legacy_grid_power_sign`
     - `legacy_site_grid_power_sign`
     - `grid_power_sign`
@@ -421,7 +438,13 @@ Fehlerklassifikation für `GreenStorageRestricted`:
 | Produktiv-Precheck | Produktiver Routine-Run ohne explizite Validierungs-/Freigabeaktivierung | `CONFIG_INVALID` | `GREEN_STORAGE_RESTRICTED_PRODUCTIVE_BLOCKED` |
 | Input-/Pre-Solver-Validierung | Fehlender oder nicht auditierbarer Herkunftsnachweis | `CONFIG_INCONSISTENT` | `GREEN_STORAGE_ORIGIN_PROOF_MISSING` |
 | Input-/Pre-Solver-Validierung | Request fordert Netzladung oder modelliert Netzbezug als zulässige Ladequelle | `CONFIG_INCONSISTENT` | `GREEN_STORAGE_GRID_CHARGE_BLOCKED` |
-| Solver-Ergebnis | Harte Constraints (`p_grid_import_t == 0`, lokale Quelle, `e_local_t`) machen den angefragten Fahrplan mathematisch unerfüllbar | `MODEL_INFEASIBLE` | `green-storage-model-infeasible` |
+| Solver-Ergebnis | Harte Constraints (`p_grid_import_t == 0`, lokale Quelle, `e_local_t`) machen den angefragten Fahrplan mathematisch unerfüllbar | `MODEL_INFEASIBLE` | `GREEN_STORAGE_MODEL_INFEASIBLE` |
+
+`GREEN_STORAGE_MODEL_INFEASIBLE` ist ein Domain-Grundcode im
+`TerminationDetail` (`format=kv1;reason=GREEN_STORAGE_MODEL_INFEASIBLE`), kein
+eigener `TerminationCode`. Das Run-Mapping nutzt die gemeinsame Matrix:
+solver-seitige Infeasibility bleibt `OptimizationSolverStatus.Infeasible` mit
+bestehendem Solver-`TerminationCode` (z. B. `or-tools-infeasible`).
 
 ### Optimierungswirkung
 
@@ -559,6 +582,15 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
     [`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md).
   - Operator-/Replay-Verbraucher dürfen einen Lauf nur im Zustand
     `CanExecute=true` in den aktiv ausführbaren Pfad überführen.
+- Beitrag zum `CanExecute`-Combiner:
+  - Co-Location führt keinen eigenen `co_location_ok`-Beitrag ein.
+  - `CONFIG_INVALID` und `CONFIG_INCONSISTENT` setzen den bestehenden
+    Combiner-Beitrag `config_ok=false`.
+  - `SCHEMA_INCONSISTENT` setzt `schema_ok=false`.
+  - Preis-/Forecast-Qualität aus `SeriesEnvelope` setzt `source_ok` gemäß
+    [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md).
+  - `MODEL_INFEASIBLE` ist kein Guard-Beitrag, sondern ein Solver-/Modellergebnis;
+    es führt über `HasUsableSolution=false` zur Nichtausführbarkeit.
 
 ---
 

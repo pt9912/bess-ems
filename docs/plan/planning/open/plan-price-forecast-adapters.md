@@ -170,15 +170,19 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
       3. Nach Freigabe wird die alte Family für den produktiven Pfad abgeschaltet, neue Family wird normativ aktiv.
     - Verbindlicher Cutover-/Rollback-SOP:
       1. **Vorbereitung**: Neue Family mit eigenem `series_family_alias` oder neuem (`series_id`, `series_product`) freigeben.
-      2. **Dual-Active-Wahrnehmung**: Alte und neue Family mindestens in zwei vollständigen Release-Fenstern parallel beobachten; ein Release-Fenster ist hier mindestens ein produktiver Import-/Refresh-Zyklus und mindestens 7 Kalendertage. Der Cutover braucht damit mindestens zwei vollständige Zyklen und mindestens 14 Kalendertage Beobachtung. `value_hash`-Abweichungen sind als `status_flags` mit `status_message` auditierbar.
+      2. **Dual-Active-Wahrnehmung**: Alte und neue Family mindestens in zwei vollständigen Release-Fenstern parallel beobachten; ein Release-Fenster ist hier standardmäßig mindestens ein produktiver Import-/Refresh-Zyklus und mindestens 7 Kalendertage. Der Cutover braucht damit im Default mindestens zwei vollständige Zyklen und mindestens 14 Kalendertage Beobachtung. Operations darf diese Mindestdauer nur per Release-Runbook überschreiben; die Zahl ist ein konservativer Default, kein stiller Code-Default. `value_hash`-Abweichungen sind als `status_flags` mit `status_message` auditierbar.
       3. **Cutover freigeben**: Neue Family wird produktiv als `primary` markiert und auf mindestens `SOURCE_OK` oder ausdrücklich zugelassene `SOURCE_DEGRADED` gesetzt.
       4. **Produktiver Umschaltpunkt**: Alte Family in produktiven Runs auf `SOURCE_REJECTED`/`CanExecute=false` halten; alte Werte sind nur noch Replay/Diagnose sichtbar.
       5. **Rollback-Fenster**: Rückkehr auf alte Family nur mit explizitem Release-Block (`release_block` oder `controlled_switchover`) möglich; Rollback ist nur dann erlaubt, wenn die neue Family in einem vollständigen Beobachtungsfenster keine vollständige akzeptierbare Lastserie (ohne harte Fallback) geliefert hat.
       6. **Abschluss**: Alter Family-Schlüssel wird auf `ARCHIVED` gesetzt; neue Family läuft ohne Alias-Wechsel weiter.
   - Für einen stabilen Tie-Break werden bei gleicher Klasse numerisch zuerst
-    `series_version` (wie definiert), dann bei gleicher Version der hash-basierte
-    Payload-Fingerprint (`value_hash`) verwendet.
+    `series_version` (wie definiert), danach nur bei unterschiedlichen, gültigen
+    Serienfamilien der hash-basierte Payload-Fingerprint (`value_hash`) als
+    auditierbarer Sortierschlüssel verwendet.
     - „gleiche Klasse“ meint die normalisierte Vergleichsschicht der festen Versionsfamilie pro Serie/Provider.
+    - Innerhalb derselben Serien-Signatur und derselben `series_version` ist
+      `value_hash` kein Tie-Break: ein abweichender Hash ist dort immer ein harter
+      Idempotenzfehler.
 
 Kontrollierte Abnahmetests für Family-/Versionswechsel:
 - **Dual-Active-Fähigkeit**: Alte und neue Family werden gleichzeitig geladen; beide dürfen im Beobachtungsfenster aktiv sein, solange beide dieselbe Semantik (`series_type`, `series_product`, `market_bid_area`, `site_id`, `resolution_minutes`) liefern.

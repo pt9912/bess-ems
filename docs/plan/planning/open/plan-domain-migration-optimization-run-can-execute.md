@@ -176,6 +176,9 @@ Dieser Pre-Slice muss vor diesen Slices abgeschlossen sein:
 
 Die Slices dürfen danach nur fachliche Gründe für `CanExecute=false` liefern,
 nicht mehr die Domain-/Persistenzmigration selbst besitzen.
+Solver-spezifische Audit-Metadaten wie `solver_scope` sind nicht Bestandteil
+dieses Pre-Slices; falls ein Slice sie ohne Request-Snapshot replayfähig im Run
+persistieren muss, braucht es einen separaten Audit-Pre-Slice.
 
 ---
 

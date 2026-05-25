@@ -3,7 +3,7 @@
 **Dokumenttyp:** Vorabklärung / Trigger-Watch
 **Status:** Offen - Folgearbeiten aus externem Fachmaterial
 **Datum:** 2026-05-24
-**Quelle-Repo:** Öffentliches Referenzmaterial – externe Orientierung, keine Code-Übernahme.
+**Quelle:** Öffentliches Referenzmaterial – externe Orientierung, keine Code-Übernahme.
 **Bezug:**
 [`../in-progress/roadmap.md`](../in-progress/roadmap.md),
 [`../../../user/bess-ems-function.md`](../../../user/bess-ems-function.md),
@@ -15,7 +15,7 @@
 ## Zweck
 
 Diese Notiz sammelt fachliche Folgearbeiten aus der Sichtung externer
-Referenzdokumente (siehe **Quelle-Repo** oben), die als fachlicher Input dienen,
+Referenzdokumente (siehe **Quelle** oben), die als fachlicher Input dienen,
 aber keine direkte Codeübernahme darstellen.
 Sie ist kein aktiver Implementierungsplan, sondern ein Trigger-Watch-Artefakt
 für Marktmodell, Co-Location, Preisquellen und Forecast-Inputs.
@@ -191,22 +191,26 @@ sowie Forecast-Serien.
   1. `F-MKT-01` (Markt-/Co-Location-Modell) wird zuerst im operativen Produktivpfad freigegeben.
   2. `F-MKT-02` kann parallel als Datenvertrags-Slice vorbereitet werden, darf Co-Location aber zunächst im degraded/fallback-Modus betreiben.
   3. Produktiv geht erst auf vollen Forecast-Fokus über, wenn `plan-price-forecast-adapters.md` im
-    Betriebsmodus mit aktivierter Qualitätsakzeptanz konform ist (`series_status` in `{SOURCE_OK, SOURCE_FALLBACK_USED}` ohne `SOURCE_BACKFILL`-Flag bei
-    `quality_mode=strict`, oder `series_status` in `{SOURCE_OK, SOURCE_DEGRADED, SOURCE_FALLBACK_USED}` bei
-    `quality_mode=degraded_ok`).
-    Die genaue `SOURCE_FALLBACK_USED`-Zulässigkeit in `strict` folgt der
-    Statusmatrix in [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md).
+    Betriebsmodus mit aktivierter Qualitätsakzeptanz vollständig nach seiner
+    Statusmatrix konform ist; die Note wiederholt keine Teilmenge des
+    `SOURCE_*`-/`quality_mode`-Vertrags.
     Für die Abgrenzung gelten die Serienbegriffe (`series_type`, `series_product`, `market_bid_area`) exakt nach
     [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md).
   4. Parallelbetrieb ist erst freigegeben, wenn `CanExecute`-Semantik zwischen
      [`plan-domain-migration-optimization-run-can-execute.md`](plan-domain-migration-optimization-run-can-execute.md)
      und den konsumierenden Slice-Plänen verbindlich umgesetzt ist.
-  5. Bei Konflikten gilt als harte Regel: neue Betriebslogik darf nicht ohne definierte
+  5. Produktiver F-MKT-02-Betrieb ist erst freigegeben, wenn
+     [`Domain-Migration PriceSeries.Identity`](plan-domain-migration-price-series-identity.md)
+     abgeschlossen ist.
+  6. Bei Konflikten gilt als harte Regel: neue Betriebslogik darf nicht ohne definierte
      `series_status`-Entscheidung in den Markt- und Optimierungsworkflow starten.
      Für nicht adapter-getragene Serien im bestehenden Altpfad ist ein kontrollierter
-     Übergang nur über den expliziten degradierten Serienzustand erlaubt
+     Übergang nur im expliziten `quality_mode=degraded_ok` und über den degradierten
+     Serienzustand erlaubt
      (`series_status=SOURCE_DEGRADED`, optional mit `status_flags` wie
-     `SOURCE_BACKFILL`).
+     `SOURCE_BACKFILL`). Dieser Altpfad ist kein `quality_mode=strict`-Pfad und
+     muss spätestens mit produktiver F-MKT-02-Aktivierung abgelöst oder als eigener
+     Legacy-Sunset-Slice geführt werden.
 
 ---
 

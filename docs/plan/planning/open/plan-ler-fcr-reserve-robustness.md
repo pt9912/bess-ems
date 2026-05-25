@@ -3,7 +3,7 @@
 **Dokumenttyp:** Slice-Skizze / offen
 **Status:** Open - wartet auf Regelleistungs-/FCR-Produkttrigger
 **Datum:** 2026-05-24
-**Quelle-Repo:** Öffentliches Referenzmaterial – Referenzpublikation als fachlicher Ausgangspunkt, kein Code-Übernahmeplan.
+**Quelle:** Öffentliches Referenzmaterial – Referenzpublikation als fachlicher Ausgangspunkt, kein Code-Übernahmeplan.
 Baltputnis et al. (2024), Journal of Energy Storage 102, 114082
 **Bezug:**
 [`../../../../spec/lastenheft.md`](../../../../spec/lastenheft.md),
@@ -83,7 +83,9 @@ Nicht explizit modelliert:
       - `conservative`: Berechnung nutzt Zusatzränder auf beiden SOC-Grenzen.
     - optional `conservative_soc_headroom_kwh` (default `0`, nur bei `soc_strategy=conservative`)
     - optional `conservative_soc_headroom_ratio` (default `0`, nur bei `soc_strategy=conservative`); Bereich `0..1`
-    - Wenn kein `conservative_soc_headroom_kwh` gesetzt ist, wird bei `conservative` `conservative_soc_headroom_ratio` genutzt.
+    - Bei `conservative` werden beide Headroom-Angaben in kWh aufgelöst und der
+      konservativere Wert genutzt: `max(conservative_soc_headroom_kwh,
+      conservative_soc_headroom_ratio * (soc_max_kwh - soc_min_kwh))`.
     - `t_min_fcr` (`FCR`-Pflichtfeld, falls FCR im gebuchten Portfolio aktiv)
       - FCR gilt als aktiv, wenn `reserve_product=FCR` im Request/Portfolio markiert
         ist oder eine der FCR-Zeitreihen (`fcr_up_kw_t`, `fcr_down_kw_t`) für den
@@ -91,6 +93,9 @@ Nicht explizit modelliert:
   - `full_activation_time` (`FCR`-Pflichtfeld bei aktivem FCR-Produkt; bei inaktivem FCR kann `0` gesetzt werden)
 - optional `full_activation_time_afrr` (nur bei produktiv aktivem aFRR; bei gesetztem Wert `> 0`)
 - optional `full_activation_time_mfrr` (nur bei produktiv aktivem mFRR; bei gesetztem Wert `> 0`)
+  - Produktspezifische Full-Activation-Zeiten haben unterschiedliche physikalische
+    Bedeutungen; es gibt keinen produktübergreifenden Fallback von aFRR/mFRR auf
+    das FCR-Pflichtfeld `full_activation_time`.
   - optional `simultaneous_reserve_direction_allowed` (default `false`)
   - optional `restore_capability_up_kw` (optional, erlaubt zusätzliche obere Schranke für intraday Wiederherstellung in Up-Lade-Richtung)
   - optional `restore_capability_down_kw` (optional, erlaubt zusätzliche obere Schranke für intraday Wiederherstellung in Down-Entlade-Richtung)
@@ -585,6 +590,7 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
     | --- | --- | --- | --- |
     | Gültiger Plan/Plan verwendbar                    | `Optimal` oder `Feasible` | bestehende Erfolgs-Codes, z. B. `or-tools-optimal` oder `or-tools-feasible-not-proven-optimal` | `true` |
     | Solver-seitige mathematische Infeasibility       | `Infeasible`             | bestehender Solver-Code, z. B. `or-tools-infeasible` | `false` |
+    | Domain-spezifisch erklärbare Infeasibility (`MODEL_INFEASIBLE`) | `Infeasible` | bestehender Solver-Code, z. B. `or-tools-infeasible`; Domain-Grund in `TerminationDetail=format=kv1;reason=<DOMAIN_REASON>` | `false` |
     | Time Limit ohne ausführbaren Plan                 | `TimeLimit`              | bestehender Timeout-Code, z. B. `or-tools-time-limit` | `false` |
     | Iteration Limit ohne ausführbaren Plan            | `IterationLimit`         | bestehender Iterations-Code, sofern vom Solver geliefert | `false` |
     | Reiner Rechenfehler/Solverfehler                  | `Failed`                 | Solver-spezifische harte Codes, z. B. `or-tools-abnormal`, `or-tools-model-invalid`, `or-tools-not-solved` | `false` |
