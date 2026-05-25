@@ -137,6 +137,9 @@ Nicht explizit modelliert:
   - Restore-Leistung:
     - Wenn gesetzt, begrenzt `restore_capability_up_kw` den maximal nutzbaren Restore-Leistungsfluss der Up-Richtung (Lade-Richtung) und `restore_capability_down_kw` die Down-Richtung (Entlade-Richtung).
     - `restore_capability_up_kw` und `restore_capability_down_kw` müssen, falls gesetzt, strikt `> 0` sein.
+    - Die Restore-Richtung ist die Wiederherstellung nach einer Reserveaktivierung:
+      Up-Reserve entlädt, Up-Restore lädt die dadurch fehlende Energie zurück;
+      Down-Reserve lädt, Down-Restore entlädt überschüssige Energie wieder.
     - Wenn ein Feld fehlt:
       - wird im ersten Slice zuerst auf eine technische Basisgrenze aus der Asset-/Reserveband-Konfiguration zurückgegriffen:
         - Up-Restore (Lade-Richtung): verfügbare Ladeleistung aus Asset-Ladelimit,
@@ -196,12 +199,12 @@ Nicht explizit modelliert:
     - `required_up_kwh` (optional, für Restore-Planung)
     - `required_down_kwh` (optional, für Restore-Planung)
   - Optional:
-    - `restore_capability_up_kw`:
+    - `restore_capability_up_kw_step`:
       - optionales per-step Override in kW für den Up-Wiederherstellungszweig auf Basis der betrachteten Reservezelle;
       - muss `> 0` sein.
       - wird in der Restore-Rekonstruktion als harte Wiederherstellungskapazität verwendet, falls gesetzt.
       - bei Wert `<= 0` oder fehlendem Wert wird kein Override angenommen.
-    - `restore_capability_down_kw`:
+    - `restore_capability_down_kw_step`:
       - optionales per-step Override in kW für den Down-Wiederherstellungszweig auf Basis der betrachteten Reservezelle;
       - muss `> 0` sein.
       - wird in der Restore-Rekonstruktion als harte Wiederherstellungskapazität verwendet, falls gesetzt.
@@ -386,16 +389,20 @@ Restore- und Gate-Entscheidungslogik (verbindlich):
       `ReserveEnergyEnvelope`.
     - `restore_capability_up_policy_t = if ReserveRobustnessPolicy.restore_capability_up_kw is set then ReserveRobustnessPolicy.restore_capability_up_kw else restore_capability_up_t_fallback`
     - `restore_capability_down_policy_t = if ReserveRobustnessPolicy.restore_capability_down_kw is set then ReserveRobustnessPolicy.restore_capability_down_kw else restore_capability_down_t_fallback`
-    - `restore_capability_up_source_t = if ReserveEnergyEnvelope.restore_capability_up_kw is set then ReserveEnergyEnvelope.restore_capability_up_kw else restore_capability_up_policy_t`
-    - `restore_capability_down_source_t = if ReserveEnergyEnvelope.restore_capability_down_kw is set then ReserveEnergyEnvelope.restore_capability_down_kw else restore_capability_down_policy_t`
+    - `restore_capability_up_source_t = if ReserveEnergyEnvelope.restore_capability_up_kw_step is set then ReserveEnergyEnvelope.restore_capability_up_kw_step else restore_capability_up_policy_t`
+    - `restore_capability_down_source_t = if ReserveEnergyEnvelope.restore_capability_down_kw_step is set then ReserveEnergyEnvelope.restore_capability_down_kw_step else restore_capability_down_policy_t`
     - `restore_capability_up_t = if restore_shortfall_up_kwh > 0 then restore_capability_up_source_t else 0`
     - `restore_capability_down_t = if restore_shortfall_down_kwh > 0 then restore_capability_down_source_t else 0`
   - Richtungsbasierte Mindest-Rekonstruktionsdauer:
+    - Auswertungsreihenfolge ist verbindlich:
+      1. Wenn ein aktiver Branch (`restore_shortfall_*_kwh > 0`) keine positive
+         Restore-Kapazität hat, endet die Bewertung sofort mit
+         `ROBUST_INFEASIBLE` und `limiting_reason_code=NO_RECOVERY_PATH`.
+      2. Erst danach werden `required_recovery_minutes_*` berechnet und gegen
+         `max_recovery_time` verglichen.
     - `required_recovery_minutes_up = if restore_capability_up_t > 0 and restore_shortfall_up_kwh > 0 then restore_shortfall_up_kwh / restore_capability_up_t * 60 else +inf`
     - `required_recovery_minutes_down = if restore_capability_down_t > 0 and restore_shortfall_down_kwh > 0 then restore_shortfall_down_kwh / restore_capability_down_t * 60 else +inf`
     - `required_recovery_minutes = max(required_recovery_minutes_up, required_recovery_minutes_down)`
-    - Falls ein aktiver Branch (`restore_shortfall_*_kwh > 0`) keine positive Restore-Kapazität hat:
-      `ROBUST_INFEASIBLE` mit `limiting_reason_code=NO_RECOVERY_PATH`.
     - `restore_capability_used` ist die effektive Restore-Kapazität (`restore_capability_up_t`
       oder `restore_capability_down_t`), die den maximalen `required_recovery_minutes`-Wert
       bestimmt; bei Gleichstand deterministisch die Up-Richtung.

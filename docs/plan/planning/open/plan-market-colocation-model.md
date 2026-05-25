@@ -69,7 +69,9 @@ Kompatibilitätsprinzip:
 - Für den ersten produktiven Slice ist die Partitionierungsentscheidung im ADR festzuhalten.
 - Partitionierung ist nur zulässig, wenn der Request-Builder alle Unterrequests vollständig
   isoliert und im Anschluss deterministisch reaggregiert. Andernfalls ist bei gemischten
-  Scope-Anforderungen ein `CONFIG_INCONSISTENT` mit `TerminationCode=config-inconsistent` zu werfen.
+  Scope-Anforderungen die fachliche Ursache `CONFIG_INCONSISTENT` zu setzen; das
+  konkrete `TerminationCode`-/`CanExecute`-Mapping bleibt der gemeinsamen Matrix
+  vorbehalten.
 
 Semantik der fachlichen Coderäume (für deterministische Fehlerauswertung):
 
@@ -85,24 +87,17 @@ Semantik der fachlichen Coderäume (für deterministische Fehlerauswertung):
 
 ### Run- und Fehlerkodierung (Kompatibilität zum bestehenden Solver-Laufmodell)
 
-Die Co-Location-/Migrationserkennung verwendet die fachlichen Coderäume `CONFIG_*` und
-`SCHEMA_INCONSISTENT`, persistiert diese aber über das bestehende `OptimizationRun`-
-Modell als `OptimizationSolverStatus` + `TerminationCode`:
+Die Co-Location-/Migrationserkennung verwendet die fachlichen Coderäume `CONFIG_*`,
+`SCHEMA_INCONSISTENT` und `MODEL_INFEASIBLE`. Die Persistenz auf
+`OptimizationRun` erfolgt ausschließlich über den gemeinsamen Ausführungs-/
+Fehlervertrag in
+[`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md).
+Dieser Plan definiert nur die Co-Location-spezifischen Ursachen und Beispiele;
+die autoritative Matrix aus `OptimizationSolverStatus`, `TerminationCode` und
+`CanExecute` wird hier nicht gespiegelt.
 
-- `OK` (korrektes Ergebnis): `OptimizationSolverStatus.Optimal` oder
-  `OptimizationSolverStatus.Feasible` je Ergebnisqualität.
-- `MODEL_INFEASIBLE` (solver-seitige mathematische Infeasibility ohne fachlichen
-  Reserve-/Robustheits-Blocker): `OptimizationSolverStatus.Infeasible`.
-- Reserve-/Robustheits-Blockaden werden nicht hier dupliziert; das autoritative Mapping
-  steht in [`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md).
-- `CONFIG_INVALID`: `OptimizationSolverStatus.Failed` mit `TerminationCode=config-invalid`.
-- `CONFIG_INCONSISTENT`: `OptimizationSolverStatus.Failed` mit
-  `TerminationCode=config-inconsistent` (kein `schema-inconsistent`).
-- `SCHEMA_INCONSISTENT`: `OptimizationSolverStatus.Failed` mit `TerminationCode=schema-inconsistent`.
-- Solver- oder Laufzeitfehler: `OptimizationSolverStatus.Failed` mit bestehendem Solver-Code
-  (bestehende Terminierungskonventionen).
-- Alle fachlichen Gründe werden zusätzlich in `TerminationDetail` geführt, damit
-  Operator-/Replay-Pfade die Unterscheidung ohne Hilfskontext nachziehen können.
+Alle fachlichen Gründe werden zusätzlich in `TerminationDetail` geführt, damit
+Operator-/Replay-Pfade die Unterscheidung ohne Hilfskontext nachziehen können.
 
 ### Projekt-/Standorttypen
 
@@ -198,6 +193,12 @@ Mögliche Domain-/Application-Erweiterungen:
     - `value_version`
   - Validierung:
     - gleiche Zeitachse wie `PriceSeries` (UTC, step-genau, gleiche Horizon-Länge) bei produktiver Nutzung.
+      Abweichende Quellauflösungen sind im produktiven Co-Location-Pfad nur
+      zulässig, wenn der externe Provider bereits in der Zielauflösung liefert
+      oder ein eigener, versionierter Preprocessing-Slice einen
+      `alignment_mode=resample`-Pfad mit deterministischer Aggregations-/
+      Interpolationsregel freigibt. Dieser Plan definiert noch keinen
+      produktiven Resampling-Pfad.
     - Ist `alignment_mode=reject` (Default im produktiven ADR): die Zeitachse muss hart identisch sein (gleiches Horizon, gleiche Schrittweite, gleiche Startzeit).
     - Ist `alignment_mode=trim-to-common` gesetzt:
       - `alignment_prepared` darf nur zusammen mit `alignment_mode=trim-to-common` verwendet werden;
@@ -544,9 +545,10 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
   übereinstimmen und die Cross-Checks bestanden sind.
 - Co-Location folgt dem selben CanExecute-Vertrag:
   - `CanExecute=true` nur bei validen Ergebnissen ohne harte Konfigurations- oder Schemaabweisung.
-  - `CanExecute=false` bei `OptimizationSolverStatus.Failed` mit `TerminationCode` aus
-    `config-invalid`, `config-inconsistent`, `schema-inconsistent` und
-    `reserve-robustness-*` bei harten Robustheits- oder Validierungs-Blockaden.
+  - `CanExecute=false` bei harten Co-Location-Konfigurations-/Schemaabweisungen
+    sowie bei harten Robustheits- oder Validierungs-Blockaden gemäß der
+    autoritativen Matrix in
+    [`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md).
   - Operator-/Replay-Verbraucher dürfen einen Lauf nur im Zustand
     `CanExecute=true` in den aktiv ausführbaren Pfad überführen.
 
@@ -559,19 +561,12 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
 - Co-Location-Constraints werden im Run-Ergebnis als eigene Objective- oder
   Constraint-Komponenten sichtbar.
 - Ein Setup wird so gemappt, dass Operator- und Replay-Sichten klar trennbar bleiben:
-  - `OptimizationSolverStatus.Optimal` oder `OptimizationSolverStatus.Feasible`: gültiger Plan.
-  - `OptimizationSolverStatus.Infeasible`: reine solver-seitige mathematische
-    Infeasibility (entspricht `MODEL_INFEASIBLE`), nicht Reserve-/Robustheitsblockade.
-  - `OptimizationSolverStatus.Failed` mit `TerminationCode=config-invalid`: globale
-    Eingabekonfiguration nicht zulässig (z. B. Scope-Konfigurationsbruch).
-  - `OptimizationSolverStatus.Failed` mit `TerminationCode=config-inconsistent`:
-    regelwerksbezogene Inkompatibilität im aktivierten Co-Location-Modell (z. B.
-    unklarer `site_grid_power_sign`-Herleitungsstatus bei aktivem Co-Location-Scope).
-  - `OptimizationSolverStatus.Failed` mit `TerminationCode=schema-inconsistent`:
-    strukturelle Vertragsverletzung (`LocalGenerationSeries`/Alignment-/Zeitscheiben-Schema
-    im produktiven Lauf, z. B. unzulässige `alignment_mode=trim-to-common` ohne
-    vollständige vorbereitende Versionierung).
-  - `OptimizationSolverStatus.Failed` mit Solverfehler-Code: Timeout/technisches Solverproblem.
+  - Die fachlichen Co-Location-Klassen `CONFIG_INVALID`, `CONFIG_INCONSISTENT`,
+    `SCHEMA_INCONSISTENT` und `MODEL_INFEASIBLE` bleiben im Run-Audit eindeutig
+    erkennbar.
+  - Das konkrete Mapping auf `OptimizationSolverStatus`, `TerminationCode` und
+    `CanExecute` entspricht ohne lokale Abweichung der autoritativen Matrix in
+    [`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md).
   - Replay-/Golden-Fixtures decken mindestens ein Standalone- und ein
      Co-Location-Szenario ab.
   - Der technische Dispatch-Pfad bleibt Safety-First und kennt keine

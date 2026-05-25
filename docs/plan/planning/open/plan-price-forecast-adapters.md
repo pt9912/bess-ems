@@ -98,17 +98,49 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
 - Der minimale `SeriesEnvelope` enthält:
   - `series_id` (stabil)
   - `series_version` (stabil, monoton wachsend oder semantische Versionskennung)
+    - Erforderlich und vergleichbar pro `(series_id, site_id?, market_bid_area?, series_product, series_type, source.provider_id)`.
+    - Akzeptiert werden:
+      - streng monoton wachsende numerische Versionen (int-kompatibel),
+      - oder Zeitstempel-basierte semantische Versionen (z. B. `2026-05-24T12:00:00Z-v3`).
+    - Andere Formate sind unzulässig und führen auf dem Importpfad zu
+      `source_eval_status=SOURCE_SCHEMA_MISMATCH` und `series_status=SOURCE_REJECTED`.
   - `series_family_alias`: optional bei stabiler Serienfamilie, verpflichtend bei
     kontrolliertem Family-Wechsel ohne neue `series_id`; stabiler Alias für
     kontrollierte Migrationspfade. Ein Wechsel der Familienkennung erfolgt nur über
     diesen Alias bzw. durch neue Serienkennung, nicht per stillschweigendem Wechsel
     derselben `series_id`.
-  - Erforderlich und vergleichbar pro `(series_id, site_id?, market_bid_area?, series_product, series_type, source.provider_id)`.
-  - Akzeptiert werden:
-    - streng monoton wachsende numerische Versionen (int-kompatibel),
-    - oder Zeitstempel-basierte semantische Versionen (z. B. `2026-05-24T12:00:00Z-v3`).
-  - Andere Formate sind unzulässig und führen auf dem Importpfad zu
-    `source_eval_status=SOURCE_SCHEMA_MISMATCH` und `series_status=SOURCE_REJECTED`.
+  - `site_id` (optional)
+    - erforderlich für standortgebundene Forecast-/Erzeugungs-/Last-/Wetter-Reihen
+    - optional oder leer für produktweite Forecast-Daten ohne Standortkontext
+  - `market_bid_area` (optional)
+    - erforderlich für `series_type=price`, damit die bestehende `PriceSeries`-Schiene
+      den Marktbereich eindeutig identifizieren kann
+  - `series_type` (`price` oder `forecast`)
+  - `series_product` (z. B. `day_ahead`, `intraday`, `load`, `pv`, `wind`, `weather-temp`)
+  - `unit` (z. B. `EUR/MWh`, `kW`, `kWh`, etc.)
+  - `resolution_minutes` (`> 0`, ganzzahlig)
+  - `timezone` (muss `UTC` sein)
+  - `horizon_start_utc`, `horizon_end_utc`
+  - optionale Co-Location-Vorverarbeitungsmetadaten:
+    - `alignment_mode` (`reject` | `trim-to-common`)
+    - `alignment_prepared` (bool, nur bei `alignment_mode=trim-to-common` sinnvoll)
+    - `alignment_prepared_by` (string, z. B. `forecast-preprocessor/v1`, `batch-trimmer/...`)
+    - `alignment_prepared_horizon_start_utc`
+    - `alignment_prepared_horizon_end_utc`
+  - `values` als geordnete Punkte:
+    - `timestamp_utc`
+    - `value`
+    - `value_type` (`actual` | `forecast`)
+    - optional `confidence` (nur spätere Extensions)
+  - `source_metadata`:
+    - `provider_id`
+    - `license_id` (optional, falls lizenzrelevant)
+    - `retrieved_at_utc`
+    - `valid_from_utc`, `valid_to_utc`
+    - `provider_request_id`
+  - `series_status` (finaler Endstatus je Serie): `SOURCE_OK`, `SOURCE_DEGRADED`, `SOURCE_FALLBACK_USED`, `SOURCE_REJECTED`
+  - `source_eval_status` (Rohstatus je Providerlauf, vor Fallback-/Degradationsentscheidung): `SOURCE_OK`, `SOURCE_AUTH_ERROR`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_EMPTY`, `SOURCE_STALE`, `SOURCE_GAP`, `SOURCE_SCHEMA_MISMATCH`, `SOURCE_RETRY_EXHAUSTED`
+  - `status_flags` (array, required bei `series_status != SOURCE_OK`; optional bei `SOURCE_OK`): `SOURCE_FALLBACK_USED`, `SOURCE_BACKFILL`, `SOURCE_RATE_LIMIT`, ...
 - Repräsentationsstabilität ist für die vollständige Serien-Signatur verpflichtend.
   - Die Vergleichbarkeit verwendet die Signatur:
     `series_id`, `source.provider_id`, `series_type`, `series_product`,
@@ -143,6 +175,10 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
       4. **Produktiver Umschaltpunkt**: Alte Family in produktiven Runs auf `SOURCE_REJECTED`/`CanExecute=false` halten; alte Werte sind nur noch Replay/Diagnose sichtbar.
       5. **Rollback-Fenster**: Rückkehr auf alte Family nur mit explizitem Release-Block (`release_block` oder `controlled_switchover`) möglich; Rollback ist nur dann erlaubt, wenn die neue Family in einem vollständigen Beobachtungsfenster keine vollständige akzeptierbare Lastserie (ohne harte Fallback) geliefert hat.
       6. **Abschluss**: Alter Family-Schlüssel wird auf `ARCHIVED` gesetzt; neue Family läuft ohne Alias-Wechsel weiter.
+  - Für einen stabilen Tie-Break werden bei gleicher Klasse numerisch zuerst
+    `series_version` (wie definiert), dann bei gleicher Version der hash-basierte
+    Payload-Fingerprint (`value_hash`) verwendet.
+    - „gleiche Klasse“ meint die normalisierte Vergleichsschicht der festen Versionsfamilie pro Serie/Provider.
 
 Kontrollierte Abnahmetests für Family-/Versionswechsel:
 - **Dual-Active-Fähigkeit**: Alte und neue Family werden gleichzeitig geladen; beide dürfen im Beobachtungsfenster aktiv sein, solange beide dieselbe Semantik (`series_type`, `series_product`, `market_bid_area`, `site_id`, `resolution_minutes`) liefern.
@@ -150,41 +186,6 @@ Kontrollierte Abnahmetests für Family-/Versionswechsel:
 - **Harsh-Case bei Alias-Ungleichheit**: `series_id`/`series_version`/`source.provider_id` gleich, aber Family-Wechsel ohne Revisionsbruch, liefern unterschiedliche `value_hash` -> harte `SOURCE_REJECTED`.
 - **Regressionstest `value_hash`**: Gleiche Vollsignatur + gleicher Hash ist idempotent; gleicher Hash plus gleicher `series_version`/Provider muss ohne Seiteneffekte mehrfach akzeptiert werden.
 - **Rollback-Sichtbarkeit**: Im kontrollierten Rollback werden alte und neue `series_family_alias` mindestens bis zum Ende eines Validation-Fensters in Operator-/Replay-Sicht weiterhin explizit aufgelöst.
-  - Für einen stabilen Tie-Break werden bei gleicher Klasse numerisch zuerst `series_version` (wie definiert),
-    dann bei gleicher Version der hash-basierte Payload-Fingerprint (`value_hash`) verwendet.
-    - „gleiche Klasse“ meint die normalisierte Vergleichsschicht der festen Versionsfamilie pro Serie/Provider.
-  - `site_id` (optional)
-    - erforderlich für standortgebundene Forecast-/Erzeugungs-/Last-/Wetter-Reihen
-    - optional oder leer für produktweite Forecast-Daten ohne Standortkontext
-  - `market_bid_area` (optional)
-    - erforderlich für `series_type=price`, damit die bestehende `PriceSeries`-Schiene
-      den Marktbereich eindeutig identifizieren kann
-  - `series_type` (`price` oder `forecast`)
-  - `series_product` (z. B. `day_ahead`, `intraday`, `load`, `pv`, `wind`, `weather-temp`)
-  - `unit` (z. B. `EUR/MWh`, `kW`, `kWh`, etc.)
-- `resolution_minutes` (`> 0`, ganzzahlig)
-  - `timezone` (muss `UTC` sein)
-  - `horizon_start_utc`, `horizon_end_utc`
-  - optionale Co-Location-Vorverarbeitungsmetadaten:
-    - `alignment_mode` (`reject` | `trim-to-common`)
-    - `alignment_prepared` (bool, nur bei `alignment_mode=trim-to-common` sinnvoll)
-    - `alignment_prepared_by` (string, z. B. `forecast-preprocessor/v1`, `batch-trimmer/...`)
-    - `alignment_prepared_horizon_start_utc`
-    - `alignment_prepared_horizon_end_utc`
-  - `values` als geordnete Punkte:
-    - `timestamp_utc`
-    - `value`
-    - `value_type` (`actual` | `forecast`)
-    - optional `confidence` (nur spätere Extensions)
-  - `source_metadata`:
-    - `provider_id`
-    - `license_id` (optional, falls lizenzrelevant)
-    - `retrieved_at_utc`
-    - `valid_from_utc`, `valid_to_utc`
-    - `provider_request_id`
-- `series_status` (finaler Endstatus je Serie): `SOURCE_OK`, `SOURCE_DEGRADED`, `SOURCE_FALLBACK_USED`, `SOURCE_REJECTED`
-- `source_eval_status` (Rohstatus je Providerlauf, vor Fallback-/Degradationsentscheidung): `SOURCE_OK`, `SOURCE_AUTH_ERROR`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_EMPTY`, `SOURCE_STALE`, `SOURCE_GAP`, `SOURCE_SCHEMA_MISMATCH`, `SOURCE_RETRY_EXHAUSTED`
-- `status_flags` (array, required bei `series_status != SOURCE_OK`; optional bei `SOURCE_OK`): `SOURCE_FALLBACK_USED`, `SOURCE_BACKFILL`, `SOURCE_RATE_LIMIT`, ...
 
 Hinweis zur Semantik:
 - `source_eval_status` ist der interne Rohstatus pro Providerlauf (inkl. Primär- und Fallback-Pfad, vor Qualitätsentscheidung).
@@ -226,14 +227,14 @@ Hinweis zur Semantik:
     `series_id`/`source.provider_id`/`series_type`/`series_product`-Kombination variieren,
     ergibt sich `source_eval_status=SOURCE_SCHEMA_MISMATCH` / `series_status=SOURCE_REJECTED`.
 - Mapping-Regel:
-- `series_type=price` wird auf bestehende Preis-Produkte in `PriceSeries` abgebildet.
+  - `series_type=price` wird auf bestehende Preis-Produkte in `PriceSeries` abgebildet.
   - dafür ist `market_bid_area` verpflichtend und wird auf das entsprechende
     `PriceSeries`-Feld gemappt.
-- `series_type=forecast` dient in diesem Slice als Adapter-/Sidecar-Vertrag für
-  deterministische Point-Forecasts. Das hier eingeführte `ForecastSeries`-Schema ist
-  ein DTO-/Contract-Typ an der Application-Grenze, noch kein produktiver
-  EMS-Domaintyp für Optimierungsentscheidungen. Ein späterer Slice kann denselben
-  Contract in ein produktives Forecast-Domainmodell überführen.
+  - `series_type=forecast` dient in diesem Slice als Adapter-/Sidecar-Vertrag für
+    deterministische Point-Forecasts. Das hier eingeführte `ForecastSeries`-Schema ist
+    ein DTO-/Contract-Typ an der Application-Grenze, noch kein produktiver
+    EMS-Domaintyp für Optimierungsentscheidungen. Ein späterer Slice kann denselben
+    Contract in ein produktives Forecast-Domainmodell überführen.
 
 ### Normatives Status-Mapping (verbindlich)
 
@@ -528,8 +529,11 @@ Primär-/Fallback-Regel ist verbindlich:
   - Primär: EPEX (nur wenn Zugriff, Lizenz und Nutzungsbedingungen geklärt sind)
   - Fallback: Open Power System Data / Replay-konforme Datenquelle
 - Forecast:
-  - Primär: ENTSO-E
-  - Fallback: Open-Meteo oder Copernicus für Wetter, je Featuretyp
+  - Produktiv verpflichtende Forecast-Familien für Phase 2: `load` und
+    `weather-temp`.
+  - `load`: Primär ENTSO-E, Fallback Replay-/historische Lastquelle mit
+    identischem `SeriesEnvelope`-Vertrag.
+  - `weather-temp`: Primär Open-Meteo, Fallback Copernicus.
 
 Aktivierungslogik:
 - `SOURCE_EMPTY` wird ohne zugelassenen, kompatiblen Fallback nur als harte
@@ -549,8 +553,12 @@ Aktivierungslogik:
 
 Zusätzlich:
 
-- Falls EPEX Lizenz nicht geklärt ist, startet Phase 2 direkt mit Fallback-Basisquelle
-  und dokumentiert den Lizenzaufhebungsplan im Runbook.
+- Falls EPEX Lizenz nicht geklärt ist, darf EPEX nicht als `primary` markiert
+  werden. In diesem Fall startet Phase 2 mit OPSD/Replay-konformer Datenquelle
+  als temporärer `primary`; die EPEX-Aktivierung bleibt ein Lizenz-Runbook- und
+  Cutover-Schritt. Der Begriff `fallback` bleibt ausschließlich Quellen
+  vorbehalten, die hinter einer aktiven Primärquelle als Ersatzpfad konfiguriert
+  sind.
 
 ### Phase 3: Forecast-Sidecar-Input
 

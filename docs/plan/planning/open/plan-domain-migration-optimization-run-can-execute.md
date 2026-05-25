@@ -93,6 +93,16 @@ Nicht vorhanden:
        `reserve-robustness-needs-restore`), muss der originale Solver-Code im
        `TerminationDetail` erhalten bleiben, z. B.
        `solver_code=or-tools-optimal;reason=INTRADAY_RESTORE_REQUIRED`.
+     - Für neu erzeugte Guard-/Robustheits-Details ist das verbindliche
+       Detailformat eine `;`-getrennte `key=value`-Liste ohne `:`-Separator.
+       Robustheitsgründe verwenden mindestens
+       `reason=<LIMITING_REASON_CODE>` und optional
+       `solver_code=<original-code>` gemäß
+       [`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md).
+       Bestehende freie `TerminationDetail`-Strings werden bei der Migration
+       nicht syntaktisch umgeschrieben; sie bleiben Legacy-Auditdaten. Neue
+       Guard-Ergebnisse dürfen keine gemischten Freitext-/`key=value`-Formate
+       erzeugen.
 
 3. Persistenz und Wire
    - `can_execute` in allen produktiven Stores hinzufügen:
@@ -106,6 +116,11 @@ Nicht vorhanden:
      - `can_execute_source=legacy_backfill` oder ein gleichwertiger
        Diskriminator wird gesetzt; dieser Wert bedeutet "kein historischer Guard
        bekannt", nicht "alle heutigen Guards aktiv grün".
+     - Ein `legacy_backfill`-Run darf von Replay-/Lesepfaden als historisch
+       nutzbare Solver-Lösung angezeigt werden, ist aber keine hinreichende
+       Aktivierungsgrundlage für einen neuen Dispatch/Re-Run. Vor jedem erneuten
+       operativen Dispatch muss die aktuelle Guard-Pipeline aktiv durchlaufen und
+       mit einem nicht-legacy Diskriminator auditierbar sein.
      - spätere fachliche Hard-Stops überschreiben auf `false`.
    - Wire-Mapper und API-/DTO-Ausgaben erweitern.
    - API-Kompatibilität:
@@ -169,6 +184,9 @@ nicht mehr die Domain-/Persistenzmigration selbst besitzen.
 - [ ] Store-/Wire-/API-/Proto-Mappings führen `can_execute`.
 - [ ] Legacy-Backfill ist über `can_execute_source=legacy_backfill` oder einen
   gleichwertigen Diskriminator von aktiv geprüften Guard-Ergebnissen unterscheidbar.
+- [ ] Replay-/Re-Run-/Dispatch-Pfade akzeptieren `legacy_backfill` nicht als
+  alleinige Aktivierungsgrundlage; vor erneutem operativem Dispatch wird ein
+  aktueller Guard-Pass persistiert.
 - [ ] Re-Klassifikation nach Solver-Ergebnis erhält originale Solver-Provenance im
   finalen Run-Audit (`solver_code=...` oder äquivalentes Feld).
 - [ ] Operative Konsumenten nutzen `HasUsableSolution && CanExecute`.

@@ -19,6 +19,9 @@ Referenzdokumente (siehe **Quelle-Repo** oben), die als fachlicher Input dienen,
 aber keine direkte Codeübernahme darstellen.
 Sie ist kein aktiver Implementierungsplan, sondern ein Trigger-Watch-Artefakt
 für Marktmodell, Co-Location, Preisquellen und Forecast-Inputs.
+Die DoD-Checkboxen in dieser Notiz bedeuten deshalb nicht "Implementierung
+abgeschlossen", sondern "Trigger-Watch ist so präzise, dass bei Auslösung ein
+Slice ohne weitere Begriffs- oder Abnahmeklärung gestartet werden kann".
 
 Die vorhandene `bess-ems`-Basis deckt bereits zentrale Bausteine ab:
 
@@ -153,8 +156,9 @@ sowie Forecast-Serien.
 - Mindestens zwei produktive Preis-Adapter (z. B. EPEX + OPSD
   Open-Power-System-Data) mit
   dokumentiertem Fallback-Verhalten, Quellenmetadaten und Refresh-Status.
-- Mindestens zwei Forecast-Adapter je produktiv aktivierter Forecast-Familie
-  (1 Primär + 1 fallbackfähiger Adapter; z. B. Last oder Wetter) mit
+- Mindestens zwei Forecast-Adapter für die produktiv verpflichtenden
+  Forecast-Familien `load` und `weather-temp`
+  (je 1 Primär + 1 fallbackfähiger Adapter) mit
   Zeitstempelung, Versionskennzeichen und Qualitätskennzahlen.
 - Operativer Importpfad mit automatischer Aktualisierung, Toleranzgrenzen
   und Alarmierung bei Datenlücken.
@@ -168,7 +172,7 @@ sowie Forecast-Serien.
   produktiven Betriebsformen (`StandaloneBess`, `ClassicalCoLocation`, `HybridWithGridImport`) definiert.
 - [ ] `GreenStorageRestricted` ist als separater Sondermodus im selben Slice als
   Validierungsmodus dokumentiert.
-- [ ] F-MKT-02-Abnahmebedingungen sind dokumentiert (je 2 Adapter je Typ: 1 Primär + 1 Fallback + Fallback-/Degradation-Modell, Aktualisierung + Alarmierung).
+- [ ] F-MKT-02-Abnahmebedingungen sind dokumentiert (Preis: 1 Primär + 1 Fallback; Forecast: je 2 Adapter für `load` und `weather-temp`; jeweils Fallback-/Degradation-Modell, Aktualisierung + Alarmierung).
 - [ ] Trigger-Koordination bei parallelen Auslösern ist definiert und konfliktfrei;
   autoritativ ist der folgende Abschnitt
   [Trigger-Koordination bei gleichzeitigen Auslösern](#trigger-koordination-bei-gleichzeitigen-auslösern).
