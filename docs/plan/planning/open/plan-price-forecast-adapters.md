@@ -111,17 +111,20 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
       `source_eval_status=SOURCE_SCHEMA_MISMATCH` und `series_status=SOURCE_REJECTED`.
   - `series_family_alias`: optional bei stabiler Serienfamilie; Pflichtfeld beim
     kontrollierten Family-Wechsel ohne neue `series_id`. Prüfbare Write-Regel:
-    Wird derselbe Schlüssel (`series_id`, `series_product`,
-    `source.provider_id`) mit anderer `series_version_family` geliefert als die
-    bisher persistierte Referenzfamilie und bleibt `series_id` unverändert, muss
+    Wird derselbe Serienidentitäts-Sub-Key ohne `series_version`
+    (`series_id`, `source.provider_id`, `series_type`, `series_product`,
+    normalisiertes `market_bid_area`, normalisierte `site_id`) mit anderer
+    `series_version_family` geliefert als die bisher persistierte
+    Referenzfamilie und bleibt `series_id` unverändert, muss
     `series_family_alias` gesetzt sein. Fehlt der Alias, ist der Import mit
     `source_eval_status=SOURCE_SCHEMA_MISMATCH` und
-    `series_status=SOURCE_REJECTED` abzulehnen. Ein Wechsel der Familienkennung
-    erfolgt nur über diesen Alias bzw. durch neue Serienkennung, nicht per
-    stillschweigendem Wechsel derselben `series_id`. Beim ersten gültigen Write
-    existiert noch keine Referenzfamilie; dort ist `series_family_alias` nicht
-    erforderlich. Ab dem ersten akzeptierten Write ist ein Familienwechsel ohne
-    neue `series_id` aliaspflichtig.
+    `series_status=SOURCE_REJECTED` abzulehnen. Ein Wechsel der
+    Familienkennung erfolgt nur über diesen Alias bzw. durch neue
+    Serienkennung, nicht per stillschweigendem Wechsel derselben
+    `series_id`. Beim ersten gültigen Write existiert noch keine
+    Referenzfamilie; dort ist `series_family_alias` nicht erforderlich. Ab dem
+    ersten akzeptierten Write ist ein Familienwechsel ohne neue `series_id`
+    aliaspflichtig.
   - `site_id` (optional)
     - erforderlich für standortgebundene Forecast-/Erzeugungs-/Last-/Wetter-Reihen
     - optional oder leer für produktweite Forecast-Daten ohne Standortkontext
@@ -212,9 +215,14 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
     - Verbindlicher Cutover-/Rollback-SOP:
       1. **Vorbereitung**: Neue Family mit eigenem `series_family_alias` oder neuem (`series_id`, `series_product`) freigeben.
       2. **Dual-Active-Wahrnehmung**: Alte und neue Family werden parallel beobachtet.
-         Der Default verlangt mindestens zwei vollständige Release-Fenster. Ein
-         Release-Fenster ist mindestens ein produktiver Import-/Refresh-Zyklus
-         und mindestens 7 Kalendertage.
+         Der Beobachtungszeitraum startet beim späteren der beiden Zeitpunkte
+         `dual_active_started_at` aus dem Release-Runbook und erstem
+         akzeptiertem Dual-Active-Import, in dem alte und neue Family im selben
+         Release-Fenster mindestens `SOURCE_OK` oder ausdrücklich zugelassenes
+         `SOURCE_DEGRADED` liefern. Der Default verlangt ab diesem Anker
+         mindestens zwei vollständige Release-Fenster. Ein Release-Fenster ist
+         mindestens ein produktiver Import-/Refresh-Zyklus und mindestens
+         7 Kalendertage.
          Damit braucht der Cutover im Default mindestens zwei vollständige
          Zyklen und mindestens 14 Kalendertage Beobachtung.
          Der 14-Tage-Default ist ein serienübergreifendes Wartezeitfenster,
@@ -430,7 +438,10 @@ Empfohlene Integrationskonvention (API/Operator):
     zusätzliches Qualitätsflag (`SOURCE_BACKFILL`) gesetzt ist.
   - `degraded_ok`: Degradierte Nutzung erlaubt, Ergebnis muss als `SOURCE_DEGRADED` gekennzeichnet werden.
 - `min_coverage_ratio` Pflicht:
-  - mindestens 99,5 %
+  - Produkt-Default `0.995` (99,5 %), wenn keine explizite Policy gesetzt ist.
+    Das ist kein universelles Mindestlimit für alle Sonderpfade: niedrigere
+    konfigurierte Werte sind nur mit explizitem Feature-/Runbook-Override im
+    `quality_mode=degraded_ok` zulässig und müssen im Audit sichtbar sein.
   - Bezug auf Rohdaten vor Backfill (`raw_values_coverage`).
   - `n_intervals` ist die erwartete Schrittzahl im Zielhorizont.
   - Es gibt keine separate harte `48`-Intervalle-Schwelle.
@@ -576,6 +587,10 @@ Endgültige Serienendstatus sind:
   - `LoadForecastAsync` (`IForecastSeriesSource`)
   - Adapter-Bridge zwischen `SeriesEnvelope`, produktiven Preis-Domainmodellen und
     Forecast-Contract-Daten
+  - `IPriceSeriesImportSink` bleibt der manuelle/Fixture-Import-Einstieg, darf
+    aber keine eigene Status- oder Identitätslogik behalten: Importe erzeugen
+    vor Persistenz denselben `SeriesEnvelope` bzw. laufen über denselben Mapper
+    wie externe Adapter.
   - verbindliches `SeriesEnvelope` gemäß obigem Datenvertrag
   - deterministisches Mapping in die bestehende Import-Pipeline (`IPriceSeriesSource`).
   - deterministische Projektion von Forecast-`SeriesEnvelope` in konsumierende

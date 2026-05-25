@@ -229,6 +229,10 @@ Mögliche Domain-/Application-Erweiterungen:
     `ForecastSeries` bleibt dabei ein Adapter-/DTO-Contract; die Optimierung
     konsumiert einen eigenen Co-Location-Domaintyp `LocalGenerationSeries`, der
     deterministisch aus dem `SeriesEnvelope` projiziert wird.
+    Die Projektion darf Serienidentität und Qualitätsstatus nicht verlieren;
+    der Co-Location-Request trägt diese Felder direkt an `LocalGenerationSeries`,
+    damit `source_ok`, Replay und PriceSeries.Identity-Audit dieselbe
+    Eingangsserie referenzieren.
   - Nur explizite Validierungs-/Migrationspfade dürfen den Adapterpfad umgehen; dann
     muss der Lauf als nicht-produktiver Validierungslauf auditierbar sein.
     Ausnahme ist der in den Liefergegenständen definierte Übergangsadapter im
@@ -248,6 +252,12 @@ Mögliche Domain-/Application-Erweiterungen:
     Plan beschreibt nur die Co-Location-Verbrauchsregeln und dupliziert keine
     Feldsemantik.
   - Weitere Pflichtfelder:
+    - `series_id`
+    - `series_version`
+    - `series_status`
+    - `source_eval_status`
+    - `status_flags`
+    - `quality_mode`
     - `value_kw`
     - `value_type` (`actual` | `forecast`) als punktbezogene Kennzeichnung;
       nicht mit `SeriesEnvelope.series_type` verwechseln.
@@ -255,7 +265,6 @@ Mögliche Domain-/Application-Erweiterungen:
     - `series_product`
     - `unit` (z. B. `kW`)
     - `source_metadata.retrieved_at_utc`
-    - `series_version`
   - Validierung:
     - gleiche Zeitachse wie `PriceSeries` (UTC, step-genau, gleiche Horizon-Länge) bei produktiver Nutzung.
       Abweichende Quellauflösungen sind im produktiven Co-Location-Pfad nur
@@ -327,16 +336,23 @@ Mögliche Domain-/Application-Erweiterungen:
 - `OriginConstraint`
   - optionale Restriktion, ob Batterieenergie aus lokaler Erzeugung,
     Netzbezug oder beidem stammen darf
+  - Aktivierung erfolgt explizit über ein Request-Feld
+    `origin_constraint_mode` mit Werten `disabled` (Default), `soft_audit` oder
+    `green_storage_restricted`.
   - aktiviert die lokale Herkunftsbilanz `e_local_t` und die Kopplung zwischen
     lokaler Erzeugung, Batterieladung und Netzbezug.
-  - Im `GreenStorageRestricted`-Pfad gilt hart:
+  - `soft_audit` ist nur in `ClassicalCoLocation`/`HybridWithGridImport`
+    zulässig: Netzbezug bleibt erlaubt, aber lokale und netzbezogene Energie
+    werden über `LocalOriginState` getrennt auditierbar.
+  - `green_storage_restricted` ist der harte Pfad für
+    `GreenStorageRestricted`.
+  - Im `green_storage_restricted`-/`GreenStorageRestricted`-Pfad gilt hart:
     `p_grid_import_t == 0`, `0 <= e_local_t <= local_origin_capacity_kwh` und
     Batterieentladung darf nur aus zuvor lokaler, in `e_local_t` geführter
     Energie erfolgen.
-  - In `ClassicalCoLocation`/`HybridWithGridImport` kann `OriginConstraint`
-    als weicher Herkunftsnachweis aktiviert werden; dann bleibt Netzbezug je
-    Modus zulässig, aber lokale und netzbezogene Energie müssen getrennt
-    auditierbar sein.
+  - `origin_constraint_mode=green_storage_restricted` außerhalb
+    `GreenStorageRestricted` oder `origin_constraint_mode=soft_audit` in
+    `GreenStorageRestricted` ist `CONFIG_INCONSISTENT`.
 
 ### Netzanschlusspunkt-Konvention (verbindlich)
 

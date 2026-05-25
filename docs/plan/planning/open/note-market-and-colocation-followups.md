@@ -253,8 +253,9 @@ Aktivierungsreihenfolge mit Gates:
    externen Serien nutzt oder diese ausdrücklich als Übergangspfad mit
    `quality_mode=degraded_ok` geführt werden.
 4. `F-MKT-02` darf parallel als Datenvertrags-Slice vorbereitet werden; volle
-   Forecast-/Adapter-Aktivierung braucht den PriceSeries.Identity-Pre-Slice
-   und mindestens die Adapter-Plan-DoD-Punkte
+   Forecast-/Adapter-Aktivierung braucht den PriceSeries.Identity-Pre-Slice,
+   den abgeschlossenen OptimizationRun.CanExecute-Pre-Slice für den
+   `source_ok`-Combiner-Beitrag und mindestens die Adapter-Plan-DoD-Punkte
    "Persistenzkompatibilität hergestellt" und
    "Import-Adapter sind bereit für produktive Nutzung".
 5. Produktive Replays ohne immutable Request-Snapshot sind vorerst nicht

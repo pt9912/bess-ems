@@ -343,6 +343,25 @@ Deterministische Berechnung (verbindlich):
          danach aktualisierten SOC.
       2) Down-Branch auf `worst_down_kwh_t` (Anhebung), anschließend Up-Branch auf dem
          danach aktualisierten SOC.
+      Formal gilt für die sequentiellen Zusatzpfade:
+      - Initialzustände: `soc_up_then_down_0 = soc_t` und
+        `soc_down_then_up_0 = soc_t`.
+      - `soc_plan_up_then_down_t = soc_up_then_down_t - max(0, b_t) * Δt / eta_discharge + max(0, -b_t) * eta_charge * Δt - self_discharge_loss_kwh_t`
+      - Wenn `worst_up_kwh_t <= (soc_plan_up_then_down_t - soc_min_eff_kwh) * eta_discharge`,
+        dann `soc_after_up_t = soc_plan_up_then_down_t - worst_up_kwh_t / eta_discharge`, sonst blockiert der Pfad.
+      - Danach gilt für denselben Schritt:
+        `worst_down_kwh_t <= (soc_max_eff_kwh - soc_after_up_t) / eta_charge`;
+        wenn ja, `soc_up_then_down_{t+1} = soc_after_up_t + worst_down_kwh_t * eta_charge`, sonst blockiert der Pfad.
+      - Symmetrisch:
+        `soc_plan_down_then_up_t = soc_down_then_up_t - max(0, b_t) * Δt / eta_discharge + max(0, -b_t) * eta_charge * Δt - self_discharge_loss_kwh_t`,
+        `soc_after_down_t = soc_plan_down_then_up_t + worst_down_kwh_t * eta_charge`
+        nach bestandenem Down-Check, anschließend Up-Check gegen
+        `(soc_after_down_t - soc_min_eff_kwh) * eta_discharge` und
+        `soc_down_then_up_{t+1} = soc_after_down_t - worst_up_kwh_t / eta_discharge`.
+      - Die unabhängigen `soc_up_t`/`soc_down_t`-Spuren bleiben für den
+        nicht-simultanen Primärfall maßgeblich; bei simultan erlaubtem
+        Gegensignal wird der Schrittstatus zusätzlich über
+        `soc_up_then_down_*` und `soc_down_then_up_*` bestimmt.
       Der Schrittstatus ist der konservative Worst Case über beide Reihenfolgen
       (jede Verletzung blockiert; bei zwei zulässigen Pfaden zählt die kleinere
       verbleibende Margin). So werden LER-nahe `soc_min` und nicht-LER-nahe `soc_max`
@@ -395,7 +414,10 @@ Deterministische Berechnung (verbindlich):
   - `soc_t` vor der Worst-Case-Prüfung hart validieren:
     - `soc_min_eff_kwh <= soc_t <= soc_max_eff_kwh`, sonst `ROBUST_INFEASIBLE`
       mit `limiting_reason_code=SOC_LIMIT`.
-  - `soc_t^{eff} = soc_t - self_discharge_loss_kwh_t`.
+  - Es gibt keinen separaten persistierten `soc_eff`-Zustand. Der
+    Self-Discharge-Term wird genau einmal in den `soc_plan_*`-Rekursionen
+    abgezogen; Implementierungen dürfen ihn nicht zusätzlich vorab auf `soc_t`
+    anwenden.
 - Verfügbare Energiemengen für die `ReserveEnergyEnvelope` sind branch-spezifisch:
   - `available_up_kwh_t` wird pro Schritt aus dem Up-Branch-Zustand nach geplanter
     Fahrplanwirkung berechnet:
@@ -496,9 +518,12 @@ Restore- und Gate-Entscheidungslogik (verbindlich):
     - `required_recovery_minutes_up = if restore_shortfall_up_kwh == 0 then 0 else restore_shortfall_up_kwh / restore_capability_up_t * 60`
     - `required_recovery_minutes_down = if restore_shortfall_down_kwh == 0 then 0 else restore_shortfall_down_kwh / restore_capability_down_t * 60`
     - `required_recovery_minutes = max(required_recovery_minutes_up, required_recovery_minutes_down)`
-    - `restore_capability_used` ist die effektive Restore-Kapazität (`restore_capability_up_t`
-      oder `restore_capability_down_t`), die den maximalen `required_recovery_minutes`-Wert
-      bestimmt; bei Gleichstand deterministisch die Up-Richtung. Wenn
+    - `restore_capability_used` ist die effektive Restore-Kapazität, die den
+      maximalen `required_recovery_minutes`-Wert bestimmt.
+      `restore_capability_used_direction` ist `up`, `down` oder `both`; bei
+      Gleichstand werden beide Richtungen auditierbar ausgewiesen
+      (`restore_capability_used_candidates=[up,down]` bzw. äquivalent), damit
+      kein bindender Down-Constraint durch einen Up-Tie-Break maskiert wird. Wenn
       `required_recovery_minutes == 0`, ist `restore_capability_used=null` /
       `not_applicable`, damit kein 0-kW-Up-Auditwert als genutzter Pfad erscheint.
 - Falls `required_recovery_minutes > max_recovery_time` => `ROBUST_INFEASIBLE` mit
@@ -873,8 +898,10 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
 - Auflösungsfelder kleiner oder gleich 0 (`resolution_minutes`) → `ROBUST_POLICY_UNSUPPORTED`.
 - Bei aktivem FCR gilt `t_min_fcr`/`full_activation_time <= 0` → `ROBUST_POLICY_UNSUPPORTED`.
 - Bei aktivem Restore-Pfad gilt `max_recovery_time <= 0` → `ROBUST_POLICY_UNSUPPORTED`.
-- `full_activation_time_afrr` / `full_activation_time_mfrr` werden nur bei gesetztem Feldwert geprüft:
-  - gesetzt und `<= 0` → `ROBUST_POLICY_UNSUPPORTED`.
+- `full_activation_time_afrr` / `full_activation_time_mfrr` werden
+  produktabhängig geprüft:
+  - Produkt inaktiv und Feldwert `0` → akzeptierter `not_applicable`-Sentinel.
+  - Produkt aktiv und Feld fehlt oder `<= 0` → `ROBUST_POLICY_UNSUPPORTED`.
 - `conservative_soc_headroom` außerhalb `0..1` (ratio) bzw. `<0` (kwh) → `ROBUST_POLICY_UNSUPPORTED`.
 - FCR-Worst-Case für nicht-LER: volle FCR-Leistung über Horizont.
 - LER-konservative FCR-Huelle mit `t_min_fcr`.

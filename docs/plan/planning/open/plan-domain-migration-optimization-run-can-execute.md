@@ -20,11 +20,15 @@ Ausführungsentscheidung.
 Normativ gilt nach der Migration:
 
 ```text
-Run darf ausgeführt werden <=> HasUsableSolution && CanExecute
+Run darf neu operativ dispatcht werden <=>
+  HasUsableSolution && CanExecute && can_execute_source != legacy_backfill
 ```
 
 Jeder Slice darf `CanExecute` nur von `true` auf `false` ziehen. Kein Slice darf
 ein bereits gesetztes `false` wieder auf `true` setzen.
+`legacy_backfill` ist eine historische Lesesicht, kein aktueller
+Aktivierungsstempel; Replay-/Diagnosepfade dürfen solche Runs anzeigen, aber
+operative Dispatch-Pfade brauchen einen aktuellen Guard-Pass.
 
 Die Run-Erzeugung erfolgt nach dieser Migration in einem gemeinsamen
 Result-Building-Schritt: Solver-Ergebnis und alle aktivierten Guards werden
@@ -94,6 +98,9 @@ duplizieren diese Matrix nicht.
 Code-Konventionen:
 - `TerminationCode` bleibt niedrig kardinal, kebab-case und familienpräfigiert
   (z. B. `reserve-robustness-needs-restore`).
+- `TerminationCode` darf maximal 64 Zeichen lang sein und folgt damit der
+  bestehenden Domain-Grenze `OptimizationRun.TerminationCodeMaxLength`; neue
+  Plan-Codes müssen diese Grenze vor Slice-Aktivierung explizit prüfen.
 - `format=kv1;reason=...` verwendet für maschinenlesbare fachliche Gründe
   `SNAKE_CAPS` (z. B. `RECOVERY_TIMEOUT`). Diese Trennung ist Absicht:
   `TerminationCode` gruppiert Dashboard-/Persistenzklassen, `reason` trägt den
@@ -136,9 +143,10 @@ Migration der Ausführungsentscheidung auf `CanExecute`.
      - Guard-Pipeline bewertet dieses Rohresultat zusammen mit Config-/Schema-/
        Source-/Robustheitsbeiträgen.
      - Die Result-Factory baut daraus einen finalen `OptimizationRun`.
-     - Wenn ein Guard den `TerminationCode` ersetzt (z. B.
-       `reserve-robustness-needs-restore`), muss der originale Solver-Code im
-       `TerminationDetail` erhalten bleiben, z. B.
+     - Wenn ein Guard-Beitrag den Solver-`TerminationCode` im finalen
+       Result-Build überstimmt (z. B. `reserve-robustness-needs-restore`),
+       muss der originale Solver-Code im `TerminationDetail` erhalten bleiben,
+       z. B.
        `format=kv1;solver_code=or-tools-optimal;reason=INTRADAY_RESTORE_REQUIRED`.
      - Für neu erzeugte Guard-/Robustheits-Details ist das verbindliche
        Detailformat `format=kv1` plus eine `;`-getrennte `key=value`-Liste ohne

@@ -79,6 +79,11 @@ Normativ soll die Serienidentität mindestens tragen:
      persisted generated key). Der eindeutige Store-Key umfasst mindestens
      `(series_id, series_version, provider_id, series_type, series_product,
      normalized_market_bid_area, normalized_site_id)`.
+     `unit` und `resolution_minutes` bleiben verpflichtende
+     Verträglichkeitsfelder und sind Bestandteil von `value_hash` sowie
+     Schema-/Signaturprüfungen; sie sind nicht Teil des eindeutigen Store-Keys,
+     weil ein Wechsel unter gleicher Serienidentität als harter
+     Schemafehler statt als zweite Serie behandelt wird.
    - Altimporte bleiben über einen Dual-Path lauffähig.
    - Bestehende In-Memory-/Legacy-Datensätze werden nicht still umgedeutet:
      - `series_id = legacy:<market_bid_area>:<product>:<price_kind>:<source>`
@@ -101,7 +106,10 @@ Normativ soll die Serienidentität mindestens tragen:
      - geordnete Zeitstempel in UTC (`O`/ISO-8601, keine lokale Zeitzone),
      - Werte in deterministischer Roundtrip-Decimal-/Double-Repräsentation,
      - `unit`, `resolution_minutes`, `series_type`, `series_product`,
-     - Coverage-Metadaten (`horizon_start_utc`, `horizon_end_utc`).
+     - Coverage-Metadaten (`horizon_start_utc`, `horizon_end_utc`),
+     - Alignment-Metadaten (`alignment_mode`, `alignment_prepared`,
+       `alignment_prepared_by`, `alignment_prepared_horizon_start_utc`,
+       `alignment_prepared_horizon_end_utc`), sofern sie gesetzt sind.
      Provider-spezifische Abrufmetadaten, `retrieved_at_utc`, Statusmeldungen
      und Credentials gehen nicht in den Hash ein.
    - Ein Mapping-Test fixiert Byte-für-Byte, dass identische Eingangszeitreihen
@@ -113,6 +121,8 @@ Normativ soll die Serienidentität mindestens tragen:
    - Harte Ablehnung bei gleicher Identität/Version und anderem `value_hash`.
    - Provider-Kontexte bleiben getrennt.
    - Family-Cutover und Rollback sind auditierbar.
+   - `alignment_prepared_*`-Metadaten ändern bei sonst identischem Payload den
+     `value_hash` deterministisch.
    - Altpfad bleibt lauffähig, solange Dual-Path aktiv ist.
    - Dual-Path-Fixtures:
      - Legacy-`PriceSeriesKey`-Datensatz wird in eine stabile Serienidentität
