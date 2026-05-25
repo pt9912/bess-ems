@@ -73,6 +73,7 @@ Nicht vorhanden:
      - Sammelbeiträge wie `source_ok` sind all-or-nothing: mehrere Slices oder
        mehrere Serien dürfen denselben Slot bedienen, und jeder einzelne
        `source_ok=false`-Beitrag zieht das aggregierte `source_ok` auf `false`;
+     - nicht aktivierte Beiträge gelten im jeweiligen Lauf als neutral `true`;
      - der Combiner berechnet monoton `CanExecute = HasUsableSolution && all(_ok)`.
 
 ### Gemeinsame Run-Mapping-Matrix
@@ -134,7 +135,8 @@ duplizieren diese Matrix nicht.
        Domain-Wireform `TerminationCode:TerminationDetail` am ersten `:` trennt.
        Werte mit natürlichem Doppelpunkt (z. B. ISO-Zeitstempel oder URLs) müssen
        vor Persistierung percent-encoded werden; neue Parser dekodieren nur
-       innerhalb von `format=kv1`.
+       innerhalb von `format=kv1`. Das gilt auch für `series_version`-Werte aus
+       Forecast-/Preisreihen, falls sie in `TerminationDetail` aufgenommen werden.
 
 3. Persistenz und Wire
    - `can_execute` in allen produktiven Stores hinzufügen:

@@ -200,7 +200,9 @@ Hinweis zur Semantik:
 - `status_detail` (optional): strukturierte Zusatzinfo (z. B. `{ "source_code": "SOURCE_STALE", "backfill_intervals_closed": 2, "effective_source_id": "opsd-..." }`)
 - `value_hash`: optional für reine Einmalimporte ohne Idempotenz-/Cutover-Vertrag;
   verpflichtend, sobald Versions-Idempotenz, Re-Load-Vergleich, Family-Cutover oder
-  Rollback aktiviert ist. Der Hash stabilisiert den Payload-Vergleich.
+  Rollback aktiviert ist. In der Erstaktivierung von Phase 1/2 ist `value_hash`
+  Pflicht, außer der Adapter ist explizit als Einmalimport ohne Re-Load-Vertrag
+  deklariert. Der Hash stabilisiert den Payload-Vergleich.
 - Validierungspflicht:
   - strikte UTC-Zeitachse
   - Schrittweite exakt `resolution_minutes`
@@ -686,6 +688,8 @@ arbeitet mit deterministischen Preiswerten.
   - `SOURCE_EMPTY` ohne expliziten degraded-Zulassungsweg bleibt hart abweisend.
 - [ ] Versions- und Idempotenzregeln umgesetzt:
   - eindeutiger Revisionsvergleich pro `(series_id, series_version, source.provider_id)`,
+  - `value_hash` ist für produktive Phase-1/2-Adapter vorhanden, außer bei
+    explizit deklarierten Einmalimporten ohne Re-Load-Vertrag,
   - payload-identisches Re-Load ist idempotent,
   - Provider-Kontexte trennscharf unabhängig von identischem `series_id`/`series_version`.
   - kontrollierter Cutover/Rollback für `series_version_family` ist dokumentiert und mit den obigen Family-Tests verifiziert.

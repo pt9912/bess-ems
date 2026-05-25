@@ -199,11 +199,11 @@ Mögliche Domain-/Application-Erweiterungen:
   - Weitere Pflichtfelder:
     - `value_kw`
     - `value_type` (`forecast` | `actual`)
-    - `source`
-    - `product`
+    - `source_metadata.provider_id`
+    - `series_product`
     - `unit` (z. B. `kW`)
-    - `updated_at_utc`
-    - `value_version`
+    - `source_metadata.retrieved_at_utc`
+    - `series_version`
   - Validierung:
     - gleiche Zeitachse wie `PriceSeries` (UTC, step-genau, gleiche Horizon-Länge) bei produktiver Nutzung.
       Abweichende Quellauflösungen sind im produktiven Co-Location-Pfad nur
@@ -212,21 +212,10 @@ Mögliche Domain-/Application-Erweiterungen:
       `alignment_mode=resample`-Pfad mit deterministischer Aggregations-/
       Interpolationsregel freigibt. Dieser Plan definiert noch keinen
       produktiven Resampling-Pfad.
-    - Ist `alignment_mode=reject` (Default im produktiven ADR): die Zeitachse muss hart identisch sein (gleiches Horizon, gleiche Schrittweite, gleiche Startzeit).
-    - Ist `alignment_mode=trim-to-common` gesetzt:
-      - `alignment_prepared` darf nur zusammen mit `alignment_mode=trim-to-common` verwendet werden;
-        `alignment_prepared=true` bei anderem `alignment_mode` ist `SCHEMA_INCONSISTENT`.
-      - produktive Optimierung darf `trim-to-common` nur mit explizit abgeschlossenem Vorverarbeitungs-Pfad und nachweislicher Versionierung in den zugehörigen Vorverarbeitungsfeldern starten; ohne diese Voraussetzungen führt der Lauf zu `SCHEMA_INCONSISTENT`.
-      - Schnittmenge auf den gemeinsamen Zeithorizont.
-      - `alignment_prepared_by` und die vorbereiteten Horizon-Grenzen (`alignment_prepared_horizon_start_utc`, `alignment_prepared_horizon_end_utc`) müssen gesetzt sein.
-      - deterministische Konvention bei Zeitachsen-Verschiebung.
-      - lückenbehaftete Schritte müssen im Anschluss vollständig abgearbeitet werden.
-      - nur im Forecast-/Preprocessing-Pfad, danach muss der Standardpfad (`reject`) mit lückenloser Zeitachse erhalten bleiben.
-      - keine offenen Zeitlücken; zulässig: kontrollierte Backfill-Regel
-        (max. 2 aufeinanderfolgende Intervalle pro Lücke).
-      - Backfill ist nur in diesem vorbereiteten `trim-to-common`-Vorverarbeitungspfad
-        zulässig. Bei `alignment_mode=reject` gibt es kein Backfill; jede
-        Zeitachsenabweichung bleibt `SCHEMA_INCONSISTENT`.
+    - Für Alignment gilt ausschließlich der Vertrag aus
+      [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md):
+      produktiver Default ist `alignment_mode=reject`; `trim-to-common` ist nur
+      über den dort spezifizierten versionierten Vorverarbeitungspfad zulässig.
       - Wenn die Vorverarbeitung Werte auffüllt oder schätzt, muss das
         resultierende `SeriesEnvelope` das Flag `SOURCE_BACKFILL` behalten. Solche
         Serien sind im produktiven `quality_mode=strict` nicht zulässig und dürfen
@@ -237,7 +226,8 @@ Mögliche Domain-/Application-Erweiterungen:
     - Negative Werte sind nur über einen separaten signierten Netzausgangs-Datensatz zulässig.
     - Last-Forecasts sind keine `LocalGenerationSeries`; sie laufen als
       `ForecastSeries` mit `series_product=load` über den Forecast-Adaptervertrag.
-    - Metadatenpflicht für `source`, `product`, `updated_at_utc`, `value_version`.
+    - Metadatenpflicht gemäß `SeriesEnvelope`: `source_metadata.provider_id`,
+      `series_product`, `source_metadata.retrieved_at_utc`, `series_version`.
 
 - `LocalOriginState`
   - virtuelle Zwischenbilanz für herkunftsgebundene Energie (kWh)
@@ -530,10 +520,15 @@ Bestandsrouten nicht brechen:
    - `site_grid_power_sign=import_pos`: Vorzeichen-/Grenzlogik bleibt konsistent
      zur Export-Variante bei identischem physischem Leistungsfluss.
    - Netzexportlimit begrenzt Batterieentladung plus lokale Erzeugung.
-   - `GreenStorageRestricted`: `e_local_0`-Randfall (`0` und >0) und `local_origin_capacity_kwh`-Randfall (`0`, Minimalreserve) werden explizit geprüft.
+   - `GreenStorageRestricted`: `e_local_0`-Randfall (`0` und >0) und
+     `local_origin_capacity_kwh`-Randfall (`0`, Minimalreserve) werden explizit geprüft;
+     `local_origin_capacity_kwh=0` blockiert mit `CONFIG_INCONSISTENT` und
+     `format=kv1;reason=GREEN_STORAGE_ORIGIN_CAPACITY_ZERO`.
    - `GreenStorageRestricted`: Lauf wird mit `CONFIG_INCONSISTENT` und
      `GREEN_STORAGE_GRID_CHARGE_BLOCKED` geblockt, wenn eine Netzladung
      (`p_grid_import_t > 0`) versucht wird.
+   - Co-Location-Konfigurations- und Schemafehler setzen `CanExecute=false`
+     gemäß Pre-Slice-Matrix.
    - Reservebänder reduzieren weiterhin verfügbare Lade-/Entladeleistung.
    - `migration_strict=false` erlaubt nicht-aktive `can_dispatch=false`-Sites mit
      `unclear`/`incompatible` im Migrationsfenster, blockiert aber aktive Sites

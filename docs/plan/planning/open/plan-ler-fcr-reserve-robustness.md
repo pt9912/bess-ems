@@ -10,7 +10,7 @@ Baltputnis et al. (2024), Journal of Energy Storage 102, 114082
 [`../../../../spec/architecture.md`](../../../../spec/architecture.md),
 [`../done/plan-RM-M4.md`](../done/plan-RM-M4.md),
 [`../done/plan-RM-M5.md`](../done/plan-RM-M5.md),
-[`../open/plan-price-forecast-adapters.md`](../open/plan-price-forecast-adapters.md)
+[`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md)
 
 ---
 
@@ -318,7 +318,10 @@ Deterministische Berechnung (verbindlich):
       symmetrisch abgedeckt.
     - Diese Kopplung ist bewusst konservativ und vollständig deterministisch.
   - Wenn simultanes Gegensignal laut Produktdefinition aktiv ist, aber `simultaneous_reserve_direction_allowed=false`,
-    gilt hart `ROBUST_POLICY_UNSUPPORTED` mit `POLICY_MISMATCH`.
+    gilt hart `ROBUST_POLICY_UNSUPPORTED` mit `POLICY_MISMATCH`. Diese Sperre
+    gilt nur für separat gebuchte Up-/Down-Produkte (aFRR/mFRR); FCR wird als
+    symmetrisches Produkt unabhängig vom Flag mit getrennten Up-/Down-Hüllen
+    ausgewertet.
 - FCR-Worst-Case-Konsistenz bei Mindestzeit:
   - Für FCR wird die Mindestaktivierungszeit mit zwei getrennten Zustandsgrößen geführt:
     - `fcr_remaining_envelope_t` ist die konservative Worst-Case-Hülle in Minuten.
@@ -585,12 +588,10 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
 
 ### Phase 3: Optimierungsintegration
 
-- Dieser Abschnitt ist der gemeinsame Referenzvertrag für Ausführungs- und
-  Guard-Verhalten (`OptimizationSolverStatus`, `TerminationCode`, `CanExecute`,
-  `CanExecute=false`-Interpretation).  
-  Das Gegenstück im Co-Location-Slice ist
-  [`plan-market-colocation-model.md`](plan-market-colocation-model.md);
-  beide Abschnitte müssen semantisch identisch bleiben.
+- Die gemeinsame Run-Mapping-Matrix lebt im Pre-Slice
+  [`Domain-Migration OptimizationRun.CanExecute`](plan-domain-migration-optimization-run-can-execute.md).
+  Dieser Abschnitt liefert nur robustheitsbezogene Guard-Beiträge und Codes; er
+  muss mit der Pre-Slice-Matrix konsistent bleiben.
 
 - Precheck für Schedule-Optimierung:
   - Reserveband darf nicht nur leistungsmässig passen, sondern muss
@@ -708,7 +709,7 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
 - Kein Ersatz für BMS-/PCS-Schutzfunktionen.
 - Keine Änderung der bestehenden Vorzeichenkonvention.
 - Kein Forecast-Adapter; Quellenbeschaffung bleibt
-  [`plan-price-forecast-adapters.md`](../open/plan-price-forecast-adapters.md).
+  [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md).
 
 ---
 

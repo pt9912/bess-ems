@@ -173,8 +173,9 @@ sowie Forecast-Serien.
 - [ ] F-MKT-01-Abnahmebedingungen sind als Slice-Startkriterien dokumentiert und
   für mindestens diese drei produktiven Betriebsformen (`StandaloneBess`,
   `ClassicalCoLocation`, `HybridWithGridImport`) definiert.
-- [ ] `GreenStorageRestricted` ist als separater Sondermodus für einen späteren
-  Validierungsslice dokumentiert.
+- [ ] `GreenStorageRestricted` läuft im ersten Slice als Validierungsmodus mit
+  harten Constraints; produktive Förderautomatik bleibt einem späteren Slice
+  vorbehalten.
 - [ ] F-MKT-02-Abnahmebedingungen sind als Slice-Startkriterien dokumentiert
   (Preis: 1 Primär + 1 Fallback; Forecast: je 2 Adapter für `load` und
   `weather-temp`; jeweils Fallback-/Degradation-Modell, Aktualisierung +
