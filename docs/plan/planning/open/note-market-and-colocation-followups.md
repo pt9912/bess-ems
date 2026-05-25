@@ -107,7 +107,8 @@ förder-/herkunftsgebundenem Grünstromspeicher.
   Hybrid mit Netzbezug und fördergebundenem Grünstromspeicher.
 - Für den ersten Slice ist ein produktiver Forecast-Adapter keine zwingende
   Voraussetzung; fehlender externer Forecast-Zugriff schaltet die
-  forecast-basierte Co-Location-Nutzung in einen kontrollierten degraded/fallback-Modus.
+  forecast-basierte Co-Location-Nutzung in einen kontrollierten
+  `quality_mode=degraded_ok`-Übergangspfad.
 
 **Aktivierungs-Pfad:** eigener Slice-Plan
 [`plan-market-colocation-model.md`](plan-market-colocation-model.md).
@@ -167,6 +168,9 @@ sowie Forecast-Serien.
 
 ## Trigger-Readiness-Checkliste
 
+Legende: `[x]` bedeutet hier "Trigger-Spezifikation scharf genug", nicht
+"Implementierung abgeschlossen".
+
 - [x] Externe Quellenanalyse ist als Trigger-Spezifikation abgeschlossen (DFBEW,
   Co-Location, Forecast-Trading, zusätzliche Medium-Quellen) und fachlich
   klassifiziert.
@@ -188,26 +192,23 @@ sowie Forecast-Serien.
 
 ## Trigger-Koordination bei gleichzeitigen Auslösern
 
-- Wenn beide Trigger (F-MKT-01 und F-MKT-02) im selben Release-Fenster ausgelöst werden:
-  1. `F-MKT-01` (Markt-/Co-Location-Modell) wird zuerst im operativen Produktivpfad freigegeben.
-  2. `F-MKT-02` kann parallel als Datenvertrags-Slice vorbereitet werden, darf Co-Location aber zunächst im degraded/fallback-Modus betreiben.
+Aktivierungsreihenfolge mit Gates:
 
-Aktivierungsvoraussetzungen:
-- Parallelbetrieb ist erst freigegeben, wenn `CanExecute`-Semantik zwischen
-  [`plan-domain-migration-optimization-run-can-execute.md`](plan-domain-migration-optimization-run-can-execute.md)
-  und den konsumierenden Slice-Plänen verbindlich umgesetzt ist.
-- Produktiver F-MKT-02-Betrieb ist erst freigegeben, wenn
-  [`Domain-Migration PriceSeries.Identity`](plan-domain-migration-price-series-identity.md)
-  abgeschlossen ist.
-- Produktiver F-MKT-01-Betrieb mit externen lokalen Erzeugungs- oder
-  Forecast-Serien ist ebenfalls erst freigegeben, wenn
-  [`Domain-Migration PriceSeries.Identity`](plan-domain-migration-price-series-identity.md)
-  abgeschlossen ist. Ohne diesen Pre-Slice darf F-MKT-01 nur mit intern
-  bereitgestellten oder degraded/fallback-geführten Übergangsserien starten.
-- Wenn produktive Replays ohne Request-Snapshot freigegeben werden sollen, ist
-  zuerst ein eigener Trigger-/Pre-Slice `OptimizationRun.SolverScopeAudit`
-  anzulegen; andernfalls bleibt der Request-Snapshot die kanonische
-  `solver_scope`-Auditquelle.
+1. [`Domain-Migration OptimizationRun.CanExecute`](plan-domain-migration-optimization-run-can-execute.md)
+   ist zuerst abzuschließen; danach dürfen konsumierende Slices ihre
+   fachlichen `*_ok`-Beiträge anschließen.
+2. [`Domain-Migration PriceSeries.Identity`](plan-domain-migration-price-series-identity.md)
+   ist vor produktivem F-MKT-02-Betrieb und vor produktivem F-MKT-01-Betrieb
+   mit externen lokalen Erzeugungs- oder Forecast-Serien abzuschließen.
+3. `F-MKT-01` darf vor F-MKT-02 nur dann produktiv starten, wenn es keine
+   externen Serien nutzt oder diese ausdrücklich als Übergangspfad mit
+   `quality_mode=degraded_ok` geführt werden.
+4. `F-MKT-02` darf parallel als Datenvertrags-Slice vorbereitet werden; volle
+   Forecast-/Adapter-Aktivierung braucht den PriceSeries.Identity-Pre-Slice.
+5. Produktive Replays ohne immutable Request-Snapshot sind vorerst nicht
+   freigegeben. Dafür ist zuerst ein eigener Trigger-/Pre-Slice
+   `OptimizationRun.SolverScopeAudit` anzulegen; andernfalls bleibt der
+   Request-Snapshot die kanonische `solver_scope`-Auditquelle.
 
 Laufende Betriebsregeln:
 - Produktiv geht erst auf vollen Forecast-Fokus über, wenn

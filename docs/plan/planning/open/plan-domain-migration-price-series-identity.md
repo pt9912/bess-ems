@@ -41,17 +41,53 @@ Normativ soll die Serienidentität mindestens tragen:
      vollständig adressieren.
    - `value_hash` ist verpflichtend, sobald Idempotenz, Re-Load-Vergleich,
      Family-Cutover oder Rollback aktiviert ist.
+   - Legacy-`PriceSeries` ohne explizite Identität werden beim Lesen über einen
+     deterministischen Adapter in die neue Identität projiziert; neue Producer
+     dürfen keine unversionierte Serie mehr schreiben.
 
 2. Store-Key
    - Der private `InMemoryPriceSeriesStore.PriceSeriesKey` wird durch einen
      expliziten, testbaren Serienidentitätstyp ersetzt oder vollständig auf die
      neue Identität umgestellt.
    - Dauerhafte Stores, soweit vorhanden, verwenden denselben Schlüsselvertrag.
+   - Der heutige Legacy-Key
+     `(MarketBidArea, Product, PriceKind, Source, HorizonStart, HorizonEnd, TimeStep)`
+     wird nur noch als Migrationsinput akzeptiert. Der neue Schlüssel ist die
+     explizite Serienidentität plus Provider-Kontext; Horizon-Grenzen sind
+     Payload-/Coverage-Metadaten, kein Identitätsersatz.
 
 3. Persistenz und Migration
    - `schema/schema.yaml` und d-migrate/RunOnce-Migrationen werden erweitert,
-     sobald ein dauerhafter Store beteiligt ist.
+     sobald ein dauerhafter Store beteiligt ist. Diese Erweiterung gehört nicht
+     zu `optimization_runs`; sie liegt in einem eigenen Preis-/Serien-Store
+     (z. B. Tabelle `price_series` oder `series_envelopes`) mit mindestens:
+     - `series_id` (`text`, required)
+     - `series_version` (`text`, required)
+     - `provider_id` (`text`, required; entspricht `source.provider_id`)
+     - `series_type` (`text`, required)
+     - `series_product` (`text`, required)
+     - `market_bid_area` (`text`, nullable)
+     - `site_id` (`text`, nullable)
+     - `unit` (`text`, required)
+     - `resolution_minutes` (`integer`, required)
+     - `value_hash` (`text`, required für produktive Re-Load-/Cutover-Pfade)
+     - `series_version_family` (`text`, nullable)
+     - `horizon_start_utc` / `horizon_end_utc` (`datetime`, timezone, required)
+     - `source_metadata_json` (`text`, required)
+   - Für eindeutige Keys werden nullable Scope-Felder normalisiert
+     (`market_bid_area`/`site_id` als leerer Scope-Key oder äquivalenter
+     persisted generated key). Der eindeutige Store-Key umfasst mindestens
+     `(series_id, series_version, provider_id, series_type, series_product,
+     normalized_market_bid_area, normalized_site_id)`.
    - Altimporte bleiben über einen Dual-Path lauffähig.
+   - Bestehende In-Memory-/Legacy-Datensätze werden nicht still umgedeutet:
+     - `series_id = legacy:<market_bid_area>:<product>:<price_kind>:<source>`
+       oder ein äquivalent dokumentierter stabiler Legacy-Alias,
+     - `series_version` wird deterministisch aus
+       `(horizon_start_utc, horizon_end_utc, resolution_minutes, source)` gebildet,
+     - `provider_id` wird aus dem bisherigen `Source`-Feld abgeleitet,
+     - `series_type`/`series_product` werden über die Mapping-Tabelle im
+       Adapterplan normalisiert.
    - Neue Serienkennungen dürfen erst produktiv aufgenommen werden, wenn der
      neue Identitätsschlüssel in allen aktiven Store-Pfaden verfügbar ist.
 
@@ -60,6 +96,17 @@ Normativ soll die Serienidentität mindestens tragen:
      `ForecastSeries`-Contract-Daten abgebildet.
    - Provider-ID, Version, Family und `value_hash` dürfen nicht im
      Mapping-Verlauf verloren gehen.
+   - `value_hash` wird kanonisch als SHA-256 über eine UTF-8-kodierte,
+     sort-key-stabile JSON-Nutzlast berechnet. Die Nutzlast enthält:
+     - geordnete Zeitstempel in UTC (`O`/ISO-8601, keine lokale Zeitzone),
+     - Werte in deterministischer Roundtrip-Decimal-/Double-Repräsentation,
+     - `unit`, `resolution_minutes`, `series_type`, `series_product`,
+     - Coverage-Metadaten (`horizon_start_utc`, `horizon_end_utc`).
+     Provider-spezifische Abrufmetadaten, `retrieved_at_utc`, Statusmeldungen
+     und Credentials gehen nicht in den Hash ein.
+   - Ein Mapping-Test fixiert Byte-für-Byte, dass identische Eingangszeitreihen
+     unabhängig von Dictionary-/JSON-Feldreihenfolge denselben `value_hash`
+     erzeugen.
 
 5. Tests
    - Idempotenter Re-Load bei gleicher Identität und gleichem `value_hash`.
@@ -67,6 +114,15 @@ Normativ soll die Serienidentität mindestens tragen:
    - Provider-Kontexte bleiben getrennt.
    - Family-Cutover und Rollback sind auditierbar.
    - Altpfad bleibt lauffähig, solange Dual-Path aktiv ist.
+   - Dual-Path-Fixtures:
+     - Legacy-`PriceSeriesKey`-Datensatz wird in eine stabile Serienidentität
+       projiziert und bleibt lesbar.
+     - Neuer `SeriesEnvelope`-Datensatz roundtript über den Store-Key ohne
+       Verlust von `provider_id`, `series_version`, `series_version_family` und
+       `value_hash`.
+     - Gleiche Identität + gleiche Version + anderer `value_hash` wird
+       deterministisch abgelehnt.
+     - Gleiche Identität + gleicher `value_hash` wird idempotent akzeptiert.
 
 ---
 
@@ -79,12 +135,17 @@ nutzen, wenn diese Identität verfügbar ist.
 
 ---
 
-## Definition of Done
+## Definition of Done (DoD)
 
 - [ ] Serienidentität ist als expliziter Application-/Domain-Vertrag eingeführt.
-- [ ] InMemory- und dauerhafte Store-Keys verwenden dieselbe Identität.
-- [ ] Import-/Request-/API-/Wire-Mappings transportieren die Identitätsfelder.
-- [ ] Idempotenz- und `value_hash`-Tests sind grün.
+- [ ] InMemory- und dauerhafte Store-Keys verwenden dieselbe Identität; der
+  Legacy-`PriceSeriesKey` ist nur noch Migrationsinput.
+- [ ] `schema/schema.yaml` und d-migrate-Migrationen führen den dauerhaften
+  Preis-/Serien-Store mit den oben genannten Identitäts-, Provider-,
+  Horizon- und Hash-Feldern, sobald Persistenz produktiv genutzt wird.
+- [ ] Import-/Request-/API-/Wire-Mappings transportieren die Identitätsfelder
+  ohne Verlust von `provider_id`, `series_version_family` und `value_hash`.
+- [ ] Idempotenz-, `value_hash`-Kanonisierung- und Dual-Path-Fixtures sind grün.
 - [ ] Dual-Path für Altimporte ist dokumentiert und getestet.
 - [ ] Preis-/Forecast-Adapterplan referenziert diesen Pre-Slice als
   abgeschlossene Voraussetzung.

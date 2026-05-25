@@ -64,6 +64,10 @@ Nicht vorhanden:
      - `CanExecute=true` ist nur zulässig, wenn `HasUsableSolution=true`.
      - `CanExecute=false` ist auch bei `Optimal`/`Feasible` zulässig, wenn ein
        fachlicher Guard die Ausführung sperrt.
+     - Die bestehende Domain-Invariante bleibt unverändert:
+       `HasUsableSolution=true` impliziert weiterhin `ProducedSchedule != null`,
+       unabhängig von `CanExecute`. Ein Guard darf die Ausführung sperren, aber
+       keine Solver-Lösung ohne Schedule-Referenz persistieren.
    - Aggregations-Hook einführen:
      - eine Guard-Pipeline oder ein Computed-Combiner sammelt Beiträge wie
        `solver_result_executable`, `config_ok`, `schema_ok`, `source_ok` und
@@ -137,8 +141,9 @@ duplizieren diese Matrix nicht.
        äußere Domain-Wireform trennt zwar nur am ersten `:`, aber Werte mit
        natürlichem Doppelpunkt (z. B. ISO-Zeitstempel oder URLs) müssen vor
        Persistierung in `kv1` percent-encoded werden; neue Parser dekodieren nur
-       innerhalb von `format=kv1`. Das gilt auch für `series_version`-Werte aus
-       Forecast-/Preisreihen, falls sie in `TerminationDetail` aufgenommen werden.
+       innerhalb von `format=kv1`. Preis-/Forecast-Slices planen aktuell keine
+       `series_version` im `TerminationDetail`; falls ein späterer Source-Guard
+       eine Version dort auditieren muss, gilt dieselbe Percent-Encoding-Regel.
      - Neue `format=kv1`-`TerminationDetail`-Strings dürfen maximal 1024 Zeichen
        lang sein. Längere Details werden vor Persistierung als Guard-/Schemafehler
        abgelehnt; Slices dürfen keine stillen Trunkierungen erzeugen.
@@ -149,6 +154,19 @@ duplizieren diese Matrix nicht.
      - d-migrate-generierte RunOnce-Migration `000N_*.sql` erzeugen,
      - `DapperOptimizationRunRepository` Read/Write-Mapper aktualisieren,
      - In-Memory-Repository und Persistenztests synchron anpassen.
+   - `termination_reason`-Kapazität im selben Pre-Slice migrieren:
+     - Ausgangslage: die bestehende Wireform persistiert `TerminationCode` und
+       `TerminationDetail` als `code:detail` in
+       `optimization_runs.termination_reason`; `schema/schema.yaml` und
+       `0001_initial.sql` begrenzen diese Spalte aktuell auf 256 Zeichen.
+     - Vor produktiver Erzeugung von `format=kv1`-Details muss
+       `schema/schema.yaml` `termination_reason.max_length` entfernen oder auf
+       mindestens `2048` erhöhen, und d-migrate muss eine passende RunOnce-
+       Migration erzeugen (`VARCHAR(2048)` oder `TEXT`).
+     - Die Detail-Obergrenze von 1024 Zeichen gilt erst nach dieser
+       Spaltenmigration; sie ist so zu testen, dass die komposierte Form
+       `TerminationCode:TerminationDetail` vollständig in die migrierte Spalte
+       passt.
    - Bestehende Daten migrieren:
      - bei `status in {optimal, feasible}` initial `can_execute=true`,
      - sonst `can_execute=false`,
@@ -196,8 +214,12 @@ duplizieren diese Matrix nicht.
    - Domain-Tests für:
      - `Optimal/Feasible` + `CanExecute=true`,
      - `Optimal/Feasible` + `CanExecute=false`,
+       inkl. unverändert required `ProducedSchedule != null`,
      - Nicht-Solution-Status + `CanExecute=false`,
      - Nicht-Solution-Status + `CanExecute=true` wird abgewiesen.
+   - Domain-Invariantentest: `Optimal`/`Feasible` + `CanExecute=false` ohne
+     `ProducedSchedule` wird weiterhin vom `OptimizationRun`-Konstruktor
+     abgewiesen.
    - Persistenz-Roundtrip für `can_execute`.
    - API-/Wire-Roundtrip.
    - Scheduler-/Dispatcher-Guard:
@@ -217,17 +239,20 @@ Die Slices dürfen danach nur fachliche Gründe für `CanExecute=false` liefern,
 nicht mehr die Domain-/Persistenzmigration selbst besitzen.
 Solver-spezifische Audit-Metadaten wie `solver_scope` sind nicht Bestandteil
 dieses Pre-Slices; falls ein Slice sie ohne Request-Snapshot replayfähig im Run
-persistieren muss, braucht es einen separaten Audit-Pre-Slice.
+persistieren muss, braucht es einen separaten Audit-Pre-Slice. Bis dahin gilt:
+produktive Replays ohne immutable Request-Snapshot sind nicht freigegeben.
 
 ---
 
-## Definition of Done
+## Definition of Done (DoD)
 
 - [ ] `OptimizationRun` trägt `CanExecute` als persistiertes Domain-Feld.
 - [ ] Guard-Pipeline bzw. Computed-Combiner ist als API-Vertrag eingeführt und
   berechnet `CanExecute` aus den Slice-Beiträgen monoton.
 - [ ] Alle Konstruktor-Aufrufer, Factories, Tests und Fixtures sind migriert.
-- [ ] Store-/Wire-/API-/Proto-Mappings führen `can_execute`.
+- [ ] Store-/Wire-/API-/Proto-Mappings führen `can_execute`; die persistierte
+  `termination_reason`-Wireform ist auf mindestens 2048 Zeichen oder `TEXT`
+  migriert.
 - [ ] Legacy-Backfill ist über `can_execute_source=legacy_backfill` oder einen
   gleichwertigen Diskriminator von aktiv geprüften Guard-Ergebnissen unterscheidbar.
 - [ ] Replay-/Re-Run-/Dispatch-Pfade akzeptieren `legacy_backfill` nicht als

@@ -631,32 +631,19 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
 - Ergebnis-/Run-Mapping (verbindlich):
   - `reserve_robustness_status = ReserveRobustnessResult.result_status`.
   - `reserve_robustness_limiting_reason = ReserveRobustnessResult.limiting_reason_code`.
-  - `HasUsableSolution` wird in der aktuellen Codebasis weiterhin aus
-    `OptimizationSolverStatus.{Optimal,Feasible}` abgeleitet; die produktive
-    Ausführungssteuerung nutzt darüber hinaus das neue harte Gate `CanExecute`.
-  - `CanExecute` als hartes Persistenzfeld erfordert eine Domain-Constructor-Migration
-    für `OptimizationRun`: bestehender immutable Konstruktor und
-    `OptimizationRun`-Wire/DB-Pfad müssen gemeinsam erweitert werden (`can_execute`
-    in Wireobjekt + Datenhaltung + Mapping), damit das Feld die Invariante
-    korrekt trägt.
-  - Diese Migration ist ein eigener Pre-Slice
+  - Die Domain-/Store-/Wire-Invarianten für `CanExecute`,
+    `HasUsableSolution`, `ProducedSchedule` und Dispatch-Gating leben
+    ausschließlich im Pre-Slice
     [`Domain-Migration OptimizationRun.CanExecute`](plan-domain-migration-optimization-run-can-execute.md)
-    und umfasst alle Konstruktor-Aufrufer, Repository-Implementierungen, Tests/Fixtures,
-    Proto-/API-/Wire-Mappings sowie die Umstellung aller Dispatch-/Scheduler-/API-Konsumenten
-    von `HasUsableSolution` auf `HasUsableSolution && CanExecute`.
+    und werden hier nicht neu formuliert.
   - Bei `reserve_robustness_status != ROBUST_OK` ist
     `reserve_robustness_limiting_reason` als Pflichtfeld im `OptimizationRun`-`TerminationDetail`
     zu persistieren, inkl. optionaler `status_description`, damit Operator-/Replay-Sichten die Ursache eindeutig nachvollziehen.
-  - Aggregationsregel für den gemeinsamen Cross-Slice-Vertrag:
-    Die normative `CanExecute`-Formel und der Combiner leben im Pre-Slice
-    [`plan-domain-migration-optimization-run-can-execute.md`](plan-domain-migration-optimization-run-can-execute.md).
-    Dieser Slice liefert nur den Beitrag `robust_ok`; jeder Slice darf
-    `CanExecute` nur von `true` auf `false` ziehen und kein durch einen anderen
-    Slice gesetztes `false` wieder auf `true` setzen.
+  - Beitrag zum gemeinsamen Combiner:
+    Dieser Slice liefert ausschließlich `robust_ok`.
   - Für diesen Slice gilt `robust_ok = (reserve_robustness_status == ROBUST_OK)`;
-    bei allen anderen Robustheitsstatuswerten ist `CanExecute=false`.
-  - `CanExecute` ist harte Ausführungsbedingung im Dispatcher/Scheduler:
-    `OptimizationSolverStatus.Feasible` bei `CanExecute=false` gilt weiterhin als nicht auszuführen.
+    bei allen anderen Robustheitsstatuswerten zieht dieser Beitrag das
+    aggregierte `CanExecute` gemäß Pre-Slice auf `false`.
   - `ROBUST_OK` => keine zusätzliche Hard-Stop-Sperre.
   - `ROBUST_INFEASIBLE` mit `limiting_reason_code=RESERVE_CAPACITY` oder
     `SOC_LIMIT` => `OptimizationSolverStatus.Failed` mit
@@ -708,6 +695,9 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
   - FCR-/aFRR-Anforderung
   - gelieferte vs. nicht gelieferte Energie
   - Robustheitsstatus pro Zeitschritt
+  - `restore_capability_used=null` wird als `not_applicable` ausgegeben, wenn
+    `required_recovery_minutes == 0`; `reserve_restore_energy_kwh=0` bleibt in
+    diesem Fall explizit sichtbar.
 
 ---
 

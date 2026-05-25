@@ -40,10 +40,10 @@ Erweiterung bzw. des daraus erzeugten Optimization-Core-Requests, nicht von
 `OptimizationRun`; der Run persistiert nur Ergebnisstatus, Terminierung und
 `CanExecute`. Für Audit/Replays ist der immutable Request-Snapshot die kanonische
 Ablage für den gewählten `solver_scope` (`LP`/`MILP`) und eine mögliche
-Partitionierungsentscheidung. Falls produktive Replays ohne Request-Snapshot
-freigegeben werden sollen, ist vorher ein eigener Pre-Slice
-`OptimizationRun.SolverScopeAudit` erforderlich; `TerminationDetail` ist nicht
-die kanonische Ablage für diesen Scope.
+Partitionierungsentscheidung. Produktive Replays ohne Request-Snapshot sind
+vorerst nicht freigegeben; falls sie später erlaubt werden sollen, ist vorher
+ein eigener Pre-Slice `OptimizationRun.SolverScopeAudit` erforderlich.
+`TerminationDetail` ist nicht die kanonische Ablage für diesen Scope.
 
 Entscheidungsreihenfolge je Request:
 
@@ -473,8 +473,9 @@ Für den Netzanschlusspunkt ist die Konvention in diesem Slice vollständig fest
   [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md).
 - Ein erster produktiver Co-Location-Slice kann mit lokalen Erzeugungs-/Lastreihen starten;
   forecast-basierte Optimierung bleibt bis zur Aktivierung von
-  `plan-price-forecast-adapters.md` im degraded/fallback-Modus.
-- Übergangsadapter im degraded/fallback-Modus:
+  `plan-price-forecast-adapters.md` in einem expliziten
+  `quality_mode=degraded_ok`-Übergangspfad.
+- Übergangsadapter im `quality_mode=degraded_ok`-Übergangspfad:
   - Bis `plan-price-forecast-adapters.md` produktiv aktiviert ist, dürfen
     `LocalGenerationSeries` nur über einen expliziten manuellen Import-/API-Push
     oder CSV/Fixture-Import in einen nicht-forecastenden Übergangsadapter geladen
@@ -571,29 +572,11 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
   - Vor Aktivierung dieses Slices ist ein eigener Pre-Slice
     [`Domain-Migration OptimizationRun.CanExecute`](plan-domain-migration-optimization-run-can-execute.md)
     abzuschließen.
-  - Dieser Pre-Slice erweitert die Datenklasse für Optimierungsläufe um `CanExecute`
-    als persistiertes Feld.
-  - Da `OptimizationRun` ein immutables Objekt mit strikter Konstruktorinvariante ist,
-    umfasst der Pre-Slice mindestens Domain-Constructor, bestehende Konstruktor-Aufrufer,
-    Wire-/DB-Pfad, neue Spalte bzw. Store-Feld `can_execute`, Proto-/API-Mapping,
-    Tests/Fixtures und Repository-Implementierungen.
-  - Solange `HasUsableSolution` in der vorhandenen Codebasis weiterhin auf
-    `OptimizationSolverStatus.{Optimal,Feasible}` basiert, gilt `CanExecute` als harte
-    Betriebs-Gate-Quelle für den Dispatcher/Scheduler, nicht umgekehrt.
-  - Alle bestehenden `HasUsableSolution`-Konsumenten im Dispatch-/Scheduler-/API-Pfad
-    sind auf konjunktive Gate-Logik umzustellen:
-    `HasUsableSolution && CanExecute`.
+  - Domain-Constructor, Store-/Wire-/API-Migration, Dispatch-Gate und
+    ProducedSchedule-Invarianten werden dort autoritativ definiert und hier
+    nicht wiederholt.
 - Ein Slice darf erst freigegeben werden, wenn beide Dokumente semantisch
   übereinstimmen und die Cross-Checks bestanden sind.
-- Co-Location folgt dem selben CanExecute-Vertrag:
-  - `CanExecute=true` nur bei validen Ergebnissen ohne harte Konfigurations- oder Schemaabweisung
-    und nur unter der Pre-Slice-Invariante `HasUsableSolution=true`.
-  - `CanExecute=false` bei harten Co-Location-Konfigurations-/Schemaabweisungen
-    sowie bei harten Robustheits- oder Validierungs-Blockaden gemäß der
-    autoritativen Matrix in
-    [`plan-domain-migration-optimization-run-can-execute.md`](plan-domain-migration-optimization-run-can-execute.md).
-  - Operator-/Replay-Verbraucher dürfen einen Lauf nur im Zustand
-    `CanExecute=true` in den aktiv ausführbaren Pfad überführen.
 - Beitrag zum `CanExecute`-Combiner:
   - Co-Location führt keinen eigenen `co_location_ok`-Beitrag ein.
   - `CONFIG_INVALID` und `CONFIG_INCONSISTENT` setzen den bestehenden
@@ -603,6 +586,8 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
     [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md).
   - `MODEL_INFEASIBLE` ist kein Guard-Beitrag, sondern ein Solver-/Modellergebnis;
     es führt über `HasUsableSolution=false` zur Nichtausführbarkeit.
+  - Alle daraus folgenden `CanExecute`-, `TerminationCode`- und Dispatch-
+    Entscheidungen ergeben sich ausschließlich aus dem Pre-Slice-Vertrag.
 
 ---
 
@@ -641,6 +626,11 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
 - [ ] Netzanbindung ist für beide `site_grid_power_sign`-Varianten verbindlich spezifiziert (`export_pos`, `import_pos`) inkl. Sign-Konventionstests.
 - [ ] `GreenStorageRestricted`-Regeln sind als harte Validierung umgesetzt (`p_grid_import_t == 0`, `e_local`-Kopplung, Konfigurationsgrenzen).
 - [ ] Gemeinsamer Fehler-/Ausführungsvertrag zu [plan-domain-migration-optimization-run-can-execute.md](plan-domain-migration-optimization-run-can-execute.md) und [plan-ler-fcr-reserve-robustness.md](plan-ler-fcr-reserve-robustness.md) ist abgeglichen (unter anderem `CanExecute`, `TerminationCode`, `TerminationDetail`, Cross-Checks, Mapping-Matrix) und durch mindestens einen Golden-Fixture-Test abgesichert.
+- [ ] Vor produktiver Nutzung von `alignment_mode=trim-to-common` ist der
+  versionierte Vorverarbeitungspfad aus
+  [plan-price-forecast-adapters.md](plan-price-forecast-adapters.md)
+  abgeschlossen; ohne diesen Pfad bleibt Co-Location produktiv auf
+  `alignment_mode=reject` beschränkt.
 - [ ] Liefergegenstände bei Aktivierung sind vollständig umgesetzt:
   - ADR/ADR-Schärfung,
   - Domain-/Application-Erweiterungen,

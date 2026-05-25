@@ -702,7 +702,10 @@ arbeitet mit deterministischen Preiswerten.
   - Source-Port- und Statusmodell,
   - Replay-/Mock-Testpfad,
   - API-/Operator-Status,
-  - Runbook (Credentials, Limits, Ausfälle).
+  - Runbook (Credentials, Limits, Ausfälle). Das Runbook übernimmt den
+    14-Kalendertage-/zwei-Release-Fenster-Cutover-Default aus diesem Plan und
+    definiert nur Override-Verfahren, Berechtigung und Auditablage; es darf
+    keinen abweichenden stillen Default einführen.
 - [ ] Akzeptanzkriterien aus diesem Dokument vollständig erfüllt.
 
 ---
