@@ -42,7 +42,8 @@ Erweiterung bzw. des daraus erzeugten Optimization-Core-Requests, nicht von
 Ablage für den gewählten `solver_scope` (`LP`/`MILP`) und eine mögliche
 Partitionierungsentscheidung. Produktive Replays ohne Request-Snapshot sind
 vorerst nicht freigegeben; falls sie später erlaubt werden sollen, ist vorher
-ein eigener Pre-Slice `OptimizationRun.SolverScopeAudit` erforderlich.
+ein eigener, aktuell noch nicht spezifizierter Pre-Slice
+`OptimizationRun.SolverScopeAudit` erforderlich.
 `TerminationDetail` ist nicht die kanonische Ablage für diesen Scope.
 
 Entscheidungsreihenfolge je Request:
@@ -178,12 +179,11 @@ Mögliche Domain-/Application-Erweiterungen:
       ist die kanonische Aktivitäts-/Migrationsmatrix für `can_dispatch`.
       `migration_dry_run=true` überschreibt `migration_strict` ausschließlich für
       Run-Blockaden und erzeugt stattdessen ein Audit-Bundle.
-      | Modus | Site im aktuellen Request aktiv? | Ergebnis |
+      | Modus | Aktivitätsbewertung | Ergebnis |
       | --- | --- | --- |
-      | `migration_dry_run=true` | ja, nein oder unklar | keine Laufblockade; Audit-Eintrag `SITE_CAN_DISPATCH_MISSING`, aktive Site gilt nicht als ausführbar, inaktive Site bleibt bis zur Bereinigung im Audit-Bundle |
-      | produktiv (`migration_strict=true` oder `false`) | ja oder unklar | harte Blockade mit `CONFIG_INCONSISTENT` / `SITE_CAN_DISPATCH_MISSING` |
-      | `migration_strict=true` produktiv | nein | harte Blockade bis explizit `can_dispatch=false` modelliert oder im Dry-Run auditierbar bereinigt |
-      | `migration_strict=false` produktiv | nein | keine Laufblockade; Datensatz bleibt im Audit-Bundle bis zur Bereinigung |
+      | `migration_dry_run=true` | aktiv, inaktiv oder unklar | keine Laufblockade; Audit-Eintrag `SITE_CAN_DISPATCH_MISSING`, aktive Site gilt nicht als ausführbar, inaktive Site bleibt bis zur Bereinigung im Audit-Bundle |
+      | produktiv | aktiv oder unklar | harte Blockade mit `CONFIG_INCONSISTENT` / `SITE_CAN_DISPATCH_MISSING`, unabhängig von `migration_strict` |
+      | produktiv | nicht aktiv | bei `migration_strict=true` harte Blockade bis explizit `can_dispatch=false` modelliert oder im Dry-Run auditierbar bereinigt; bei `migration_strict=false` keine Laufblockade, Datensatz bleibt im Audit-Bundle bis zur Bereinigung |
       Der `migration_strict`-Schalter wirkt damit ausschließlich für nicht aktive
       Sites; aktive Sites bleiben in beiden Produktivmodi hart blockiert.
     - Produktiver Zugriff außerhalb eines Migrationsfensters:
@@ -200,8 +200,14 @@ Mögliche Domain-/Application-Erweiterungen:
     `IForecastSeriesSource`/`SeriesEnvelope` aus
     [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md) und tragen
     `series_status`, `source_eval_status` und `status_flags`.
+    `ForecastSeries` bleibt dabei ein Adapter-/DTO-Contract; die Optimierung
+    konsumiert einen eigenen Co-Location-Domaintyp `LocalGenerationSeries`, der
+    deterministisch aus dem `SeriesEnvelope` projiziert wird.
   - Nur explizite Validierungs-/Migrationspfade dürfen den Adapterpfad umgehen; dann
     muss der Lauf als nicht-produktiver Validierungslauf auditierbar sein.
+    Ausnahme ist der in den Liefergegenständen definierte Übergangsadapter im
+    `quality_mode=degraded_ok`-Pfad; er bleibt auditpflichtig und wird mit
+    F-MKT-02 abgelöst oder per Legacy-Sunset-Slice weitergeführt.
   - Pflichtfelder:
     - `site_id`
       - bei produktiver Co-Location-Nutzung muss die `site_id` eindeutig einem
@@ -217,7 +223,7 @@ Mögliche Domain-/Application-Erweiterungen:
     Feldsemantik.
   - Weitere Pflichtfelder:
     - `value_kw`
-    - `point_kind` (`forecast` | `actual`) als punktbezogene Kennzeichnung;
+    - `value_type` (`actual` | `forecast`) als punktbezogene Kennzeichnung;
       nicht mit `SeriesEnvelope.series_type` verwechseln.
     - `source_metadata.provider_id`
     - `series_product`
@@ -456,7 +462,7 @@ Rollback-/Backout-Verhalten:
 - Harte Koppelregeln:
   - `p_grid_import_t == 0` (für beide Site-Konventionen) – vollständiges Netzbezugsverbot.
   - `-b_t <= (g_t - c_t)` (Laden nur solange lokaler Überschuss vorliegt)
-  - `b_t <= e_local_t * eta_discharge / Δt` (Entladen nur aus vorhandener lokaler Herkunftsmasse)
+  - `max(0, b_t) <= e_local_t * eta_discharge / Δt` (Entladen nur aus vorhandener lokaler Herkunftsmasse)
   - Ist kein Herkunftsnachweis oder keine ausreichende lokale Quelle vorhanden, gilt `CONFIG_INCONSISTENT`.
 - Abregelung `c_t` ist im Modus erlaubt und mindert damit lokal verfügbaren Strom.
 - Bei fehlender Herkunftstransparenz darf kein produktiver Lauf gestartet werden.
@@ -552,7 +558,9 @@ Bestandsrouten nicht brechen:
    - Dieser Übergangsadapter darf keine automatischen externen Abrufe durchführen,
      muss `series_status=SOURCE_DEGRADED` und einen Audit-Hinweis
      `format=kv1;reason=LOCAL_GENERATION_TRANSITIONAL_INPUT` setzen und bleibt
-     auf `quality_mode=degraded_ok` beschränkt.
+     auf `quality_mode=degraded_ok` beschränkt. Der Rohstatus ist
+     `source_eval_status=SOURCE_TRANSITIONAL_INPUT` gemäß
+     [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md).
    - Der Übergangsadapter ist mit Aktivierung von F-MKT-02 abzulösen oder als
      eigener Legacy-Sunset-Slice weiterzuführen.
 6. Tests:

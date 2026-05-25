@@ -3,7 +3,9 @@
 **Dokumenttyp:** Vorabklärung / Trigger-Watch
 **Status:** Offen - Folgearbeiten aus externem Fachmaterial
 **Datum:** 2026-05-24
-**Quelle:** Öffentliches Referenzmaterial – externe Orientierung, keine Code-Übernahme.
+**Quelle:** Öffentlich benanntes Referenzmaterial – externe Orientierung,
+keine Code-Übernahme; Namen dienen nur der Nachvollziehbarkeit der
+fachlichen Einordnung.
 **Bezug:**
 [`../in-progress/roadmap.md`](../in-progress/roadmap.md),
 [`../../../user/bess-ems-function.md`](../../../user/bess-ems-function.md),
@@ -105,13 +107,14 @@ förder-/herkunftsgebundenem Grünstromspeicher.
   Einspeiselimit, lokalen Erzeugungsprognosen und Speicherüberbauung.
 - Ein Vermarktungsmodell verlangt getrennte Behandlung von Standalone,
   Hybrid mit Netzbezug und fördergebundenem Grünstromspeicher.
-- Für den ersten Slice ist ein produktiver Forecast-Adapter keine zwingende
-  Voraussetzung; fehlender externer Forecast-Zugriff schaltet die
-  forecast-basierte Co-Location-Nutzung in einen kontrollierten
-  `quality_mode=degraded_ok`-Übergangspfad.
 
 **Aktivierungs-Pfad:** eigener Slice-Plan
 [`plan-market-colocation-model.md`](plan-market-colocation-model.md).
+Für den ersten Slice ist ein produktiver Forecast-Adapter keine zwingende
+Voraussetzung; fehlender externer Forecast-Zugriff schaltet die
+forecast-basierte Co-Location-Nutzung in einen kontrollierten
+`quality_mode=degraded_ok`-Übergangspfad. Dieser Pfad ist ein
+Architektur-/Aktivierungszugeständnis, kein eigener Trigger.
 
 **Abnahmekriterien:**
 
@@ -164,6 +167,10 @@ sowie Forecast-Serien.
   Forecast-Familien `load` und `weather-temp`
   (je 1 Primär + 1 fallbackfähiger Adapter) mit
   Zeitstempelung, Versionskennzeichen und Qualitätskennzahlen.
+- Für produktive forecast-basierte Co-Location mit PV-/Wind-Erzeugungsreihen
+  sind zusätzlich je aktivierter lokaler Erzeugungsfamilie (`pv`, `wind`) ein
+  Primär- und ein fallbackfähiger Adapter oder ein explizit dokumentierter
+  `quality_mode=degraded_ok`-Übergangspfad erforderlich.
 - Operativer Importpfad mit automatischer Aktualisierung, Toleranzgrenzen
   und Alarmierung bei Datenlücken.
 - Qualitätsschema enthält kombinierte Status-Sichtbarkeit (Fallback + Degradation)
@@ -185,8 +192,10 @@ Legende: `[x]` bedeutet hier "Trigger-Spezifikation scharf genug", nicht
   vorbehalten.
 - [x] F-MKT-02-Abnahmebedingungen sind als Slice-Startkriterien dokumentiert
   (Preis: 1 Primär + 1 Fallback; Forecast: je 2 Adapter für `load` und
-  `weather-temp`; jeweils Fallback-/Degradation-Modell, Aktualisierung +
-  Alarmierung).
+  `weather-temp`; bei forecast-basierter Co-Location zusätzlich `pv`/`wind`
+  je aktivierter lokaler Erzeugungsfamilie oder ein expliziter
+  `degraded_ok`-Übergangspfad; jeweils Fallback-/Degradation-Modell,
+  Aktualisierung + Alarmierung).
 - [x] Trigger-Koordination bei parallelen Auslösern ist als Startregel definiert;
   autoritativ ist der folgende Abschnitt
   [Trigger-Koordination bei gleichzeitigen Auslösern](#trigger-koordination-bei-gleichzeitigen-auslösern).
@@ -213,7 +222,8 @@ Aktivierungsreihenfolge mit Gates:
    "Import-Adapter sind bereit für produktive Nutzung".
 5. Produktive Replays ohne immutable Request-Snapshot sind vorerst nicht
    freigegeben. Dafür ist zuerst ein eigener Trigger-/Pre-Slice
-   `OptimizationRun.SolverScopeAudit` anzulegen; andernfalls bleibt der
+   `OptimizationRun.SolverScopeAudit` anzulegen. Dieser Name ist aktuell ein
+   noch nicht spezifizierter Folge-Pre-Slice; andernfalls bleibt der
    Request-Snapshot die kanonische `solver_scope`-Auditquelle.
 
 Laufende Betriebsregeln:
@@ -231,8 +241,9 @@ Laufende Betriebsregeln:
 - Für nicht adapter-getragene Serien im bestehenden Altpfad ist ein
   kontrollierter Übergang nur im expliziten `quality_mode=degraded_ok` und über
   den degradierten Serienzustand erlaubt (`series_status=SOURCE_DEGRADED`,
-  optional mit `status_flags` wie `SOURCE_BACKFILL`). Dieser Altpfad ist kein
-  `quality_mode=strict`-Pfad und muss spätestens mit produktiver
+  `source_eval_status=SOURCE_TRANSITIONAL_INPUT` und Audit-Hinweis
+  `format=kv1;reason=LOCAL_GENERATION_TRANSITIONAL_INPUT`). Dieser Altpfad ist
+  kein `quality_mode=strict`-Pfad und muss spätestens mit produktiver
   F-MKT-02-Aktivierung abgelöst oder als eigener Legacy-Sunset-Slice geführt
   werden.
 

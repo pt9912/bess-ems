@@ -135,9 +135,19 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
         eigener, versionierter Preprocessing-Slice die Aggregations-/
         Interpolationsregel freigibt.
     - `alignment_prepared` (bool, nur bei `alignment_mode=trim-to-common` sinnvoll)
-    - `alignment_prepared_by` (string, z. B. `forecast-preprocessor/v1`, `batch-trimmer/...`)
-    - `alignment_prepared_horizon_start_utc`
-    - `alignment_prepared_horizon_end_utc`
+    - `alignment_prepared_by` (string, z. B. `forecast-preprocessor/v1`, `batch-trimmer/...`);
+      gesetzt durch den versionierten Preprocessor, nicht durch einen
+      nachgelagerten Optimierungsconsumer.
+    - `alignment_prepared_horizon_start_utc`: inklusiver Start des nach
+      Vorverarbeitung tatsächlich konsumierbaren Zielhorizonts. Bei
+      `trim-to-common` ist dies der getrimmte Common-Horizon, nicht der
+      ursprüngliche Quellhorizont.
+    - `alignment_prepared_horizon_end_utc`: exklusives Ende desselben
+      konsumierbaren Zielhorizonts.
+      Beide Horizon-Felder sind Pflicht, wenn `alignment_prepared=true`, müssen
+      innerhalb des ursprünglichen `horizon_start_utc`/`horizon_end_utc` liegen
+      und gehen in `value_hash`/Idempotenz ein, damit Re-Loads denselben
+      Vorverarbeitungsschritt bytegleich auditieren können.
   - `values` als geordnete Punkte:
     - `timestamp_utc`
     - `value`
@@ -153,8 +163,16 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
         Family-Cutover, Status-Mapping oder Validierung.
     - `provider_request_id`
   - `series_status` (finaler Endstatus je Serie): `SOURCE_OK`, `SOURCE_DEGRADED`, `SOURCE_FALLBACK_USED`, `SOURCE_REJECTED`
-  - `source_eval_status` (Rohstatus je Providerlauf, vor Fallback-/Degradationsentscheidung): `SOURCE_OK`, `SOURCE_AUTH_ERROR`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_EMPTY`, `SOURCE_STALE`, `SOURCE_GAP`, `SOURCE_SCHEMA_MISMATCH`, `SOURCE_RETRY_EXHAUSTED`
+  - `source_eval_status` (Rohstatus je Providerlauf, vor Fallback-/Degradationsentscheidung): `SOURCE_OK`, `SOURCE_AUTH_ERROR`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_EMPTY`, `SOURCE_STALE`, `SOURCE_GAP`, `SOURCE_SCHEMA_MISMATCH`, `SOURCE_RETRY_EXHAUSTED`, `SOURCE_TRANSITIONAL_INPUT`
   - `status_flags` (array, required bei `series_status != SOURCE_OK`; optional bei `SOURCE_OK`): `SOURCE_FALLBACK_USED`, `SOURCE_BACKFILL`, `SOURCE_RATE_LIMIT`, ...
+  - `status_message` (optional): menschenlesbar
+  - `status_detail` (optional): strukturierte Zusatzinfo (z. B. `{ "source_code": "SOURCE_STALE", "backfill_intervals_closed": 2, "effective_source_id": "opsd-..." }`)
+  - `value_hash`: optional für reine Einmalimporte ohne Idempotenz-/Cutover-Vertrag;
+    verpflichtend, sobald Versions-Idempotenz, Re-Load-Vergleich,
+    Family-Cutover oder Rollback aktiviert ist. In der Erstaktivierung von Phase
+    1/2 ist `value_hash` Pflicht, außer der Adapter ist explizit als
+    Einmalimport ohne Re-Load-Vertrag deklariert. Der Hash stabilisiert den
+    Payload-Vergleich.
 - Repräsentationsstabilität ist für die vollständige Serien-Signatur verpflichtend.
   - Die Vergleichbarkeit verwendet die Signatur:
     `series_id`, `source.provider_id`, `series_type`, `series_product`,
@@ -184,7 +202,20 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
       3. Nach Freigabe wird die alte Family für den produktiven Pfad abgeschaltet, neue Family wird normativ aktiv.
     - Verbindlicher Cutover-/Rollback-SOP:
       1. **Vorbereitung**: Neue Family mit eigenem `series_family_alias` oder neuem (`series_id`, `series_product`) freigeben.
-      2. **Dual-Active-Wahrnehmung**: Alte und neue Family mindestens in zwei vollständigen Release-Fenstern parallel beobachten; ein Release-Fenster ist hier standardmäßig mindestens ein produktiver Import-/Refresh-Zyklus und mindestens 7 Kalendertage. Der Cutover braucht damit im Default mindestens zwei vollständige Zyklen und mindestens 14 Kalendertage Beobachtung. Der 14-Tage-Default ist ein serienübergreifendes Wartezeitfenster, keine Stop-Condition: auch durchgehend idempotente `value_hash`-Vergleiche nach weniger als 14 Kalendertagen erlauben keinen Early-Cutover ohne expliziten Release-Runbook-Override. Die Zahl ist ein konservativer Produkt-Default, kein stiller Code-Default. `value_hash`-Abweichungen werden in `status_detail` strukturiert auditierbar gemacht; `status_flags` erhält nur einen eigenen Flag-Wert, falls dieser später explizit eingeführt wird.
+      2. **Dual-Active-Wahrnehmung**: Alte und neue Family werden parallel beobachtet.
+         Der Default verlangt mindestens zwei vollständige Release-Fenster. Ein
+         Release-Fenster ist mindestens ein produktiver Import-/Refresh-Zyklus
+         und mindestens 7 Kalendertage.
+         Damit braucht der Cutover im Default mindestens zwei vollständige
+         Zyklen und mindestens 14 Kalendertage Beobachtung.
+         Der 14-Tage-Default ist ein serienübergreifendes Wartezeitfenster,
+         keine Stop-Condition: auch durchgehend idempotente `value_hash`-
+         Vergleiche nach weniger als 14 Kalendertagen erlauben keinen
+         Early-Cutover ohne expliziten Release-Runbook-Override.
+         Die Zahl ist ein konservativer Produkt-Default, kein stiller
+         Code-Default. `value_hash`-Abweichungen werden in `status_detail`
+         strukturiert auditierbar gemacht; `status_flags` erhält nur einen
+         eigenen Flag-Wert, falls dieser später explizit eingeführt wird.
       3. **Cutover freigeben**: Neue Family wird produktiv als `primary` markiert und auf mindestens `SOURCE_OK` oder ausdrücklich zugelassene `SOURCE_DEGRADED` gesetzt.
       4. **Produktiver Umschaltpunkt**: Alte Family in produktiven Runs auf `SOURCE_REJECTED`/`CanExecute=false` halten; alte Werte sind nur noch Replay/Diagnose sichtbar.
       5. **Rollback-Fenster**: Rückkehr auf alte Family nur mit explizitem Release-Block möglich; Rollback ist nur dann erlaubt, wenn die neue Family in einem vollständigen Beobachtungsfenster keine vollständige akzeptierbare Lastserie (ohne harte Fallback) geliefert hat. Die Runbook-Marker `release_block` und `controlled_switchover` werden im Aktivierungs-Runbook definiert, inklusive Ablageort, Berechtigung und Löschregel.
@@ -210,13 +241,6 @@ Hinweis zur Semantik:
 - `series_status` ist der externe Endstatus für Operator/API-Verträge (single-value).
 - Kombinierte Ereignisse werden weiterhin nur in `status_flags` kodiert.
 - `SOURCE_DEGRADED` ist ausschließlich ein finaler `series_status` und nicht als `source_eval_status` vorgesehen.
-- `status_message` (optional): menschenlesbar
-- `status_detail` (optional): strukturierte Zusatzinfo (z. B. `{ "source_code": "SOURCE_STALE", "backfill_intervals_closed": 2, "effective_source_id": "opsd-..." }`)
-- `value_hash`: optional für reine Einmalimporte ohne Idempotenz-/Cutover-Vertrag;
-  verpflichtend, sobald Versions-Idempotenz, Re-Load-Vergleich, Family-Cutover oder
-  Rollback aktiviert ist. In der Erstaktivierung von Phase 1/2 ist `value_hash`
-  Pflicht, außer der Adapter ist explizit als Einmalimport ohne Re-Load-Vertrag
-  deklariert. Der Hash stabilisiert den Payload-Vergleich.
 - Validierungspflicht:
   - strikte UTC-Zeitachse
   - Schrittweite exakt `resolution_minutes`
@@ -264,7 +288,10 @@ Hinweis zur Semantik:
   - `series_type=forecast` dient in diesem Slice als Adapter-/Sidecar-Vertrag für
     deterministische Point-Forecasts. Das hier eingeführte `ForecastSeries`-Schema ist
     ein DTO-/Contract-Typ an der Application-Grenze, noch kein produktiver
-    EMS-Domaintyp für Optimierungsentscheidungen. Ein späterer Slice kann denselben
+    EMS-Domaintyp für Optimierungsentscheidungen.
+  - Co-Location-Verbraucher projizieren `SeriesEnvelope` deterministisch in ihren
+    eigenen Domaintyp `LocalGenerationSeries`; die Optimierung konsumiert diesen
+    Domaintyp, nicht `ForecastSeries` direkt. Ein späterer Slice kann denselben
     Contract in ein produktives Forecast-Domainmodell überführen.
 
 ### Normatives Status-Mapping (verbindlich)
@@ -296,6 +323,14 @@ Kanonische Ableitungsregeln (deterministisch):
     `SOURCE_DEGRADED` je nach Backfill/Qualitätsminderung.
   - Bei fehlendem kompatiblen Fallback: harte Abweisung außer im `degraded_ok`-Modus
     für `SOURCE_STALE` (-> `SOURCE_DEGRADED`).
+- `source_eval_status=SOURCE_TRANSITIONAL_INPUT`:
+  - nur für explizit freigegebene manuelle Import-/API-Push- oder
+    CSV/Fixture-Übergangspfade zulässig.
+  - bei `quality_mode=degraded_ok`: `series_status=SOURCE_DEGRADED`,
+    `status_detail` enthält mindestens
+    `format=kv1;reason=LOCAL_GENERATION_TRANSITIONAL_INPUT`.
+  - bei `quality_mode=strict`: `series_status=SOURCE_REJECTED`.
+  - automatische externe Abrufe dürfen diesen Rohstatus nicht setzen.
 - `source_eval_status=SOURCE_OK` bleibt `series_status=SOURCE_OK`, sofern weitere
   Daten- und Zeitachsenvalidierung bestanden ist.
 
@@ -334,6 +369,20 @@ Interoperabilitätsregel (über Pläne hinweg):
   - Die finale Serienqualität bleibt ein einzelner Wert in `series_status` (`SOURCE_OK`, `SOURCE_DEGRADED`, `SOURCE_FALLBACK_USED`, `SOURCE_REJECTED`).
   - Kombinierte Ereignisse (z. B. Fallback **und** Backfill) werden nur durch `status_flags` abgebildet; `series_status` bleibt ein `single-value`.
 - `status_flags` ist verpflichtend, wenn `series_status != SOURCE_OK`.
+- Combiner-Beitrag:
+  - Dieser Slice ist Eigentümer des gemeinsamen `CanExecute`-Combiner-Beitrags
+    `source_ok` aus
+    [`plan-domain-migration-optimization-run-can-execute.md`](plan-domain-migration-optimization-run-can-execute.md).
+  - Für jede im Request verpflichtende Serie gilt `source_ok=false`, wenn die
+    Serie fehlt, `series_status=SOURCE_REJECTED` ist oder ein vorhandener
+    Qualitätsgrad im konsumierenden Slice nicht zugelassen ist.
+  - `series_status=SOURCE_OK` setzt für diese Serie `source_ok=true`.
+  - `series_status=SOURCE_FALLBACK_USED` und `SOURCE_DEGRADED` setzen
+    `source_ok=true` nur, wenn der konsumierende Slice den Qualitätsgrad
+    ausdrücklich erlaubt (`quality_mode=degraded_ok` bzw. explizit zugelassener
+    Fallback); sonst ziehen sie `source_ok=false`.
+  - Mehrere Pflichtserien aggregieren all-or-nothing: ein einzelner
+    `source_ok=false`-Beitrag zieht den aggregierten Beitrag auf `false`.
 
 Empfohlene Integrationskonvention (API/Operator):
 
@@ -441,6 +490,8 @@ Fallback-/Degradationsdetails werden zusätzlich in `status_flags` und optionale
 - `SOURCE_GAP` – nicht behebbare Zeitlücken
 - `SOURCE_SCHEMA_MISMATCH` – Zeitachse/Einheit/Schemafehler
 - `SOURCE_RETRY_EXHAUSTED` – Retries erfolglos
+- `SOURCE_TRANSITIONAL_INPUT` – explizit freigegebener manueller/Fixture-
+  Übergangsinput ohne automatische externe Providerabfrage
 
 - `SOURCE_REJECTED` ist ausschließlich Endstatus (`series_status`), kein Rohstatus aus
   `source_eval_status`.
@@ -502,6 +553,9 @@ Endgültige Serienendstatus sind:
     Forecast-Contract-Daten
   - verbindliches `SeriesEnvelope` gemäß obigem Datenvertrag
   - deterministisches Mapping in die bestehende Import-Pipeline (`IPriceSeriesSource`).
+  - deterministische Projektion von Forecast-`SeriesEnvelope` in konsumierende
+    Domaintypen wie `LocalGenerationSeries`; `ForecastSeries` selbst bleibt
+    Contract-/DTO-Daten.
 - Persistenz-/Schema-Migration als Phase-1-Voraussetzung:
   - `PriceSeries`/Import-Request erhalten die Serienidentitätsfelder oder einen
     deterministisch äquivalenten Ersatzschlüssel.
@@ -516,6 +570,9 @@ Endgültige Serienendstatus sind:
   - `max_stale_age_minutes`
   - provider rate limit + Retry-Backoff
 - operatorfähige Fehlercodes inkl. `SOURCE_*`
+- `value_hash` ist für produktive Phase-1-Adapter mit Re-Load- oder
+  Idempotenzvertrag verpflichtend und wird in Tests/Audit sichtbar gemacht;
+  Einmalimporte ohne Re-Load-Vertrag müssen explizit deklariert sein.
 - API-/Operator-Status für Quellen:
   - letzter erfolgreicher Abruf + aktiver Statuscode
   - letzter Fehler
@@ -548,6 +605,10 @@ Primär-/Fallback-Regel ist verbindlich:
   - `load`: Primär ENTSO-E, Fallback Replay-/historische Lastquelle mit
     identischem `SeriesEnvelope`-Vertrag.
   - `weather-temp`: Primär Open-Meteo, Fallback Copernicus.
+  - Für forecast-basierte Co-Location werden `pv` und `wind` je aktivierter
+    lokaler Erzeugungsfamilie zusätzlich produktiv verpflichtend
+    (je 1 Primär + 1 fallbackfähiger Adapter), sofern der Co-Location-Slice
+    nicht ausdrücklich im `quality_mode=degraded_ok`-Übergangspfad bleibt.
 
 Aktivierungslogik:
 - `SOURCE_EMPTY` folgt ausschließlich der kanonischen Regel oben: nur ein
@@ -618,7 +679,9 @@ arbeitet mit deterministischen Preiswerten.
 1. Folge-ADR oder Architektur-Schärfung für externe Datenquellen.
 2. Adapter-Port für Preis-/Forecast-Quellen oder Erweiterung des
    bestehenden `IPriceSeriesSource`-Umfelds; Forecast-Ergebnisse bleiben in diesem
-   Slice Contract-/DTO-Daten, bis ein produktiver Forecast-Domaintyp aktiviert wird.
+   Slice Contract-/DTO-Daten. Konsumierende Slices wie Co-Location projizieren
+   sie deterministisch in eigene Domaintypen (`LocalGenerationSeries`), bis ein
+   produktiver Forecast-Domaintyp aktiviert wird.
 3. Schema-Migration `PriceSeries`/Store-Identität:
    - umgesetzt über
      [`Domain-Migration PriceSeries.Identity`](plan-domain-migration-price-series-identity.md),
@@ -645,6 +708,9 @@ arbeitet mit deterministischen Preiswerten.
      (`SOURCE_REJECTED`) und Rollback-Sichtbarkeit
    - Optimierung bekommt exakt die erwartete Schrittzahl
    - operatorfähige Laufcodes werden bei Fehlerpfaden gesetzt (`SOURCE_*`)
+   - `value_hash` ist in produktiven Phase-1/2-Re-Load-Pfaden vorhanden und
+     wird bei fehlendem Wert außerhalb expliziter Einmalimporte hart
+     abgewiesen.
 8. Runbook für Credentials, Rate Limits, Provider-Ausfall und Cutover-Marker
    (`release_block`, `controlled_switchover` inkl. Ablageort und Verantwortlichkeit).
 

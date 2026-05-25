@@ -110,8 +110,12 @@ Code-Konventionen:
 | Reiner Rechenfehler/Solverfehler | `Failed` | Solver-spezifische harte Codes, z. B. `or-tools-abnormal`, `or-tools-model-invalid`, `or-tools-not-solved` | `false` |
 | Konfigurationsfehler (`CONFIG_*`) | `Failed` | `config-invalid` oder `config-inconsistent` | `false` |
 | Schematafehler (`SCHEMA_INCONSISTENT`) | `Failed` | `schema-inconsistent` | `false` |
-| Fachlicher Guard erfordert Nacharbeit trotz Solver-Lösung | eigentliches Solverergebnis (`Optimal` oder `Feasible`) | fachlicher Guard-Code, z. B. `reserve-robustness-needs-restore` | `false` |
+| Fachlicher Guard erfordert Nacharbeit trotz Solver-Lösung | eigentliches Solverergebnis (`Optimal` oder `Feasible`) | fachlicher Guard-Code, z. B. `reserve-robustness-needs-restore`; der originale Solver-Code muss in `TerminationDetail` erhalten bleiben, z. B. `format=kv1;solver_code=or-tools-optimal;reason=INTRADAY_RESTORE_REQUIRED` | `false` |
 | Fachliche Source-/Policy-/Robustheitsblockade | `Failed` | fachlicher harter Code, z. B. `source-*`, `policy-*`, `reserve-robustness-*` | `false` |
+
+`OptimizationSolverStatus.IterationLimit` ist im bestehenden Domain-Enum bereits
+vorhanden; die Matrix-Zeile ist deshalb keine neue Enum-Einführung, sondern eine
+Migration der Ausführungsentscheidung auf `CanExecute`.
 
 2. Konstruktor-Aufrufer und Factories
    - alle direkten `OptimizationRun`-Aufrufer aktualisieren; die konkrete Liste ist
@@ -202,6 +206,11 @@ Code-Konventionen:
      `TerminationDetail=format=kv1;reason=...;solver_code=...` muss nach
      Persistierung, `ParseTerminationReason` und erneuter Ausgabe bytegleich
      erhalten bleiben; ein Detailwert mit unescaped `:` wird abgewiesen.
+   - Overflow-Test ergänzen: ein neues `format=kv1`-Detail mit mehr als 1024
+     Zeichen wird vor Persistierung abgewiesen und erzeugt deterministisch
+     `TerminationCode=schema-inconsistent`, `CanExecute=false`,
+     `schema_ok=false` und
+     `TerminationDetail=format=kv1;reason=TERMINATION_DETAIL_OVERFLOW`.
    - Percent-Encoding-Roundtrip ergänzen: ein `format=kv1`-Detail mit
      percent-encodiertem ISO-Zeitstempelwert wird persistiert, geparst,
      innerhalb des `kv1`-Parsers decodiert und bytegleich zum ursprünglichen
@@ -244,6 +253,11 @@ Code-Konventionen:
      abgewiesen.
    - Persistenz-Roundtrip für `can_execute`.
    - API-/Wire-Roundtrip.
+   - `format=kv1`-Detailtests:
+     - Roundtrip mit `solver_code`,
+     - Overflow-Reject oberhalb 1024 Zeichen,
+     - Ersatz-Detail `format=kv1;reason=TERMINATION_DETAIL_OVERFLOW` ohne
+       Trunkierung.
    - Scheduler-/Dispatcher-Guard:
      `OptimizationSolverStatus.Feasible` + `CanExecute=false` darf nie in den
      ausführbaren Pfad gelangen.
@@ -261,7 +275,9 @@ Die Slices dürfen danach nur fachliche Gründe für `CanExecute=false` liefern,
 nicht mehr die Domain-/Persistenzmigration selbst besitzen.
 Solver-spezifische Audit-Metadaten wie `solver_scope` sind nicht Bestandteil
 dieses Pre-Slices; falls ein Slice sie ohne Request-Snapshot replayfähig im Run
-persistieren muss, braucht es einen separaten Audit-Pre-Slice. Bis dahin gilt:
+persistieren muss, braucht es einen separaten Audit-Pre-Slice. Der aktuell
+verwendete Name `OptimizationRun.SolverScopeAudit` ist ein noch nicht
+spezifizierter Folge-Pre-Slice; bis ein Stub oder Plan dafür angelegt ist, gilt:
 produktive Replays ohne immutable Request-Snapshot sind nicht freigegeben.
 
 ---

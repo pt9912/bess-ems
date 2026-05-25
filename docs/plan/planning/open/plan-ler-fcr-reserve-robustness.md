@@ -92,7 +92,10 @@ Nicht explizit modelliert:
       - FCR gilt als aktiv, wenn `reserve_product=FCR` im Request/Portfolio markiert
         ist oder eine der FCR-Zeitreihen (`fcr_up_kw_t`, `fcr_down_kw_t`) für den
         Horizont positive Werte enthält.
-  - `full_activation_time` (`FCR`-Pflichtfeld bei aktivem FCR-Produkt; bei inaktivem FCR kann `0` gesetzt werden)
+  - `full_activation_time` (`FCR`-Pflichtfeld bei aktivem FCR-Produkt; bei
+    inaktivem FCR kann `0` als expliziter `not_applicable`-Sentinel gesetzt
+    werden. Dieser Sentinel hat keine Aktivierungssemantik und ist bei aktivem
+    FCR unzulässig.)
 - optional `full_activation_time_afrr` (nur bei produktiv aktivem aFRR; bei gesetztem Wert `> 0`)
 - optional `full_activation_time_mfrr` (nur bei produktiv aktivem mFRR; bei gesetztem Wert `> 0`)
   - aFRR gilt als produktiv aktiv, wenn `reserve_product=aFRR` im
@@ -156,11 +159,10 @@ Nicht explizit modelliert:
   - `self_discharge_mode=relative_soc_per_hour`:
       - für `is_ler=true`: `self_discharge_soc_per_hour` ist Pflichtfeld (`>= 0`, Anteil SOC-Verlust pro Stunde),
       - `self_discharge_kwh_per_hour` darf nicht gesetzt sein.
-    - Verlustberechnung ist deterministisch: `self_discharge_loss_kwh_t = soc_t * self_discharge_soc_per_hour * Δt`,
-      wobei `soc_t` der SOC zu Beginn der Zeitscheibe ist und `Δt = resolution_minutes / 60`.
-      Das ist bewusst eine lineare, konservative Approximation pro Zeitscheibe,
-      keine exponentielle Zerfallsformel; bei großen `Δt` kann sie strengere
-      Verluste ausweisen als ein physikalisch glatter Zerfall.
+    - Die zeitschrittweise Verlustberechnung ist ausschließlich in der
+      Hilfsgröße `self_discharge_loss_kwh_t` im Abschnitt
+      `Worst-Case-Energie` definiert. Dort ist auch die lineare,
+      konservative Approximation für relative SOC-Verluste festgelegt.
   - Restore-Leistung:
     - Wenn gesetzt, begrenzt `restore_capability_up_kw` den maximal nutzbaren Restore-Leistungsfluss der Up-Richtung (Lade-Richtung) und `restore_capability_down_kw` die Down-Richtung (Entlade-Richtung).
     - `restore_capability_up_kw` und `restore_capability_down_kw` müssen, falls gesetzt, strikt `> 0` sein.
@@ -207,8 +209,10 @@ Nicht explizit modelliert:
   - `full_activation_time_afrr` und `full_activation_time_mfrr` müssen bei produktiv aktivem aFRR bzw. mFRR strikt `> 0` sein.
   - Ist das jeweilige Produkt aktiviert und der Wert fehlt oder ist `0`, gilt `ROBUST_POLICY_UNSUPPORTED` (`POLICY_MISMATCH`).
   - `simultaneous_reserve_direction_allowed` ist optional-boolean; fehlt/`false` wird als Default `false` interpretiert.
-  - `simultaneous_reserve_direction_allowed=true` ist in Kombination mit nicht-linearer Kopplung nur mit klarer
-    Reihenfolgeimplementierung in der Worst-Case-Rekursion erlaubt.
+  - `simultaneous_reserve_direction_allowed=true` ist nur mit klarer
+    Reihenfolgeimplementierung der SOC-Branch-Rekursion erlaubt, weil
+    Wirkungsgrade, SOC-Grenzen und geplante Fahrplanwirkung richtungsabhängig
+    gekoppelt sind.
 
 - `ReserveEnergyEnvelope`
   - Zeitschrittweise Worst-Case-Energiehuelle für Up- und Down-Richtung.
@@ -361,6 +365,9 @@ Deterministische Berechnung (verbindlich):
       `self_discharge_loss_kwh_t = self_discharge_kwh_per_hour * Δt`.
     - bei `self_discharge_mode=relative_soc_per_hour`:
       `self_discharge_loss_kwh_t = soc_t * self_discharge_soc_per_hour * Δt`.
+      Das ist bewusst eine lineare, konservative Approximation pro Zeitscheibe,
+      keine exponentielle Zerfallsformel; bei großen `Δt` kann sie strengere
+      Verluste ausweisen als ein physikalisch glatter Zerfall.
 - Interner SOC-Rechnungszugang aus geplanter Fahrplanposition:
   - `soc_{t+1,plan}` ist für gültige Laufparameter nur definiert, wenn `eta_charge >= eta_min` und `eta_discharge >= eta_min` gilt.
   - `soc_{t+1,plan} = soc_t - max(0, b_t) * Δt / eta_discharge + max(0, -b_t) * eta_charge * Δt - self_discharge_loss_kwh_t`.
@@ -726,7 +733,9 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
   - Hinweis `fcr_envelope_mode=static_worst_case`, wenn
     `fcr_remaining_envelope_t = t_min_fcr` alert-unabhängig reserviert; damit
     ist der SOC-Headroom-Verlust für FCR-lastige LER-Assets operatorseitig
-    sichtbar.
+    sichtbar. Bei `Δt < t_min_fcr/60` akkumuliert der `Δt`-Clip über die
+    fortgeschriebene SOC-Rekursion der Folgeschritte zur vollen
+    `t_min_fcr`-Dauer.
   - `restore_capability_used=null` wird als `not_applicable` ausgegeben, wenn
     `required_recovery_minutes == 0`; `reserve_restore_energy_kwh=0` bleibt in
     diesem Fall explizit sichtbar.
@@ -818,7 +827,9 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
 - Selbstentlade-Schemafehler (explizit):
   - `self_discharge_mode=invalid` (`x_per_hour` unbekannt) → `ROBUST_POLICY_UNSUPPORTED`.
   - `is_ler=true` und beide Moduswerte gesetzt (`self_discharge_kwh_per_hour` und `self_discharge_soc_per_hour`) → `ROBUST_POLICY_UNSUPPORTED`.
-  - `is_ler=true` und kein Moduswert gesetzt (beide optional Felder leer/nicht gesetzt) → `ROBUST_POLICY_UNSUPPORTED`.
+  - `is_ler=true`, Policy leer und Asset leer → `ROBUST_POLICY_UNSUPPORTED`.
+  - `is_ler=true`, Policy leer und Asset liefert genau einen gültigen
+    Fallback-Wert → akzeptierte Auflösung, kein `ROBUST_POLICY_UNSUPPORTED`.
   - negative/überschüssige Werte (`self_discharge_kwh_per_hour < 0`, `self_discharge_soc_per_hour < 0` oder `> 1`) → `ROBUST_POLICY_UNSUPPORTED`.
 - Scheduler-/Dispatcher-Guard (hart):
   - Bei `OptimizationSolverStatus` (`Optimal|Feasible`) + `CanExecute=false` darf der Lauf in keiner API/Dispatcher-Route in den ausführbaren Zustand übergehen.
