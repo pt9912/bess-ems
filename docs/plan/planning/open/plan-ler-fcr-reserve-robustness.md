@@ -3,8 +3,10 @@
 **Dokumenttyp:** MVP-Spec / offen
 **Status:** Open - wartet auf Regelleistungs-/FCR-Produkttrigger
 **Datum:** 2026-05-24
-**Quelle:** Öffentliches Referenzmaterial – Referenzpublikation als fachlicher Ausgangspunkt, kein Code-Übernahmeplan.
-Baltputnis et al. (2024), Journal of Energy Storage 102, 114082
+**Quelle:** Öffentliches akademisches Referenzmaterial zu LER-/FCR-Robustheit
+als fachlicher Ausgangspunkt, kein Code-Übernahmeplan. Bibliographische
+Details bleiben im Aktivierungs-ADR bzw. in den Quellen-Notizen, nicht als
+namentliche Repo-Spezifikationszeile.
 **Bezug:**
 [`../../../../spec/lastenheft.md`](../../../../spec/lastenheft.md),
 [`../../../../spec/architecture.md`](../../../../spec/architecture.md),
@@ -380,8 +382,18 @@ Deterministische Berechnung (verbindlich):
   - `fcr_remaining_envelope_t`-abhängiger FCR-Term:
     - `fcr_term_up_t = min(Δt, fcr_remaining_envelope_t/60) * fcr_up_kw_t`
     - `fcr_term_down_t = min(Δt, fcr_remaining_envelope_t/60) * fcr_down_kw_t`
-  - `worst_up_kwh_t = fcr_term_up_t + min(Δt, full_activation_time_afrr_eff/60) * (alpha_afrr_up_t * afrr_up_kw_t) + min(Δt, full_activation_time_mfrr_eff/60) * (alpha_mfrr_up_t * mfrr_up_kw_t)`
-  - `worst_down_kwh_t = fcr_term_down_t + min(Δt, full_activation_time_afrr_eff/60) * (alpha_afrr_down_t * afrr_down_kw_t) + min(Δt, full_activation_time_mfrr_eff/60) * (alpha_mfrr_down_t * mfrr_down_kw_t)`
+  - aFRR-/mFRR-`full_activation_time_*` ist hier die Rampenzeit bis zur vollen
+    Aktivierung, nicht eine begrenzte Burst-Dauer. Nach Rampenende bleibt die
+    Aktivierung im Worst Case bis zum Ende der Zeitscheibe voll anliegen; es gibt
+    keinen separaten residual-energy-Tracker wie bei der FCR-Mindestzeit.
+  - Hilfsfaktor für aktivierbare Rampenenergie in Stunden:
+    `ramp_energy_hours(Δt, τ) = 0` für `τ <= 0`,
+    `0.5 * Δt * Δt / τ` für `0 < Δt < τ`,
+    sonst `Δt - 0.5 * τ`, mit `τ = full_activation_time_*_eff / 60`.
+  - `afrr_energy_hours_t = ramp_energy_hours(Δt, full_activation_time_afrr_eff/60)`
+  - `mfrr_energy_hours_t = ramp_energy_hours(Δt, full_activation_time_mfrr_eff/60)`
+  - `worst_up_kwh_t = fcr_term_up_t + afrr_energy_hours_t * (alpha_afrr_up_t * afrr_up_kw_t) + mfrr_energy_hours_t * (alpha_mfrr_up_t * mfrr_up_kw_t)`
+  - `worst_down_kwh_t = fcr_term_down_t + afrr_energy_hours_t * (alpha_afrr_down_t * afrr_down_kw_t) + mfrr_energy_hours_t * (alpha_mfrr_down_t * mfrr_down_kw_t)`
 - Normalisierte Worst-Case-Leistung:
   - `worst_up_kw_t = worst_up_kwh_t / Δt`
   - `worst_down_kw_t = worst_down_kwh_t / Δt`
@@ -827,7 +839,9 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
 - `conservative_soc_headroom` außerhalb `0..1` (ratio) bzw. `<0` (kwh) → `ROBUST_POLICY_UNSUPPORTED`.
 - FCR-Worst-Case für nicht-LER: volle FCR-Leistung über Horizont.
 - LER-konservative FCR-Huelle mit `t_min_fcr`.
-- Voller Aktivierungszeitraum deutlich größer als Horizon (`full_activation_time`, `full_activation_time_afrr`, `full_activation_time_mfrr`) nutzt deterministisch den `Δt`-clip ohne Negative oder unzulässige Reserve-Anforderung.
+- Voller Aktivierungszeitraum deutlich größer als Horizon (`full_activation_time`, `full_activation_time_afrr`, `full_activation_time_mfrr`) nutzt deterministisch die jeweilige Produktsemantik:
+  FCR den `Δt`-Clip der Mindestzeit, aFRR/mFRR den Rampenenergie-Faktor ohne
+  Negative oder unzulässige Reserve-Anforderung.
 - Grenzwert-Effizienz `eta_charge` / `eta_discharge` nahe Null (z. B. `1e-9`) wird explizit als harte Verweigerung
   auf `ROBUST_POLICY_UNSUPPORTED` getestet (`eta_min`-Grenzprüfung), ohne implizite `clamp`-/`bounding`-Logik.
 - Alert State startet bei definierter Frequenzabweichung und endet erst

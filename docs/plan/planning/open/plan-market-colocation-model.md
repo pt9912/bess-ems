@@ -58,6 +58,14 @@ Die Umschaltung erfolgt per Request und ist nicht global. Ein Request mit mindes
 Asset (`ClassicalCoLocation`, `HybridWithGridImport`, `GreenStorageRestricted`
 im Validierungsmodus oder aktivierter `OriginConstraint`)
 wird standardmäßig als `MILP` ausgeführt.
+Für den produktiven MVP ist dies der kanonische ADR-Default:
+`CoLocationMode != StandaloneBess` => `solver_scope=MILP`. Hintergrund ist der
+Import/Export-Mutex (`p_grid_import_t * p_grid_export_t = 0`), der bei jeder Site
+mit `max_import_kw > 0` und `max_export_kw > 0` MILP-gebunden ist und über
+Richtungs-Binärisierung erzwungen wird. Eine LP-Ausnahme darf ein ADR nur für
+konkret belegte Sonderfälle freigeben, in denen der Mutex strukturell entfällt
+(z. B. `max_import_kw=0` oder `max_export_kw=0`) und keine Herkunfts-/
+Richtungsbinarisierung aktiv ist.
 `GreenStorageRestricted` bleibt explizit außerhalb des produktiven Routine-Betriebs:
 - im produktiven Scope ist `GreenStorageRestricted` nur mit explizitem
   `green_storage_validation_mode=true` zulässig;
@@ -348,14 +356,9 @@ Interpretation:
 - `b_t` und `(g_t - c_t)` wirken auf denselben Punkt.
 - Die Export-/Importgrenzen gelten explizit für jede Zeitscheibe.
 - Die Kombination aus Import/Export- und Gesamtanschlussgrenze vermeidet Simultanfehler bei der Berechnung.
- - Für den produktiven MVP gilt als konservativer ADR-Default:
-   `CoLocationMode != StandaloneBess` => `solver_scope=MILP`.
-   Hintergrund: Der Import/Export-Mutex (`p_grid_import_t * p_grid_export_t = 0`) ist
-   bei jeder Site mit `max_import_kw > 0` und `max_export_kw > 0` MILP-gebunden und
-   wird über Richtungs-Binärisierung erzwungen.
-   Eine LP-Ausnahme darf ein ADR nur für konkret belegte Sonderfälle freigeben, in denen
-   der Mutex strukturell entfällt (z. B. `max_import_kw=0` oder `max_export_kw=0`) und
-   keine Herkunfts-/Richtungsbinarisierung aktiv ist.
+- Der Solver-Scope folgt ausschließlich der kanonischen Regel im Abschnitt
+  `Architektur- und Solver-Scope für LP/MILP`; diese Interpretation definiert
+  keine zweite ADR-Regel.
 
 ### Legacy-Daten-Migrationslauf und Backout (verbindlich)
 
@@ -376,13 +379,10 @@ werden.
   - `migration_strict=true` (Standard): unklare oder inkompatible Datensätze werden in produktiven Co-Location-Requests blockiert.
   - `migration_strict=false` (nur mit explizitem Release-Governance): erlaubt die Koexistenz bis zur Bereinigung nicht-aktiver Sites; aktive Sites bleiben weiterhin blockiert.
   - Aktivitätsdeterministik:
-    - Die kanonische Bewertung fehlender `can_dispatch`-Werte steht in der
-      Matrix im Abschnitt `SiteConstraint`.
-    - `migration_dry_run=true` blockiert keinen Lauf, unabhängig vom Wert von
-      `migration_strict`; produktive Läufe folgen der Matrix.
-    - Nicht aktive Sites werden explizit mit `can_dispatch=false` markiert oder
-      im Migrationsaudit ohne harte Blockade geführt, bis sie aktiv in Betrieb
-      genommen werden.
+    - Die kanonische Bewertung fehlender `can_dispatch`-Werte steht ausschließlich
+      in der Matrix im Abschnitt `SiteConstraint`.
+    - Diese Migrationssektion verweist nur auf die Matrix; sie formuliert keine
+      zweite Fallunterscheidung für aktive oder nicht aktive Sites.
 - Migrationsfenster (vor Aktivierung des Co-Location-MVP, nicht inline im operativen Lauf).
 - Kandidatenklassifikation je Datensatz:
   - `normalized`: `site_grid_power_sign` ist gesetzt oder eindeutig aus vorhandenen
@@ -510,17 +510,6 @@ Für den Netzanschlusspunkt ist die Konvention in diesem Slice vollständig fest
   forecast-basierte Optimierung bleibt bis zur Aktivierung von
   `plan-price-forecast-adapters.md` in einem expliziten
   `quality_mode=degraded_ok`-Übergangspfad.
-- Übergangsadapter im `quality_mode=degraded_ok`-Übergangspfad:
-  - Bis `plan-price-forecast-adapters.md` produktiv aktiviert ist, dürfen
-    `LocalGenerationSeries` nur über einen expliziten manuellen Import-/API-Push
-    oder CSV/Fixture-Import in einen nicht-forecastenden Übergangsadapter geladen
-    werden.
-  - Dieser Übergangsadapter darf keine automatischen externen Abrufe durchführen,
-    muss `series_status=SOURCE_DEGRADED` und einen Audit-Hinweis
-    `format=kv1;reason=LOCAL_GENERATION_TRANSITIONAL_INPUT` setzen und bleibt
-    auf `quality_mode=degraded_ok` beschränkt.
-  - Der Übergangsadapter ist mit Aktivierung von F-MKT-02 abzulösen oder als
-    eigener Legacy-Sunset-Slice weiterzuführen.
 - Keine Multi-Asset-Fleet-Optimierung über mehrere Standorte; das bleibt
   M6-Folgearbeit.
 
@@ -555,7 +544,18 @@ Bestandsrouten nicht brechen:
 3. Application-Port-Erweiterung für Optimierungsrequests.
 4. OR-Tools-Modellerweiterung oder neuer Solver-Pfad für
    Co-Location-Constraints.
-5. Tests:
+5. Übergangsadapter im `quality_mode=degraded_ok`-Übergangspfad:
+   - Bis `plan-price-forecast-adapters.md` produktiv aktiviert ist, dürfen
+     `LocalGenerationSeries` nur über einen expliziten manuellen Import-/API-Push
+     oder CSV/Fixture-Import in einen nicht-forecastenden Übergangsadapter geladen
+     werden.
+   - Dieser Übergangsadapter darf keine automatischen externen Abrufe durchführen,
+     muss `series_status=SOURCE_DEGRADED` und einen Audit-Hinweis
+     `format=kv1;reason=LOCAL_GENERATION_TRANSITIONAL_INPUT` setzen und bleibt
+     auf `quality_mode=degraded_ok` beschränkt.
+   - Der Übergangsadapter ist mit Aktivierung von F-MKT-02 abzulösen oder als
+     eigener Legacy-Sunset-Slice weiterzuführen.
+6. Tests:
    - Kein simultaner Netzimport/Netzeinspeisung im gleichen Zeitschritt.
    - Standalone bleibt bit-kompatibel zum heutigen Pfad.
    - PV-Überschuss kann Batterie laden, ohne Exportlimit zu verletzen.
@@ -575,7 +575,7 @@ Bestandsrouten nicht brechen:
    - `migration_strict=false` erlaubt nicht-aktive `can_dispatch=false`-Sites mit
      `unclear`/`incompatible` im Migrationsfenster, blockiert aber aktive Sites
      mit `can_dispatch=true` konsistent auf `CONFIG_INCONSISTENT`.
-6. Operator-/API-Doku für die neuen Eingaben und Fehlermodi.
+7. Operator-/API-Doku für die neuen Eingaben und Fehlermodi.
 
 ## Gemeinsamer Ausführungs-/Fehlermodus-Vertrag
 

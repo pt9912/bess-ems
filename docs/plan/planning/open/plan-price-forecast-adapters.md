@@ -107,11 +107,16 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
       - oder Zeitstempel-basierte semantische Versionen (z. B. `2026-05-24T12:00:00Z-v3`).
     - Andere Formate sind unzulässig und führen auf dem Importpfad zu
       `source_eval_status=SOURCE_SCHEMA_MISMATCH` und `series_status=SOURCE_REJECTED`.
-  - `series_family_alias`: optional bei stabiler Serienfamilie, verpflichtend bei
-    kontrolliertem Family-Wechsel ohne neue `series_id`; stabiler Alias für
-    kontrollierte Migrationspfade. Ein Wechsel der Familienkennung erfolgt nur über
-    diesen Alias bzw. durch neue Serienkennung, nicht per stillschweigendem Wechsel
-    derselben `series_id`.
+  - `series_family_alias`: optional bei stabiler Serienfamilie; Pflichtfeld beim
+    kontrollierten Family-Wechsel ohne neue `series_id`. Prüfbare Write-Regel:
+    Wird derselbe Schlüssel (`series_id`, `series_product`,
+    `source.provider_id`) mit anderer `series_version_family` geliefert als die
+    bisher persistierte Referenzfamilie und bleibt `series_id` unverändert, muss
+    `series_family_alias` gesetzt sein. Fehlt der Alias, ist der Import mit
+    `source_eval_status=SOURCE_SCHEMA_MISMATCH` und
+    `series_status=SOURCE_REJECTED` abzulehnen. Ein Wechsel der Familienkennung
+    erfolgt nur über diesen Alias bzw. durch neue Serienkennung, nicht per
+    stillschweigendem Wechsel derselben `series_id`.
   - `site_id` (optional)
     - erforderlich für standortgebundene Forecast-/Erzeugungs-/Last-/Wetter-Reihen
     - optional oder leer für produktweite Forecast-Daten ohne Standortkontext
@@ -179,7 +184,7 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
       3. Nach Freigabe wird die alte Family für den produktiven Pfad abgeschaltet, neue Family wird normativ aktiv.
     - Verbindlicher Cutover-/Rollback-SOP:
       1. **Vorbereitung**: Neue Family mit eigenem `series_family_alias` oder neuem (`series_id`, `series_product`) freigeben.
-      2. **Dual-Active-Wahrnehmung**: Alte und neue Family mindestens in zwei vollständigen Release-Fenstern parallel beobachten; ein Release-Fenster ist hier standardmäßig mindestens ein produktiver Import-/Refresh-Zyklus und mindestens 7 Kalendertage. Der Cutover braucht damit im Default mindestens zwei vollständige Zyklen und mindestens 14 Kalendertage Beobachtung. Der 14-Tage-Default ist ein serienübergreifender Produkt-Default, der zwei Wochen-/Intra-Week-Muster abdeckt; Operations darf ihn pro Serie nur per Release-Runbook überschreiben. Die Zahl ist ein konservativer Default, kein stiller Code-Default. `value_hash`-Abweichungen werden in `status_detail` strukturiert auditierbar gemacht; `status_flags` erhält nur einen eigenen Flag-Wert, falls dieser später explizit eingeführt wird.
+      2. **Dual-Active-Wahrnehmung**: Alte und neue Family mindestens in zwei vollständigen Release-Fenstern parallel beobachten; ein Release-Fenster ist hier standardmäßig mindestens ein produktiver Import-/Refresh-Zyklus und mindestens 7 Kalendertage. Der Cutover braucht damit im Default mindestens zwei vollständige Zyklen und mindestens 14 Kalendertage Beobachtung. Der 14-Tage-Default ist ein serienübergreifendes Wartezeitfenster, keine Stop-Condition: auch durchgehend idempotente `value_hash`-Vergleiche nach weniger als 14 Kalendertagen erlauben keinen Early-Cutover ohne expliziten Release-Runbook-Override. Die Zahl ist ein konservativer Produkt-Default, kein stiller Code-Default. `value_hash`-Abweichungen werden in `status_detail` strukturiert auditierbar gemacht; `status_flags` erhält nur einen eigenen Flag-Wert, falls dieser später explizit eingeführt wird.
       3. **Cutover freigeben**: Neue Family wird produktiv als `primary` markiert und auf mindestens `SOURCE_OK` oder ausdrücklich zugelassene `SOURCE_DEGRADED` gesetzt.
       4. **Produktiver Umschaltpunkt**: Alte Family in produktiven Runs auf `SOURCE_REJECTED`/`CanExecute=false` halten; alte Werte sind nur noch Replay/Diagnose sichtbar.
       5. **Rollback-Fenster**: Rückkehr auf alte Family nur mit explizitem Release-Block möglich; Rollback ist nur dann erlaubt, wenn die neue Family in einem vollständigen Beobachtungsfenster keine vollständige akzeptierbare Lastserie (ohne harte Fallback) geliefert hat. Die Runbook-Marker `release_block` und `controlled_switchover` werden im Aktivierungs-Runbook definiert, inklusive Ablageort, Berechtigung und Löschregel.
@@ -387,7 +392,7 @@ Empfohlene Integrationskonvention (API/Operator):
     kontrolliert weiterlaufen, weil ihre Zeitachse vollständig ist und die
     Qualitätsminderung sichtbar markiert wird.
 
-### Qualitätsentscheidungen bei `SOURCE_*` (verbindlich)
+### Qualitätsentscheidungen bei `SOURCE_*` (Ablauf)
 
 Die Entscheidungslogik ist zweistufig:
 - `source_eval_status` wird zuerst berechnet (`SOURCE_*` inklusive `SOURCE_OK`, harte oder degradierende Rohcodes).
@@ -426,7 +431,7 @@ Hinweis:
 Endstatus ist ein einzelner Wert (`single-value`) je Serie (`series_status`).
 Fallback-/Degradationsdetails werden zusätzlich in `status_flags` und optionalem `status_detail` erfasst.
 
-### Fehler-/Rohcodes und Endstatus (verbindlich)
+### Fehler-/Rohcodes und Endstatus (Vokabular)
 
 - `SOURCE_AUTH_ERROR` – Authentifizierung fehlt/fehlerhaft
 - `SOURCE_RATE_LIMIT` – Rate-Limit erreicht / Retry empfohlen
@@ -555,7 +560,7 @@ Aktivierungslogik:
 - Qualitäts- und Fallback-Entscheide inkl. `SOURCE_*`-Matrix, `quality_mode`,
   `fallback`-Kompatibilität, harte Ablehnungen und `status_flags` sind
   verbindlich im Abschnitt
-  [Qualitätsentscheidungen bei `SOURCE_*` (verbindlich)](#qualitätsentscheidungen-bei-source_-verbindlich)
+  [Qualitätsentscheidungen bei `SOURCE_*` (Ablauf)](#qualitätsentscheidungen-bei-source_-ablauf)
   festgelegt.
 - Diese Phase beschreibt nur den Source-Auswahl- und Aktivierungspfad; die
   Status-/Fallback-Matrix wird nicht hier dupliziert.
