@@ -88,13 +88,16 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
 
 ### Gemeinsame Serien-Typsignatur (verbindlich)
 
-- Provider-Ports liefern ein einheitliches `SeriesEnvelope`:
-  - `LoadAsync` auf dem bestehenden `IPriceSeriesSource`-Port
-  - `LoadForecastAsync` auf neuem `IForecastSeriesSource`-Port
-    (separate Schnittstelle zur Preis-/Forecast-Domain, kein paralleler `LoadPriceSeriesAsync`-Name ohne explizite Migrationsphase)
-- Der bestehende `PriceSeries`-/`IPriceSeriesSource`-Pfad bleibt die
-  Application-Grenze; `SeriesEnvelope`-Objekte müssen in bestehende Domain-Serien
-  überführt werden.
+- Provider-Adapter liefern intern ein einheitliches `SeriesEnvelope`.
+- Der bestehende `PriceSeries`-/`IPriceSeriesSource`-Pfad bleibt mit seiner
+  heutigen Signatur die Application-Grenze; `LoadAsync` gibt weiterhin
+  `PriceSeries` zurück. Für Preisreihen mappt eine Adapter-Bridge
+  `SeriesEnvelope` deterministisch auf `PriceSeries`, bevor der bestehende Port
+  bedient wird.
+- Forecasts laufen über den neuen `IForecastSeriesSource`-Port
+  (`LoadForecastAsync`) und verwenden den `SeriesEnvelope`-/Forecast-Contract
+  direkt; kein paralleler `LoadPriceSeriesAsync`-Name ohne explizite
+  Migrationsphase.
 - Der minimale `SeriesEnvelope` enthält:
   - `series_id` (stabil)
   - `series_version` (stabil, monoton wachsend oder semantische Versionskennung)
@@ -170,7 +173,7 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
       3. Nach Freigabe wird die alte Family für den produktiven Pfad abgeschaltet, neue Family wird normativ aktiv.
     - Verbindlicher Cutover-/Rollback-SOP:
       1. **Vorbereitung**: Neue Family mit eigenem `series_family_alias` oder neuem (`series_id`, `series_product`) freigeben.
-      2. **Dual-Active-Wahrnehmung**: Alte und neue Family mindestens in zwei vollständigen Release-Fenstern parallel beobachten; ein Release-Fenster ist hier standardmäßig mindestens ein produktiver Import-/Refresh-Zyklus und mindestens 7 Kalendertage. Der Cutover braucht damit im Default mindestens zwei vollständige Zyklen und mindestens 14 Kalendertage Beobachtung. Operations darf diese Mindestdauer nur per Release-Runbook überschreiben; die Zahl ist ein konservativer Default, kein stiller Code-Default. `value_hash`-Abweichungen sind als `status_flags` mit `status_message` auditierbar.
+      2. **Dual-Active-Wahrnehmung**: Alte und neue Family mindestens in zwei vollständigen Release-Fenstern parallel beobachten; ein Release-Fenster ist hier standardmäßig mindestens ein produktiver Import-/Refresh-Zyklus und mindestens 7 Kalendertage. Der Cutover braucht damit im Default mindestens zwei vollständige Zyklen und mindestens 14 Kalendertage Beobachtung. Operations darf diese Mindestdauer nur per Release-Runbook überschreiben; die Zahl ist ein konservativer Default, kein stiller Code-Default. `value_hash`-Abweichungen werden in `status_detail` strukturiert auditierbar gemacht; `status_flags` erhält nur einen eigenen Flag-Wert, falls dieser später explizit eingeführt wird.
       3. **Cutover freigeben**: Neue Family wird produktiv als `primary` markiert und auf mindestens `SOURCE_OK` oder ausdrücklich zugelassene `SOURCE_DEGRADED` gesetzt.
       4. **Produktiver Umschaltpunkt**: Alte Family in produktiven Runs auf `SOURCE_REJECTED`/`CanExecute=false` halten; alte Werte sind nur noch Replay/Diagnose sichtbar.
       5. **Rollback-Fenster**: Rückkehr auf alte Family nur mit explizitem Release-Block möglich; Rollback ist nur dann erlaubt, wenn die neue Family in einem vollständigen Beobachtungsfenster keine vollständige akzeptierbare Lastserie (ohne harte Fallback) geliefert hat. Die Runbook-Marker `release_block` und `controlled_switchover` werden im Aktivierungs-Runbook definiert, inklusive Ablageort, Berechtigung und Löschregel.
@@ -478,7 +481,8 @@ Endgültige Serienendstatus sind:
 ### Phase 1: Adapter-Vertrag und Import-Hardening
 
 - Quellenneutrales Adapterinterface oberhalb externer Provider:
-  - `LoadAsync` (`IPriceSeriesSource`)
+  - bestehendes `LoadAsync` (`IPriceSeriesSource`) bleibt `PriceSeries`-basiert;
+    `SeriesEnvelope` wird davor in der Adapter-Bridge gemappt
   - `LoadForecastAsync` (`IForecastSeriesSource`)
   - Adapter-Bridge zwischen `SeriesEnvelope`, produktiven Preis-Domainmodellen und
     Forecast-Contract-Daten

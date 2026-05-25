@@ -110,7 +110,9 @@ Nicht explizit modelliert:
     Merge-Resolution; ein Policy-Wert darf einen andersartigen Asset-Fallback
     verdrängen, ohne als "beide vorhanden" zu zählen.
   - `max_recovery_time` (harte obere Grenze für die Wiederherstellungsdauer in Minuten; bei aktivem Restore-Pfad erforderlich, sonst darf `0` gesetzt werden)
-  - `intraday_gate_closure` (optional, Default `0`, wird für Restore-gesteuerte Läufe benötigt)
+  - `intraday_gate_closure` (optional, Default `0`; bei Restore-gesteuerten
+    Läufen zulässig als "keine Gate-Latenz konfiguriert", sofern das Produkt
+    keine positive Gate-Frist verlangt)
   - `intraday_preparation_time` (optional, Default `0` ohne Restore-Pfad; bei aktivem
     Restore-Pfad Pflichtfeld `> 0`)
   - `minutes_until_next_restore_window_start` (optional, `>= 0`)
@@ -306,7 +308,9 @@ Deterministische Berechnung (verbindlich):
     im selben Schritt wie folgt gekoppelt:
     - `worst_total_kwh_t = worst_up_kwh_t + worst_down_kwh_t`
     - `worst_total_kw_t = worst_total_kwh_t / Δt`
-    - `worst_total_*` dient als auditierbare kombinierte Kennzahl für UI/Replay.
+    - `worst_total_*` dient ausschließlich als auditierbare kombinierte Kennzahl
+      für UI/Replay; die Größe ist keine Steuer- oder Entscheidungsgröße der
+      harten Verifikation.
     - Für die harte Verifikation werden beide sequentiellen Reihenfolgen bewertet:
       1) Up-Branch auf `worst_up_kwh_t` (Absenkung), anschließend Down-Branch auf dem
          danach aktualisierten SOC.
@@ -327,6 +331,9 @@ Deterministische Berechnung (verbindlich):
     - `fcr_remaining_envelope_t` ist die konservative Worst-Case-Hülle in Minuten.
       Für die Prüfung am Entscheidungszeitpunkt gilt pro Schritt:
       `fcr_remaining_envelope_t = t_min_fcr`, unabhängig vom aktuellen Alert-Status.
+      Diese volle Reservierung auch außerhalb laufender Alerts ist eine bewusste
+      Worst-Case-Wahl des ersten Slice; ein statusabhängiger "adaptive envelope"-
+      Pfad ist ein späterer Slice.
     - `fcr_remaining_tracking_t` ist der Alert-Tracking-Zustand in Minuten und dient
       nur Laufzeit-Replay, Operator-Ausgabe und fortlaufender Alert-Rekursion.
     - Bei Schrittübergang in Alert wird für die Tracking-Ansicht
@@ -395,6 +402,9 @@ Restore- und Gate-Entscheidungslogik (verbindlich):
 
 - Bei `ROBUST_INFEASIBLE` mit Primärursache `SOC_LIMIT` oder `RESERVE_CAPACITY` prüft der Prüfer zuerst, ob
   die Abweichung durch kontrollierte Intraday-Restore-Aktionen behoben werden kann:
+  Die folgenden `restore_shortfall_*`-Größen gehören zur unabhängigen
+  Worst-Case-Hülle je Richtung; sie sind keine konkrete Fahrplanaktion und
+  dürfen nicht als gleichzeitiges Laden/Entladen interpretiert werden.
   - Up-Verstoß-Defizit:
     `restore_shortfall_up_kwh = max(0, worst_up_kwh_t - (soc_plan_up_t - soc_min_eff_kwh) * eta_discharge)`
   - Down-Verstoß-Defizit:
@@ -527,16 +537,17 @@ Pflichtregeln:
  - Zuerst wird je Zeitfenster berechnet, ob eine Wiederherstellung je Richtung nötig ist:
    - `required_restore_up_kwh_t = coalesce(required_up_kwh_t, worst_up_kwh_t)`
    - `required_restore_down_kwh_t = coalesce(required_down_kwh_t, worst_down_kwh_t)`
-   - `restore_up_kwh_t = max(0, required_restore_up_kwh_t - available_up_kwh_t)`
-   - `restore_down_kwh_t = max(0, required_restore_down_kwh_t - available_down_kwh_t)`
+   - `scheduled_restore_up_kwh_t = max(0, required_restore_up_kwh_t - available_up_kwh_t)`
+   - `scheduled_restore_down_kwh_t = max(0, required_restore_down_kwh_t - available_down_kwh_t)`
   - Vor der Berechnung gilt hart:
     - `required_restore_up_kwh_t` und `required_restore_down_kwh_t` müssen `>= 0` sein.
     - Wird ein negativer Rohwert übermittelt (`coalesce` nicht möglich), gilt `ROBUST_POLICY_UNSUPPORTED` mit `POLICY_MISMATCH` als harte Vorvalidierung.
- - Wenn `restore_up_kwh_t > 0` und `restore_down_kwh_t > 0` im selben Schritt gilt:
+ - Wenn `scheduled_restore_up_kwh_t > 0` und
+   `scheduled_restore_down_kwh_t > 0` im selben Schritt gilt:
    - `ReserveRobustnessResult` wird mit `ROBUST_INFEASIBLE` und `limiting_reason_code = NO_RECOVERY_PATH` geführt (ein Batteriekorridor kann pro Schritt nicht zugleich laden und entladen).
  - Sonst:
-   - Laden, wenn `restore_up_kwh_t > 0` (Wird Worst-Case-Up nicht gedeckt).
-   - Entladen, wenn `restore_down_kwh_t > 0` (Wird Worst-Case-Down nicht gedeckt).
+   - Laden, wenn `scheduled_restore_up_kwh_t > 0` (Wird Worst-Case-Up nicht gedeckt).
+   - Entladen, wenn `scheduled_restore_down_kwh_t > 0` (Wird Worst-Case-Down nicht gedeckt).
  - harte Begrenzung durch Asset-Leistung, Reservebänder,
    SOC-Grenzen und Gate-Closure-Zeit.
  - Restore ist nur dann ausgabe- und ausführungspfadfähig, wenn aktuell ein

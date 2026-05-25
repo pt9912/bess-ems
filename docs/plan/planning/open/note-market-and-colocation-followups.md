@@ -167,23 +167,23 @@ sowie Forecast-Serien.
 
 ## Trigger-Readiness-Checkliste
 
-- [ ] Externe Quellenanalyse ist als Trigger-Spezifikation abgeschlossen (DFBEW,
+- [x] Externe Quellenanalyse ist als Trigger-Spezifikation abgeschlossen (DFBEW,
   Co-Location, Forecast-Trading, zusätzliche Medium-Quellen) und fachlich
   klassifiziert.
-- [ ] F-MKT-01-Abnahmebedingungen sind als Slice-Startkriterien dokumentiert und
+- [x] F-MKT-01-Abnahmebedingungen sind als Slice-Startkriterien dokumentiert und
   für mindestens diese drei produktiven Betriebsformen (`StandaloneBess`,
   `ClassicalCoLocation`, `HybridWithGridImport`) definiert.
-- [ ] `GreenStorageRestricted` läuft im ersten Slice als Validierungsmodus mit
+- [x] `GreenStorageRestricted` läuft im ersten Slice als Validierungsmodus mit
   harten Constraints; produktive Förderautomatik bleibt einem späteren Slice
   vorbehalten.
-- [ ] F-MKT-02-Abnahmebedingungen sind als Slice-Startkriterien dokumentiert
+- [x] F-MKT-02-Abnahmebedingungen sind als Slice-Startkriterien dokumentiert
   (Preis: 1 Primär + 1 Fallback; Forecast: je 2 Adapter für `load` und
   `weather-temp`; jeweils Fallback-/Degradation-Modell, Aktualisierung +
   Alarmierung).
-- [ ] Trigger-Koordination bei parallelen Auslösern ist als Startregel definiert;
+- [x] Trigger-Koordination bei parallelen Auslösern ist als Startregel definiert;
   autoritativ ist der folgende Abschnitt
   [Trigger-Koordination bei gleichzeitigen Auslösern](#trigger-koordination-bei-gleichzeitigen-auslösern).
-- [ ] Copyright- und Nutzungsgrenzen sind als Prüfpunkte für spätere Slices
+- [x] Copyright- und Nutzungsgrenzen sind als Prüfpunkte für spätere Slices
   explizit dokumentiert.
 
 ## Trigger-Koordination bei gleichzeitigen Auslösern
@@ -199,6 +199,11 @@ Aktivierungsvoraussetzungen:
 - Produktiver F-MKT-02-Betrieb ist erst freigegeben, wenn
   [`Domain-Migration PriceSeries.Identity`](plan-domain-migration-price-series-identity.md)
   abgeschlossen ist.
+- Produktiver F-MKT-01-Betrieb mit externen lokalen Erzeugungs- oder
+  Forecast-Serien ist ebenfalls erst freigegeben, wenn
+  [`Domain-Migration PriceSeries.Identity`](plan-domain-migration-price-series-identity.md)
+  abgeschlossen ist. Ohne diesen Pre-Slice darf F-MKT-01 nur mit intern
+  bereitgestellten oder degraded/fallback-geführten Übergangsserien starten.
 - Wenn produktive Replays ohne Request-Snapshot freigegeben werden sollen, ist
   zuerst ein eigener Trigger-/Pre-Slice `OptimizationRun.SolverScopeAudit`
   anzulegen; andernfalls bleibt der Request-Snapshot die kanonische

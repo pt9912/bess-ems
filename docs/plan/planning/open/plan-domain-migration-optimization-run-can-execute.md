@@ -88,6 +88,7 @@ duplizieren diese Matrix nicht.
 | Gültiger Plan/Plan verwendbar | `Optimal` oder `Feasible` | bestehende Erfolgs-Codes, z. B. `or-tools-optimal` oder `or-tools-feasible-not-proven-optimal` | `true` |
 | Solver-seitige mathematische Infeasibility | `Infeasible` | bestehender Solver-Code, z. B. `or-tools-infeasible` | `false` |
 | Domain-spezifisch erklärbare Infeasibility (`MODEL_INFEASIBLE`) | `Infeasible` | bestehender Solver-Code, z. B. `or-tools-infeasible`; Domain-Grund in `TerminationDetail=format=kv1;reason=<DOMAIN_REASON>` | `false` |
+| Solver-seitig unbeschränktes Modell | `Unbounded` | bestehender Solver-Code, z. B. `or-tools-unbounded` | `false` |
 | Time Limit ohne ausführbaren Plan | `TimeLimit` | bestehender Timeout-Code, z. B. `or-tools-time-limit` | `false` |
 | Iteration Limit ohne ausführbaren Plan | `IterationLimit` | bestehender Iterations-Code, sofern vom Solver geliefert | `false` |
 | Reiner Rechenfehler/Solverfehler | `Failed` | Solver-spezifische harte Codes, z. B. `or-tools-abnormal`, `or-tools-model-invalid`, `or-tools-not-solved` | `false` |
@@ -131,12 +132,16 @@ duplizieren diese Matrix nicht.
        Guard-Ergebnisse dürfen keine gemischten Freitext-/`key=value`-Formate
        erzeugen. Parser müssen Legacy-Strings als Freitext behandeln, sobald
        kein führendes `format=kv1;` vorhanden ist.
-     - `format=kv1`-Werte dürfen keinen Doppelpunkt enthalten, weil die bestehende
-       Domain-Wireform `TerminationCode:TerminationDetail` am ersten `:` trennt.
-       Werte mit natürlichem Doppelpunkt (z. B. ISO-Zeitstempel oder URLs) müssen
-       vor Persistierung percent-encoded werden; neue Parser dekodieren nur
+     - `format=kv1`-Werte dürfen keinen Doppelpunkt enthalten, damit der neue
+       `kv1`-Parser eine einfache, kanonische `;`-/`=`-Grammatik behält. Die
+       äußere Domain-Wireform trennt zwar nur am ersten `:`, aber Werte mit
+       natürlichem Doppelpunkt (z. B. ISO-Zeitstempel oder URLs) müssen vor
+       Persistierung in `kv1` percent-encoded werden; neue Parser dekodieren nur
        innerhalb von `format=kv1`. Das gilt auch für `series_version`-Werte aus
        Forecast-/Preisreihen, falls sie in `TerminationDetail` aufgenommen werden.
+     - Neue `format=kv1`-`TerminationDetail`-Strings dürfen maximal 1024 Zeichen
+       lang sein. Längere Details werden vor Persistierung als Guard-/Schemafehler
+       abgelehnt; Slices dürfen keine stillen Trunkierungen erzeugen.
 
 3. Persistenz und Wire
    - `can_execute` in allen produktiven Stores hinzufügen:

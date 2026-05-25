@@ -83,7 +83,9 @@ Semantik der fachlichen Coderäume (für deterministische Fehlerauswertung):
 - `CONFIG_INVALID`: globale Konfiguration/Request-Kontraktfehler (z. B. ungültige Kombinationen
   der Solver-Scope-Aktivierungen, produktiv gesperrte Modi oder fehlende Muss-Felder auf
   dem globalen Solver-Scope). Standortbezogene Migrations-/Ableitungsfälle wie fehlende
-  Sign-Konventionen werden nicht hier, sondern als `CONFIG_INCONSISTENT` klassifiziert.
+  Sign-Konventionen und standortbezogene Aktivitäts-/Muss-Feld-Lücken wie
+  `can_dispatch` werden nicht hier, sondern als `CONFIG_INCONSISTENT`
+  klassifiziert.
 - `CONFIG_INCONSISTENT`: fachlich konsistenzrelevante, aber konfigurationsnahe Inkonsistenzen
   im Request (z. B. nicht auflösbare/inhomogene Modellierung über aktivierte Co-Location-Modi
   oder nicht deterministisch ableitbare Sign-Konvention).
@@ -164,8 +166,11 @@ Mögliche Domain-/Application-Erweiterungen:
       | --- | --- | --- |
       | `migration_dry_run=true` | ja oder unklar | keine Laufblockade; Audit-Eintrag `SITE_CAN_DISPATCH_MISSING`, Site gilt nicht als aktiv ausführbar |
       | `migration_strict=true` produktiv | ja oder unklar | harte Blockade mit `CONFIG_INCONSISTENT` / `SITE_CAN_DISPATCH_MISSING` |
+      | `migration_strict=true` produktiv | nein | harte Blockade bis explizit `can_dispatch=false` modelliert oder im Dry-Run auditierbar bereinigt |
       | `migration_strict=false` produktiv | ja | harte Blockade mit `CONFIG_INCONSISTENT` / `SITE_CAN_DISPATCH_MISSING` |
       | `migration_strict=false` produktiv | nein | keine Laufblockade; Datensatz bleibt im Audit-Bundle bis zur Bereinigung |
+      Der `migration_strict`-Schalter wirkt damit ausschließlich für nicht aktive
+      Sites; aktive Sites bleiben in beiden Produktivmodi hart blockiert.
     - Produktiver Zugriff außerhalb eines Migrationsfensters:
       - `can_dispatch` muss gesetzt sein.
       - `can_dispatch=false` markiert die Site als inaktiv; inaktive Sites werden bei aktiven Requests nicht ausgewertet.
@@ -235,6 +240,9 @@ Mögliche Domain-/Application-Erweiterungen:
   - `eta_charge` (optional, default `1.0`)
   - `eta_discharge` (optional, default `1.0`)
   - Begrenzung via `local_origin_capacity_kwh`
+  - Für `GreenStorageRestricted` muss `local_origin_capacity_kwh > 0` gelten.
+    `local_origin_capacity_kwh=0` ist keine nutzbare Herkunftsbilanz und führt zu
+    `CONFIG_INCONSISTENT` mit `format=kv1;reason=GREEN_STORAGE_ORIGIN_CAPACITY_ZERO`.
   - Validierung (nur wenn von `1.0` abweichend): `eta_min <= eta_charge <= 1`
     und `eta_min <= eta_discharge <= 1`; `eta_min = 1e-6` ist dieselbe
     gemeinsame Assetmodell-Invariante wie im Robustheitspfad.
@@ -326,15 +334,10 @@ Interpretation:
 Für produktive Freischaltung ist ein deterministischer Migrationspfad für bestehende
 `SiteConstraint`-Datensätze vorab definiert:
 
-Naming-Konvention für Toleranzschalter:
-
-| Bereich | Strenger Produktivmodus | Tolerierter Migrations-/Degraded-Modus |
-| --- | --- | --- |
-| Co-Location-Konfiguration | `migration_strict=true` | `migration_strict=false` nur mit Release-Governance |
-| Preis-/Forecast-Qualität | `quality_mode=strict` | `quality_mode=degraded_ok` nur bei expliziter Slice-Freigabe |
-
-Beide Schalter sind bewusst getrennt, müssen aber in Operator-/Runbook-Sichten
-nebeneinander ausgewiesen werden.
+`migration_strict` steuert ausschließlich die Toleranz für Co-Location-
+Konfigurationsmigrationen; `quality_mode` steuert ausschließlich
+Preis-/Forecast-Qualität. Beide Schalter bleiben getrennt und müssen in
+Operator-/Runbook-Sichten nebeneinander ausgewiesen werden.
 
 - Migrationsfenster ist zweistufig:
   - `migration_dry_run=true`: vollständige Klassifikation mit vollständigem Audit-Bundle, aber ohne Laufblockade.
@@ -412,6 +415,8 @@ Rollback-/Backout-Verhalten:
   - `e_local_{t+1} = e_local_t + eta_charge * max(0, -b_t) * Δt - max(0, b_t) * Δt / eta_discharge`
     (bei Vorzeichenkonvention `b_t>0` Entladen, `b_t<0` Laden; für `eta_charge = eta_discharge = 1` vereinfacht sich dies zu `e_local_t - b_t * Δt`)
   - `0 <= e_local_t <= local_origin_capacity_kwh`
+  - `local_origin_capacity_kwh > 0`; `0` ist `CONFIG_INCONSISTENT` mit
+    `format=kv1;reason=GREEN_STORAGE_ORIGIN_CAPACITY_ZERO`.
   - `e_local_0` ist konfigurierbar (meist 0).
 - Harte Koppelregeln:
   - `p_grid_import_t == 0` (für beide Site-Konventionen) – vollständiges Netzbezugsverbot.
