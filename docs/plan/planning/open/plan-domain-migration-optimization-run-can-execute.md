@@ -59,8 +59,11 @@ Nicht vorhanden:
      `CanExecute=true` als Default ist nur für Pfade zulässig, die nachweislich
      keine aktivierten Guard-Beiträge kennen (z. B. NoOp-Optimierer,
      Test-Fixtures oder reine Legacy-Leser).
-   - Optionales Audit-Metadatum `CanExecuteSource` oder äquivalenter Wire-Wert
-     vorsehen, damit `computed_from_guards` von `legacy_backfill` unterscheidbar ist.
+   - Audit-Diskriminator verpflichtend vorsehen: entweder `CanExecuteSource`
+     oder ein äquivalenter Wire-Wert muss `computed_from_guards` von
+     `legacy_backfill` unterscheidbar machen. Nur Installationen ohne
+     Legacy-Bestand dürfen den Backfill-Wert unbenutzt lassen; der
+     Diskriminator bleibt trotzdem Teil des Vertrags.
    - Invarianten ergänzen:
      - `CanExecute=true` ist nur zulässig, wenn `HasUsableSolution=true`.
      - `CanExecute=false` ist auch bei `Optimal`/`Feasible` zulässig, wenn ein

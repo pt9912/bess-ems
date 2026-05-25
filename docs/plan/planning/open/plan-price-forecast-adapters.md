@@ -140,6 +140,9 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
     - `license_id` (optional, falls lizenzrelevant)
     - `retrieved_at_utc`
     - `valid_from_utc`, `valid_to_utc`
+      - reserviert für spätere Quellen-Gültigkeitsfenster; im ersten Slice sind
+        sie reine Audit-Metadaten und kein Bestandteil von Idempotenz,
+        Family-Cutover, Status-Mapping oder Validierung.
     - `provider_request_id`
   - `series_status` (finaler Endstatus je Serie): `SOURCE_OK`, `SOURCE_DEGRADED`, `SOURCE_FALLBACK_USED`, `SOURCE_REJECTED`
   - `source_eval_status` (Rohstatus je Providerlauf, vor Fallback-/Degradationsentscheidung): `SOURCE_OK`, `SOURCE_AUTH_ERROR`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_EMPTY`, `SOURCE_STALE`, `SOURCE_GAP`, `SOURCE_SCHEMA_MISMATCH`, `SOURCE_RETRY_EXHAUSTED`
@@ -234,9 +237,14 @@ Hinweis zur Semantik:
     Migrationspfad über `series_family_alias` (oder neue `series_id`).
     Ohne expliziten Revisionswechsel ist keine In-Place-Korrektur derselben Version im produktiven Lauf erlaubt.
   - Eine eingehende Serie mit älterer Version als die letzte akzeptierte Referenzversion für dieselbe
-    Serien-Signatur wird nach dem stabilisierten Vergleich als harte Versionsabweichung
+    Serien-Signatur und dieselbe `series_version_family` wird nach dem
+    stabilisierten Vergleich als harte Versionsabweichung
     (`series_status=SOURCE_REJECTED`) abgewiesen.
-    - Der stabile Vergleich nutzt zuerst die Versionsfamilie (`int` oder `timestamp`), danach den normalisierten Fortschritt in dieser Familie.
+    - Der stabile Vergleich nutzt die feste Versionsfamilie (`int` oder
+      `timestamp`) und danach den normalisierten Fortschritt in dieser Familie.
+      Während eines Dual-Active-Cutovers werden alte und neue Family getrennt
+      bewertet; Korrekturen der alten Family im Beobachtungsfenster gelten nicht
+      automatisch als Regression der neuen Family.
   - Signaturänderungen bei optionalen Feldern sind harte Inkompatibilitäten:
     Wenn `market_bid_area`, `site_id`, `unit` oder `resolution_minutes` für dieselbe
     `series_id`/`source.provider_id`/`series_type`/`series_product`-Kombination variieren,
@@ -343,6 +351,10 @@ Empfohlene Integrationskonvention (API/Operator):
     Bei 96 Intervallen sind damit 0 Rohdatenlücken zulässig; bei 200 Intervallen
     genau 1. Diese Rundungsregel ist bewusst konservativ und ersetzt
     horizon-spezifische Magic Numbers.
+    Operative Folge: Bei typischen 24-h-/15-min-Horizonten greift Backfill wegen
+    dieser Mindestabdeckung praktisch nicht; Backfill ist erst bei längeren
+    Horizonten oder explizit konfigurierter niedrigerer Mindestabdeckung im
+    `quality_mode=degraded_ok` wirksam.
   - Die konsolidierte konsumierbare Serie muss nach Backfill keine offenen Lücken mehr enthalten.
 - Lückenregime:
   - Rohdaten mit Lücken vor Backfill sind nur zulässig, solange
@@ -385,36 +397,15 @@ Die `SOURCE_*`-Auswertung ist für jede Serie deterministisch:
   `SOURCE_UNAVAILABLE`, `SOURCE_RETRY_EXHAUSTED`) gehen in Schritt 3.
 
 3) Fallback- und Qualitätsmoduslogik
-- Fallback ist versuchsweise nur für diese Codes:
-  - `SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_RETRY_EXHAUSTED`
-- `SOURCE_AUTH_ERROR`, `SOURCE_SCHEMA_MISMATCH` sind nicht fallback-fähig.
-- Sind Primärcode + kompatible Fallback-Quelle vorhanden:
-  - Der Fallback wird synchron ausgewertet.
-  - Ist Fallback erfolgreich:
-  - bei `quality_mode=strict`:
-    - finaler Zustand darf nur `series_status=SOURCE_OK` oder `series_status=SOURCE_FALLBACK_USED` sein.
-    - führt der Fallback zusätzliche Qualitätsminderung (`SOURCE_BACKFILL` o. ä.), ist das Ergebnis `SOURCE_REJECTED`.
-    - explizit mit der Ausnahme: `SOURCE_FALLBACK_USED` ist in `strict` nur ohne
-      `SOURCE_BACKFILL` erlaubt.
-    - Zusätzliche Qualitätsminderung führt in `strict` auf `SOURCE_REJECTED`; das
-      Statusvokabular oben bleibt normativ.
-  - bei `quality_mode=degraded_ok`: finaler Zustand darf `series_status=SOURCE_DEGRADED` oder `series_status=SOURCE_FALLBACK_USED` sein; kombinierte Ereignisse werden in `status_flags` gehalten.
-    - Wenn Fallback erfolgreich und keine zusätzliche Qualitätsminderung vorliegt: `series_status=SOURCE_FALLBACK_USED`, `status_flags=[SOURCE_FALLBACK_USED]`.
-    - Wenn Fallback erfolgreich mit Backfill/Degradation: `series_status=SOURCE_DEGRADED`, `status_flags=[SOURCE_FALLBACK_USED, SOURCE_BACKFILL]`.
-  - Ist Fallback fehlgeschlagen:
-    - `strict`: harte Ablehnung (`series_status=SOURCE_REJECTED`).
-    - `degraded_ok`: nur akzeptierbare Backfill/Degradation zulassen (`series_status=SOURCE_DEGRADED`), sonst `series_status=SOURCE_REJECTED`.
-- Kein kompatibler Fallback:
-  - `strict`: harte Ablehnung bei `source_eval_status in {SOURCE_STALE, SOURCE_RATE_LIMIT, SOURCE_UNAVAILABLE, SOURCE_RETRY_EXHAUSTED}`.
-  - `degraded_ok`: `source_eval_status=SOURCE_STALE` kann als `series_status=SOURCE_DEGRADED` akzeptiert werden; `SOURCE_EMPTY` bleibt `series_status=SOURCE_REJECTED`.
+- Fallback wird nur für die in den kanonischen Ableitungsregeln genannten
+  fallback-fähigen Rohcodes versucht.
+- Der Fallback-Pfad darf keine eigenen Endstatusregeln formulieren; er übergibt
+  Rohcode, Fallback-Ergebnis und Qualitätsflags an die kanonische Ableitung.
 
 4) Endstatuszuordnung bei akzeptierter Serie
-- Primär: `SOURCE_OK`.
-  - Mit Ersatzquelle: `series_status=SOURCE_FALLBACK_USED`.
-  - Qualitätsminderung: `series_status=SOURCE_DEGRADED`.
-- Kombinationsregel: Ist Fallback erfolgreich **und** Backfill aktiv, ist der `series_status` `SOURCE_DEGRADED` mit `status_flags` inklusive `SOURCE_FALLBACK_USED` und `SOURCE_BACKFILL`.
-  - Diese Kombination ist in `quality_mode=strict` nicht zulässig.
-- harte Ablehnung: `series_status=SOURCE_REJECTED`.
+- Die Endstatuszuordnung ist ausschließlich die kanonische Ableitung oben.
+  Diese Flow-Sektion beschreibt nur die Reihenfolge der Verarbeitung und darf
+  keine abweichende Statusmatrix enthalten.
 
 Hinweis:
 Endstatus ist ein einzelner Wert (`single-value`) je Serie (`series_status`).
@@ -513,28 +504,12 @@ Endgültige Serienendstatus sind:
   - Quelle und Produkt
   - Serien-ID plus `series_version` des zuletzt geladenen Satzes
 - Deterministische Reaktionsregeln:
-  - `SOURCE_OK`: normaler Betrieb
-  - `SOURCE_AUTH_ERROR`: wird zu `series_status=SOURCE_REJECTED` abgeleitet,
-    kein Retry/Fallback.
-  - `SOURCE_SCHEMA_MISMATCH`: wird zu `series_status=SOURCE_REJECTED` abgeleitet,
-    kein Retry/Fallback.
-  - `SOURCE_GAP` wird gemäß den im vorangehenden Abschnitt definierten globalen Ableitungsregeln entschieden
-    (`quality_mode=strict` => `SOURCE_REJECTED`, `quality_mode=degraded_ok` =>
-    Backfill/`SOURCE_DEGRADED` oder harte Ablehnung bei nicht behebbaren Restlücken).
-- `SOURCE_RATE_LIMIT`, `SOURCE_STALE`, `SOURCE_UNAVAILABLE`, `SOURCE_RETRY_EXHAUSTED`:
-    - Primär wird kontrollierter Fallback auf `fallback`-Quelle versucht, sofern vorhanden und kompatibel.
-    - Fallback nur akzeptieren, wenn `SeriesEnvelope`, Einheit und Horizon exakt kompatibel sind.
-    - Bei Fallback Erfolg gilt Fallback-Ergebnis nach `quality_mode`:
-      - `strict`: nur akzeptierte Daten ohne Backfill/Verfallung (`SOURCE_OK`,
-        `SOURCE_FALLBACK_USED` ohne `SOURCE_BACKFILL`-Flag)
-      - `degraded_ok`: Fallback kann als `SOURCE_DEGRADED` geführt werden.
-      - in strict ist Fallback mit Backfill weiterhin `SOURCE_REJECTED`.
-  - Bei Ausfall / Schemakonflikt des Fallbacks:
-    - `quality_mode=degraded_ok` und Primärcode `SOURCE_STALE`: degradierte Fortsetzung als `SOURCE_DEGRADED` möglich
-    - sonst harte Ablehnung (`SOURCE_REJECTED`)
-  - Fallback nicht verfügbar:
-    - `strict`: harte Ablehnung für `SOURCE_STALE`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_RETRY_EXHAUSTED`
-    - `degraded_ok`: nur `SOURCE_STALE` als `SOURCE_DEGRADED` möglich; `SOURCE_EMPTY` bleibt `SOURCE_REJECTED`.
+  - Die Source-Auswahl, Retry-/Fallback-Versuche und Operator-Ausgaben folgen
+    den kanonischen Ableitungsregeln aus dem Abschnitt
+    [Verbindlicher Daten- und Fehlervertrag](#verbindlicher-daten-und-fehlervertrag).
+  - Dieser Phase-1-Block definiert keine zweite Statusmatrix. Er ergänzt nur,
+    dass Fallback-Quellen `SeriesEnvelope`, Einheit und Horizon exakt kompatibel
+    liefern müssen, bevor die kanonische Ableitung angewendet wird.
 
 ### Phase 2: Erste produktive Quelle
 

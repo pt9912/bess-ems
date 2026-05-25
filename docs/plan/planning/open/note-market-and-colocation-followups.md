@@ -41,19 +41,20 @@ Fachvalidierung und als Input für produktnahe Folge-Slices.
 
 ### Hohe Relevanz
 
-- `DFBEW_HP_extern_Batteriespeicher_Frontier_Economics_2602.pdf` (liegt in den gesichteten Referenzunterlagen)
-  - Geschäftsmodelle, regulatorischer Rahmen, Deutschland/Frankreich,
-    Co-Location, Day-Ahead, Intraday, Systemdienstleistungen und Risiken.
+- Frontier-Economics-/DFBEW-Referenzmaterial zu Batteriespeicher-
+  Geschäftsmodellen in Deutschland/Frankreich:
+  - Geschäftsmodelle, regulatorischer Rahmen, Co-Location, Day-Ahead,
+    Intraday, Systemdienstleistungen und Risiken.
   - Nutzen: Validierung von `LH-MKT-*`, Regelleistungsfolgearbeiten,
     Produkt-/Compliance-Gates und Betreiber-Risiken.
 
-- `suena_energy_Whitepaper_Co-Location.pdf` (liegt in den gesichteten Referenzunterlagen)
+- Co-Location-Whitepaper eines BESS-Optimierungsanbieters:
   - Co-Located-Speicher, Hybridmodelle mit Netzbezug, Speicher-
     Überbauung, Grünstromspeicher, Multi-Market-Optimierung und
     Netzrestriktionen.
   - Nutzen: Fachliche Vorlage für einen Co-Location-/Hybrid-BESS-Slice.
 
-- `BESS_Forecasting_Trading_Strategies.pptx` (liegt in den gesichteten Referenzunterlagen)
+- Produkt-/Strategiematerial zu BESS-Forecasting und Trading:
   - Revenue Streams, Day-Ahead-only-Grenzen, Intraday-/Balancing-
     Opportunitäten, Multi-Day-Planning, negative Preise, RL-Ausblick.
   - Nutzen: Produkt-/Roadmap-Input für Marktlogik, Operator-UI und
@@ -61,18 +62,17 @@ Fachvalidierung und als Input für produktnahe Folge-Slices.
 
 ### Mittlere Relevanz
 
-- `Data_sources_list.docx` (liegt in den gesichteten Referenzunterlagen)
+- Quellenkatalog für Markt- und Wetterdaten:
   - EPEX, TSO-Daten, Wetter, Fuel, CO2, OPSD.
   - Nutzen: Quellenkatalog für Preis- und Forecast-Adapter.
 
-- `Feature_selection.docx` und
-  `WattWise Feature Selection_20260310.docx` (liegen in den gesichteten Referenzunterlagen)
+- Forecast-Feature-Selection-Material:
   - Lag-Features, residual load, Wind-/Solar-Forecast, Load-Forecast,
     Wetter, Gas, Coal, CO2, Kalenderfeatures.
   - Nutzen: Input-Vertrag für Forecast-Sidecar oder externe
     Forecast-Provider, nicht für den technischen Regelkreis.
 
-- `European_BESS_Optimizers_Landscape.pptx` (liegt in den gesichteten Referenzunterlagen)
+- Marktüberblick zu europäischen BESS-Optimierern:
   - Wettbewerbs-/Produktpositionierung.
   - Nutzen: Benchmarking für Feature-Scope und UI-Sprache; Aussagen zu
     Firmen, Funding und Uplift müssen vor externer Verwendung
@@ -89,8 +89,8 @@ Fachvalidierung und als Input für produktnahe Folge-Slices.
 
 ## Item F-MKT-01: Co-Location-/Hybrid-BESS-Modell
 
-**Quelle:** DFBEW/Frontier, suena Co-Location Whitepaper,
-`BESS_Forecasting_Trading_Strategies.pptx`
+**Quelle:** DFBEW/Frontier-Referenzmaterial, Co-Location-Whitepaper,
+BESS-Forecasting-/Trading-Strategiematerial
 
 **Problem heute:** `bess-ems` optimiert und dispatcht Batterie-Assets,
 aber das Marktmodell unterscheidet noch nicht explizit zwischen
@@ -132,8 +132,8 @@ förder-/herkunftsgebundenem Grünstromspeicher.
 
 ## Item F-MKT-02: Preisquellen- und Forecast-Adapter
 
-**Quelle:** Data-sources- und Feature-selection-Dokumente, Forecasting-
-Papers, `BESS_Forecasting_Trading_Strategies.pptx`
+**Quelle:** Data-sources- und Feature-selection-Referenzmaterial,
+Forecasting-Papers, BESS-Forecasting-/Trading-Strategiematerial
 
 **Problem heute:** `bess-ems` besitzt einen source-neutralen
 `PriceSeries`-Pfad und einen Import-Endpunkt, aber keine produktiven

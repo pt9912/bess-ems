@@ -422,11 +422,17 @@ Restore- und Gate-Entscheidungslogik (verbindlich):
   - Effektive Restore-Kapazität je Richtung berechnet sich per Coalesce:
     per-step Envelope-Override > Policy-Skalar > technischer Default.
     - `restore_capability_up_t_fallback` ist der deterministische technische Default je Schritt
-      (z. B. aus Asset- oder Reservebandgrenzen), nicht aus der bereits erzeugten
-      `ReserveEnergyEnvelope`.
+      aus Asset-/Schedule-/Reservebandgrenzen, nicht aus der bereits erzeugten
+      `ReserveEnergyEnvelope`:
+      `max(0, min(asset_charge_limit_kw_t, grid_import_headroom_kw_t?) - scheduled_charge_kw_t - reserveband_charge_kw_t)`.
     - `restore_capability_down_t_fallback` ist der analoge deterministische technische Default je Schritt
-      (z. B. aus Asset- oder Reservebandgrenzen), nicht aus der bereits erzeugten
-      `ReserveEnergyEnvelope`.
+      aus Asset-/Schedule-/Reservebandgrenzen, nicht aus der bereits erzeugten
+      `ReserveEnergyEnvelope`:
+      `max(0, min(asset_discharge_limit_kw_t, grid_export_headroom_kw_t?) - scheduled_discharge_kw_t - reserveband_discharge_kw_t)`.
+      Die optionalen `grid_*_headroom_kw_t`-Klammern werden nur im
+      Co-Location-Pfad gesetzt; außerhalb davon ist die jeweilige Grenze nicht
+      einschränkend. Alle Terme sind nicht-negativ zu normalisieren, bevor der
+      `max(0, ...)`-Clamp angewendet wird.
     - `restore_capability_up_policy_t = if ReserveRobustnessPolicy.restore_capability_up_kw is set then ReserveRobustnessPolicy.restore_capability_up_kw else restore_capability_up_t_fallback`
     - `restore_capability_down_policy_t = if ReserveRobustnessPolicy.restore_capability_down_kw is set then ReserveRobustnessPolicy.restore_capability_down_kw else restore_capability_down_t_fallback`
     - `restore_capability_up_source_t = if ReserveEnergyEnvelope.restore_capability_up_kw_step is set then ReserveEnergyEnvelope.restore_capability_up_kw_step else restore_capability_up_policy_t`

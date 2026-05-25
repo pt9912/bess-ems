@@ -101,7 +101,7 @@ Die Co-Location-/Migrationserkennung verwendet die fachlichen Coderäume `CONFIG
 `SCHEMA_INCONSISTENT` und `MODEL_INFEASIBLE`. Die Persistenz auf
 `OptimizationRun` erfolgt ausschließlich über den gemeinsamen Ausführungs-/
 Fehlervertrag in
-[`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md).
+[`plan-domain-migration-optimization-run-can-execute.md`](plan-domain-migration-optimization-run-can-execute.md).
 Dieser Plan definiert nur die Co-Location-spezifischen Ursachen und Beispiele;
 die autoritative Matrix aus `OptimizationSolverStatus`, `TerminationCode` und
 `CanExecute` wird hier nicht gespiegelt.
@@ -141,6 +141,8 @@ Der Slice modelliert mindestens diese Betriebsarten:
   - Validierungsmodus wird strukturell durch
     `green_storage_validation_mode=true` im Optimierungsrequest markiert. Ohne
     dieses Flag ist der Modus im produktiven Routinepfad blockiert.
+    Das Flag ist Bestandteil der `ScheduleOptimizationRequest`-Erweiterung und
+    muss im immutable Request-Snapshot für Replay/Audit erhalten bleiben.
   - Validierungsmodus bedeutet vollständige Solver-Formulierung mit harten
     Herkunfts-/Netzbezugs-Constraints, aber ohne automatische produktive
     Förder-/Marktentscheidung im Regelkreis.
@@ -171,6 +173,7 @@ Mögliche Domain-/Application-Erweiterungen:
       | Modus | Site im aktuellen Request aktiv? | Ergebnis |
       | --- | --- | --- |
       | `migration_dry_run=true` | ja oder unklar | keine Laufblockade; Audit-Eintrag `SITE_CAN_DISPATCH_MISSING`, Site gilt nicht als aktiv ausführbar |
+      | `migration_dry_run=true` | nein | keine Laufblockade; Audit-Eintrag `SITE_CAN_DISPATCH_MISSING`, Datensatz bleibt bis zur Bereinigung im Audit-Bundle |
       | `migration_strict=true` produktiv | ja oder unklar | harte Blockade mit `CONFIG_INCONSISTENT` / `SITE_CAN_DISPATCH_MISSING` |
       | `migration_strict=true` produktiv | nein | harte Blockade bis explizit `can_dispatch=false` modelliert oder im Dry-Run auditierbar bereinigt |
       | `migration_strict=false` produktiv | ja | harte Blockade mit `CONFIG_INCONSISTENT` / `SITE_CAN_DISPATCH_MISSING` |
@@ -252,10 +255,10 @@ Mögliche Domain-/Application-Erweiterungen:
     `local_origin_capacity_kwh=0` ist keine nutzbare Herkunftsbilanz und führt zu
     `CONFIG_INCONSISTENT` mit `format=kv1;reason=GREEN_STORAGE_ORIGIN_CAPACITY_ZERO`.
   - Validierung (nur wenn von `1.0` abweichend): `eta_min <= eta_charge <= 1`
-    und `eta_min <= eta_discharge <= 1`; `eta_min = 1e-6` ist dieselbe
-    gemeinsame Assetmodell-Invariante wie im Robustheitspfad. Die Umsetzung darf
-    diesen Wert nicht planlokal duplizieren, sondern muss ihn aus einer zentralen
-    Assetmodell-Konstante bzw. einem gemeinsamen Validierungshelfer beziehen.
+    und `eta_min <= eta_discharge <= 1`; `eta_min` ist die gemeinsame
+    Assetmodell-Invariante aus dem Robustheitspfad und muss aus einer zentralen
+    Assetmodell-Konstante bzw. einem gemeinsamen Validierungshelfer bezogen
+    werden, nicht aus einer planlokalen Kopie.
 
 - `CoLocationMode`
   - Betriebsart nach obigem Arbeitsmodell
