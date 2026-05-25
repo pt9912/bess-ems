@@ -604,9 +604,9 @@ arbeitet mit deterministischen Preiswerten.
 
 ---
 
-## Liefergegenstaende bei Aktivierung
+## Liefergegenstände bei Aktivierung
 
-1. Folge-ADR oder Architektur-Schräftigung für externe Datenquellen.
+1. Folge-ADR oder Architektur-Schärfung für externe Datenquellen.
 2. Adapter-Port für Preis-/Forecast-Quellen oder Erweiterung des
    bestehenden `IPriceSeriesSource`-Umfelds; Forecast-Ergebnisse bleiben in diesem
    Slice Contract-/DTO-Daten, bis ein produktiver Forecast-Domaintyp aktiviert wird.

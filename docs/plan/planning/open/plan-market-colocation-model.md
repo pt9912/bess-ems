@@ -58,8 +58,10 @@ Die Umschaltung erfolgt per Request und ist nicht global. Ein Request mit mindes
 Asset (`ClassicalCoLocation`, `HybridWithGridImport` oder aktivierter `OriginConstraint`)
 wird standardmäßig als `MILP` ausgeführt.
 `GreenStorageRestricted` bleibt explizit außerhalb des produktiven Routine-Betriebs:
-- im produktiven Scope ist `GreenStorageRestricted` nur in einem expliziten Validierungsmodus (z. B. separater Migrations-/Freigabepfad) zulässig;
-- bei produktivem Routine-Run ohne diese explizite Freigabe gilt hart `CONFIG_INVALID` (`GREEN_STORAGE_RESTRICTED_PRODUCTIVE_BLOCKED`).
+- im produktiven Scope ist `GreenStorageRestricted` nur mit explizitem
+  `green_storage_validation_mode=true` zulässig;
+- bei produktivem Routine-Run ohne dieses Flag gilt hart `CONFIG_INVALID`
+  (`GREEN_STORAGE_RESTRICTED_PRODUCTIVE_BLOCKED`).
 
 Kompatibilitätsprinzip:
 
@@ -131,6 +133,9 @@ Der Slice modelliert mindestens diese Betriebsarten:
     laden/entladen.
   - Dieser Modus ist zunächst Modell- und Validierungs-Scope; produktive
     Förderlogik braucht eigene Rechts-/Compliance-Freigabe.
+  - Validierungsmodus wird strukturell durch
+    `green_storage_validation_mode=true` im Optimierungsrequest markiert. Ohne
+    dieses Flag ist der Modus im produktiven Routinepfad blockiert.
   - Validierungsmodus bedeutet vollständige Solver-Formulierung mit harten
     Herkunfts-/Netzbezugs-Constraints, aber ohne automatische produktive
     Förder-/Marktentscheidung im Regelkreis.
@@ -184,20 +189,13 @@ Mögliche Domain-/Application-Erweiterungen:
         `SiteConstraint` zugeordnet sein; andernfalls `SCHEMA_INCONSISTENT`.
     - `timestamp_utc`
     - `resolution_minutes`
-  - Die Felder `alignment_mode`, `alignment_prepared`, `alignment_prepared_by`,
-    `alignment_prepared_horizon_start_utc`, `alignment_prepared_horizon_end_utc`
-    entsprechen der Co-Location-Erweiterung von `SeriesEnvelope` aus
-    [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md).
-  - Alignment-Felder:
-    - `alignment_mode` (`reject` | `trim-to-common`)
-      - `reject`: harte Ablehnung bei Zeitachsenabweichung (Default im produktiven ADR).
-      - `trim-to-common`: kontrollierte Trimmung auf gemeinsame Schnittmenge für Vorverarbeitung; nur zulässig bei abgeschlossenem Forecast-Preprocessing und nur dann als vorbereiteter Input (`alignment_prepared=true`).
-    - `alignment_prepared` (verpflichtend bei `trim-to-common`)
-      - Kennzeichen, dass die Trimmung bereits vollständig deterministisch durchgeführt wurde (inkl. Reihenfolge- und Segmentierungsvorschrift).
-    - `alignment_prepared_by` (verpflichtend bei `alignment_prepared=true`)
-      - Präfix/Komponente, die den Vorverarbeitungslauf ausgeführt hat (`forecast-preprocessor/v1`, `batch-trimmer/...`).
-    - `alignment_prepared_horizon_start_utc` und `alignment_prepared_horizon_end_utc` (verpflichtend bei `alignment_prepared=true`)
-      - Resultierende harte Zeitschnittgrenzen nach Trimming.
+  - Die normative Definition der Alignment-Felder
+    (`alignment_mode`, `alignment_prepared`, `alignment_prepared_by`,
+    `alignment_prepared_horizon_start_utc`, `alignment_prepared_horizon_end_utc`)
+    lebt ausschließlich in
+    [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md). Dieser
+    Plan beschreibt nur die Co-Location-Verbrauchsregeln und dupliziert keine
+    Feldsemantik.
   - Weitere Pflichtfelder:
     - `value_kw`
     - `value_type` (`forecast` | `actual`)
@@ -247,7 +245,9 @@ Mögliche Domain-/Application-Erweiterungen:
   - `eta_charge` (optional, default `1.0`)
   - `eta_discharge` (optional, default `1.0`)
   - Begrenzung via `local_origin_capacity_kwh`
-  - Validierung (nur wenn von `1.0` abweichend): `0 < eta_charge <= 1` und `0 < eta_discharge <= 1`
+  - Validierung (nur wenn von `1.0` abweichend): `eta_min <= eta_charge <= 1`
+    und `eta_min <= eta_discharge <= 1`; `eta_min = 1e-6` ist dieselbe
+    gemeinsame Assetmodell-Invariante wie im Robustheitspfad.
 
 - `CoLocationMode`
   - Betriebsart nach obigem Arbeitsmodell
@@ -435,7 +435,7 @@ Fehlerklassifikation für `GreenStorageRestricted`:
 
 | Erkennungsschicht | Auslöser | Coderraum | Grundcode |
 | --- | --- | --- | --- |
-| Produktiv-Precheck | Produktiver Routine-Run ohne explizite Validierungs-/Freigabeaktivierung | `CONFIG_INVALID` | `GREEN_STORAGE_RESTRICTED_PRODUCTIVE_BLOCKED` |
+| Produktiv-Precheck | Produktiver Routine-Run ohne `green_storage_validation_mode=true` | `CONFIG_INVALID` | `GREEN_STORAGE_RESTRICTED_PRODUCTIVE_BLOCKED` |
 | Input-/Pre-Solver-Validierung | Fehlender oder nicht auditierbarer Herkunftsnachweis | `CONFIG_INCONSISTENT` | `GREEN_STORAGE_ORIGIN_PROOF_MISSING` |
 | Input-/Pre-Solver-Validierung | Request fordert Netzladung oder modelliert Netzbezug als zulässige Ladequelle | `CONFIG_INCONSISTENT` | `GREEN_STORAGE_GRID_CHARGE_BLOCKED` |
 | Solver-Ergebnis | Harte Constraints (`p_grid_import_t == 0`, lokale Quelle, `e_local_t`) machen den angefragten Fahrplan mathematisch unerfüllbar | `MODEL_INFEASIBLE` | `GREEN_STORAGE_MODEL_INFEASIBLE` |
@@ -503,9 +503,9 @@ Bestandsrouten nicht brechen:
 
 ---
 
-## Liefergegenstaende bei Aktivierung
+## Liefergegenstände bei Aktivierung
 
-1. Folge-ADR oder ADR-Schärf für Co-Location-Modell und
+1. Folge-ADR oder ADR-Schärfung für Co-Location-Modell und
    Netzanschlusspunkt-Vorzeichen.
 2. Domain-Modelle für Standorttyp, Netzanschlussgrenzen und lokale
    Erzeugungs-/Forecast-Zeitreihen inkl. verbindlicher Site-Netzflussdefinition.
@@ -536,9 +536,9 @@ Die Ausführungsregeln für Status/Mappings (`OptimizationSolverStatus`,
 LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
 
 - Autoritative Quelle für den gemeinsamen Vertrag ist
-  [`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md).
+  [`plan-domain-migration-optimization-run-can-execute.md`](plan-domain-migration-optimization-run-can-execute.md).
 - Die vollständige `CanExecute`-/`OptimizationSolverStatus`/`TerminationCode`-Matrix ist dort autoritativ festgelegt und wird hier nicht dupliziert.
-- Änderungen an dieser Matrix sind Release-blocking, wenn nicht gemeinsam in beiden Plänen umgesetzt.
+- Änderungen an dieser Matrix sind Release-blocking, wenn nicht im Pre-Slice und in allen konsumierenden Plänen umgesetzt.
 - Preis-/Forecast-Serienidentität ist mit
   [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md)
   semantisch deckungsgleich definiert:
@@ -553,7 +553,7 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
   gemeinsam und im selben Release-Commit umzusetzen.
 - Cross-Slice-Contract ist verbindlich und prüfpflichtig:
   - Die Mapping-Matrix (`OptimizationSolverStatus` + `TerminationCode` + `CanExecute`)
-    wird ausschließlich in [`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md)
+    wird ausschließlich in [`plan-domain-migration-optimization-run-can-execute.md`](plan-domain-migration-optimization-run-can-execute.md)
     gepflegt; dieser Plan darf nur auf sie referenzieren.
   - Abweichung ist ein hartes Release-Blocking; kein Slice darf unabhängig freigegeben werden.
 - Implementierungsvorgabe:
@@ -579,7 +579,7 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
   - `CanExecute=false` bei harten Co-Location-Konfigurations-/Schemaabweisungen
     sowie bei harten Robustheits- oder Validierungs-Blockaden gemäß der
     autoritativen Matrix in
-    [`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md).
+    [`plan-domain-migration-optimization-run-can-execute.md`](plan-domain-migration-optimization-run-can-execute.md).
   - Operator-/Replay-Verbraucher dürfen einen Lauf nur im Zustand
     `CanExecute=true` in den aktiv ausführbaren Pfad überführen.
 - Beitrag zum `CanExecute`-Combiner:
@@ -606,7 +606,7 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
     erkennbar.
   - Das konkrete Mapping auf `OptimizationSolverStatus`, `TerminationCode` und
     `CanExecute` entspricht ohne lokale Abweichung der autoritativen Matrix in
-    [`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md).
+    [`plan-domain-migration-optimization-run-can-execute.md`](plan-domain-migration-optimization-run-can-execute.md).
   - Replay-/Golden-Fixtures decken mindestens ein Standalone- und ein
      Co-Location-Szenario ab.
   - Der technische Dispatch-Pfad bleibt Safety-First und kennt keine
@@ -628,9 +628,9 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
   - `migration_strict=false` ist ein dokumentierter Sonderbetrieb mit aktivitätsbasierter Isolation (`can_dispatch`).
 - [ ] Netzanbindung ist für beide `site_grid_power_sign`-Varianten verbindlich spezifiziert (`export_pos`, `import_pos`) inkl. Sign-Konventionstests.
 - [ ] `GreenStorageRestricted`-Regeln sind als harte Validierung umgesetzt (`p_grid_import_t == 0`, `e_local`-Kopplung, Konfigurationsgrenzen).
-- [ ] Gemeinsamer Fehler-/Ausführungsvertrag zu [plan-ler-fcr-reserve-robustness.md](plan-ler-fcr-reserve-robustness.md) ist abgeglichen (unter anderem `CanExecute`, `TerminationCode`, `TerminationDetail`, Cross-Checks, Mapping-Matrix) und durch mindestens einen Golden-Fixture-Test abgesichert.
+- [ ] Gemeinsamer Fehler-/Ausführungsvertrag zu [plan-domain-migration-optimization-run-can-execute.md](plan-domain-migration-optimization-run-can-execute.md) und [plan-ler-fcr-reserve-robustness.md](plan-ler-fcr-reserve-robustness.md) ist abgeglichen (unter anderem `CanExecute`, `TerminationCode`, `TerminationDetail`, Cross-Checks, Mapping-Matrix) und durch mindestens einen Golden-Fixture-Test abgesichert.
 - [ ] Liefergegenstände bei Aktivierung sind vollständig umgesetzt:
-  - ADR/ADR-Schräftigung,
+  - ADR/ADR-Schärfung,
   - Domain-/Application-Erweiterungen,
   - Solver/Modellerweiterung,
   - Regressionsmatrix + Migrationstestfälle,

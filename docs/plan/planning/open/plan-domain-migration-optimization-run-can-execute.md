@@ -72,6 +72,26 @@ Nicht vorhanden:
        Vertrag an;
      - der Combiner berechnet monoton `CanExecute = HasUsableSolution && all(_ok)`.
 
+### Gemeinsame Run-Mapping-Matrix
+
+Dieser Pre-Slice ist die autoritative Quelle für die gemeinsame
+`OptimizationSolverStatus`-/`TerminationCode`-/`CanExecute`-Matrix. Fach-Slices
+dürfen nur ihre fachlichen Grundcodes und `*_ok`-Beiträge ergänzen; sie
+duplizieren diese Matrix nicht.
+
+| Ergebnisklasse | OptimizationSolverStatus | TerminationCode (Beispiel) | CanExecute |
+| --- | --- | --- | --- |
+| Gültiger Plan/Plan verwendbar | `Optimal` oder `Feasible` | bestehende Erfolgs-Codes, z. B. `or-tools-optimal` oder `or-tools-feasible-not-proven-optimal` | `true` |
+| Solver-seitige mathematische Infeasibility | `Infeasible` | bestehender Solver-Code, z. B. `or-tools-infeasible` | `false` |
+| Domain-spezifisch erklärbare Infeasibility (`MODEL_INFEASIBLE`) | `Infeasible` | bestehender Solver-Code, z. B. `or-tools-infeasible`; Domain-Grund in `TerminationDetail=format=kv1;reason=<DOMAIN_REASON>` | `false` |
+| Time Limit ohne ausführbaren Plan | `TimeLimit` | bestehender Timeout-Code, z. B. `or-tools-time-limit` | `false` |
+| Iteration Limit ohne ausführbaren Plan | `IterationLimit` | bestehender Iterations-Code, sofern vom Solver geliefert | `false` |
+| Reiner Rechenfehler/Solverfehler | `Failed` | Solver-spezifische harte Codes, z. B. `or-tools-abnormal`, `or-tools-model-invalid`, `or-tools-not-solved` | `false` |
+| Konfigurationsfehler (`CONFIG_*`) | `Failed` | `config-invalid` oder `config-inconsistent` | `false` |
+| Schematafehler (`SCHEMA_INCONSISTENT`) | `Failed` | `schema-inconsistent` | `false` |
+| Fachlicher Guard erfordert Nacharbeit trotz Solver-Lösung | eigentliches Solverergebnis (`Optimal` oder `Feasible`) | fachlicher Guard-Code, z. B. `reserve-robustness-needs-restore` | `false` |
+| Fachliche Source-/Policy-/Robustheitsblockade | `Failed` | fachlicher harter Code, z. B. `source-*`, `policy-*`, `reserve-robustness-*` | `false` |
+
 2. Konstruktor-Aufrufer und Factories
    - alle direkten `OptimizationRun`-Aufrufer aktualisieren; die konkrete Liste ist
      per `rg "new OptimizationRun\\(" src tests` vor Umsetzung zu ziehen und umfasst

@@ -123,7 +123,8 @@ Nicht explizit modelliert:
   - Wirkungsgrade:
     - Wird `eta_charge`/`eta_discharge` in der Policy nicht gesetzt, sind sie aus dem Assetmodell zu lesen.
     - Falls gesetzt, muss gelten: `eta_min <= eta_charge <= 1` und `eta_min <= eta_discharge <= 1`.
-    - `eta_min` ist ein verbindlicher, kleiner positiver Toleranzwert: `eta_min = 1e-6`.
+    - `eta_min` ist die gemeinsame Assetmodell-Invariante für alle Energiepfade
+      (Co-Location, lokale Herkunftsbilanz, Robustheitsprüfung): `eta_min = 1e-6`.
     - `eta_charge < eta_min` oder `eta_discharge < eta_min` führt zu `ROBUST_POLICY_UNSUPPORTED`.
   - Selbstentladung:
   - Für `is_ler=true` gilt: Es muss nach Policy-/Asset-Auflösung ein effektiver LER-Verlustwert
@@ -423,9 +424,15 @@ Restore- und Gate-Entscheidungslogik (verbindlich):
   `minutes_until_next_restore_window_end` ist `null`):
   - Ergebnis `ROBUST_INFEASIBLE` mit `limiting_reason_code=INTRADAY_GATE_CLOSED`.
 - Falls das nächste Window den benötigten Zeitraum nicht trägt:
-  `minutes_until_next_restore_window_start + intraday_preparation_time + intraday_gate_closure + required_recovery_minutes >
-  minutes_until_next_restore_window_end`:
-  - Ergebnis `ROBUST_INFEASIBLE` mit `limiting_reason_code=INTRADAY_GATE_CLOSED`.
+  - `intraday_gate_closure` ist die Marktabgabe-/Order-Deadline vor Beginn des
+    nächsten Restore-Fensters, nicht eine Wiederherstellungsdauer innerhalb des
+    Fensters.
+  - Vorlaufprüfung:
+    `intraday_preparation_time + intraday_gate_closure > minutes_until_next_restore_window_start`
+    => `ROBUST_INFEASIBLE` mit `limiting_reason_code=INTRADAY_GATE_CLOSED`.
+  - Fenstertragfähigkeit:
+    `minutes_until_next_restore_window_start + required_recovery_minutes > minutes_until_next_restore_window_end`
+    => `ROBUST_INFEASIBLE` mit `limiting_reason_code=INTRADAY_GATE_CLOSED`.
 - Ansonsten wird der Endstatus `ROBUST_NEEDS_INTRADAY_RESTORE`.
 - Bei allen anderen Fällen bleibt der bestehende Abgleich auf `ROBUST_OK`/`ROBUST_INFEASIBLE` unverändert.
 
@@ -521,8 +528,9 @@ Pflichtregeln:
  - harte Begrenzung durch Asset-Leistung, Reservebänder,
    SOC-Grenzen und Gate-Closure-Zeit.
  - Restore ist nur dann ausgabe- und ausführungspfadfähig, wenn aktuell ein
-   ausreichendes Wiederherstellungsfenster offen ist und `intraday_gate_closure`
-   nicht aktiv ist.
+   ausreichendes Wiederherstellungsfenster offen ist und die Summe aus
+   `intraday_preparation_time` und `intraday_gate_closure` vor Fensterbeginn
+   eingehalten werden kann.
  - keine automatische Marktorder im Domain- oder Regelkreis.
 
 Der Slice definiert nur EMS-seitig den Bedarf und einen Fahrplanvorschlag;
@@ -583,22 +591,16 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
 - Ergebnisverhalten:
   - Robustheitsverletzung wird über bestehende `OptimizationSolverStatus` +
     strukturierte `TerminationCode` + harte `CanExecute`-Sperren ausgedrückt.
-  - Mapping-Matrix in diesem Plan ist die autoritative gemeinsame Matrix für
-    [`plan-market-colocation-model.md`](plan-market-colocation-model.md):
+  - Die gemeinsame Run-Mapping-Matrix lebt autoritativ im Pre-Slice
+    [`Domain-Migration OptimizationRun.CanExecute`](plan-domain-migration-optimization-run-can-execute.md).
+    Dieser Plan ergänzt nur die robustheitsbezogenen Codes:
 
-    | Ergebnisklasse                                  | OptimizationSolverStatus | TerminationCode (Beispiel)                                           | CanExecute |
+    | Robustheitsergebnis | OptimizationSolverStatus | TerminationCode | CanExecute |
     | --- | --- | --- | --- |
-    | Gültiger Plan/Plan verwendbar                    | `Optimal` oder `Feasible` | bestehende Erfolgs-Codes, z. B. `or-tools-optimal` oder `or-tools-feasible-not-proven-optimal` | `true` |
-    | Solver-seitige mathematische Infeasibility       | `Infeasible`             | bestehender Solver-Code, z. B. `or-tools-infeasible` | `false` |
-    | Domain-spezifisch erklärbare Infeasibility (`MODEL_INFEASIBLE`) | `Infeasible` | bestehender Solver-Code, z. B. `or-tools-infeasible`; Domain-Grund in `TerminationDetail=format=kv1;reason=<DOMAIN_REASON>` | `false` |
-    | Time Limit ohne ausführbaren Plan                 | `TimeLimit`              | bestehender Timeout-Code, z. B. `or-tools-time-limit` | `false` |
-    | Iteration Limit ohne ausführbaren Plan            | `IterationLimit`         | bestehender Iterations-Code, sofern vom Solver geliefert | `false` |
-    | Reiner Rechenfehler/Solverfehler                  | `Failed`                 | Solver-spezifische harte Codes, z. B. `or-tools-abnormal`, `or-tools-model-invalid`, `or-tools-not-solved` | `false` |
-    | Konfigurationsfehler (`CONFIG_*`)                | `Failed`                 | `config-invalid` oder `config-inconsistent` | `false` |
-    | Schematafehler (`SCHEMA_INCONSISTENT`)          | `Failed`                 | `schema-inconsistent` | `false` |
     | Restore erforderlich, Plan nicht ausführbar bis Restore erfolgt | eigentliches Solverergebnis (`Optimal` oder `Feasible`) | `reserve-robustness-needs-restore` | `false` |
-    | Robustheits-/Reserve-Blockade                      | `Failed`                 | `reserve-robustness-*` | `false` |
-    | Harte Source-/Policy-Abweisungen außerhalb Produktbereichs | `Failed`          | `source-*`/`policy-*` falls eingeführt | `false` |
+    | Robustheits-/Reserve-Blockade | `Failed` | `reserve-robustness-infeasible` oder `reserve-robustness-recovery-timeout` | `false` |
+    | Robustheits-Source fehlt | `Failed` | `reserve-robustness-source-missing` | `false` |
+    | Robustheitspolicy nicht unterstützt | `Failed` | `reserve-robustness-policy-unsupported` | `false` |
   - Die verwendeten `TerminationCode` für robustheitsbezogene Sperren sind
     `reserve-robustness-needs-restore`, `reserve-robustness-infeasible`,
     `reserve-robustness-recovery-timeout`, `reserve-robustness-source-missing`,
@@ -701,9 +703,9 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
 
 ---
 
-## Liefergegenstaende bei Aktivierung
+## Liefergegenstände bei Aktivierung
 
-1. ADR oder Architektur-Schärf für LER/FCR-Robustheitsmodell.
+1. ADR oder Architektur-Schärfung für LER/FCR-Robustheitsmodell.
 2. Domain-/Application-Typen für Robustheit, Alert State und Recovery.
 3. Deterministische Golden-Fixtures für Worst-Case-Energiehuellen.
 4. Application-Port `IReserveRobustnessCheck`.

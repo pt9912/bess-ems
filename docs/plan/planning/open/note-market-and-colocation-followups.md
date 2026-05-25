@@ -190,27 +190,37 @@ sowie Forecast-Serien.
 - Wenn beide Trigger (F-MKT-01 und F-MKT-02) im selben Release-Fenster ausgelöst werden:
   1. `F-MKT-01` (Markt-/Co-Location-Modell) wird zuerst im operativen Produktivpfad freigegeben.
   2. `F-MKT-02` kann parallel als Datenvertrags-Slice vorbereitet werden, darf Co-Location aber zunächst im degraded/fallback-Modus betreiben.
-  3. Produktiv geht erst auf vollen Forecast-Fokus über, wenn `plan-price-forecast-adapters.md` im
-    Betriebsmodus mit aktivierter Qualitätsakzeptanz vollständig nach seiner
-    Statusmatrix konform ist; die Note wiederholt keine Teilmenge des
-    `SOURCE_*`-/`quality_mode`-Vertrags.
-    Für die Abgrenzung gelten die Serienbegriffe (`series_type`, `series_product`, `market_bid_area`) exakt nach
-    [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md).
-  4. Parallelbetrieb ist erst freigegeben, wenn `CanExecute`-Semantik zwischen
-     [`plan-domain-migration-optimization-run-can-execute.md`](plan-domain-migration-optimization-run-can-execute.md)
-     und den konsumierenden Slice-Plänen verbindlich umgesetzt ist.
-  5. Produktiver F-MKT-02-Betrieb ist erst freigegeben, wenn
-     [`Domain-Migration PriceSeries.Identity`](plan-domain-migration-price-series-identity.md)
-     abgeschlossen ist.
-  6. Bei Konflikten gilt als harte Regel: neue Betriebslogik darf nicht ohne definierte
-     `series_status`-Entscheidung in den Markt- und Optimierungsworkflow starten.
-     Für nicht adapter-getragene Serien im bestehenden Altpfad ist ein kontrollierter
-     Übergang nur im expliziten `quality_mode=degraded_ok` und über den degradierten
-     Serienzustand erlaubt
-     (`series_status=SOURCE_DEGRADED`, optional mit `status_flags` wie
-     `SOURCE_BACKFILL`). Dieser Altpfad ist kein `quality_mode=strict`-Pfad und
-     muss spätestens mit produktiver F-MKT-02-Aktivierung abgelöst oder als eigener
-     Legacy-Sunset-Slice geführt werden.
+
+Aktivierungsvoraussetzungen:
+- Parallelbetrieb ist erst freigegeben, wenn `CanExecute`-Semantik zwischen
+  [`plan-domain-migration-optimization-run-can-execute.md`](plan-domain-migration-optimization-run-can-execute.md)
+  und den konsumierenden Slice-Plänen verbindlich umgesetzt ist.
+- Produktiver F-MKT-02-Betrieb ist erst freigegeben, wenn
+  [`Domain-Migration PriceSeries.Identity`](plan-domain-migration-price-series-identity.md)
+  abgeschlossen ist.
+- Wenn produktive Replays ohne Request-Snapshot freigegeben werden sollen, ist
+  zuerst ein eigener Trigger-/Pre-Slice `OptimizationRun.SolverScopeAudit`
+  anzulegen; andernfalls bleibt der Request-Snapshot die kanonische
+  `solver_scope`-Auditquelle.
+
+Laufende Betriebsregeln:
+- Produktiv geht erst auf vollen Forecast-Fokus über, wenn
+  `plan-price-forecast-adapters.md` im Betriebsmodus mit aktivierter
+  Qualitätsakzeptanz vollständig nach seiner Statusmatrix konform ist; die Note
+  wiederholt keine Teilmenge des `SOURCE_*`-/`quality_mode`-Vertrags.
+  Für die Abgrenzung gelten die Serienbegriffe (`series_type`,
+  `series_product`, `market_bid_area`) exakt nach
+  [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md).
+- Bei Konflikten gilt als harte Regel: neue Betriebslogik darf nicht ohne
+  definierte `series_status`-Entscheidung in den Markt- und
+  Optimierungsworkflow starten.
+- Für nicht adapter-getragene Serien im bestehenden Altpfad ist ein
+  kontrollierter Übergang nur im expliziten `quality_mode=degraded_ok` und über
+  den degradierten Serienzustand erlaubt (`series_status=SOURCE_DEGRADED`,
+  optional mit `status_flags` wie `SOURCE_BACKFILL`). Dieser Altpfad ist kein
+  `quality_mode=strict`-Pfad und muss spätestens mit produktiver
+  F-MKT-02-Aktivierung abgelöst oder als eigener Legacy-Sunset-Slice geführt
+  werden.
 
 ---
 
