@@ -170,7 +170,7 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
       3. Nach Freigabe wird die alte Family für den produktiven Pfad abgeschaltet, neue Family wird normativ aktiv.
     - Verbindlicher Cutover-/Rollback-SOP:
       1. **Vorbereitung**: Neue Family mit eigenem `series_family_alias` oder neuem (`series_id`, `series_product`) freigeben.
-      2. **Dual-Active-Wahrnehmung**: Alte und neue Family mindestens in zwei vollständigen Release-Fenstern parallel beobachten; `value_hash`-Abweichungen sind als `status_flags` mit `status_message` auditierbar.
+      2. **Dual-Active-Wahrnehmung**: Alte und neue Family mindestens in zwei vollständigen Release-Fenstern parallel beobachten; ein Release-Fenster ist hier mindestens ein produktiver Import-/Refresh-Zyklus und mindestens 7 Kalendertage. Der Cutover braucht damit mindestens zwei vollständige Zyklen und mindestens 14 Kalendertage Beobachtung. `value_hash`-Abweichungen sind als `status_flags` mit `status_message` auditierbar.
       3. **Cutover freigeben**: Neue Family wird produktiv als `primary` markiert und auf mindestens `SOURCE_OK` oder ausdrücklich zugelassene `SOURCE_DEGRADED` gesetzt.
       4. **Produktiver Umschaltpunkt**: Alte Family in produktiven Runs auf `SOURCE_REJECTED`/`CanExecute=false` halten; alte Werte sind nur noch Replay/Diagnose sichtbar.
       5. **Rollback-Fenster**: Rückkehr auf alte Family nur mit explizitem Release-Block (`release_block` oder `controlled_switchover`) möglich; Rollback ist nur dann erlaubt, wenn die neue Family in einem vollständigen Beobachtungsfenster keine vollständige akzeptierbare Lastserie (ohne harte Fallback) geliefert hat.
@@ -498,8 +498,10 @@ Endgültige Serienendstatus sind:
   - Serien-ID plus `series_version` des zuletzt geladenen Satzes
 - Deterministische Reaktionsregeln:
   - `SOURCE_OK`: normaler Betrieb
-  - `SOURCE_AUTH_ERROR`: harte Ablehnung (`SOURCE_REJECTED`), kein Retry/Fallback.
-  - `SOURCE_SCHEMA_MISMATCH`: harte Ablehnung (`SOURCE_REJECTED`), kein Retry/Fallback.
+  - `SOURCE_AUTH_ERROR`: wird zu `series_status=SOURCE_REJECTED` abgeleitet,
+    kein Retry/Fallback.
+  - `SOURCE_SCHEMA_MISMATCH`: wird zu `series_status=SOURCE_REJECTED` abgeleitet,
+    kein Retry/Fallback.
   - `SOURCE_GAP` wird gemäß den im vorangehenden Abschnitt definierten globalen Ableitungsregeln entschieden
     (`quality_mode=strict` => `SOURCE_REJECTED`, `quality_mode=degraded_ok` =>
     Backfill/`SOURCE_DEGRADED` oder harte Ablehnung bei nicht behebbaren Restlücken).
@@ -507,7 +509,8 @@ Endgültige Serienendstatus sind:
     - Primär wird kontrollierter Fallback auf `fallback`-Quelle versucht, sofern vorhanden und kompatibel.
     - Fallback nur akzeptieren, wenn `SeriesEnvelope`, Einheit und Horizon exakt kompatibel sind.
     - Bei Fallback Erfolg gilt Fallback-Ergebnis nach `quality_mode`:
-      - `strict`: nur akzeptierte Daten ohne Backfill/Verfallung (`SOURCE_OK`, `SOURCE_FALLBACK_USED`)
+      - `strict`: nur akzeptierte Daten ohne Backfill/Verfallung (`SOURCE_OK`,
+        `SOURCE_FALLBACK_USED` ohne `SOURCE_BACKFILL`-Flag)
       - `degraded_ok`: Fallback kann als `SOURCE_DEGRADED` geführt werden.
       - in strict ist Fallback mit Backfill weiterhin `SOURCE_REJECTED`.
   - Bei Ausfall / Schemakonflikt des Fallbacks:

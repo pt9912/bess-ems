@@ -54,8 +54,10 @@ Nicht vorhanden:
 
 1. Domain
    - `OptimizationRun` um `CanExecute` als Konstruktorparameter und Property erweitern.
-   - Default für bestehende Produzenten: `true`, sofern kein expliziter Hard-Stop
-     vorliegt.
+   - Default für bestehende Produzenten: `true` ist nur für Pfade zulässig, die
+     nachweislich keine aktivierten Guard-Beiträge kennen (z. B. NoOp-Optimierer,
+     Test-Fixtures oder reine Legacy-Leser). Alle neuen produktiven Produzenten
+     schreiben `CanExecute` ausschließlich über den Combiner.
    - Optionales Audit-Metadatum `CanExecuteSource` oder äquivalenter Wire-Wert
      vorsehen, damit `computed_from_guards` von `legacy_backfill` unterscheidbar ist.
    - Invarianten ergänzen:
@@ -92,17 +94,19 @@ Nicht vorhanden:
      - Wenn ein Guard den `TerminationCode` ersetzt (z. B.
        `reserve-robustness-needs-restore`), muss der originale Solver-Code im
        `TerminationDetail` erhalten bleiben, z. B.
-       `solver_code=or-tools-optimal;reason=INTRADAY_RESTORE_REQUIRED`.
+       `format=kv1;solver_code=or-tools-optimal;reason=INTRADAY_RESTORE_REQUIRED`.
      - Für neu erzeugte Guard-/Robustheits-Details ist das verbindliche
-       Detailformat eine `;`-getrennte `key=value`-Liste ohne `:`-Separator.
+       Detailformat `format=kv1` plus eine `;`-getrennte `key=value`-Liste ohne
+       `:`-Separator.
        Robustheitsgründe verwenden mindestens
-       `reason=<LIMITING_REASON_CODE>` und optional
+       `format=kv1;reason=<LIMITING_REASON_CODE>` und optional
        `solver_code=<original-code>` gemäß
        [`plan-ler-fcr-reserve-robustness.md`](plan-ler-fcr-reserve-robustness.md).
        Bestehende freie `TerminationDetail`-Strings werden bei der Migration
        nicht syntaktisch umgeschrieben; sie bleiben Legacy-Auditdaten. Neue
        Guard-Ergebnisse dürfen keine gemischten Freitext-/`key=value`-Formate
-       erzeugen.
+       erzeugen. Parser müssen Legacy-Strings als Freitext behandeln, sobald
+       kein führendes `format=kv1;` vorhanden ist.
 
 3. Persistenz und Wire
    - `can_execute` in allen produktiven Stores hinzufügen:
@@ -188,7 +192,7 @@ nicht mehr die Domain-/Persistenzmigration selbst besitzen.
   alleinige Aktivierungsgrundlage; vor erneutem operativem Dispatch wird ein
   aktueller Guard-Pass persistiert.
 - [ ] Re-Klassifikation nach Solver-Ergebnis erhält originale Solver-Provenance im
-  finalen Run-Audit (`solver_code=...` oder äquivalentes Feld).
+  finalen Run-Audit (`format=kv1;solver_code=...` oder äquivalentes Feld).
 - [ ] Operative Konsumenten nutzen `HasUsableSolution && CanExecute`.
 - [ ] Migration vorhandener Daten ist dokumentiert und getestet.
 - [ ] Markt-/Co-Location- und LER/FCR-Slices referenzieren dieses Dokument als

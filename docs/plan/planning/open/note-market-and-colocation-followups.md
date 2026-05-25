@@ -19,9 +19,9 @@ Referenzdokumente (siehe **Quelle-Repo** oben), die als fachlicher Input dienen,
 aber keine direkte Codeübernahme darstellen.
 Sie ist kein aktiver Implementierungsplan, sondern ein Trigger-Watch-Artefakt
 für Marktmodell, Co-Location, Preisquellen und Forecast-Inputs.
-Die DoD-Checkboxen in dieser Notiz bedeuten deshalb nicht "Implementierung
-abgeschlossen", sondern "Trigger-Watch ist so präzise, dass bei Auslösung ein
-Slice ohne weitere Begriffs- oder Abnahmeklärung gestartet werden kann".
+Die Readiness-Checkboxen in dieser Notiz bedeuten deshalb: Die
+Trigger-Spezifikation ist so präzise, dass bei Auslösung ein Slice ohne weitere
+Begriffs- oder Abnahmeklärung gestartet werden kann.
 
 Die vorhandene `bess-ems`-Basis deckt bereits zentrale Bausteine ab:
 
@@ -165,18 +165,25 @@ sowie Forecast-Serien.
 - Qualitätsschema enthält kombinierte Status-Sichtbarkeit (Fallback + Degradation)
   ohne Informationsverlust für Operator/Rückverfolgbarkeit.
 
-## Definition of Done (DoD)
+## Trigger-Readiness-Checkliste
 
-- [ ] Externe Quellenanalyse abgeschlossen (DFBEW, Co-Location, Forecast-Trading, zusätzliche Medium-Quellen) und fachlich klassifiziert.
-- [ ] F-MKT-01-Abnahmebedingungen sind dokumentiert und für mindestens diese drei
-  produktiven Betriebsformen (`StandaloneBess`, `ClassicalCoLocation`, `HybridWithGridImport`) definiert.
-- [ ] `GreenStorageRestricted` ist als separater Sondermodus im selben Slice als
-  Validierungsmodus dokumentiert.
-- [ ] F-MKT-02-Abnahmebedingungen sind dokumentiert (Preis: 1 Primär + 1 Fallback; Forecast: je 2 Adapter für `load` und `weather-temp`; jeweils Fallback-/Degradation-Modell, Aktualisierung + Alarmierung).
-- [ ] Trigger-Koordination bei parallelen Auslösern ist definiert und konfliktfrei;
+- [ ] Externe Quellenanalyse ist als Trigger-Spezifikation abgeschlossen (DFBEW,
+  Co-Location, Forecast-Trading, zusätzliche Medium-Quellen) und fachlich
+  klassifiziert.
+- [ ] F-MKT-01-Abnahmebedingungen sind als Slice-Startkriterien dokumentiert und
+  für mindestens diese drei produktiven Betriebsformen (`StandaloneBess`,
+  `ClassicalCoLocation`, `HybridWithGridImport`) definiert.
+- [ ] `GreenStorageRestricted` ist als separater Sondermodus für einen späteren
+  Validierungsslice dokumentiert.
+- [ ] F-MKT-02-Abnahmebedingungen sind als Slice-Startkriterien dokumentiert
+  (Preis: 1 Primär + 1 Fallback; Forecast: je 2 Adapter für `load` und
+  `weather-temp`; jeweils Fallback-/Degradation-Modell, Aktualisierung +
+  Alarmierung).
+- [ ] Trigger-Koordination bei parallelen Auslösern ist als Startregel definiert;
   autoritativ ist der folgende Abschnitt
   [Trigger-Koordination bei gleichzeitigen Auslösern](#trigger-koordination-bei-gleichzeitigen-auslösern).
-- [ ] Copyright- und Nutzungsgrenzen sind explizit dokumentiert und für externe Claims verifiziert.
+- [ ] Copyright- und Nutzungsgrenzen sind als Prüfpunkte für spätere Slices
+  explizit dokumentiert.
 
 ## Trigger-Koordination bei gleichzeitigen Auslösern
 
@@ -184,7 +191,7 @@ sowie Forecast-Serien.
   1. `F-MKT-01` (Markt-/Co-Location-Modell) wird zuerst im operativen Produktivpfad freigegeben.
   2. `F-MKT-02` kann parallel als Datenvertrags-Slice vorbereitet werden, darf Co-Location aber zunächst im degraded/fallback-Modus betreiben.
   3. Produktiv geht erst auf vollen Forecast-Fokus über, wenn `plan-price-forecast-adapters.md` im
-    Betriebsmodus mit aktivierter Qualitätsakzeptanz konform ist (`series_status` in `{SOURCE_OK, SOURCE_FALLBACK_USED}` bei
+    Betriebsmodus mit aktivierter Qualitätsakzeptanz konform ist (`series_status` in `{SOURCE_OK, SOURCE_FALLBACK_USED}` ohne `SOURCE_BACKFILL`-Flag bei
     `quality_mode=strict`, oder `series_status` in `{SOURCE_OK, SOURCE_DEGRADED, SOURCE_FALLBACK_USED}` bei
     `quality_mode=degraded_ok`).
     Die genaue `SOURCE_FALLBACK_USED`-Zulässigkeit in `strict` folgt der

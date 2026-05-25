@@ -102,7 +102,8 @@ Nicht explizit modelliert:
   - Für `is_ler=true` gilt nach Policy-/Asset-Auflösung: genau ein Verlustwert ist zulässig (`self_discharge_kwh_per_hour` oder `self_discharge_soc_per_hour`). Sind beide vorhanden, ist die Konfiguration als inkompatibel zu behandeln (`ROBUST_POLICY_UNSUPPORTED`).
   - `max_recovery_time` (harte obere Grenze für die Wiederherstellungsdauer in Minuten; bei aktivem Restore-Pfad erforderlich, sonst darf `0` gesetzt werden)
   - `intraday_gate_closure` (optional, Default `0`, wird für Restore-gesteuerte Läufe benötigt)
-  - `intraday_preparation_time` (optional, Default `0`, wird für Restore-gesteuerte Läufe benötigt)
+  - `intraday_preparation_time` (optional, Default `0` ohne Restore-Pfad; bei aktivem
+    Restore-Pfad Pflichtfeld `> 0`)
   - `minutes_until_next_restore_window_start` (optional, `>= 0`)
   - `minutes_until_next_restore_window_end` (optional, wenn ein Fenster bekannt ist)
   - `market_time_unit` (Kompatibilitäts-/Zukunfts-Hook; im ersten Slice fest auf `minute`)
@@ -292,12 +293,16 @@ Deterministische Berechnung (verbindlich):
     im selben Schritt wie folgt gekoppelt:
     - `worst_total_kwh_t = worst_up_kwh_t + worst_down_kwh_t`
     - `worst_total_kw_t = worst_total_kwh_t / Δt`
-    - `worst_total_*` dient als auditierbare kombinierte Kennzahl für UI/Replay; für die harte Verifikation wird die sequentielle Reihenfolge explizit definiert:
-      1) Up-Branch auf `worst_up_kwh_t` (Absenkung),
-      2) anschließend Down-Branch auf `worst_down_kwh_t` auf dem SOC nach Up.
-      - Im sequentiellen Pfad wird Up zuerst auf den Schrittzustand angewendet und Down nur auf dem danach aktualisierten SOC geführt.
-      - Up zuerst ist der konservative Default, weil die LER-Worst-Case-Annahme auf
-        der Entlade-/Up-Seite die kritischere Untergrenze zuerst belastet.
+    - `worst_total_*` dient als auditierbare kombinierte Kennzahl für UI/Replay.
+    - Für die harte Verifikation werden beide sequentiellen Reihenfolgen bewertet:
+      1) Up-Branch auf `worst_up_kwh_t` (Absenkung), anschließend Down-Branch auf dem
+         danach aktualisierten SOC.
+      2) Down-Branch auf `worst_down_kwh_t` (Anhebung), anschließend Up-Branch auf dem
+         danach aktualisierten SOC.
+      Der Schrittstatus ist der konservative Worst Case über beide Reihenfolgen
+      (jede Verletzung blockiert; bei zwei zulässigen Pfaden zählt die kleinere
+      verbleibende Margin). So werden LER-nahe `soc_min` und nicht-LER-nahe `soc_max`
+      symmetrisch abgedeckt.
     - Diese Kopplung ist bewusst konservativ und vollständig deterministisch.
   - Wenn simultanes Gegensignal laut Produktdefinition aktiv ist, aber `simultaneous_reserve_direction_allowed=false`,
     gilt hart `ROBUST_POLICY_UNSUPPORTED` mit `POLICY_MISMATCH`.
@@ -400,8 +405,8 @@ Restore- und Gate-Entscheidungslogik (verbindlich):
          `ROBUST_INFEASIBLE` und `limiting_reason_code=NO_RECOVERY_PATH`.
       2. Erst danach werden `required_recovery_minutes_*` berechnet und gegen
          `max_recovery_time` verglichen.
-    - `required_recovery_minutes_up = if restore_capability_up_t > 0 and restore_shortfall_up_kwh > 0 then restore_shortfall_up_kwh / restore_capability_up_t * 60 else +inf`
-    - `required_recovery_minutes_down = if restore_capability_down_t > 0 and restore_shortfall_down_kwh > 0 then restore_shortfall_down_kwh / restore_capability_down_t * 60 else +inf`
+    - `required_recovery_minutes_up = if restore_shortfall_up_kwh == 0 then 0 else restore_shortfall_up_kwh / restore_capability_up_t * 60`
+    - `required_recovery_minutes_down = if restore_shortfall_down_kwh == 0 then 0 else restore_shortfall_down_kwh / restore_capability_down_t * 60`
     - `required_recovery_minutes = max(required_recovery_minutes_up, required_recovery_minutes_down)`
     - `restore_capability_used` ist die effektive Restore-Kapazität (`restore_capability_up_t`
       oder `restore_capability_down_t`), die den maximalen `required_recovery_minutes`-Wert
@@ -478,6 +483,8 @@ Pflichtregeln:
 - `intraday_preparation_time` gilt als Mindestvorlauf für den Restore-Einstieg:
   Ein Restore-Vorschlag darf nur erzeugt werden, wenn vor dem geplanten Ausführungsfenster
   mindestens die Vorlaufzeit eingehalten ist.
+  Bei aktivem Restore-Pfad ist `intraday_preparation_time > 0` Pflicht; ein
+  fehlender oder `0`-Wert ist `ROBUST_POLICY_UNSUPPORTED` mit `POLICY_MISMATCH`.
 - Reserve Mode darf nur aktiviert werden, wenn der resultierende
   Robustheitszustand operator-fähig erklaert wird.
 - Recovery endet erst, wenn Worst-Case-Lieferfähigkeit wieder
@@ -612,9 +619,11 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
     `reserve_robustness_limiting_reason` als Pflichtfeld im `OptimizationRun`-`TerminationDetail`
     zu persistieren, inkl. optionaler `status_description`, damit Operator-/Replay-Sichten die Ursache eindeutig nachvollziehen.
   - Aggregationsregel für den gemeinsamen Cross-Slice-Vertrag:
-    `CanExecute = robust_ok && config_ok && schema_ok && source_ok && solver_result_executable`.
-    Jeder Slice darf `CanExecute` nur von `true` auf `false` ziehen; kein Slice darf
-    ein durch einen anderen Slice gesetztes `false` wieder auf `true` setzen.
+    Die normative `CanExecute`-Formel und der Combiner leben im Pre-Slice
+    [`plan-domain-migration-optimization-run-can-execute.md`](plan-domain-migration-optimization-run-can-execute.md).
+    Dieser Slice liefert nur den Beitrag `robust_ok`; jeder Slice darf
+    `CanExecute` nur von `true` auf `false` ziehen und kein durch einen anderen
+    Slice gesetztes `false` wieder auf `true` setzen.
   - Für diesen Slice gilt `robust_ok = (reserve_robustness_status == ROBUST_OK)`;
     bei allen anderen Robustheitsstatuswerten ist `CanExecute=false`.
   - `CanExecute` ist harte Ausführungsbedingung im Dispatcher/Scheduler:
@@ -638,9 +647,10 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
     - bei `limiting_reason_code=RECOVERY_TIMEOUT` =>
       `OptimizationSolverStatus.Failed` mit
       `TerminationCode=reserve-robustness-recovery-timeout`,
-      `TerminationDetail=reason=RECOVERY_TIMEOUT`.
+      `TerminationDetail=format=kv1;reason=RECOVERY_TIMEOUT`.
       Für robustheitsbezogene Codes ist `TerminationDetail` strukturiert:
-      `reason=<LIMITING_REASON_CODE>` und optional `solver_code=<original-code>`.
+      `format=kv1;reason=<LIMITING_REASON_CODE>` und optional
+      `solver_code=<original-code>`.
       Messwertartige Details dürfen als weitere `key=value`-Paare ergänzt werden.
       Reine menschenlesbare Detailstrings bleiben nur bei bestehenden Solver-/
       Laufzeitcodes zulässig.

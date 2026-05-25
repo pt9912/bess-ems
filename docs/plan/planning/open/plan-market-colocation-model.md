@@ -38,9 +38,10 @@ Der operative Optimierungsrequest enthält genau eine Solver-Scope-Ausprägung.
 `solver_scope` wird Bestandteil der bestehenden `ScheduleOptimizationRequest`-
 Erweiterung bzw. des daraus erzeugten Optimization-Core-Requests, nicht von
 `OptimizationRun`; der Run persistiert nur Ergebnisstatus, Terminierung und
-`CanExecute`. Für Audit/Replays muss der Request-Snapshot oder ein äquivalentes
-Run-Metadatum den gewählten `solver_scope` (`LP`/`MILP`) und eine mögliche
-Partitionierungsentscheidung enthalten.
+`CanExecute`. Für Audit/Replays muss der immutable Request-Snapshot bzw. ein
+dediziertes Run-Audit-Metadatum den gewählten `solver_scope` (`LP`/`MILP`) und
+eine mögliche Partitionierungsentscheidung enthalten. `TerminationDetail` ist
+nicht die kanonische Ablage für diesen Scope.
 
 Entscheidungsreihenfolge je Request:
 
@@ -146,6 +147,13 @@ Mögliche Domain-/Application-Erweiterungen:
     - Legacy-Migrationsfenster:
       - Im Migrations-Dry-Run darf das Feld als `can_dispatch=false` modelliert werden,
         aber nur mit explizitem Migrations-Audit-Flag und sichtbar im Audit-Report.
+    - Fehlendes `can_dispatch` wird nach Modus eindeutig behandelt:
+      | Modus | Site im aktuellen Request aktiv? | Ergebnis |
+      | --- | --- | --- |
+      | `migration_dry_run=true` | ja oder unklar | keine Laufblockade; Audit-Eintrag `SITE_CAN_DISPATCH_MISSING`, Site gilt nicht als aktiv ausführbar |
+      | `migration_strict=true` produktiv | ja oder unklar | harte Blockade mit `CONFIG_INCONSISTENT` / `SITE_CAN_DISPATCH_MISSING` |
+      | `migration_strict=false` produktiv | ja | harte Blockade mit `CONFIG_INCONSISTENT` / `SITE_CAN_DISPATCH_MISSING` |
+      | `migration_strict=false` produktiv | nein | keine Laufblockade; Datensatz bleibt im Audit-Bundle bis zur Bereinigung |
     - Produktiver Zugriff außerhalb eines Migrationsfensters:
       - `can_dispatch` muss gesetzt sein.
       - `can_dispatch=false` markiert die Site als inaktiv; inaktive Sites werden bei aktiven Requests nicht ausgewertet.
