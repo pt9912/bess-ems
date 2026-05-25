@@ -157,6 +157,9 @@ sowie Forecast-Serien.
 - Mindestens zwei produktive Preis-Adapter (z. B. EPEX + OPSD
   Open-Power-System-Data) mit
   dokumentiertem Fallback-Verhalten, Quellenmetadaten und Refresh-Status.
+  Falls EPEX beim Start nicht als `primary` freigegeben ist, darf OPSD oder eine
+  Replay-/Basisquelle temporär `primary` sein; das zählt nicht als fehlender
+  Adapter, solange ein fallbackfähiger zweiter Pfad dokumentiert ist.
 - Mindestens zwei Forecast-Adapter für die produktiv verpflichtenden
   Forecast-Familien `load` und `weather-temp`
   (je 1 Primär + 1 fallbackfähiger Adapter) mit
@@ -204,17 +207,21 @@ Aktivierungsreihenfolge mit Gates:
    externen Serien nutzt oder diese ausdrücklich als Übergangspfad mit
    `quality_mode=degraded_ok` geführt werden.
 4. `F-MKT-02` darf parallel als Datenvertrags-Slice vorbereitet werden; volle
-   Forecast-/Adapter-Aktivierung braucht den PriceSeries.Identity-Pre-Slice.
+   Forecast-/Adapter-Aktivierung braucht den PriceSeries.Identity-Pre-Slice
+   und mindestens die Adapter-Plan-DoD-Punkte
+   "Persistenzkompatibilität hergestellt" und
+   "Import-Adapter sind bereit für produktive Nutzung".
 5. Produktive Replays ohne immutable Request-Snapshot sind vorerst nicht
    freigegeben. Dafür ist zuerst ein eigener Trigger-/Pre-Slice
    `OptimizationRun.SolverScopeAudit` anzulegen; andernfalls bleibt der
    Request-Snapshot die kanonische `solver_scope`-Auditquelle.
 
 Laufende Betriebsregeln:
-- Produktiv geht erst auf vollen Forecast-Fokus über, wenn
-  `plan-price-forecast-adapters.md` im Betriebsmodus mit aktivierter
-  Qualitätsakzeptanz vollständig nach seiner Statusmatrix konform ist; die Note
-  wiederholt keine Teilmenge des `SOURCE_*`-/`quality_mode`-Vertrags.
+- Produktiv geht erst auf Forecast-/Adapter-Vollaktivierung über, wenn alle DoD-
+  Items in [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md)
+  erfüllt sind und mindestens ein produktiver Refresh-Zyklus je aktivierter
+  Serie ohne `SOURCE_REJECTED` abgeschlossen wurde. Die Note wiederholt keine
+  Teilmenge des `SOURCE_*`-/`quality_mode`-Vertrags.
   Für die Abgrenzung gelten die Serienbegriffe (`series_type`,
   `series_product`, `market_bid_area`) exakt nach
   [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md).

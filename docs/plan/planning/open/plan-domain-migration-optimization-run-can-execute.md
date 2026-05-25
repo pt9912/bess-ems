@@ -54,10 +54,11 @@ Nicht vorhanden:
 
 1. Domain
    - `OptimizationRun` um `CanExecute` als Konstruktorparameter und Property erweitern.
-   - Default für bestehende Produzenten: `true` ist nur für Pfade zulässig, die
-     nachweislich keine aktivierten Guard-Beiträge kennen (z. B. NoOp-Optimierer,
-     Test-Fixtures oder reine Legacy-Leser). Alle neuen produktiven Produzenten
-     schreiben `CanExecute` ausschließlich über den Combiner.
+   - Kein produktiver Produzent darf `CanExecute` direkt setzen; produktive
+     Pfade schreiben `CanExecute` ausschließlich über den Combiner.
+     `CanExecute=true` als Default ist nur für Pfade zulässig, die nachweislich
+     keine aktivierten Guard-Beiträge kennen (z. B. NoOp-Optimierer,
+     Test-Fixtures oder reine Legacy-Leser).
    - Optionales Audit-Metadatum `CanExecuteSource` oder äquivalenter Wire-Wert
      vorsehen, damit `computed_from_guards` von `legacy_backfill` unterscheidbar ist.
    - Invarianten ergänzen:
@@ -86,6 +87,14 @@ Dieser Pre-Slice ist die autoritative Quelle für die gemeinsame
 `OptimizationSolverStatus`-/`TerminationCode`-/`CanExecute`-Matrix. Fach-Slices
 dürfen nur ihre fachlichen Grundcodes und `*_ok`-Beiträge ergänzen; sie
 duplizieren diese Matrix nicht.
+
+Code-Konventionen:
+- `TerminationCode` bleibt niedrig kardinal, kebab-case und familienpräfigiert
+  (z. B. `reserve-robustness-needs-restore`).
+- `format=kv1;reason=...` verwendet für maschinenlesbare fachliche Gründe
+  `SNAKE_CAPS` (z. B. `RECOVERY_TIMEOUT`). Diese Trennung ist Absicht:
+  `TerminationCode` gruppiert Dashboard-/Persistenzklassen, `reason` trägt den
+  slicenahen Detailgrund.
 
 | Ergebnisklasse | OptimizationSolverStatus | TerminationCode (Beispiel) | CanExecute |
 | --- | --- | --- | --- |

@@ -55,11 +55,14 @@ Entscheidungsreihenfolge je Request:
    die Partitionierung vollständig isolierbar sowie deterministisch reaggregierbar ist.
 
 Die Umschaltung erfolgt per Request und ist nicht global. Ein Request mit mindestens einem betroffenen
-Asset (`ClassicalCoLocation`, `HybridWithGridImport` oder aktivierter `OriginConstraint`)
+Asset (`ClassicalCoLocation`, `HybridWithGridImport`, `GreenStorageRestricted`
+im Validierungsmodus oder aktivierter `OriginConstraint`)
 wird standardmäßig als `MILP` ausgeführt.
 `GreenStorageRestricted` bleibt explizit außerhalb des produktiven Routine-Betriebs:
 - im produktiven Scope ist `GreenStorageRestricted` nur mit explizitem
   `green_storage_validation_mode=true` zulässig;
+- bei `green_storage_validation_mode=true` gilt der Request explizit als
+  MILP-relevant;
 - bei produktivem Routine-Run ohne dieses Flag gilt hart `CONFIG_INVALID`
   (`GREEN_STORAGE_RESTRICTED_PRODUCTIVE_BLOCKED`).
 
@@ -161,7 +164,10 @@ Mögliche Domain-/Application-Erweiterungen:
     - Legacy-Migrationsfenster:
       - Im Migrations-Dry-Run darf das Feld als `can_dispatch=false` modelliert werden,
         aber nur mit explizitem Migrations-Audit-Flag und sichtbar im Audit-Report.
-    - Fehlendes `can_dispatch` wird nach Modus eindeutig behandelt:
+    - Fehlendes `can_dispatch` wird nach Modus eindeutig behandelt; diese Matrix
+      ist die kanonische Aktivitäts-/Migrationsmatrix für `can_dispatch`.
+      `migration_dry_run=true` überschreibt `migration_strict` ausschließlich für
+      Run-Blockaden und erzeugt stattdessen ein Audit-Bundle.
       | Modus | Site im aktuellen Request aktiv? | Ergebnis |
       | --- | --- | --- |
       | `migration_dry_run=true` | ja oder unklar | keine Laufblockade; Audit-Eintrag `SITE_CAN_DISPATCH_MISSING`, Site gilt nicht als aktiv ausführbar |
@@ -179,8 +185,7 @@ Mögliche Domain-/Application-Erweiterungen:
   - `site_grid_power_sign` (verpflichtend): `export_pos` oder `import_pos`
     - `export_pos`: positive Leistung bedeutet Export ans Netz
     - `import_pos`: positive Leistung bedeutet Import aus dem Netz
-
-  - `LocalGenerationSeries`
+- `LocalGenerationSeries`
   - Zeitreihe für PV/Wind-Erzeugung oder Forecast.
   - Produktive `LocalGenerationSeries`-Eingänge laufen über
     `IForecastSeriesSource`/`SeriesEnvelope` aus
@@ -228,7 +233,10 @@ Mögliche Domain-/Application-Erweiterungen:
         eingehen. Reines deterministisches Trimming ohne aufgefüllte Werte setzt
         kein `SOURCE_BACKFILL`-Flag.
     - `value_kw` ist eine Produktionsleistung und für diese Serie standardmäßig nicht negativ.
-    - Negative Werte sind nur über einen separaten signierten Netzausgangs-Datensatz zulässig.
+    - Negative Werte sind in `LocalGenerationSeries` nicht zulässig. Signierte
+      Nettoeinspeise- oder Lastreihen müssen als eigene `ForecastSeries` über den
+      Forecast-Adaptervertrag mit explizitem `series_product` und dokumentierter
+      Vorzeichenkonvention modelliert werden.
     - Last-Forecasts sind keine `LocalGenerationSeries`; sie laufen als
       `ForecastSeries` mit `series_product=load` über den Forecast-Adaptervertrag.
     - Metadatenpflicht gemäß `SeriesEnvelope`: `source_metadata.provider_id`,
@@ -245,7 +253,9 @@ Mögliche Domain-/Application-Erweiterungen:
     `CONFIG_INCONSISTENT` mit `format=kv1;reason=GREEN_STORAGE_ORIGIN_CAPACITY_ZERO`.
   - Validierung (nur wenn von `1.0` abweichend): `eta_min <= eta_charge <= 1`
     und `eta_min <= eta_discharge <= 1`; `eta_min = 1e-6` ist dieselbe
-    gemeinsame Assetmodell-Invariante wie im Robustheitspfad.
+    gemeinsame Assetmodell-Invariante wie im Robustheitspfad. Die Umsetzung darf
+    diesen Wert nicht planlokal duplizieren, sondern muss ihn aus einer zentralen
+    Assetmodell-Konstante bzw. einem gemeinsamen Validierungshelfer beziehen.
 
 - `CoLocationMode`
   - Betriebsart nach obigem Arbeitsmodell
@@ -345,9 +355,13 @@ Operator-/Runbook-Sichten nebeneinander ausgewiesen werden.
   - `migration_strict=true` (Standard): unklare oder inkompatible Datensätze werden in produktiven Co-Location-Requests blockiert.
   - `migration_strict=false` (nur mit explizitem Release-Governance): erlaubt die Koexistenz bis zur Bereinigung nicht-aktiver Sites; aktive Sites bleiben weiterhin blockiert.
   - Aktivitätsdeterministik:
-    - Eine Site gilt für die Migrationsbewertung als aktiv, wenn sie explizit im Scope des aktuellen Co-Location-Requests aktiv ist.
-      Dafür ist `can_dispatch=true` erforderlich; bei `can_dispatch`-Fehlanzeige ist der Scope im Produktivbetrieb blockiert, im Migrations-Dry-Run explizit als inaktiv markiert (mit Audit-Vermerk).
-    - Nicht aktive Sites werden explizit mit `can_dispatch=false` markiert oder im Migrationsaudit ohne harte Blockade geführt, bis sie aktiv in Betrieb genommen werden.
+    - Die kanonische Bewertung fehlender `can_dispatch`-Werte steht in der
+      Matrix im Abschnitt `SiteConstraint`.
+    - `migration_dry_run=true` blockiert keinen Lauf, unabhängig vom Wert von
+      `migration_strict`; produktive Läufe folgen der Matrix.
+    - Nicht aktive Sites werden explizit mit `can_dispatch=false` markiert oder
+      im Migrationsaudit ohne harte Blockade geführt, bis sie aktiv in Betrieb
+      genommen werden.
 - Migrationsfenster (vor Aktivierung des Co-Location-MVP, nicht inline im operativen Lauf).
 - Kandidatenklassifikation je Datensatz:
   - `normalized`: `site_grid_power_sign` ist gesetzt oder eindeutig aus vorhandenen
@@ -506,7 +520,8 @@ Bestandsrouten nicht brechen:
 - Regressionstest ist als Matrix verbindlich:
   - LP-basierter Standalone-Fall bleibt bit-kompatibel.
   - Co-Location mit aktivem Import/Export-/Herkunftsmodell muss auf MILP laufen.
-  - Degraded/Fallback-Fall im `GreenStorageRestricted` folgt dem selben LP/MILP-Wechselpfad.
+  - `quality_mode=degraded_ok`-Übergangsfälle im `GreenStorageRestricted`
+    folgen demselben LP/MILP-Wechselpfad.
 
 ---
 

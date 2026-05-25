@@ -93,6 +93,12 @@ Nicht explizit modelliert:
   - `full_activation_time` (`FCR`-Pflichtfeld bei aktivem FCR-Produkt; bei inaktivem FCR kann `0` gesetzt werden)
 - optional `full_activation_time_afrr` (nur bei produktiv aktivem aFRR; bei gesetztem Wert `> 0`)
 - optional `full_activation_time_mfrr` (nur bei produktiv aktivem mFRR; bei gesetztem Wert `> 0`)
+  - aFRR gilt als produktiv aktiv, wenn `reserve_product=aFRR` im
+    Request/Portfolio markiert ist oder eine der aFRR-Zeitreihen
+    (`afrr_up_kw_t`, `afrr_down_kw_t`) für den Horizont positive Werte enthält.
+  - mFRR gilt als produktiv aktiv, wenn `reserve_product=mFRR` im
+    Request/Portfolio markiert ist oder eine der mFRR-Zeitreihen
+    (`mfrr_up_kw_t`, `mfrr_down_kw_t`) für den Horizont positive Werte enthält.
   - Produktspezifische Full-Activation-Zeiten haben unterschiedliche physikalische
     Bedeutungen; es gibt keinen produktübergreifenden Fallback von aFRR/mFRR auf
     das FCR-Pflichtfeld `full_activation_time`.
@@ -131,6 +137,9 @@ Nicht explizit modelliert:
     - Falls gesetzt, muss gelten: `eta_min <= eta_charge <= 1` und `eta_min <= eta_discharge <= 1`.
     - `eta_min` ist die gemeinsame Assetmodell-Invariante für alle Energiepfade
       (Co-Location, lokale Herkunftsbilanz, Robustheitsprüfung): `eta_min = 1e-6`.
+      Die Umsetzung bezieht diesen Wert aus einer zentralen Assetmodell-Konstante
+      bzw. einem gemeinsamen Validierungshelfer, nicht aus einer planlokalen
+      Kopie.
     - `eta_charge < eta_min` oder `eta_discharge < eta_min` führt zu `ROBUST_POLICY_UNSUPPORTED`.
   - Selbstentladung:
   - Für `is_ler=true` gilt: Es muss nach Policy-/Asset-Auflösung ein effektiver LER-Verlustwert
@@ -845,6 +854,10 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
     Optimierungs-Constraint in den LP/MILP-Kern eingefügt.
   - aFRR-/mFRR-Aktivierungsenergie ist im ersten produktiven Slice voll modelliert
     inkl. `full_activation_time_afrr` / `full_activation_time_mfrr` und Tests dafür.
+  - FCR nutzt im ersten Slice bewusst die volle Worst-Case-Hülle
+    `fcr_remaining_envelope_t = t_min_fcr`, unabhängig vom aktuellen
+    Alert-Tracking-Zustand. Eine statusabhängige adaptive Envelope ist ein
+    eigener Folge-Slice.
 - Operator-Sicht ist entschieden:
   - API ist Primärkanal für Aktivierungsentscheidungen (`CanExecute`, Status, Limiting Reason, Restore-Hinweis).
   - UI zeigt denselben operativen Zustand für Bedienung.
