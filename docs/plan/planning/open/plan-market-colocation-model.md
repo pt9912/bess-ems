@@ -79,7 +79,11 @@ Richtungsbinarisierung aktiv ist.
 Kompatibilitätsprinzip:
 
 - Bestehende Standalone-only-Requests bleiben LP.
-- Bei nicht kompatibler `solver_scope`-Zuordnung endet der Lauf mit `CONFIG_INVALID`, nicht mit stiller Downgrade-Logik.
+- Bei strukturell ungültiger `solver_scope`-Zuordnung endet der Lauf mit
+  `CONFIG_INVALID`, nicht mit stiller Downgrade-Logik. Dazu gehören z. B.
+  produktiv gesperrte Modi wie `GreenStorageRestricted` ohne
+  `green_storage_validation_mode=true` oder eine explizite Anforderung
+  `solver_scope=LP` trotz aktivierter Herkunfts-/Mutex-Constraints.
 - Für gemischte Multi-Site-/Multi-Asset-Fälle gilt:
   - deterministische Default-Regel: vollständiger Request wird als MILP-Request ausgeführt.
   - optional (explizit freigeschalteter ADR-Pfad): Request-Partitionierung in homogene Solver-Scope-Gruppen vor dem Optimierer.
@@ -90,6 +94,8 @@ Kompatibilitätsprinzip:
   Scope-Anforderungen die fachliche Ursache `CONFIG_INCONSISTENT` zu setzen; das
   konkrete `TerminationCode`-/`CanExecute`-Mapping bleibt der gemeinsamen Matrix
   vorbehalten.
+  Ein unpartitionierter Mixed-Scope-Request ohne aktivierte Partitionierung ist
+  damit `CONFIG_INCONSISTENT`, nicht zusätzlich `CONFIG_INVALID`.
 
 Semantik der fachlichen Coderäume (für deterministische Fehlerauswertung):
 
@@ -155,7 +161,12 @@ Der Slice modelliert mindestens diese Betriebsarten:
     muss im immutable Request-Snapshot für Replay/Audit erhalten bleiben.
   - Validierungsmodus bedeutet vollständige Solver-Formulierung mit harten
     Herkunfts-/Netzbezugs-Constraints, aber ohne automatische produktive
-    Förder-/Marktentscheidung im Regelkreis.
+    Förder-/Marktentscheidung im Regelkreis. Ein solcher Lauf darf Solverstatus
+    und Modell-/Constraint-Ergebnis erzeugen, wird aber über den gemeinsamen
+    `CanExecute`-Combiner als nicht dispatchfähig markiert
+    (`CanExecute=false`, `config_ok=false`, Grund
+    `GREEN_STORAGE_RESTRICTED_VALIDATION_ONLY`), solange kein eigener
+    Compliance-/Produktivfreigabe-Slice die Förderlogik aktiviert.
 
 ### Neue fachliche Konzepte
 
@@ -180,6 +191,13 @@ Mögliche Domain-/Application-Erweiterungen:
       Liste ist die kanonische Aktivitäts-/Migrationsmatrix für `can_dispatch`.
       `migration_dry_run=true` überschreibt `migration_strict` ausschließlich für
       Run-Blockaden und erzeugt stattdessen ein Audit-Bundle:
+      Die Aktivitätsbewertung wird aus dem Request-Kontext bestimmt, nicht aus
+      `can_dispatch`: Eine Site ist aktiv, wenn sie im Request-Body als
+      Optimierungsteilnehmer geführt wird oder Schedule-, Reserveband-,
+      Forecast-/LocalGeneration- oder OriginConstraint-Eingänge sie für den
+      aktuellen Horizon referenzieren. Sie ist nicht aktiv, wenn kein aktueller
+      Request-Input sie referenziert. Sie ist unklar, wenn Legacy-/Importdaten
+      diese Zuordnung nicht deterministisch erlauben.
       - `migration_dry_run=true`, Aktivitätsbewertung aktiv, inaktiv oder
         unklar: keine Laufblockade; Audit-Eintrag
         `SITE_CAN_DISPATCH_MISSING`, aktive Site gilt nicht als ausführbar,
@@ -482,6 +500,7 @@ Fehlerklassifikation für `GreenStorageRestricted`:
 | Erkennungsschicht | Auslöser | Coderaum | Grundcode |
 | --- | --- | --- | --- |
 | Produktiv-Precheck | Produktiver Routine-Run ohne `green_storage_validation_mode=true` | `CONFIG_INVALID` | `GREEN_STORAGE_RESTRICTED_PRODUCTIVE_BLOCKED` |
+| Dispatch-Gate | `green_storage_validation_mode=true` ohne produktive Compliance-/Förderfreigabe | `CONFIG_INCONSISTENT` | `GREEN_STORAGE_RESTRICTED_VALIDATION_ONLY` |
 | Input-/Pre-Solver-Validierung | Fehlender oder nicht auditierbarer Herkunftsnachweis | `CONFIG_INCONSISTENT` | `GREEN_STORAGE_ORIGIN_PROOF_MISSING` |
 | Input-/Pre-Solver-Validierung | Request fordert Netzladung oder modelliert Netzbezug als zulässige Ladequelle | `CONFIG_INCONSISTENT` | `GREEN_STORAGE_GRID_CHARGE_BLOCKED` |
 | Solver-Ergebnis | Harte Constraints (`p_grid_import_t == 0`, lokale Quelle, `e_local_t`) machen den angefragten Fahrplan mathematisch unerfüllbar | `MODEL_INFEASIBLE` | `GREEN_STORAGE_MODEL_INFEASIBLE` |

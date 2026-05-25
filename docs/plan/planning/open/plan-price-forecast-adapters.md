@@ -101,7 +101,9 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
 - Der minimale `SeriesEnvelope` enthält:
   - `series_id` (stabil)
   - `series_version` (stabil, monoton wachsend oder semantische Versionskennung)
-    - Erforderlich und vergleichbar pro `(series_id, site_id?, market_bid_area?, series_product, series_type, source.provider_id)`.
+    - Erforderlich und vergleichbar pro kanonischer Serien-Signatur; die
+      Signatur ist unten im Abschnitt `Repräsentationsstabilität` verbindlich
+      definiert und darf hier nicht als Teilmenge dupliziert werden.
     - Akzeptiert werden:
       - streng monoton wachsende numerische Versionen (int-kompatibel),
       - oder Zeitstempel-basierte semantische Versionen (z. B. `2026-05-24T12:00:00Z-v3`).
@@ -116,13 +118,20 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
     `source_eval_status=SOURCE_SCHEMA_MISMATCH` und
     `series_status=SOURCE_REJECTED` abzulehnen. Ein Wechsel der Familienkennung
     erfolgt nur über diesen Alias bzw. durch neue Serienkennung, nicht per
-    stillschweigendem Wechsel derselben `series_id`.
+    stillschweigendem Wechsel derselben `series_id`. Beim ersten gültigen Write
+    existiert noch keine Referenzfamilie; dort ist `series_family_alias` nicht
+    erforderlich. Ab dem ersten akzeptierten Write ist ein Familienwechsel ohne
+    neue `series_id` aliaspflichtig.
   - `site_id` (optional)
     - erforderlich für standortgebundene Forecast-/Erzeugungs-/Last-/Wetter-Reihen
     - optional oder leer für produktweite Forecast-Daten ohne Standortkontext
   - `market_bid_area` (optional)
     - erforderlich für `series_type=price`, damit die bestehende `PriceSeries`-Schiene
       den Marktbereich eindeutig identifizieren kann
+    - empfohlen für gebietsgebundene Forecasts (`series_type=forecast` und
+      `series_product` in `{load, pv, wind}`), sofern die Reihe nicht eindeutig
+      standortgebunden über `site_id` ist. Operator-/Replay-Sichten dürfen den
+      Gebietsbezug nicht aus Provider-Konventionen erraten müssen.
   - `series_type` (`price` oder `forecast`)
   - `series_product` (z. B. `day_ahead`, `intraday`, `load`, `pv`, `wind`, `weather-temp`)
   - `unit` (z. B. `EUR/MWh`, `kW`, `kWh`, etc.)
@@ -160,7 +169,7 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
     - `valid_from_utc`, `valid_to_utc`
       - reserviert für spätere Quellen-Gültigkeitsfenster; im ersten Slice sind
         sie reine Audit-Metadaten und kein Bestandteil von Idempotenz,
-        Family-Cutover, Status-Mapping oder Validierung.
+        Family-Cutover, Status-Mapping, Validierung oder `value_hash`.
     - `provider_request_id`
   - `series_status` (finaler Endstatus je Serie): `SOURCE_OK`, `SOURCE_DEGRADED`, `SOURCE_FALLBACK_USED`, `SOURCE_REJECTED`
   - `source_eval_status` (Rohstatus je Providerlauf, vor Fallback-/Degradationsentscheidung): `SOURCE_OK`, `SOURCE_AUTH_ERROR`, `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_EMPTY`, `SOURCE_STALE`, `SOURCE_GAP`, `SOURCE_SCHEMA_MISMATCH`, `SOURCE_RETRY_EXHAUSTED`, `SOURCE_TRANSITIONAL_INPUT`
@@ -699,13 +708,19 @@ arbeitet mit deterministischen Preiswerten.
 7. Tests:
    - erfolgreiche Serienladung
    - fehlende Credentials
-   - identische `(series_id, series_version, source.provider_id)` mehrfach laden mit identischem Payload bleibt idempotent
-   - identische `(series_id, series_version, source.provider_id)` mit anderem `value_hash` führt deterministisch zu `SOURCE_REJECTED`
-   - gleicher `(series_id, series_version)` mit anderem `provider_id` wird als separater Provider-Kontext bewertet
+   - identische kanonische Serien-Signatur plus `series_version` mehrfach laden
+     mit identischem Payload bleibt idempotent
+   - identische kanonische Serien-Signatur plus `series_version` mit anderem
+     `value_hash` führt deterministisch zu `SOURCE_REJECTED`
+   - gleiche `series_id`/`series_version` mit anderem `provider_id` wird als
+     separater Provider-Kontext innerhalb der kanonischen Signatur bewertet
    - Primary-Validierung gegen Secondary-Adapter bei Primary-Ausfall
    - Rate-Limit-/Providerfehler
    - stale Daten werden je nach `quality_mode` korrekt geführt (`SOURCE_DEGRADED` vs `SOURCE_REJECTED`)
    - Zeitzone/DST bleibt konsistent
+   - `valid_from_utc`/`valid_to_utc` werden, falls geliefert, als reine
+     Audit-Metadaten persistiert bzw. ausgegeben und verändern weder Mapper-
+     Idempotenz noch `value_hash`.
    - UTC-Zeitachse, Schrittweite und Lückenbehandlung (99,5 % Mindestabdeckung)
    - Family-Cutover Dual-Active, harter Familienwechsel ohne Alias
      (`SOURCE_REJECTED`) und Rollback-Sichtbarkeit
@@ -715,7 +730,9 @@ arbeitet mit deterministischen Preiswerten.
      wird bei fehlendem Wert außerhalb expliziter Einmalimporte hart
      abgewiesen.
 8. Runbook für Credentials, Rate Limits, Provider-Ausfall und Cutover-Marker
-   (`release_block`, `controlled_switchover` inkl. Ablageort und Verantwortlichkeit).
+   (`release_block`, `controlled_switchover` inkl. Ablageort und Verantwortlichkeit);
+   Runbook-Overrides für Early-Cutover müssen als Audit-Marker roundtrippen,
+   damit kein impliziter Code-Default entsteht.
 
 ---
 

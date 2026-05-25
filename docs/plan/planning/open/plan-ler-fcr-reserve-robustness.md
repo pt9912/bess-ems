@@ -96,8 +96,14 @@ Nicht explizit modelliert:
     inaktivem FCR kann `0` als expliziter `not_applicable`-Sentinel gesetzt
     werden. Dieser Sentinel hat keine Aktivierungssemantik und ist bei aktivem
     FCR unzulässig.)
-- optional `full_activation_time_afrr` (nur bei produktiv aktivem aFRR; bei gesetztem Wert `> 0`)
-- optional `full_activation_time_mfrr` (nur bei produktiv aktivem mFRR; bei gesetztem Wert `> 0`)
+- optional `full_activation_time_afrr` (nur bei produktiv aktivem aFRR; bei
+  inaktivem aFRR kann `0` als expliziter `not_applicable`-Sentinel gesetzt
+  werden. Dieser Sentinel hat keine Aktivierungssemantik und ist bei aktivem
+  aFRR unzulässig.)
+- optional `full_activation_time_mfrr` (nur bei produktiv aktivem mFRR; bei
+  inaktivem mFRR kann `0` als expliziter `not_applicable`-Sentinel gesetzt
+  werden. Dieser Sentinel hat keine Aktivierungssemantik und ist bei aktivem
+  mFRR unzulässig.)
   - aFRR gilt als produktiv aktiv, wenn `reserve_product=aFRR` im
     Request/Portfolio markiert ist oder eine der aFRR-Zeitreihen
     (`afrr_up_kw_t`, `afrr_down_kw_t`) für den Horizont positive Werte enthält.
@@ -353,7 +359,8 @@ Deterministische Berechnung (verbindlich):
       `fcr_remaining_envelope_t = t_min_fcr`, unabhängig vom aktuellen Alert-Status.
       Diese volle Reservierung auch außerhalb laufender Alerts ist eine bewusste
       Worst-Case-Wahl des ersten Slice; ein statusabhängiger "adaptive envelope"-
-      Pfad ist ein späterer Slice.
+      Pfad ist ein späterer Slice. Die statische Hülle ist im Aktivierungs-ADR
+      als kapazitätsmindernde Entscheidung für LER-Assets sichtbar zu machen.
     - `fcr_remaining_tracking_t` ist der Alert-Tracking-Zustand in Minuten und dient
       nur Laufzeit-Replay, Operator-Ausgabe und fortlaufender Alert-Rekursion.
     - Bei Schrittübergang in Alert wird für die Tracking-Ansicht

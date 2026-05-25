@@ -244,6 +244,11 @@ Aktivierungsreihenfolge mit Gates:
 2. [`Domain-Migration PriceSeries.Identity`](plan-domain-migration-price-series-identity.md)
    ist vor produktivem F-MKT-02-Betrieb und vor produktivem F-MKT-01-Betrieb
    mit externen lokalen Erzeugungs- oder Forecast-Serien abzuschließen.
+   Die gemeinsame Assetmodell-Konstante bzw. der gemeinsame Validierungshelfer
+   für `eta_min` wird mit dem ersten aktivierten Slice eingeführt, der
+   Wirkungsgradvalidierung benötigt (`plan-market-colocation-model.md` oder
+   `plan-ler-fcr-reserve-robustness.md`), und danach vom jeweils anderen Slice
+   wiederverwendet.
 3. `F-MKT-01` darf vor F-MKT-02 nur dann produktiv starten, wenn es keine
    externen Serien nutzt oder diese ausdrücklich als Übergangspfad mit
    `quality_mode=degraded_ok` geführt werden.
@@ -253,10 +258,11 @@ Aktivierungsreihenfolge mit Gates:
    "Persistenzkompatibilität hergestellt" und
    "Import-Adapter sind bereit für produktive Nutzung".
 5. Produktive Replays ohne immutable Request-Snapshot sind vorerst nicht
-   freigegeben. Dafür ist zuerst ein eigener Trigger-/Pre-Slice
-   [`OptimizationRun.SolverScopeAudit`](plan-domain-migration-optimization-run-solver-scope-audit.md)
-   abzuschließen; andernfalls bleibt der
-   Request-Snapshot die kanonische `solver_scope`-Auditquelle.
+   freigegeben. Die erste Produkt- oder Betreiberanforderung nach Replay ohne
+   immutable Request-Snapshot aktiviert den Trigger für den Pre-Slice
+   [`OptimizationRun.SolverScopeAudit`](plan-domain-migration-optimization-run-solver-scope-audit.md);
+   andernfalls bleibt der Request-Snapshot die kanonische `solver_scope`-
+   Auditquelle.
 
 Laufende Betriebsregeln:
 - Produktiv geht erst auf Forecast-/Adapter-Vollaktivierung über, wenn alle DoD-
@@ -270,14 +276,12 @@ Laufende Betriebsregeln:
 - Bei Konflikten gilt als harte Regel: neue Betriebslogik darf nicht ohne
   definierte `series_status`-Entscheidung in den Markt- und
   Optimierungsworkflow starten.
-- Für nicht adapter-getragene Serien im bestehenden Altpfad ist ein
-  kontrollierter Übergang nur im expliziten `quality_mode=degraded_ok` und über
-  den degradierten Serienzustand erlaubt (`series_status=SOURCE_DEGRADED`,
-  `source_eval_status=SOURCE_TRANSITIONAL_INPUT` und Audit-Hinweis
-  `format=kv1;reason=LOCAL_GENERATION_TRANSITIONAL_INPUT`). Dieser Altpfad ist
-  kein `quality_mode=strict`-Pfad und muss spätestens mit produktiver
-  F-MKT-02-Aktivierung abgelöst oder als eigener Legacy-Sunset-Slice geführt
-  werden.
+- Für nicht adapter-getragene Serien im bestehenden Altpfad verweist diese Note
+  ausschließlich auf den kanonischen Transitional-Input-Vertrag in
+  [`plan-price-forecast-adapters.md`](plan-price-forecast-adapters.md). Dieser
+  Altpfad ist kein `quality_mode=strict`-Pfad und muss spätestens mit
+  produktiver F-MKT-02-Aktivierung abgelöst oder als eigener Legacy-Sunset-Slice
+  geführt werden.
 
 ---
 
