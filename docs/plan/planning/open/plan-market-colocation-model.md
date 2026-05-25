@@ -286,6 +286,8 @@ Mögliche Domain-/Application-Erweiterungen:
 
 - `LocalOriginState`
   - virtuelle Zwischenbilanz für herkunftsgebundene Energie (kWh)
+  - `e_local_0` als Initialzustand der Herkunftsbilanz; Default `0`.
+    Erforderlich, sobald `OriginConstraint` aktiv ist.
   - `e_local_t` je Zeitschritt
   - `eta_charge` (optional, default `1.0`)
   - `eta_discharge` (optional, default `1.0`)
@@ -293,6 +295,14 @@ Mögliche Domain-/Application-Erweiterungen:
   - Für `GreenStorageRestricted` muss `local_origin_capacity_kwh > 0` gelten.
     `local_origin_capacity_kwh=0` ist keine nutzbare Herkunftsbilanz und führt zu
     `CONFIG_INCONSISTENT` mit `format=kv1;reason=GREEN_STORAGE_ORIGIN_CAPACITY_ZERO`.
+  - Für `ClassicalCoLocation`/`HybridWithGridImport` mit aktivem
+    `OriginConstraint` gilt ebenfalls `local_origin_capacity_kwh > 0`; sonst
+    ist die aktivierte Herkunftsbilanz inkonsistent
+    (`CONFIG_INCONSISTENT`, `format=kv1;reason=ORIGIN_CAPACITY_ZERO`).
+    Ohne aktiven `OriginConstraint` darf das Feld fehlen; `0` bedeutet nicht
+    "unbounded", sondern "keine nutzbare Herkunftsbilanz".
+  - Validierung: `0 <= e_local_0 <= local_origin_capacity_kwh`, wenn
+    `OriginConstraint` aktiv ist.
   - Validierung (nur wenn von `1.0` abweichend): `eta_min <= eta_charge <= 1`
     und `eta_min <= eta_discharge <= 1`; `eta_min` ist die gemeinsame
     Assetmodell-Invariante aus dem Robustheitspfad
@@ -468,10 +478,12 @@ Rollback-/Backout-Verhalten:
   `unclear`/`incompatible` nicht freizuschalten.
 - Für Ausnahmeszenarien kann ein Release-Block oder eine kontrollierte Suspendierung gelten:
   - Release-Block: Freigabe bis Daten bereinigt sind.
-  - Notfallmodus: optionaler Operator-Override nur für nicht-aktive Sites im Rahmen einer
-    dokumentierten Wartungsfreigabe.
-  - Nicht-aktive Sites sind im Notfallmodus mit `can_dispatch=false` explizit zu markieren;
-    aktive Sites bleiben weiterhin hart blockiert.
+  - Notfallmodus: optionaler Operator-Override nur für Sites, deren
+    Aktivitätsbewertung aus dem aktuellen Request-Kontext nicht aktiv ist, im
+    Rahmen einer dokumentierten Wartungsfreigabe.
+  - Im Notfallmodus dürfen Sites, deren Aktivitätsbewertung nicht aktiv ist, mit
+    `can_dispatch=false` modelliert werden; die Aktivitätsbewertung bleibt
+    request-basiert. Aktive Sites bleiben weiterhin hart blockiert.
 - Keine stillschweigende „Best-Effort“-Auto-Ableitung in produktivem Requestbetrieb.
 
 ### GreenStorageRestricted-Regeln (MVP)
@@ -486,7 +498,8 @@ Rollback-/Backout-Verhalten:
   - `0 <= e_local_t <= local_origin_capacity_kwh`
   - `local_origin_capacity_kwh > 0`; `0` ist `CONFIG_INCONSISTENT` mit
     `format=kv1;reason=GREEN_STORAGE_ORIGIN_CAPACITY_ZERO`.
-  - `e_local_0` ist konfigurierbar (meist 0).
+  - `e_local_0` kommt aus `LocalOriginState` und muss in der konfigurierten
+    Kapazität liegen.
 - Harte Koppelregeln:
   - `p_grid_import_t == 0` (für beide Site-Konventionen) – vollständiges Netzbezugsverbot.
   - `-b_t <= (g_t - c_t)` (Laden nur solange lokaler Überschuss vorliegt)
@@ -502,6 +515,7 @@ Fehlerklassifikation für `GreenStorageRestricted`:
 | Produktiv-Precheck | Produktiver Routine-Run ohne `green_storage_validation_mode=true` | `CONFIG_INVALID` | `GREEN_STORAGE_RESTRICTED_PRODUCTIVE_BLOCKED` |
 | Dispatch-Gate | `green_storage_validation_mode=true` ohne produktive Compliance-/Förderfreigabe | `CONFIG_INCONSISTENT` | `GREEN_STORAGE_RESTRICTED_VALIDATION_ONLY` |
 | Input-/Pre-Solver-Validierung | Fehlender oder nicht auditierbarer Herkunftsnachweis | `CONFIG_INCONSISTENT` | `GREEN_STORAGE_ORIGIN_PROOF_MISSING` |
+| Input-/Pre-Solver-Validierung | Aktivierter weicher Herkunftsnachweis ohne nutzbare Herkunftskapazität | `CONFIG_INCONSISTENT` | `ORIGIN_CAPACITY_ZERO` |
 | Input-/Pre-Solver-Validierung | Request fordert Netzladung oder modelliert Netzbezug als zulässige Ladequelle | `CONFIG_INCONSISTENT` | `GREEN_STORAGE_GRID_CHARGE_BLOCKED` |
 | Solver-Ergebnis | Harte Constraints (`p_grid_import_t == 0`, lokale Quelle, `e_local_t`) machen den angefragten Fahrplan mathematisch unerfüllbar | `MODEL_INFEASIBLE` | `GREEN_STORAGE_MODEL_INFEASIBLE` |
 
@@ -603,6 +617,9 @@ Bestandsrouten nicht brechen:
      `local_origin_capacity_kwh`-Randfall (`0`, Minimalreserve) werden explizit geprüft;
      `local_origin_capacity_kwh=0` blockiert mit `CONFIG_INCONSISTENT` und
      `format=kv1;reason=GREEN_STORAGE_ORIGIN_CAPACITY_ZERO`.
+   - Weicher `OriginConstraint` in `ClassicalCoLocation`/`HybridWithGridImport`
+     mit `local_origin_capacity_kwh=0` blockiert mit `CONFIG_INCONSISTENT` und
+     `format=kv1;reason=ORIGIN_CAPACITY_ZERO`.
    - `GreenStorageRestricted`: Lauf wird mit `CONFIG_INCONSISTENT` und
      `GREEN_STORAGE_GRID_CHARGE_BLOCKED` geblockt, wenn eine Netzladung
      (`p_grid_import_t > 0`) versucht wird.

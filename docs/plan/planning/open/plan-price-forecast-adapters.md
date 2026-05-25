@@ -227,7 +227,12 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
          eigenen Flag-Wert, falls dieser später explizit eingeführt wird.
       3. **Cutover freigeben**: Neue Family wird produktiv als `primary` markiert und auf mindestens `SOURCE_OK` oder ausdrücklich zugelassene `SOURCE_DEGRADED` gesetzt.
       4. **Produktiver Umschaltpunkt**: Alte Family in produktiven Runs auf `SOURCE_REJECTED`/`CanExecute=false` halten; alte Werte sind nur noch Replay/Diagnose sichtbar.
-      5. **Rollback-Fenster**: Rückkehr auf alte Family nur mit explizitem Release-Block möglich; Rollback ist nur dann erlaubt, wenn die neue Family in einem vollständigen Beobachtungsfenster keine vollständige akzeptierbare Lastserie (ohne harte Fallback) geliefert hat. Die Runbook-Marker `release_block` und `controlled_switchover` werden im Aktivierungs-Runbook definiert, inklusive Ablageort, Berechtigung und Löschregel.
+      5. **Rollback-Fenster**: Rückkehr auf alte Family nur mit explizitem
+         Release-Block möglich. Rollback ist nur zulässig, wenn die neue Family
+         im Beobachtungsfenster die Lastserie nicht ohne harten Fallback
+         akzeptierbar liefern konnte. Die Runbook-Marker `release_block` und
+         `controlled_switchover` werden im Aktivierungs-Runbook definiert,
+         inklusive Ablageort, Berechtigung und Löschregel.
       6. **Abschluss**: Alter Family-Schlüssel wird auf `ARCHIVED` gesetzt; neue Family läuft ohne Alias-Wechsel weiter.
   - Für einen stabilen Tie-Break werden bei gleicher Klasse numerisch zuerst
     `series_version` (wie definiert), danach nur bei unterschiedlichen, gültigen
@@ -333,6 +338,11 @@ Kanonische Ableitungsregeln (deterministisch):
   - Bei vorhandenem kompatiblem Fallback folgt die Fallback-Evaluierung.
   - Bei erfolgreichem Fallback: `series_status=SOURCE_FALLBACK_USED` oder
     `SOURCE_DEGRADED` je nach Backfill/Qualitätsminderung.
+    Präzedenz bei kombinierten Ereignissen ist verbindlich:
+    Qualitätsminderung schlägt Fallback. Wenn Fallback und Backfill bzw. andere
+    Degradation zugleich auftreten, ist `series_status=SOURCE_DEGRADED` und
+    `status_flags` enthält mindestens `SOURCE_FALLBACK_USED` und den
+    Degradationsflag, z. B. `SOURCE_BACKFILL`.
   - Bei fehlendem kompatiblen Fallback: harte Abweisung außer im `degraded_ok`-Modus
     für `SOURCE_STALE` (-> `SOURCE_DEGRADED`).
 - `source_eval_status=SOURCE_TRANSITIONAL_INPUT`:
@@ -430,9 +440,12 @@ Empfohlene Integrationskonvention (API/Operator):
     genau 1. Diese Rundungsregel ist bewusst konservativ und ersetzt
     horizon-spezifische Magic Numbers.
     Operative Folge: Bei typischen 24-h-/15-min-Horizonten greift Backfill wegen
-    dieser Mindestabdeckung praktisch nicht; Backfill ist erst bei längeren
-    Horizonten oder explizit konfigurierter niedrigerer Mindestabdeckung im
-    `quality_mode=degraded_ok` wirksam.
+    dieser Mindestabdeckung praktisch nicht. Das ist im Default gewollt:
+    Backfill ist nur bei längeren Horizonten oder explizit konfigurierter
+    niedrigerer Mindestabdeckung im `quality_mode=degraded_ok` aktiv. Tests für
+    `SOURCE_BACKFILL` müssen deshalb entweder einen längeren Horizon oder eine
+    explizit abgesenkte `min_coverage_ratio` verwenden; ein typischer
+    24-h-/15-min-Defaulttest erwartet keinen Backfill.
   - Die konsolidierte konsumierbare Serie muss nach Backfill keine offenen Lücken mehr enthalten.
 - Lückenregime:
   - Rohdaten mit Lücken vor Backfill sind nur zulässig, solange

@@ -320,7 +320,8 @@ Deterministische Berechnung (verbindlich):
   - optionale Pflichtanteile je Produkt und Richtung:
   - `alpha_afrr_up_t`, `alpha_afrr_down_t`
   - `alpha_mfrr_up_t`, `alpha_mfrr_down_t`
-  - Default: `1.0`, wenn das Produkt gebucht ist, sonst `0.0` bei nicht gebuchtem Produkt.
+  - Default: `1.0`, wenn das Produkt nach den obigen Produkt-Aktivitätsregeln
+    produktiv aktiv ist, sonst `0.0`.
   - Vor der Rechnung ist hart zu validieren:
     - Alle Reserve- und Alphafelder pro Zeitschritt sind endlich und nicht negativ.
     - `fcr_*`, `afrr_*`, `mfrr_*` und die optionalen `required_*`-Felder sind `>= 0`.
@@ -370,6 +371,14 @@ Deterministische Berechnung (verbindlich):
     - Für die Worst-Case-Hülle ist die zu reservierende FCR-Energie auf
       `min(Δt, fcr_remaining_envelope_t/60)` h zu skalieren.
     - Mit der Tracking-Logik wird bei kleinen `Δt` die volle Mindestdauer konservativ über Folgeintervalle berücksichtigt.
+    - Beispiel: Bei `Δt=1/60 h`, `t_min_fcr=30 min` und `fcr_up_kw_t=1 MW`
+      ist `fcr_remaining_envelope_t` zwar pro Schritt statisch `30 min`, der
+      FCR-Term aber `min(1/60, 30/60) * 1000 kW = 16,67 kWh` je Schritt.
+      Über 30 fortgeschriebene SOC-Schritte akkumuliert dies zu `500 kWh`,
+      also genau 30 Minuten FCR-Energie. Es wird nicht pro Schritt erneut
+      30-Minuten-Energie abgezogen; die statische Größe erzwingt nur, dass
+      jeder Entscheidungszeitpunkt als neuer Worst-Case-Startpunkt bewertet
+      wird.
 - Hilfsgröße:
   - `self_discharge_loss_kwh_t` ist deterministisch zu berechnen:
     - bei `self_discharge_mode=absolute_kwh_per_hour`:
@@ -445,10 +454,17 @@ Restore- und Gate-Entscheidungslogik (verbindlich):
   Die folgenden `restore_shortfall_*`-Größen gehören zur unabhängigen
   Worst-Case-Hülle je Richtung; sie sind keine konkrete Fahrplanaktion und
   dürfen nicht als gleichzeitiges Laden/Entladen interpretiert werden.
+  - Effektiver Restore-Bedarf:
+    - `required_restore_up_kwh_t = coalesce(required_up_kwh_t, worst_up_kwh_t)`
+    - `required_restore_down_kwh_t = coalesce(required_down_kwh_t, worst_down_kwh_t)`
+    - Operatorseitig gesetzte `required_*`-Werte dürfen größer sein als die
+      Worst-Case-Hülle; wenn gesetzt, sind sie bewusst der größere
+      Restore-Planungs- und Gate-Bedarf. So entstehen keine divergierenden
+      Gate- und Plan-Energien.
   - Up-Verstoß-Defizit:
-    `restore_shortfall_up_kwh = max(0, worst_up_kwh_t - (soc_plan_up_t - soc_min_eff_kwh) * eta_discharge)`
+    `restore_shortfall_up_kwh = max(0, required_restore_up_kwh_t - (soc_plan_up_t - soc_min_eff_kwh) * eta_discharge)`
   - Down-Verstoß-Defizit:
-    `restore_shortfall_down_kwh = max(0, worst_down_kwh_t - (soc_max_eff_kwh - soc_plan_down_t) / eta_charge)`
+    `restore_shortfall_down_kwh = max(0, required_restore_down_kwh_t - (soc_max_eff_kwh - soc_plan_down_t) / eta_charge)`
 - Verfügbare Wiederherstellungsleistung je Schritt:
   - Effektive Restore-Kapazität je Richtung berechnet sich per Coalesce:
     per-step Envelope-Override > Policy-Skalar > technischer Default.
@@ -581,8 +597,9 @@ Pflichtregeln:
  vorschlagen:
 
  - Zuerst wird je Zeitfenster berechnet, ob eine Wiederherstellung je Richtung nötig ist:
-   - `required_restore_up_kwh_t = coalesce(required_up_kwh_t, worst_up_kwh_t)`
-   - `required_restore_down_kwh_t = coalesce(required_down_kwh_t, worst_down_kwh_t)`
+   - `required_restore_up_kwh_t` und `required_restore_down_kwh_t` sind die
+     bereits in der Gate-Entscheidungslogik verwendeten effektiven
+     Restore-Bedarfe.
    - `scheduled_restore_up_kwh_t = max(0, required_restore_up_kwh_t - available_up_kwh_t)`
    - `scheduled_restore_down_kwh_t = max(0, required_restore_down_kwh_t - available_down_kwh_t)`
   - Vor der Berechnung gilt hart:

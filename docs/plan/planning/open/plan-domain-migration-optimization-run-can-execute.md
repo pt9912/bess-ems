@@ -215,6 +215,11 @@ Migration der Ausführungsentscheidung auf `CanExecute`.
      percent-encodiertem ISO-Zeitstempelwert wird persistiert, geparst,
      innerhalb des `kv1`-Parsers decodiert und bytegleich zum ursprünglichen
      fachlichen Wert verglichen.
+   - Source-Guard-Vorsorgetest ergänzen: eine timestamp-basierte
+     `series_version` mit Doppelpunkt (z. B. `2026-05-24T12:00:00Z-v3`) wird
+     als hypothetischer `kv1`-Wert percent-encoded, roundtrippt und decodiert
+     bytegleich. Das bleibt auch dann Pflicht, wenn aktuelle Preis-/Forecast-
+     Slices `series_version` noch nicht im `TerminationDetail` persistieren.
    - API-Kompatibilität:
      - Producer-Vertrag: `can_execute` ist nach der Migration ein required Feld in
        Optimierungs-Run-Responses.
