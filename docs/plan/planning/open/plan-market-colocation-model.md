@@ -172,11 +172,9 @@ Mögliche Domain-/Application-Erweiterungen:
       Run-Blockaden und erzeugt stattdessen ein Audit-Bundle.
       | Modus | Site im aktuellen Request aktiv? | Ergebnis |
       | --- | --- | --- |
-      | `migration_dry_run=true` | ja oder unklar | keine Laufblockade; Audit-Eintrag `SITE_CAN_DISPATCH_MISSING`, Site gilt nicht als aktiv ausführbar |
-      | `migration_dry_run=true` | nein | keine Laufblockade; Audit-Eintrag `SITE_CAN_DISPATCH_MISSING`, Datensatz bleibt bis zur Bereinigung im Audit-Bundle |
-      | `migration_strict=true` produktiv | ja oder unklar | harte Blockade mit `CONFIG_INCONSISTENT` / `SITE_CAN_DISPATCH_MISSING` |
+      | `migration_dry_run=true` | ja, nein oder unklar | keine Laufblockade; Audit-Eintrag `SITE_CAN_DISPATCH_MISSING`, aktive Site gilt nicht als ausführbar, inaktive Site bleibt bis zur Bereinigung im Audit-Bundle |
+      | produktiv (`migration_strict=true` oder `false`) | ja oder unklar | harte Blockade mit `CONFIG_INCONSISTENT` / `SITE_CAN_DISPATCH_MISSING` |
       | `migration_strict=true` produktiv | nein | harte Blockade bis explizit `can_dispatch=false` modelliert oder im Dry-Run auditierbar bereinigt |
-      | `migration_strict=false` produktiv | ja | harte Blockade mit `CONFIG_INCONSISTENT` / `SITE_CAN_DISPATCH_MISSING` |
       | `migration_strict=false` produktiv | nein | keine Laufblockade; Datensatz bleibt im Audit-Bundle bis zur Bereinigung |
       Der `migration_strict`-Schalter wirkt damit ausschließlich für nicht aktive
       Sites; aktive Sites bleiben in beiden Produktivmodi hart blockiert.
@@ -211,7 +209,8 @@ Mögliche Domain-/Application-Erweiterungen:
     Feldsemantik.
   - Weitere Pflichtfelder:
     - `value_kw`
-    - `value_type` (`forecast` | `actual`)
+    - `point_kind` (`forecast` | `actual`) als punktbezogene Kennzeichnung;
+      nicht mit `SeriesEnvelope.series_type` verwechseln.
     - `source_metadata.provider_id`
     - `series_product`
     - `unit` (z. B. `kW`)
@@ -221,7 +220,7 @@ Mögliche Domain-/Application-Erweiterungen:
     - gleiche Zeitachse wie `PriceSeries` (UTC, step-genau, gleiche Horizon-Länge) bei produktiver Nutzung.
       Abweichende Quellauflösungen sind im produktiven Co-Location-Pfad nur
       zulässig, wenn der externe Provider bereits in der Zielauflösung liefert
-      oder ein eigener, versionierter Preprocessing-Slice einen
+      oder ein eigener, versionierter Preprocessing-Slice den reservierten
       `alignment_mode=resample`-Pfad mit deterministischer Aggregations-/
       Interpolationsregel freigibt. Dieser Plan definiert noch keinen
       produktiven Resampling-Pfad.
@@ -266,10 +265,26 @@ Mögliche Domain-/Application-Erweiterungen:
 
 - `CurtailmentCost`
   - Strafkosten für Abregelung lokaler Erzeugung
+  - wirkt additiv in der Zielfunktion als
+    `sum_t(curtailment_cost_eur_per_kwh * c_t * Δt)`;
+    `c_t` ist die abgeregelte lokale Erzeugungsleistung in kW.
+  - `curtailment_cost_eur_per_kwh >= 0`; fehlt der Wert, ist Abregelung nur als
+    technischer Slack mit explizitem Audit zulässig und darf nicht still
+    kostenfrei optimiert werden.
 
 - `OriginConstraint`
   - optionale Restriktion, ob Batterieenergie aus lokaler Erzeugung,
     Netzbezug oder beidem stammen darf
+  - aktiviert die lokale Herkunftsbilanz `e_local_t` und die Kopplung zwischen
+    lokaler Erzeugung, Batterieladung und Netzbezug.
+  - Im `GreenStorageRestricted`-Pfad gilt hart:
+    `p_grid_import_t == 0`, `0 <= e_local_t <= local_origin_capacity_kwh` und
+    Batterieentladung darf nur aus zuvor lokaler, in `e_local_t` geführter
+    Energie erfolgen.
+  - In `ClassicalCoLocation`/`HybridWithGridImport` kann `OriginConstraint`
+    als weicher Herkunftsnachweis aktiviert werden; dann bleibt Netzbezug je
+    Modus zulässig, aber lokale und netzbezogene Energie müssen getrennt
+    auditierbar sein.
 
 ### Netzanschlusspunkt-Konvention (verbindlich)
 
@@ -347,10 +362,13 @@ Interpretation:
 Für produktive Freischaltung ist ein deterministischer Migrationspfad für bestehende
 `SiteConstraint`-Datensätze vorab definiert:
 
-`migration_strict` steuert ausschließlich die Toleranz für Co-Location-
-Konfigurationsmigrationen; `quality_mode` steuert ausschließlich
-Preis-/Forecast-Qualität. Beide Schalter bleiben getrennt und müssen in
-Operator-/Runbook-Sichten nebeneinander ausgewiesen werden.
+`migration_strict` ist ein Deployment-/Release-Governance-Schalter für
+Co-Location-Konfigurationsmigrationen; er wird nicht pro Optimierungsrequest
+frei gesetzt. `quality_mode` ist ein expliziter Source-Qualitätsmodus am
+Serien-/Adapterlauf bzw. am daraus erzeugten Optimierungsrequest. Beide
+Schalter bleiben getrennt, werden im immutable Request-/Run-Audit sichtbar
+gemacht und müssen in Operator-/Runbook-Sichten nebeneinander ausgewiesen
+werden.
 
 - Migrationsfenster ist zweistufig:
   - `migration_dry_run=true`: vollständige Klassifikation mit vollständigem Audit-Bundle, aber ohne Laufblockade.

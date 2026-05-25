@@ -125,7 +125,10 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
   - `timezone` (muss `UTC` sein)
   - `horizon_start_utc`, `horizon_end_utc`
   - optionale Co-Location-Vorverarbeitungsmetadaten:
-    - `alignment_mode` (`reject` | `trim-to-common`)
+    - `alignment_mode` (`reject` | `trim-to-common` | `resample`)
+      - `resample` ist reserviert und im ersten Slice hart gesperrt, bis ein
+        eigener, versionierter Preprocessing-Slice die Aggregations-/
+        Interpolationsregel freigibt.
     - `alignment_prepared` (bool, nur bei `alignment_mode=trim-to-common` sinnvoll)
     - `alignment_prepared_by` (string, z. B. `forecast-preprocessor/v1`, `batch-trimmer/...`)
     - `alignment_prepared_horizon_start_utc`
@@ -277,7 +280,11 @@ Kanonische Ableitungsregeln (deterministisch):
   - ist eine vollständige Schließung nicht möglich oder überschreitet
     `missing_raw_intervals` die berechnete Grenze `max_missing_raw_intervals`, wird
     `series_status=SOURCE_REJECTED`.
-- `source_eval_status=SOURCE_EMPTY` -> `series_status=SOURCE_REJECTED`, harte Abweisung.
+- `source_eval_status=SOURCE_EMPTY`:
+  - Bei erfolgreicher kompatibler Fallback-Quelle: `series_status=SOURCE_FALLBACK_USED`.
+  - Ohne erfolgreichen kompatiblen Fallback: `series_status=SOURCE_REJECTED`.
+  - `quality_mode=degraded_ok` darf eine leere Primärantwort nie allein in
+    `SOURCE_DEGRADED` umwerten.
 - `source_eval_status` aus `{SOURCE_STALE, SOURCE_RATE_LIMIT, SOURCE_UNAVAILABLE, SOURCE_RETRY_EXHAUSTED}`:
   - Bei vorhandenem kompatiblem Fallback folgt die Fallback-Evaluierung.
   - Bei erfolgreichem Fallback: `series_status=SOURCE_FALLBACK_USED` oder
@@ -305,8 +312,10 @@ Interoperabilitätsregel (über Pläne hinweg):
   produktiven Pfad als hartes Verarbeitungsfehlerbild zu behandeln.
 - Bei `SOURCE_DEGRADED`/`SOURCE_FALLBACK_USED` ist die Ausführung nur erlaubt,
   wenn der Slice diese Qualitätsgrade explizit erlaubt.
-- `SOURCE_EMPTY` bleibt **in beiden Qualitätsmodi** hart als `SOURCE_REJECTED`
-  und darf nicht implizit in `degraded_ok` umgewertet werden.
+- `SOURCE_EMPTY` bleibt hart als `SOURCE_REJECTED`, wenn keine kompatible
+  Fallback-Quelle erfolgreich eine nicht-leere Serie liefert. Ein erfolgreicher
+  Fallback darf daraus `SOURCE_FALLBACK_USED` machen; `SOURCE_EMPTY` darf nie
+  durch `quality_mode=degraded_ok` allein zu `SOURCE_DEGRADED` werden.
 
 - Konsistenz-Regel:
   - Wenn `series_type=price`, ist `market_bid_area` Pflichtfeld; `site_id` optional.
@@ -337,6 +346,9 @@ Empfohlene Integrationskonvention (API/Operator):
   - Preisreihen: 90 Minuten (default, pro Serie konfigurierbar)
   - Forecastreihen: 720 Minuten (default, pro Feature konfigurierbar)
 - `quality_mode`:
+  - lebt am Serien-/Adapterlauf und muss in Source-Audit sowie im daraus
+    erzeugten Optimierungsrequest sichtbar sein; er ist kein globaler
+    Deployment-Schalter.
   - `strict` (Default): Keine Degradation erlaubt. Fallback ist nur zulässig,
     wenn daraus `SOURCE_OK` oder `SOURCE_FALLBACK_USED` resultiert und kein
     zusätzliches Qualitätsflag (`SOURCE_BACKFILL`) gesetzt ist.
@@ -391,10 +403,13 @@ Die `SOURCE_*`-Auswertung ist für jede Serie deterministisch:
 - Rohcodes werden ausschließlich nach den **Kanonischen Ableitungsregeln** oben
   klassifiziert. Diese Flow-Sektion wiederholt die Matrix nicht normativ.
 - `SOURCE_OK` geht direkt in die Endstatuszuordnung.
-- harte Rohcodes (`SOURCE_AUTH_ERROR`, `SOURCE_SCHEMA_MISMATCH`, `SOURCE_EMPTY`,
-  nicht behebbare `SOURCE_GAP`) enden ohne Retry/Fallback in `SOURCE_REJECTED`.
-- fallback-fähige Rohcodes (`SOURCE_STALE`, `SOURCE_RATE_LIMIT`,
-  `SOURCE_UNAVAILABLE`, `SOURCE_RETRY_EXHAUSTED`) gehen in Schritt 3.
+- harte Rohcodes (`SOURCE_AUTH_ERROR`, `SOURCE_SCHEMA_MISMATCH`, nicht behebbare
+  `SOURCE_GAP`) enden ohne Retry/Fallback in `SOURCE_REJECTED`.
+- `SOURCE_EMPTY` darf nur über einen erfolgreichen kompatiblen Fallback in
+  `SOURCE_FALLBACK_USED` wechseln; ohne Fallback bleibt es `SOURCE_REJECTED`.
+- fallback-fähige Rohcodes (`SOURCE_EMPTY`, `SOURCE_STALE`,
+  `SOURCE_RATE_LIMIT`, `SOURCE_UNAVAILABLE`, `SOURCE_RETRY_EXHAUSTED`) gehen in
+  Schritt 3.
 
 3) Fallback- und Qualitätsmoduslogik
 - Fallback wird nur für die in den kanonischen Ableitungsregeln genannten
@@ -530,8 +545,10 @@ Primär-/Fallback-Regel ist verbindlich:
   - `weather-temp`: Primär Open-Meteo, Fallback Copernicus.
 
 Aktivierungslogik:
-- `SOURCE_EMPTY` wird ohne zugelassenen, kompatiblen Fallback nur als harte
-  Fehlerklasse `SOURCE_REJECTED` behandelt.
+- `SOURCE_EMPTY` folgt ausschließlich der kanonischen Regel oben: nur ein
+  erfolgreicher kompatibler Fallback kann die leere Primärantwort retten; ohne
+  Fallback bleibt sie `SOURCE_REJECTED` und wird nie nur wegen
+  `quality_mode=degraded_ok` akzeptiert.
 - Primärquelle wird standardmäßig genutzt.
 - Bei Ausfall oder Qualitätsfehlern der Primärquelle wird nur auf eine explizit als
   `fallback` konfigurierte, kompatible Quelle gewechselt.
@@ -669,7 +686,9 @@ arbeitet mit deterministischen Preiswerten.
 - [ ] Fallback-/Degradationslogik ist deterministisch umgesetzt:
   - harte Fehler (`SOURCE_REJECTED`) vs. degradierte Nutzung (`SOURCE_DEGRADED`) klar getrennt,
   - kombinierte Qualitätsereignisse via `status_flags`,
-  - `SOURCE_EMPTY` ohne expliziten degraded-Zulassungsweg bleibt hart abweisend.
+  - `SOURCE_EMPTY` bleibt ohne erfolgreichen kompatiblen Fallback hart
+    abweisend; `quality_mode=degraded_ok` allein darf keine leere Serie
+    akzeptieren.
 - [ ] Versions- und Idempotenzregeln umgesetzt:
   - eindeutiger Revisionsvergleich pro `(series_id, series_version, source.provider_id)`,
   - `value_hash` ist für produktive Phase-1/2-Adapter vorhanden, außer bei

@@ -236,6 +236,7 @@ Nicht explizit modelliert:
       - bei Wert `<= 0` oder fehlendem Wert wird kein Override angenommen.
     - `required_activation_minutes`:
       - optionales Feld in Minuten als Operatorkontext.
+      - `audit_only=true` ist für dieses Feld im Envelope Pflicht.
       - dient in der Erstimplementierung rein auditierbar und ist nicht verpflichtender
         Steuerparameter.
       - Wird das Feld später Steuerparameter, braucht es einen expliziten Migrationsschritt:
@@ -710,6 +711,10 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
   - FCR-/aFRR-Anforderung
   - gelieferte vs. nicht gelieferte Energie
   - Robustheitsstatus pro Zeitschritt
+  - Hinweis `fcr_envelope_mode=static_worst_case`, wenn
+    `fcr_remaining_envelope_t = t_min_fcr` alert-unabhängig reserviert; damit
+    ist der SOC-Headroom-Verlust für FCR-lastige LER-Assets operatorseitig
+    sichtbar.
   - `restore_capability_used=null` wird als `not_applicable` ausgegeben, wenn
     `required_recovery_minutes == 0`; `reserve_restore_energy_kwh=0` bleibt in
     diesem Fall explizit sichtbar.

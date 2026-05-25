@@ -59,11 +59,11 @@ Nicht vorhanden:
      `CanExecute=true` als Default ist nur für Pfade zulässig, die nachweislich
      keine aktivierten Guard-Beiträge kennen (z. B. NoOp-Optimierer,
      Test-Fixtures oder reine Legacy-Leser).
-   - Audit-Diskriminator verpflichtend vorsehen: entweder `CanExecuteSource`
-     oder ein äquivalenter Wire-Wert muss `computed_from_guards` von
-     `legacy_backfill` unterscheidbar machen. Nur Installationen ohne
-     Legacy-Bestand dürfen den Backfill-Wert unbenutzt lassen; der
-     Diskriminator bleibt trotzdem Teil des Vertrags.
+   - Audit-Diskriminator verpflichtend vorsehen: Feldname
+     `can_execute_source`, Enumwerte mindestens `computed_from_guards` und
+     `legacy_backfill`. Der Wert muss in allen Stores/Wire-Pfaden identisch
+     roundtrippen; abweichende Feldnamen sind nur interne Mapper-Aliasse, nicht
+     Teil des externen Vertrags.
    - Invarianten ergänzen:
      - `CanExecute=true` ist nur zulässig, wenn `HasUsableSolution=true`.
      - `CanExecute=false` ist auch bei `Optimal`/`Feasible` zulässig, wenn ein
@@ -158,7 +158,10 @@ Code-Konventionen:
        eine Version dort auditieren muss, gilt dieselbe Percent-Encoding-Regel.
      - Neue `format=kv1`-`TerminationDetail`-Strings dürfen maximal 1024 Zeichen
        lang sein. Längere Details werden vor Persistierung als Guard-/Schemafehler
-       abgelehnt; Slices dürfen keine stillen Trunkierungen erzeugen.
+       abgelehnt; Slices dürfen keine stillen Trunkierungen erzeugen. Der
+       Ersatz-Run verwendet `TerminationCode=schema-inconsistent`,
+       `CanExecute=false`, `schema_ok=false` und das feste Detail
+       `format=kv1;reason=TERMINATION_DETAIL_OVERFLOW`.
 
 3. Persistenz und Wire
    - `can_execute` in allen produktiven Stores hinzufügen:
@@ -182,20 +185,27 @@ Code-Konventionen:
    - Bestehende Daten migrieren:
      - bei `status in {optimal, feasible}` initial `can_execute=true`,
      - sonst `can_execute=false`,
-     - `can_execute_source=legacy_backfill` oder ein gleichwertiger
-       Diskriminator wird gesetzt; dieser Wert bedeutet "kein historischer Guard
-       bekannt", nicht "alle heutigen Guards aktiv grün".
+     - `can_execute_source=legacy_backfill` wird gesetzt; dieser Wert bedeutet
+       "kein historischer Guard bekannt", nicht "alle heutigen Guards aktiv grün".
      - Ein `legacy_backfill`-Run darf von Replay-/Lesepfaden als historisch
        nutzbare Solver-Lösung angezeigt werden, ist aber keine hinreichende
        Aktivierungsgrundlage für einen neuen Dispatch/Re-Run. Vor jedem erneuten
        operativen Dispatch muss die aktuelle Guard-Pipeline aktiv durchlaufen und
        mit einem nicht-legacy Diskriminator auditierbar sein.
+     - Dispatcher-/Scheduler-Gate: operative Dispatch-Pfade müssen zusätzlich zu
+       `HasUsableSolution && CanExecute` prüfen, dass
+       `can_execute_source != legacy_backfill`. Replay-/Diagnosepfade dürfen
+       `legacy_backfill` anzeigen, müssen aber als nicht-dispatchfähig markieren.
      - spätere fachliche Hard-Stops überschreiben auf `false`.
    - Wire-Mapper und API-/DTO-Ausgaben erweitern.
    - Roundtrip-Test ergänzen: `TerminationCode` plus
      `TerminationDetail=format=kv1;reason=...;solver_code=...` muss nach
      Persistierung, `ParseTerminationReason` und erneuter Ausgabe bytegleich
      erhalten bleiben; ein Detailwert mit unescaped `:` wird abgewiesen.
+   - Percent-Encoding-Roundtrip ergänzen: ein `format=kv1`-Detail mit
+     percent-encodiertem ISO-Zeitstempelwert wird persistiert, geparst,
+     innerhalb des `kv1`-Parsers decodiert und bytegleich zum ursprünglichen
+     fachlichen Wert verglichen.
    - API-Kompatibilität:
      - Producer-Vertrag: `can_execute` ist nach der Migration ein required Feld in
        Optimierungs-Run-Responses.
@@ -265,13 +275,17 @@ produktive Replays ohne immutable Request-Snapshot sind nicht freigegeben.
 - [ ] Store-/Wire-/API-/Proto-Mappings führen `can_execute`; die persistierte
   `termination_reason`-Wireform ist auf mindestens 2048 Zeichen oder `TEXT`
   migriert.
-- [ ] Legacy-Backfill ist über `can_execute_source=legacy_backfill` oder einen
-  gleichwertigen Diskriminator von aktiv geprüften Guard-Ergebnissen unterscheidbar.
+- [ ] Legacy-Backfill ist über `can_execute_source=legacy_backfill` vom Enumwert
+  `computed_from_guards` unterscheidbar; der Enum roundtrippt in allen
+  Store-/Wire-Pfaden.
 - [ ] Replay-/Re-Run-/Dispatch-Pfade akzeptieren `legacy_backfill` nicht als
   alleinige Aktivierungsgrundlage; vor erneutem operativem Dispatch wird ein
   aktueller Guard-Pass persistiert.
 - [ ] Re-Klassifikation nach Solver-Ergebnis erhält originale Solver-Provenance im
   finalen Run-Audit (`format=kv1;solver_code=...` oder äquivalentes Feld).
+- [ ] `format=kv1`-Percent-Encoding ist per Roundtrip-Test abgesichert
+  (ISO-Zeitstempelwert mit `:` codieren, persistieren, parsen, decodieren,
+  fachlichen Wert bytegleich vergleichen).
 - [ ] Operative Konsumenten nutzen `HasUsableSolution && CanExecute`.
 - [ ] Migration vorhandener Daten ist dokumentiert und getestet.
 - [ ] Markt-/Co-Location- und LER/FCR-Slices referenzieren dieses Dokument als
