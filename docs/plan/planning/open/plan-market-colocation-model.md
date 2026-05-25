@@ -1,6 +1,6 @@
 # Plan: Co-Location- und Hybrid-BESS-Modell
 
-**Dokumenttyp:** Slice-Skizze / offen
+**Dokumenttyp:** MVP-Spec / offen
 **Status:** Open - wartet auf Produkt-/Standorttrigger
 **Datum:** 2026-05-24
 **Quelle:** [`note-market-and-colocation-followups.md`](note-market-and-colocation-followups.md)
@@ -479,6 +479,17 @@ Für den Netzanschlusspunkt ist die Konvention in diesem Slice vollständig fest
 - Ein erster produktiver Co-Location-Slice kann mit lokalen Erzeugungs-/Lastreihen starten;
   forecast-basierte Optimierung bleibt bis zur Aktivierung von
   `plan-price-forecast-adapters.md` im degraded/fallback-Modus.
+- Übergangsadapter im degraded/fallback-Modus:
+  - Bis `plan-price-forecast-adapters.md` produktiv aktiviert ist, dürfen
+    `LocalGenerationSeries` nur über einen expliziten manuellen Import-/API-Push
+    oder CSV/Fixture-Import in einen nicht-forecastenden Übergangsadapter geladen
+    werden.
+  - Dieser Übergangsadapter darf keine automatischen externen Abrufe durchführen,
+    muss `series_status=SOURCE_DEGRADED` und einen Audit-Hinweis
+    `format=kv1;reason=LOCAL_GENERATION_TRANSITIONAL_INPUT` setzen und bleibt
+    auf `quality_mode=degraded_ok` beschränkt.
+  - Der Übergangsadapter ist mit Aktivierung von F-MKT-02 abzulösen oder als
+    eigener Legacy-Sunset-Slice weiterzuführen.
 - Keine Multi-Asset-Fleet-Optimierung über mehrere Standorte; das bleibt
   M6-Folgearbeit.
 
@@ -575,7 +586,8 @@ LER/FCR-Robustheitsslice **kompatibel und semantisch konsistent** zu halten.
 - Ein Slice darf erst freigegeben werden, wenn beide Dokumente semantisch
   übereinstimmen und die Cross-Checks bestanden sind.
 - Co-Location folgt dem selben CanExecute-Vertrag:
-  - `CanExecute=true` nur bei validen Ergebnissen ohne harte Konfigurations- oder Schemaabweisung.
+  - `CanExecute=true` nur bei validen Ergebnissen ohne harte Konfigurations- oder Schemaabweisung
+    und nur unter der Pre-Slice-Invariante `HasUsableSolution=true`.
   - `CanExecute=false` bei harten Co-Location-Konfigurations-/Schemaabweisungen
     sowie bei harten Robustheits- oder Validierungs-Blockaden gemäß der
     autoritativen Matrix in

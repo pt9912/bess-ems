@@ -1,6 +1,6 @@
 # Plan: Preisquellen- und Forecast-Adapter
 
-**Dokumenttyp:** Slice-Skizze / offen
+**Dokumenttyp:** MVP-Spec / offen
 **Status:** Open - wartet auf Quellen-/Produkttrigger
 **Datum:** 2026-05-24
 **Quelle:** [`note-market-and-colocation-followups.md`](note-market-and-colocation-followups.md)
@@ -173,7 +173,7 @@ Einheitliche Adaptervertraege für Preis- und Forecastdaten:
       2. **Dual-Active-Wahrnehmung**: Alte und neue Family mindestens in zwei vollständigen Release-Fenstern parallel beobachten; ein Release-Fenster ist hier standardmäßig mindestens ein produktiver Import-/Refresh-Zyklus und mindestens 7 Kalendertage. Der Cutover braucht damit im Default mindestens zwei vollständige Zyklen und mindestens 14 Kalendertage Beobachtung. Operations darf diese Mindestdauer nur per Release-Runbook überschreiben; die Zahl ist ein konservativer Default, kein stiller Code-Default. `value_hash`-Abweichungen sind als `status_flags` mit `status_message` auditierbar.
       3. **Cutover freigeben**: Neue Family wird produktiv als `primary` markiert und auf mindestens `SOURCE_OK` oder ausdrücklich zugelassene `SOURCE_DEGRADED` gesetzt.
       4. **Produktiver Umschaltpunkt**: Alte Family in produktiven Runs auf `SOURCE_REJECTED`/`CanExecute=false` halten; alte Werte sind nur noch Replay/Diagnose sichtbar.
-      5. **Rollback-Fenster**: Rückkehr auf alte Family nur mit explizitem Release-Block (`release_block` oder `controlled_switchover`) möglich; Rollback ist nur dann erlaubt, wenn die neue Family in einem vollständigen Beobachtungsfenster keine vollständige akzeptierbare Lastserie (ohne harte Fallback) geliefert hat.
+      5. **Rollback-Fenster**: Rückkehr auf alte Family nur mit explizitem Release-Block möglich; Rollback ist nur dann erlaubt, wenn die neue Family in einem vollständigen Beobachtungsfenster keine vollständige akzeptierbare Lastserie (ohne harte Fallback) geliefert hat. Die Runbook-Marker `release_block` und `controlled_switchover` werden im Aktivierungs-Runbook definiert, inklusive Ablageort, Berechtigung und Löschregel.
       6. **Abschluss**: Alter Family-Schlüssel wird auf `ARCHIVED` gesetzt; neue Family läuft ohne Alias-Wechsel weiter.
   - Für einen stabilen Tie-Break werden bei gleicher Klasse numerisch zuerst
     `series_version` (wie definiert), danach nur bei unterschiedlichen, gültigen
@@ -218,6 +218,9 @@ Hinweis zur Semantik:
     - identische `value_hash`-Werte sind idempotent,
     - unterschiedliche `value_hash` bei identischer Signatur und identischem `series_version` führen als harter Fehler zu  
       (`source_eval_status=SOURCE_SCHEMA_MISMATCH`, `series_status=SOURCE_REJECTED`).
+    - fehlt `value_hash`, wird keine Idempotenzprüfung durchgeführt; ein Re-Load
+      muss deterministisch eine neue `series_version` erzeugen oder als
+      Einmalimport ohne Re-Load-Vertrag behandelt werden.
   - Für inhaltliche Korrekturen ist ein Revisionswechsel zwingend:
     entweder höhere `series_version` derselben Familie oder ein kontrollierter
     Migrationspfad über `series_family_alias` (oder neue `series_id`).
@@ -634,7 +637,8 @@ arbeitet mit deterministischen Preiswerten.
    - UTC-Zeitachse, Schrittweite und Lückenbehandlung (99,5 % Mindestabdeckung)
    - Optimierung bekommt exakt die erwartete Schrittzahl
    - operatorfähige Laufcodes werden bei Fehlerpfaden gesetzt (`SOURCE_*`)
-8. Runbook für Credentials, Rate Limits und Provider-Ausfall.
+8. Runbook für Credentials, Rate Limits, Provider-Ausfall und Cutover-Marker
+   (`release_block`, `controlled_switchover` inkl. Ablageort und Verantwortlichkeit).
 
 ---
 

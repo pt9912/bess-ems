@@ -1,6 +1,6 @@
 # Plan: LER/FCR Reserve Robustness
 
-**Dokumenttyp:** Slice-Skizze / offen
+**Dokumenttyp:** MVP-Spec / offen
 **Status:** Open - wartet auf Regelleistungs-/FCR-Produkttrigger
 **Datum:** 2026-05-24
 **Quelle:** Öffentliches Referenzmaterial – Referenzpublikation als fachlicher Ausgangspunkt, kein Code-Übernahmeplan.
@@ -104,7 +104,11 @@ Nicht explizit modelliert:
   - optional `self_discharge_mode` (Werte: `absolute_kwh_per_hour` | `relative_soc_per_hour`, optional nur relevant wenn `is_ler=true`)
   - optional `self_discharge_kwh_per_hour` (gültig nur bei `self_discharge_mode=absolute_kwh_per_hour`, optional nur bei `is_ler=true`)
   - optional `self_discharge_soc_per_hour` (gültig nur bei `self_discharge_mode=relative_soc_per_hour`, optional nur bei `is_ler=true`)
-  - Für `is_ler=true` gilt nach Policy-/Asset-Auflösung: genau ein Verlustwert ist zulässig (`self_discharge_kwh_per_hour` oder `self_discharge_soc_per_hour`). Sind beide vorhanden, ist die Konfiguration als inkompatibel zu behandeln (`ROBUST_POLICY_UNSUPPORTED`).
+  - Für `is_ler=true` gilt nach Policy-/Asset-Auflösung: genau ein effektiver
+    Verlustwert ist zulässig (`self_discharge_kwh_per_hour` oder
+    `self_discharge_soc_per_hour`). Die Prüfung erfolgt nach Policy-vor-Asset-
+    Merge-Resolution; ein Policy-Wert darf einen andersartigen Asset-Fallback
+    verdrängen, ohne als "beide vorhanden" zu zählen.
   - `max_recovery_time` (harte obere Grenze für die Wiederherstellungsdauer in Minuten; bei aktivem Restore-Pfad erforderlich, sonst darf `0` gesetzt werden)
   - `intraday_gate_closure` (optional, Default `0`, wird für Restore-gesteuerte Läufe benötigt)
   - `intraday_preparation_time` (optional, Default `0` ohne Restore-Pfad; bei aktivem
@@ -141,6 +145,9 @@ Nicht explizit modelliert:
       - `self_discharge_kwh_per_hour` darf nicht gesetzt sein.
     - Verlustberechnung ist deterministisch: `self_discharge_loss_kwh_t = soc_t * self_discharge_soc_per_hour * Δt`,
       wobei `soc_t` der SOC zu Beginn der Zeitscheibe ist und `Δt = resolution_minutes / 60`.
+      Das ist bewusst eine lineare, konservative Approximation pro Zeitscheibe,
+      keine exponentielle Zerfallsformel; bei großen `Δt` kann sie strengere
+      Verluste ausweisen als ein physikalisch glatter Zerfall.
   - Restore-Leistung:
     - Wenn gesetzt, begrenzt `restore_capability_up_kw` den maximal nutzbaren Restore-Leistungsfluss der Up-Richtung (Lade-Richtung) und `restore_capability_down_kw` die Down-Richtung (Entlade-Richtung).
     - `restore_capability_up_kw` und `restore_capability_down_kw` müssen, falls gesetzt, strikt `> 0` sein.
@@ -416,7 +423,9 @@ Restore- und Gate-Entscheidungslogik (verbindlich):
     - `required_recovery_minutes = max(required_recovery_minutes_up, required_recovery_minutes_down)`
     - `restore_capability_used` ist die effektive Restore-Kapazität (`restore_capability_up_t`
       oder `restore_capability_down_t`), die den maximalen `required_recovery_minutes`-Wert
-      bestimmt; bei Gleichstand deterministisch die Up-Richtung.
+      bestimmt; bei Gleichstand deterministisch die Up-Richtung. Wenn
+      `required_recovery_minutes == 0`, ist `restore_capability_used=null` /
+      `not_applicable`, damit kein 0-kW-Up-Auditwert als genutzter Pfad erscheint.
 - Falls `required_recovery_minutes > max_recovery_time` => `ROBUST_INFEASIBLE` mit
   `limiting_reason_code=RECOVERY_TIMEOUT`.
 - Falls kein zulässiges Window vorliegt:
@@ -784,6 +793,9 @@ Order-Routing oder Börsenanbindung bleibt außerhalb.
   `reserve_robustness_status=ROBUST_NEEDS_INTRADAY_RESTORE` und
   `action=intraday_restore_required` (optional ergänzt durch `status_description`) im
   Replay-/Operator-Output.
+- Robustheits-`TerminationDetail` roundtript als `format=kv1` ohne Doppelpunkt in
+  Werten: Persistierung + `ParseTerminationReason` + erneute Ausgabe erhält
+  `format=kv1;reason=...;solver_code=...` bytegleich.
 - `market_time_unit` abseits von `minute` → `ROBUST_POLICY_UNSUPPORTED`.
 - Auflösungsfelder kleiner oder gleich 0 (`resolution_minutes`) → `ROBUST_POLICY_UNSUPPORTED`.
 - Bei aktivem FCR gilt `t_min_fcr`/`full_activation_time <= 0` → `ROBUST_POLICY_UNSUPPORTED`.

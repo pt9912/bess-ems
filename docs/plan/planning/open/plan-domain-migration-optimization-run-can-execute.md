@@ -70,6 +70,9 @@ Nicht vorhanden:
        `robust_ok`;
      - nachfolgende Slices hängen ihre `*_ok`-Beiträge ausschließlich an diesem
        Vertrag an;
+     - Sammelbeiträge wie `source_ok` sind all-or-nothing: mehrere Slices oder
+       mehrere Serien dürfen denselben Slot bedienen, und jeder einzelne
+       `source_ok=false`-Beitrag zieht das aggregierte `source_ok` auf `false`;
      - der Combiner berechnet monoton `CanExecute = HasUsableSolution && all(_ok)`.
 
 ### Gemeinsame Run-Mapping-Matrix
@@ -127,6 +130,11 @@ duplizieren diese Matrix nicht.
        Guard-Ergebnisse dürfen keine gemischten Freitext-/`key=value`-Formate
        erzeugen. Parser müssen Legacy-Strings als Freitext behandeln, sobald
        kein führendes `format=kv1;` vorhanden ist.
+     - `format=kv1`-Werte dürfen keinen Doppelpunkt enthalten, weil die bestehende
+       Domain-Wireform `TerminationCode:TerminationDetail` am ersten `:` trennt.
+       Werte mit natürlichem Doppelpunkt (z. B. ISO-Zeitstempel oder URLs) müssen
+       vor Persistierung percent-encoded werden; neue Parser dekodieren nur
+       innerhalb von `format=kv1`.
 
 3. Persistenz und Wire
    - `can_execute` in allen produktiven Stores hinzufügen:
@@ -147,6 +155,10 @@ duplizieren diese Matrix nicht.
        mit einem nicht-legacy Diskriminator auditierbar sein.
      - spätere fachliche Hard-Stops überschreiben auf `false`.
    - Wire-Mapper und API-/DTO-Ausgaben erweitern.
+   - Roundtrip-Test ergänzen: `TerminationCode` plus
+     `TerminationDetail=format=kv1;reason=...;solver_code=...` muss nach
+     Persistierung, `ParseTerminationReason` und erneuter Ausgabe bytegleich
+     erhalten bleiben; ein Detailwert mit unescaped `:` wird abgewiesen.
    - API-Kompatibilität:
      - Producer-Vertrag: `can_execute` ist nach der Migration ein required Feld in
        Optimierungs-Run-Responses.
