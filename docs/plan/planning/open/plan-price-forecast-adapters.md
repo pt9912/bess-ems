@@ -654,7 +654,7 @@ Endgültige Serienendstatus sind:
 - Deterministische Reaktionsregeln:
   - Die Source-Auswahl, Retry-/Fallback-Versuche und Operator-Ausgaben folgen
     den kanonischen Ableitungsregeln aus dem Abschnitt
-    [Verbindlicher Daten- und Fehlervertrag](#verbindlicher-daten-und-fehlervertrag).
+    [Verbindlicher Daten- und Fehlervertrag](#verbindlicher-daten--und-fehlervertrag).
   - Dieser Phase-1-Block definiert keine zweite Statusmatrix. Er ergänzt nur,
     dass Fallback-Quellen `SeriesEnvelope`, Einheit und Horizon exakt kompatibel
     liefern müssen, bevor die kanonische Ableitung angewendet wird.
