@@ -82,7 +82,7 @@ help:
 	@echo "  make lock-refresh    Refresh packages.lock.json files in Docker (per docs/user/quality.md §1.4)"
 	@echo "  make schema-validate      Validate schema/schema.yaml via d-migrate (RM-M2-MIG-02)"
 	@echo "  make schema-generate      Generate ?001_initial.sql from schema/schema.yaml (RM-M2-MIG-02)"
-	@echo "  make docs-check           Validate local Markdown links"
+	@echo "  make docs-check           Validate Markdown refs (d-check) + host paths (rest sensor)"
 	@echo "  make helm-lint            Lint/render Kubernetes Helm chart (RM-M6-03)"
 	@echo ""
 	@echo "Welle 5 (Closure, active):"
@@ -171,7 +171,14 @@ helm-lint:
 		--set topology.mode=workerPerAsset \
 		--set mqtt.enabled=true >/tmp/bess-ems-helm-mqtt.yaml
 
+# Referenz-Checks (Links, Anker) via d-check (Digest-Pin auf v0.2.0,
+# https://github.com/pt9912/d-check/releases/tag/v0.2.0; Konfiguration
+# in .d-check.yml); die Dockerfile-Stage prueft als Rest-Sensor nur
+# noch host-lokale absolute Pfade (tools/check_markdown_links.py).
+D_CHECK_IMAGE ?= ghcr.io/pt9912/d-check@sha256:f2e0ac7bd9650fe560058e530c8890a629e2df43b8b2e696e78488794d311846
+
 docs-check:
+	docker run --rm -v "$(CURDIR)":/repo:ro $(D_CHECK_IMAGE)
 	$(DOCKER_BUILD) --target docs-check -t $(IMAGE_PREFIX)-docs-check:latest
 
 # --- Welle 1 (active) ------------------------------------------------------

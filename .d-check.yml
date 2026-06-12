@@ -1,0 +1,15 @@
+# Doku-Referenz-Checks via d-check (ghcr.io/pt9912/d-check) — ersetzt
+# die Link-/Anker-Prüfungen von tools/check_markdown_links.py
+# (Rollout 2026-06-12; 13. Alt-Tool-Vorkommen, eigenständige Linie).
+# check_markdown_links.py bleibt als Rest-Sensor für host-lokale
+# absolute Pfade in Prosa (/Development/…, C:\…, UNC) — für einen
+# generischen Referenz-Checker out-of-scope. Scan über die Repo-Wurzel
+# wie das Alt-Tool; .github/ wie dort ausgenommen.
+# Bekannte Abdeckungs-Differenzen (im Bestand ohne Befund):
+# Reference-Style-Definitionen, HTML-/{#id}-Anker und
+# ASCII-Slug-Varianten prüfte das Alt-Tool, d-check nicht.
+# Beschreibung siehe: https://raw.githubusercontent.com/pt9912/d-check/refs/heads/main/README.md
+scan:
+  roots: ["."]
+  ignore: [".github/**"]
+modules: [links, anchors]

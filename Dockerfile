@@ -39,9 +39,9 @@ COPY proto/ proto/
 RUN dotnet restore BatteryEms.sln --locked-mode
 
 # ---------------------------------------------------------------------------
-# docs-check: dependency-free Markdown local-link validation.
-# External URLs are not fetched; the gate checks repo-local paths and Markdown
-# anchors so documentation changes cannot leave broken local references behind.
+# docs-check (rest sensor): rejects host-local absolute paths in Markdown
+# prose. Local link and anchor validation moved to d-check (2026-06-12,
+# digest-pinned image run by `make docs-check`; config in .d-check.yml).
 # ---------------------------------------------------------------------------
 FROM ${PYTHON_IMAGE} AS docs-check
 WORKDIR /src
