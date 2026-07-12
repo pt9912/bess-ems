@@ -157,8 +157,10 @@ höchstens eine **nicht-normative** Produzenten-Hilfe.
 Die Feldmenge + Null-Weglassung werden **mechanisch aus dem Code abgeleitet** (nicht
 hand-gelistet — das wäre derselbe Handspiegel-Drift). **Autorität je Richtung:**
 `telemetry`/`status`/`fault` ← `bess-field-sim/internal/mqtt/serializer.go`
-(Go/Feld ist De-facto-Produzent, bess-ems test-gepinnt); `command`/`command_ack` ←
-`MqttPayloads.cs` (C#/EMS ist Produzent).
+(Go/Feld ist De-facto-Produzent, bess-ems test-gepinnt); `command` ←
+`MqttPayloads.cs` (C#/EMS **produziert**, `MqttCommandSink.cs:81`); `command_ack` ←
+**Feld produziert**, bess-ems **konsumiert** (`MqttCommandSink.cs:152`) — dessen
+C#-Typ `CommandAckPayload` pinnt die EMS-Erwartung, nicht den Produzenten.
 
 **Feldmenge** (verbindlich):
 
