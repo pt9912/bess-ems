@@ -27,7 +27,7 @@ DOCKER_BUILD = $(DOCKER) build $(BUILD_CONTEXT) \
 	native-lint native-sanitizer native-coverage-report native-coverage-gate native-coverage-exclusions \
 	simulator-test simulator-race simulator-lint simulator-coverage-gate \
 	build ci runtime fullbuild lock-refresh release-assets \
-	schema-validate schema-generate schema-drift-check \
+	schema-validate schema-generate schema-drift-check field-contract-check \
 	helm-lint docs-check
 
 help:
@@ -181,6 +181,18 @@ docs-check:
 	docker run --rm -v "$(CURDIR)":/repo:ro $(D_CHECK_IMAGE)
 	$(DOCKER_BUILD) --target docs-check -t $(IMAGE_PREFIX)-docs-check:latest
 
+FIELD_CONTRACT_IMAGE ?= python:3.13-slim
+
+# ADR 0013 §5.1: integrity gate for the published device-mapping field contract.
+# Deep drift (envelope <-> MqttPayloads.cs, schema_version runtime enforcement +
+# example conformance) is covered by the C# test suite under `make test`. This guards
+# the *shipped* schema files that `make schema-*` (Postgres DDL) does not: all present,
+# valid JSON objects, schema_version pinned to the v1 major, CHANGELOG present.
+# Stdlib-only python, no network.
+field-contract-check:
+	docker run --rm -v "$(CURDIR)":/repo:ro -w /repo $(FIELD_CONTRACT_IMAGE) \
+		python3 scripts/field_contract_check.py
+
 # --- Welle 1 (active) ------------------------------------------------------
 
 solid-suppression-gate:
@@ -212,7 +224,7 @@ coverage-gate:
 # --- Aggregated gates ------------------------------------------------------
 
 gates: lint arch-check test test-safety test-mpc-property test-replay coverage-gate \
-	docs-check \
+	docs-check field-contract-check \
 	simulator-lint simulator-test simulator-race simulator-coverage-gate \
 	native-build native-lint native-sanitizer \
 	native-coverage-gate native-coverage-exclusions \

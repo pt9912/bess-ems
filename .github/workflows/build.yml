@@ -86,6 +86,7 @@ jobs:
           copy_from_image "bess-field-sim:coverage" "/out" "artifacts/ci/simulator-coverage"
           run_gate schema-validate
           run_gate schema-drift-check
+          run_gate field-contract-check
           run_gate native-build native-build
           run_gate native-sanitizer native-sanitizer
           run_gate native-coverage-gate native-coverage-gate
