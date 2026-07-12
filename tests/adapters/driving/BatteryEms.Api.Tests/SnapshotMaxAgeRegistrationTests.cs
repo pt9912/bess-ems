@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using BatteryEms.Api.Composition;
 using BatteryEms.Application.Realtime;
 using Microsoft.Extensions.Configuration;
@@ -68,5 +69,32 @@ public sealed class SnapshotMaxAgeRegistrationTests
         var resolved = config.GetValue("Bess:SnapshotMaxAge", ApplicationServiceRegistration.DefaultSnapshotMaxAge);
 
         Assert.Equal(ApplicationServiceRegistration.DefaultSnapshotMaxAge, resolved);
+    }
+
+    // appsettings.json documents the key for operators AND is the value the Host loads,
+    // so it must equal DefaultSnapshotMaxAge — otherwise the two representations of the
+    // 10 s window drift silently (bump the constant, the Host keeps the appsettings value).
+    [Fact]
+    public void Host_appsettings_snapshot_max_age_matches_the_code_default()
+    {
+        var appsettings = Path.Combine(RepoRoot(), "src", "host", "BatteryEms.Host", "appsettings.json");
+        var config = new ConfigurationBuilder().AddJsonFile(appsettings).Build();
+
+        var configured = config.GetValue<TimeSpan?>("Bess:SnapshotMaxAge");
+
+        Assert.NotNull(configured);
+        Assert.Equal(ApplicationServiceRegistration.DefaultSnapshotMaxAge, configured);
+    }
+
+    private static string RepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "BatteryEms.sln")))
+        {
+            dir = dir.Parent;
+        }
+
+        return dir?.FullName
+            ?? throw new InvalidOperationException("BatteryEms.sln not found above the test output directory.");
     }
 }

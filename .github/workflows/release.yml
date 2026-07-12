@@ -224,6 +224,7 @@ jobs:
           set -euo pipefail
           version="${{ steps.tag.outputs.version }}"
           epoch="${{ steps.tag.outputs.source_date_epoch }}"
+          case "${epoch}" in ''|*[!0-9]*) echo "source_date_epoch invalid: '${epoch}'" >&2; exit 1 ;; esac
           # ADR 0013 §5.1: publish config/schema/*.json as a reproducible, versioned
           # contract asset — pinned entry order/mtime/ownership + gzip -n, so the SHA256
           # in SHA256SUMS is stable and verifiable (mirrors build-release-assets.sh).

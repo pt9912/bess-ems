@@ -57,6 +57,16 @@ EXAMPLE_RULES = (
     ("retention.json", "retention.schema.json"),
 )
 
+# Patterns that MUST match at least one shipped example. Without this floor the gate
+# false-passes ("0 examples conform", exit 0) if config/examples/ (or its adapters/
+# mappings) vanishes in a bad merge — the same presence regression REQUIRED_SCHEMAS
+# guards for schemas.
+REQUIRED_EXAMPLE_PATTERNS = (
+    "adapters/modbus.*.json",
+    "adapters/mqtt.*.json",
+    "adapters/opcua.*.json",
+)
+
 
 def load_json(path, errors):
     """Parse JSON, appending a clean diagnostic (never a traceback) on failure."""
@@ -69,11 +79,11 @@ def load_json(path, errors):
     return None
 
 
-def match_schema(rel):
+def match_rule(rel):
     for pattern, target in EXAMPLE_RULES:
         if rel.match(pattern):
-            return target
-    return None
+            return pattern, target
+    return None, None
 
 
 def main() -> int:
@@ -133,15 +143,20 @@ def main() -> int:
                 f"{SCHEMA_DIR / name}: schema_version.enum must be {CONTRACT_MAJOR!r}, got {enum!r}"
             )
 
-    # Every shipped example validates against its schema.
+    # Every shipped example validates against its schema, and the required example
+    # patterns must each be present (no silent 0-examples pass).
     example_count = 0
-    if EXAMPLES_DIR.is_dir():
+    if not EXAMPLES_DIR.is_dir():
+        errors.append(f"{EXAMPLES_DIR}: examples directory is missing")
+    else:
+        matched = {pattern: 0 for pattern, _ in EXAMPLE_RULES}
         for example in sorted(EXAMPLES_DIR.rglob("*.json")):
             rel = example.relative_to(EXAMPLES_DIR)
-            schema_name = match_schema(rel)
+            pattern, schema_name = match_rule(rel)
             if schema_name is None:
                 errors.append(f"{example}: shipped example has no validation rule (add it to EXAMPLE_RULES)")
                 continue
+            matched[pattern] += 1
             schema = schemas.get(schema_name)
             if not isinstance(schema, dict):
                 errors.append(f"{example}: schema {schema_name} unavailable to validate against")
@@ -161,6 +176,9 @@ def main() -> int:
                 loc = "/".join(str(p) for p in err.path) or "(root)"
                 errors.append(f"{example}: fails {schema_name} at {loc}: {err.message}")
             example_count += 1
+        for pattern in REQUIRED_EXAMPLE_PATTERNS:
+            if matched.get(pattern, 0) == 0:
+                errors.append(f"{EXAMPLES_DIR}: no example matches required pattern '{pattern}' — a protocol mapping example must ship")
 
     if errors:
         print("field-contract-check FAILED:", file=sys.stderr)

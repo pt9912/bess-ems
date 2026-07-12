@@ -152,6 +152,14 @@ echo "[build-release-assets] packaging device-mapping schema bundle"
 # (gzip -n), so the SHA256 is stable run-to-run and the published checksum is verifiable.
 schema_bundle="${RELEASE_DIR}/bess-ems-schemas-${vbare}.tar.gz"
 SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git -C "${repo_root}" log -1 --format=%ct HEAD)}"
+# A malformed epoch makes tar --mtime="@" silently substitute a constant (warn, exit 0);
+# the cmp self-check proves determinism, not timestamp correctness, so guard it here.
+case "${SOURCE_DATE_EPOCH}" in
+  ''|*[!0-9]*)
+    echo "[build-release-assets] SOURCE_DATE_EPOCH='${SOURCE_DATE_EPOCH}' is not a positive integer epoch" >&2
+    exit 1
+    ;;
+esac
 build_schema_bundle() {
   local stage="$1" out="$2"
   rm -rf "${stage}"

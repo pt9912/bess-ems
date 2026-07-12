@@ -55,7 +55,9 @@ RUN python tools/check_markdown_links.py --root /src
 # against them, and asserts the bundle invariants (schema_version pin, CHANGELOG).
 # The MQTT envelope C#<->schema drift check needs the C# source and stays in
 # EnvelopeSchemaTests under `make test` (same `make gates` aggregate).
-# Shares the digest-tag PYTHON_IMAGE with docs-check.
+# Uses the same PYTHON_IMAGE tag as docs-check (both unpinned by tag; a repo-wide
+# digest pin is a separate follow-up). jsonschema is version-pinned; its transitives
+# float, which is acceptable for a check-only gate that never ships.
 # ---------------------------------------------------------------------------
 FROM ${PYTHON_IMAGE} AS field-contract-check
 WORKDIR /src
