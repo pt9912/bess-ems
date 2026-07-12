@@ -49,6 +49,22 @@ COPY . .
 RUN python tools/check_markdown_links.py --root /src
 
 # ---------------------------------------------------------------------------
+# field-contract-check (ADR 0013 §5.1): integrity + conformance gate for the
+# published device-mapping field contract. Meta-validates every schema (Draft
+# 2020-12), validates the shipped example mappings under config/examples/
+# against them, and asserts the bundle invariants (schema_version pin, CHANGELOG).
+# The MQTT envelope C#<->schema drift check needs the C# source and stays in
+# EnvelopeSchemaTests under `make test` (same `make gates` aggregate).
+# Shares the digest-tag PYTHON_IMAGE with docs-check.
+# ---------------------------------------------------------------------------
+FROM ${PYTHON_IMAGE} AS field-contract-check
+WORKDIR /src
+RUN pip install --no-cache-dir jsonschema==4.23.0
+COPY config/ config/
+COPY scripts/field_contract_check.py scripts/
+RUN python scripts/field_contract_check.py
+
+# ---------------------------------------------------------------------------
 # lint: dotnet build -warnaserror (RM-M1-01, RM-M1-21)
 # ---------------------------------------------------------------------------
 FROM restore AS lint

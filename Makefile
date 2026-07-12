@@ -181,17 +181,14 @@ docs-check:
 	docker run --rm -v "$(CURDIR)":/repo:ro $(D_CHECK_IMAGE)
 	$(DOCKER_BUILD) --target docs-check -t $(IMAGE_PREFIX)-docs-check:latest
 
-FIELD_CONTRACT_IMAGE ?= python:3.13-slim
-
-# ADR 0013 §5.1: integrity gate for the published device-mapping field contract.
-# Deep drift (envelope <-> MqttPayloads.cs, schema_version runtime enforcement +
-# example conformance) is covered by the C# test suite under `make test`. This guards
-# the *shipped* schema files that `make schema-*` (Postgres DDL) does not: all present,
-# valid JSON objects, schema_version pinned to the v1 major, CHANGELOG present.
-# Stdlib-only python, no network.
+# ADR 0013 §5.1: integrity + conformance gate for the published device-mapping
+# field contract. Meta-validates every schema (Draft 2020-12), validates the
+# shipped example mappings under config/examples/ against them, and asserts the
+# bundle invariants (schema_version pin, CHANGELOG). Envelope C#<->schema drift
+# stays in EnvelopeSchemaTests under `make test` (same aggregate). Runs in the
+# field-contract-check Dockerfile stage (jsonschema on ${PYTHON_IMAGE}).
 field-contract-check:
-	docker run --rm -v "$(CURDIR)":/repo:ro -w /repo $(FIELD_CONTRACT_IMAGE) \
-		python3 scripts/field_contract_check.py
+	$(DOCKER_BUILD) --target field-contract-check -t $(IMAGE_PREFIX)-field-contract-check:latest
 
 # --- Welle 1 (active) ------------------------------------------------------
 
@@ -230,7 +227,7 @@ gates: lint arch-check test test-safety test-mpc-property test-replay coverage-g
 	native-coverage-gate native-coverage-exclusions \
 	test-native-interop test-native-parity \
 	test-hil-opcua test-hil-optimization-core test-optimization-core-compose
-	@echo "[gates] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, docs-check, simulator-{lint,test,race,coverage-gate}) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + M5 (test-hil-optimization-core, test-optimization-core-compose, test-mpc-property, test-replay)"
+	@echo "[gates] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, docs-check, field-contract-check, simulator-{lint,test,race,coverage-gate}) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + M5 (test-hil-optimization-core, test-optimization-core-compose, test-mpc-property, test-replay)"
 
 # --- Welle 3 (partially active) --------------------------------------------
 
@@ -417,13 +414,13 @@ test-container: runtime
 ci: lint arch-check test test-safety test-mpc-property test-replay coverage-gate \
     docs-check \
     simulator-lint simulator-test simulator-race simulator-coverage-gate \
-    schema-validate schema-drift-check \
+    schema-validate schema-drift-check field-contract-check \
     native-build native-lint native-sanitizer \
     native-coverage-gate native-coverage-exclusions \
     test-native-interop test-native-parity \
     test-hil-opcua test-hil-optimization-core \
     test-optimization-core-compose test-integration
-	@echo "[ci] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, docs-check, simulator-*) + M2 schema (validate, drift-check) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + M5 (test-hil-optimization-core, test-optimization-core-compose, test-mpc-property, test-replay) + test-integration"
+	@echo "[ci] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, docs-check, simulator-*) + M2 schema (validate, drift-check) + field-contract-check + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + M5 (test-hil-optimization-core, test-optimization-core-compose, test-mpc-property, test-replay) + test-integration"
 
 # Fresh-clone-naher Komplettlauf: alle CI-Gates plus Runtime-Image und
 # Compose-Smoke. Letzte Stufe vor einem M1-Tag (RM-M1-20).
