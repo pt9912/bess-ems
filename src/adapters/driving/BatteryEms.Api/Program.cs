@@ -5,6 +5,7 @@ using BatteryEms.Api.Endpoints;
 using BatteryEms.Api.Observability;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.Json;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Prometheus;
 
@@ -48,7 +49,8 @@ public class Program
         // Application-side stateful in-memory stores + driving-port use
         // cases. Bundled in ApplicationServiceRegistration to keep this
         // method's class coupling under the CA1506 threshold.
-        builder.Services.AddBessApplicationInMemoryStores();
+        builder.Services.AddBessApplicationInMemoryStores(
+            builder.Configuration.GetValue("Bess:SnapshotMaxAge", ApplicationServiceRegistration.DefaultSnapshotMaxAge));
 
         // RM-M1-16: API-token AuthN + role-based AuthZ for write endpoints.
         builder.Services.AddApiTokenAuth(builder.Configuration);

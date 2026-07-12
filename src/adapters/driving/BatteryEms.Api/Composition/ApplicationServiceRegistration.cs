@@ -18,13 +18,20 @@ namespace BatteryEms.Api.Composition;
 // Worker (RM-M1-19) will reuse this extension for the same shape.
 public static class ApplicationServiceRegistration
 {
-    public static IServiceCollection AddBessApplicationInMemoryStores(this IServiceCollection services)
+    // ADR 0013 §5.1: snapshot freshness window. Single shared default; both process
+    // call-sites (Host + API) read Bess:SnapshotMaxAge from their own IConfiguration
+    // and pass the resolved value here (the API project cannot reference BessHostOptions).
+    public static readonly TimeSpan DefaultSnapshotMaxAge = TimeSpan.FromSeconds(10);
+
+    public static IServiceCollection AddBessApplicationInMemoryStores(
+        this IServiceCollection services,
+        TimeSpan? snapshotMaxAge = null)
     {
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton<IBatteryAssetRegistry>(_ => new InMemoryBatteryAssetRegistry());
-        services.AddSingleton<ISnapshotStore>(_ => new InMemorySnapshotStore(TimeSpan.FromSeconds(10)));
+        services.AddSingleton<ISnapshotStore>(_ => new InMemorySnapshotStore(snapshotMaxAge ?? DefaultSnapshotMaxAge));
         services.AddSingleton<ICommandRepository, InMemoryCommandRepository>();
         services.AddSingleton<IScheduleRepository>(_ => new InMemoryScheduleRepository());
         services.AddSingleton<IScheduleTracker, DefaultScheduleTracker>();

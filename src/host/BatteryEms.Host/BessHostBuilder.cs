@@ -61,7 +61,8 @@ public static class BessHostBuilder
         builder.Host.ConfigureBessJsonLogging();
         ConfigureJson(builder.Services);
         builder.Services.AddOpenApi();
-        builder.Services.AddBessApplicationInMemoryStores();
+        builder.Services.AddBessApplicationInMemoryStores(
+            builder.Configuration.GetValue("Bess:SnapshotMaxAge", ApplicationServiceRegistration.DefaultSnapshotMaxAge));
         builder.Services.AddBessNativeControl(builder.Configuration);
         ConfigurePersistence(builder.Services, hostOptions);
         ConfigureOptimization(builder.Services, hostOptions);
