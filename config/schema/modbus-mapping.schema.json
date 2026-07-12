@@ -6,6 +6,11 @@
   "additionalProperties": false,
   "required": ["profile_name", "unit_id_discovery", "registers"],
   "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["v1"],
+      "description": "Mapping-file schema version (ADR 0013). v1 ships today; a new version requires a tested migration path before the loader accepts it."
+    },
     "profile_name": { "type": "string", "minLength": 1 },
     "unit_id_discovery": { "type": "string", "enum": ["static", "dynamic", "sunspec"] },
     "static_unit_id": { "type": "integer", "minimum": 0, "maximum": 255 },

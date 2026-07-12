@@ -6,6 +6,11 @@
   "additionalProperties": false,
   "required": ["profile_name", "topics"],
   "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["v1"],
+      "description": "Mapping-file schema version (ADR 0013). v1 ships today; a new version requires a tested migration path before the loader accepts it."
+    },
     "profile_name": { "type": "string", "minLength": 1 },
     "topics": {
       "type": "array",
