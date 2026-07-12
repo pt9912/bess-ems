@@ -624,6 +624,28 @@ public sealed class JsonFileConfigurationLoaderTests
     }
 
     [Fact]
+    public void Modbus_non_string_schema_version_fails_structured_not_raw()
+    {
+        // A numeric schema_version must yield a ConfigurationValidationException,
+        // not a raw InvalidOperationException from GetValue<string>().
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson("""
+            {
+              "schema_version": 1,
+              "profile_name": "p",
+              "unit_id_discovery": "static",
+              "static_unit_id": 1,
+              "registers": [
+                { "name": "x", "address": 0, "type": "uint16", "scale_factor": 1, "range": [0, 1], "writable": false, "write_cadence": "cyclic", "auth_required": "none" }
+              ]
+            }
+            """);
+
+        var ex = Assert.Throws<ConfigurationValidationException>(() => loader.LoadModbusMapping(path));
+        Assert.Contains("required field 'schema_version'", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Missing_file_throws_validation_exception()
     {
         var loader = new JsonFileConfigurationLoader(SchemaDirectory);

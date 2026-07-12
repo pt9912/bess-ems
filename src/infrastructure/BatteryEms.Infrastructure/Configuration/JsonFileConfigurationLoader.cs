@@ -408,7 +408,14 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
             throw new ConfigurationValidationException($"Configuration file is empty: {filePath}");
         }
 
-        var declaredVersion = rawNode["schema_version"]?.GetValue<string>();
+        // A present-but-non-string schema_version (e.g. a number) must not blow up
+        // with a raw InvalidOperationException from GetValue<string>(); treat any
+        // absent/non-string value as the structured missing-field diagnose.
+        string? declaredVersion = null;
+        if (rawNode["schema_version"] is JsonValue sv && sv.TryGetValue<string>(out var s))
+        {
+            declaredVersion = s;
+        }
         if (string.IsNullOrWhiteSpace(declaredVersion))
         {
             throw new ConfigurationValidationException(
