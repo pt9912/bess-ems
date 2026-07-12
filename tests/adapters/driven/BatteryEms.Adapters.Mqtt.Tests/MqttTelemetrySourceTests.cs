@@ -74,7 +74,7 @@ public sealed class MqttTelemetrySourceTests
     [Fact]
     public void Constructor_throws_when_telemetry_topic_missing_from_mapping()
     {
-        var mapping = new BatteryEms.Application.Configuration.MqttMappingConfiguration("p",
+        var mapping = new BatteryEms.Application.Configuration.MqttMappingConfiguration("v1", "p",
             new List<BatteryEms.Application.Configuration.MqttTopicMapping>
             {
                 new("command", "battery/{assetId}/command", "publish", "json", false, "none"),

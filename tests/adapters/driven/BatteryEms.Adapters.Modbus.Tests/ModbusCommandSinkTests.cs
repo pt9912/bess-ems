@@ -330,6 +330,7 @@ public sealed class ModbusCommandSinkTests
     public void Constructor_rejects_non_static_unit_id_discovery()
     {
         var mapping = new ModbusMappingConfiguration(
+            SchemaVersion: "v1",
             ProfileName: "x",
             UnitIdDiscovery: "dynamic",
             StaticUnitId: null,

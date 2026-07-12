@@ -23,6 +23,7 @@ internal static class MqttFixtures
         maxOperatingTemperatureCelsius: 55);
 
     public static MqttMappingConfiguration SimulatorMapping() => new(
+        SchemaVersion: "v1",
         ProfileName: "test",
         Topics: new List<MqttTopicMapping>
         {

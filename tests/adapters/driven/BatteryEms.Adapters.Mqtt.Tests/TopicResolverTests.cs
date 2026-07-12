@@ -16,7 +16,7 @@ public sealed class TopicResolverTests
     [Fact]
     public void Require_throws_when_name_missing()
     {
-        var mapping = new MqttMappingConfiguration("p", new List<MqttTopicMapping>
+        var mapping = new MqttMappingConfiguration("v1", "p", new List<MqttTopicMapping>
         {
             new("telemetry", "battery/{assetId}/telemetry", "subscribe", "json", false, "none"),
         });
@@ -30,7 +30,7 @@ public sealed class TopicResolverTests
         // EMS-perspective semantics: a command_ack with direction='publish'
         // would mean the EMS publishes ACKs, which is wrong. Resolver must
         // refuse to silently match the wrong-direction topic.
-        var mapping = new MqttMappingConfiguration("p", new List<MqttTopicMapping>
+        var mapping = new MqttMappingConfiguration("v1", "p", new List<MqttTopicMapping>
         {
             new("command_ack", "battery/{assetId}/command/ack", "publish", "json", false, "none"),
         });

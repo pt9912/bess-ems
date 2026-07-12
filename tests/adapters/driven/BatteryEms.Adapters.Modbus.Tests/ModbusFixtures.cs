@@ -23,6 +23,7 @@ internal static class ModbusFixtures
         maxOperatingTemperatureCelsius: 55);
 
     public static ModbusMappingConfiguration VendorNeutralMapping() => new(
+        SchemaVersion: "v1",
         ProfileName: "test",
         UnitIdDiscovery: "static",
         StaticUnitId: 1,

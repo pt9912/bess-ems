@@ -114,6 +114,7 @@ public sealed class ModbusTelemetrySourceTests
     public void Constructor_rejects_non_static_unit_id_discovery()
     {
         var mapping = new ModbusMappingConfiguration(
+            SchemaVersion: "v1",
             ProfileName: "x",
             UnitIdDiscovery: "dynamic",
             StaticUnitId: null,
@@ -145,6 +146,7 @@ public sealed class ModbusTelemetrySourceTests
         };
 
         var mapping = new ModbusMappingConfiguration(
+            SchemaVersion: "v1",
             ProfileName: "hil",
             UnitIdDiscovery: "static",
             StaticUnitId: 1,
@@ -195,6 +197,7 @@ public sealed class ModbusTelemetrySourceTests
         // values; anything else (typo, vendor-specific table) must
         // fail fast so the read-path branch stays total.
         var mapping = new ModbusMappingConfiguration(
+            SchemaVersion: "v1",
             ProfileName: "p",
             UnitIdDiscovery: "static",
             StaticUnitId: 1,

@@ -172,11 +172,11 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
         }
 
         return new ModbusMappingConfiguration(
+            SchemaVersion: dto.SchemaVersion,
             ProfileName: dto.ProfileName,
             UnitIdDiscovery: dto.UnitIdDiscovery,
             StaticUnitId: dto.StaticUnitId,
-            Registers: registers,
-            SchemaVersion: dto.SchemaVersion ?? "v1");
+            Registers: registers);
     }
 
     public MqttMappingConfiguration LoadMqttMapping(string filePath)
@@ -199,7 +199,7 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
             })
             .ToList();
 
-        return new MqttMappingConfiguration(dto.ProfileName, topics, dto.SchemaVersion ?? "v1");
+        return new MqttMappingConfiguration(dto.SchemaVersion, dto.ProfileName, topics);
     }
 
     public OpcUaMappingConfiguration LoadOpcUaMapping(string filePath)
@@ -523,11 +523,11 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "Instantiated by JsonSerializer via reflection.")]
     private sealed record ModbusMappingDto(
+        string SchemaVersion,
         string ProfileName,
         string UnitIdDiscovery,
         int? StaticUnitId,
-        List<ModbusRegisterDto>? Registers,
-        string? SchemaVersion = null);
+        List<ModbusRegisterDto>? Registers);
 
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "Instantiated by JsonSerializer via reflection.")]
@@ -559,9 +559,9 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "Instantiated by JsonSerializer via reflection.")]
     private sealed record MqttMappingDto(
+        string SchemaVersion,
         string ProfileName,
-        List<MqttTopicDto>? Topics,
-        string? SchemaVersion = null);
+        List<MqttTopicDto>? Topics);
 
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812", Justification = "Instantiated by JsonSerializer via reflection.")]

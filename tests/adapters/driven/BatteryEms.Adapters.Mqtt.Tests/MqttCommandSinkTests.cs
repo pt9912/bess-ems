@@ -187,7 +187,7 @@ public sealed class MqttCommandSinkTests
     [Fact]
     public void Constructor_throws_when_command_topic_missing()
     {
-        var mapping = new BatteryEms.Application.Configuration.MqttMappingConfiguration("p",
+        var mapping = new BatteryEms.Application.Configuration.MqttMappingConfiguration("v1", "p",
             new List<BatteryEms.Application.Configuration.MqttTopicMapping>
             {
                 new("command_ack", "battery/{assetId}/command/ack", "subscribe", "json", false, "none"),
@@ -199,7 +199,7 @@ public sealed class MqttCommandSinkTests
     [Fact]
     public void Constructor_throws_when_ack_topic_missing()
     {
-        var mapping = new BatteryEms.Application.Configuration.MqttMappingConfiguration("p",
+        var mapping = new BatteryEms.Application.Configuration.MqttMappingConfiguration("v1", "p",
             new List<BatteryEms.Application.Configuration.MqttTopicMapping>
             {
                 new("command", "battery/{assetId}/command", "publish", "json", false, "none"),
