@@ -11,6 +11,13 @@
     <PackageReference Include="MQTTnet" />
   </ItemGroup>
 
+  <!-- ADR 0013 §5.1: the wire DTOs (MqttPayloads) are internal; the test
+       project needs them to validate the envelope schema against the real
+       System.Text.Json output. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="BatteryEms.Adapters.Mqtt.Tests" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\..\hexagon\BatteryEms.Application\BatteryEms.Application.csproj" />
     <ProjectReference Include="..\..\..\hexagon\BatteryEms.Domain\BatteryEms.Domain.csproj" />

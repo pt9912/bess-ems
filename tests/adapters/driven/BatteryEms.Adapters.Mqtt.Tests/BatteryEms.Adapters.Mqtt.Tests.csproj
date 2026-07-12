@@ -19,6 +19,9 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <!-- ADR 0013 §5.1: C#->Schema envelope generation + drift/round-trip check. -->
+    <PackageReference Include="JsonSchema.Net" />
+    <PackageReference Include="JsonSchema.Net.Generation" />
   </ItemGroup>
 
   <ItemGroup>

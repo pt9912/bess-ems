@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bess-ems.io/schema/mqtt-telemetry-envelope.json",
+  "title": "MQTT payload envelope (ADR 0013 5.1)",
+  "description": "Generated from BatteryEms.Adapters.Mqtt.MqttPayloads (C# to Schema). Field-normative wire contract for the telemetry/command/command_ack payloads. Do not hand-edit; regenerate.",
+  "$defs": {
+    "telemetry": {
+      "type": "object",
+      "properties": {
+        "offset_millis": {
+          "type": "integer"
+        },
+        "soc_percent": {
+          "type": "number"
+        },
+        "soh_percent": {
+          "type": "number"
+        },
+        "active_power_kw": {
+          "type": "number"
+        },
+        "reactive_power_kvar": {
+          "type": "number"
+        },
+        "dc_voltage": {
+          "type": "number"
+        },
+        "dc_current": {
+          "type": "number"
+        },
+        "temperature_celsius": {
+          "type": "number"
+        },
+        "available": {
+          "type": "boolean"
+        },
+        "fault_status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "offset_millis",
+        "soc_percent",
+        "soh_percent",
+        "active_power_kw",
+        "reactive_power_kvar",
+        "dc_voltage",
+        "dc_current",
+        "temperature_celsius",
+        "available",
+        "fault_status"
+      ]
+    },
+    "command": {
+      "type": "object",
+      "properties": {
+        "command_id": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "asset_id": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "active_power_kw": {
+          "type": "number"
+        },
+        "reactive_power_kvar": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "valid_until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "command_id",
+        "timestamp",
+        "asset_id",
+        "mode",
+        "active_power_kw",
+        "valid_until",
+        "reason",
+        "source"
+      ]
+    },
+    "command_ack": {
+      "type": "object",
+      "properties": {
+        "command_id": {
+          "type": "string"
+        },
+        "accepted": {
+          "type": "boolean"
+        },
+        "dispatched_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "reason": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "command_id",
+        "accepted",
+        "dispatched_at"
+      ]
+    }
+  }
+}

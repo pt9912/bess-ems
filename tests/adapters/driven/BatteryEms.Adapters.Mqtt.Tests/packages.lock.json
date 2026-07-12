@@ -8,6 +8,25 @@
         "resolved": "10.0.0",
         "contentHash": "pmUxktztlMnsIvgHjzxG3fHRAXpqmZSA+W8dIsbVMfwI01SnBndrBIOE3Stg6987+o7HjBa62C4q5um3Ia6d9g=="
       },
+      "JsonSchema.Net": {
+        "type": "Direct",
+        "requested": "[9.2.2, )",
+        "resolved": "9.2.2",
+        "contentHash": "S65LahlS1jA1cVshtBx7lnFPbQoTgZ4QdHX8fZ94VwUBlMQ9IvA2bu4ElUdrdu0VrJImMCxs5rpyybcvsrnmRA==",
+        "dependencies": {
+          "JsonPointer.Net": "7.0.1"
+        }
+      },
+      "JsonSchema.Net.Generation": {
+        "type": "Direct",
+        "requested": "[7.3.10, )",
+        "resolved": "7.3.10",
+        "contentHash": "KNk7hdXJXjvjxMTYbPCCNhzFR09oSLCwc3tuhKZ1Ne2Vw9CsCRnHNTbmSKQc4MTaLvMlTg48fi4fAo5jt9GQEw==",
+        "dependencies": {
+          "Humanizer.Core": "3.0.10",
+          "JsonSchema.Net": "9.2.2"
+        }
+      },
       "Microsoft.Extensions.DependencyInjection": {
         "type": "Direct",
         "requested": "[10.0.7, )",
@@ -43,6 +62,25 @@
         "requested": "[3.1.5, )",
         "resolved": "3.1.5",
         "contentHash": "tKi7dSTwP4m5m9eXPM2Ime4Kn7xNf4x4zT9sdLO/G4hZVnQCRiMTWoSZqI/pYTVeI27oPPqHBKYI/DjJ9GsYgA=="
+      },
+      "Humanizer.Core": {
+        "type": "Transitive",
+        "resolved": "3.0.10",
+        "contentHash": "yZIhtw8sYuvsONzQbZxWpR60tMWYHXoo0DL6nyOqSFiU5POjBTSEyWFpTQtJEZuy+oqiYTXKXY/Mjx7KnqIQFw=="
+      },
+      "Json.More.Net": {
+        "type": "Transitive",
+        "resolved": "3.0.1",
+        "contentHash": "fRctF2J2SILYG6wqP21drmeEODmCVkVQ/b3MndDu2fT1swfySyUgq7ePCk+aENGlDcIm05fyfjh9vcuqDEfv3w=="
+      },
+      "JsonPointer.Net": {
+        "type": "Transitive",
+        "resolved": "7.0.1",
+        "contentHash": "5C497yxfktYFsqxKG+GUQPsMvBqIjzLkqtDEdMGsnBpl3/OB8DOvTo7LEyRX7AVc1kVVj0IX5zhmLrlbvAYEnw==",
+        "dependencies": {
+          "Humanizer.Core": "3.0.10",
+          "Json.More.Net": "3.0.1"
+        }
       },
       "Microsoft.CodeCoverage": {
         "type": "Transitive",

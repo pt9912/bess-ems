@@ -526,7 +526,7 @@
           "BatteryEms.Application": "[1.0.0, )",
           "BatteryEms.Domain": "[1.0.0, )",
           "BatteryEms.Worker": "[1.0.0, )",
-          "JsonSchema.Net": "[9.2.0, )"
+          "JsonSchema.Net": "[9.2.2, )"
         }
       },
       "batteryems.worker": {
@@ -594,9 +594,9 @@
       },
       "JsonSchema.Net": {
         "type": "CentralTransitive",
-        "requested": "[9.2.0, )",
-        "resolved": "9.2.0",
-        "contentHash": "pc1hr16zNQSxVsOSIYWliE3rtl5E4MwRXReflPf60l5tSvzMfl65eJV6M+iPXhZ2Ui5o078LJ2pS9O1o5ZT1zQ==",
+        "requested": "[9.2.2, )",
+        "resolved": "9.2.2",
+        "contentHash": "S65LahlS1jA1cVshtBx7lnFPbQoTgZ4QdHX8fZ94VwUBlMQ9IvA2bu4ElUdrdu0VrJImMCxs5rpyybcvsrnmRA==",
         "dependencies": {
           "JsonPointer.Net": "7.0.1"
         }

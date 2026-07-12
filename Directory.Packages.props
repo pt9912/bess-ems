@@ -12,7 +12,11 @@
     <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />
     <PackageVersion Include="coverlet.msbuild" Version="10.0.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.203" />
-    <PackageVersion Include="JsonSchema.Net" Version="9.2.0" />
+    <PackageVersion Include="JsonSchema.Net" Version="9.2.2" />
+    <!-- ADR 0013 §5.1: generates the MQTT telemetry-envelope schema from
+         MqttPayloads.cs (C#->Schema). Own version line (7.x); 7.3.10 requires
+         JsonSchema.Net >= 9.2.2, hence the coordinated bump above. -->
+    <PackageVersion Include="JsonSchema.Net.Generation" Version="7.3.10" />
     <PackageVersion Include="Dapper" Version="2.1.72" />
     <!-- RM-M2-MIG-02: DbUp applies the versioned SQL migrations
          emitted by d-migrate (per ADR 0001). SQL-first, embedded-
