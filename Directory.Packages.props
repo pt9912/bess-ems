@@ -32,7 +32,15 @@
     <PackageVersion Include="Grpc.Net.Client" Version="2.71.0" />
     <PackageVersion Include="Grpc.Tools" Version="2.71.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.7" />
-    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.7" />
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
+    <!-- CVE-2026-49451 / GHSA-v5pm-xwqc-g5wc (High, CVSS 7.5): uncontrolled
+         recursion on a circular schema reference terminates the process via
+         stack overflow (JSON + YAML reader paths). Microsoft.OpenApi is pulled
+         transitively by Microsoft.AspNetCore.OpenApi, whose 10.0.x servicing
+         (incl. 10.0.9) still floors it at the vulnerable 2.0.0. Pin to the
+         first patched 2.x release (2.7.5); CentralPackageTransitivePinning
+         promotes this over the transitive 2.0.0 floor. -->
+    <PackageVersion Include="Microsoft.OpenApi" Version="2.7.5" />
     <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.7" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.7" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.7" />
