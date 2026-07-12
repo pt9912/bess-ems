@@ -1,7 +1,7 @@
 # Plan: Feldvertrag-Bundle + Versionierung (ADR 0013 §5.1)
 
-**Dokumenttyp:** Slice-Scope / next
-**Status:** Next — Scope skizziert, noch nicht aktiv
+**Dokumenttyp:** Slice-Plan / in-progress
+**Status:** In Progress — §5.1 in Umsetzung (Sub-Slice 1 zuerst)
 **Datum:** 2026-07-12
 **Quelle:** [`../../adr/0013-device-mapping-field-contract.md`](../../adr/0013-device-mapping-field-contract.md) §5.1
 **Bezug:**
