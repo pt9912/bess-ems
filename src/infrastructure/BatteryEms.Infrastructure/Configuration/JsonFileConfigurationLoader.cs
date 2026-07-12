@@ -10,13 +10,12 @@ namespace BatteryEms.Infrastructure.Configuration;
 
 public sealed class JsonFileConfigurationLoader : IConfigurationLoader
 {
-    // RM-M4-07 D-02: only v1 ships today. Adding v2+ requires a
-    // tested migration path (see follow-up F-07 in
-    // note-RM-M4-followups.md). The loader pre-validates this list
-    // before the JSON-schema run so an old/new file format gets a
-    // structured "unsupported-schema-version" diagnose instead of a
-    // generic enum-violation message.
-    private static readonly string[] SupportedOpcUaSchemaVersions = ["v1"];
+    // ADR 0013 §5.1 / RM-M4-07 D-02: only v1 ships today for every device
+    // mapping (Modbus/MQTT/OPC-UA). Adding v2+ requires a tested migration
+    // path. The loader pre-validates this list before the JSON-schema run so
+    // an old/new file format gets a structured "unsupported-schema-version"
+    // diagnose instead of a generic enum-violation message.
+    private static readonly string[] SupportedMappingSchemaVersions = ["v1"];
 
     private readonly JsonSchema _assetSchema;
     private readonly JsonSchema _assetsSchema;
@@ -133,6 +132,7 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
 
     public ModbusMappingConfiguration LoadModbusMapping(string filePath)
     {
+        EnsureSupportedSchemaVersion(filePath, "Modbus");
         var node = LoadAndValidate(filePath, _modbusSchema);
 
         var dto = node.Deserialize<ModbusMappingDto>(_serializerOptions)
@@ -181,6 +181,7 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
 
     public MqttMappingConfiguration LoadMqttMapping(string filePath)
     {
+        EnsureSupportedSchemaVersion(filePath, "MQTT");
         var node = LoadAndValidate(filePath, _mqttSchema);
 
         var dto = node.Deserialize<MqttMappingDto>(_serializerOptions)
@@ -203,43 +204,9 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
 
     public OpcUaMappingConfiguration LoadOpcUaMapping(string filePath)
     {
-        // RM-M4-07: pre-validate `schema_version` for a structured
-        // diagnose path. JSON-schema validation also enforces the
-        // enum, but its error message would be generic. By reading
-        // the field first we surface "unsupported-schema-version"
-        // with the actual value plus the supported set — operator-
-        // actionable signal beats opaque schema-validation noise.
-        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
-        if (!File.Exists(filePath))
-        {
-            throw new ConfigurationValidationException($"Configuration file not found: {filePath}");
-        }
-
-        JsonNode? rawNode;
-        try
-        {
-            rawNode = JsonNode.Parse(File.ReadAllText(filePath));
-        }
-        catch (JsonException ex)
-        {
-            throw new ConfigurationValidationException($"Configuration file is not valid JSON: {filePath}", ex);
-        }
-        if (rawNode is null)
-        {
-            throw new ConfigurationValidationException($"Configuration file is empty: {filePath}");
-        }
-
-        var declaredVersion = rawNode["schema_version"]?.GetValue<string>();
-        if (string.IsNullOrWhiteSpace(declaredVersion))
-        {
-            throw new ConfigurationValidationException(
-                $"OPC-UA mapping {filePath} is missing required field 'schema_version'.");
-        }
-        if (!SupportedOpcUaSchemaVersions.Contains(declaredVersion, StringComparer.Ordinal))
-        {
-            throw new ConfigurationValidationException(
-                $"OPC-UA mapping {filePath} declares unsupported-schema-version '{declaredVersion}'; supported: [{string.Join(", ", SupportedOpcUaSchemaVersions)}].");
-        }
+        // ADR 0013 §5.1 / RM-M4-07: structured schema_version pre-check
+        // (shared with Modbus/MQTT) before the generic JSON-schema run.
+        EnsureSupportedSchemaVersion(filePath, "OPC-UA");
 
         var node = LoadAndValidate(filePath, _opcuaSchema);
 
@@ -413,6 +380,45 @@ public sealed class JsonFileConfigurationLoader : IConfigurationLoader
             p => new Lazy<JsonSchema>(
                 () => JsonSchema.FromFile(p),
                 LazyThreadSafetyMode.ExecutionAndPublication)).Value;
+    }
+
+    // ADR 0013 §5.1: shared schema_version pre-check for device mappings.
+    // Runs before the JSON-schema validation so a missing/unsupported version
+    // surfaces an operator-actionable message rather than a generic enum
+    // violation. Mirrors the message shape used for OPC-UA since RM-M4-07.
+    private static void EnsureSupportedSchemaVersion(string filePath, string mappingKind)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+        if (!File.Exists(filePath))
+        {
+            throw new ConfigurationValidationException($"Configuration file not found: {filePath}");
+        }
+
+        JsonNode? rawNode;
+        try
+        {
+            rawNode = JsonNode.Parse(File.ReadAllText(filePath));
+        }
+        catch (JsonException ex)
+        {
+            throw new ConfigurationValidationException($"Configuration file is not valid JSON: {filePath}", ex);
+        }
+        if (rawNode is null)
+        {
+            throw new ConfigurationValidationException($"Configuration file is empty: {filePath}");
+        }
+
+        var declaredVersion = rawNode["schema_version"]?.GetValue<string>();
+        if (string.IsNullOrWhiteSpace(declaredVersion))
+        {
+            throw new ConfigurationValidationException(
+                $"{mappingKind} mapping {filePath} is missing required field 'schema_version'.");
+        }
+        if (!SupportedMappingSchemaVersions.Contains(declaredVersion, StringComparer.Ordinal))
+        {
+            throw new ConfigurationValidationException(
+                $"{mappingKind} mapping {filePath} declares unsupported-schema-version '{declaredVersion}'; supported: [{string.Join(", ", SupportedMappingSchemaVersions)}].");
+        }
     }
 
     private static JsonNode LoadAndValidate(string filePath, JsonSchema schema)

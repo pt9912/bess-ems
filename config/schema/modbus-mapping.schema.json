@@ -4,7 +4,7 @@
   "title": "Modbus adapter mapping",
   "type": "object",
   "additionalProperties": false,
-  "required": ["profile_name", "unit_id_discovery", "registers"],
+  "required": ["schema_version", "profile_name", "unit_id_discovery", "registers"],
   "properties": {
     "schema_version": {
       "type": "string",

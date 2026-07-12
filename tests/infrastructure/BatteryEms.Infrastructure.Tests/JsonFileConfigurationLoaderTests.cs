@@ -259,6 +259,7 @@ public sealed class JsonFileConfigurationLoaderTests
         var path = WriteTempJson(
             """
             {
+              "schema_version": "v1",
               "profile_name": "p",
               "unit_id_discovery": "static",
               "static_unit_id": 1,
@@ -303,6 +304,7 @@ public sealed class JsonFileConfigurationLoaderTests
         var path = WriteTempJson(
             """
             {
+              "schema_version": "v1",
               "profile_name": "p",
               "unit_id_discovery": "static",
               "static_unit_id": 1,
@@ -376,6 +378,7 @@ public sealed class JsonFileConfigurationLoaderTests
         var path = WriteTempJson(
             """
             {
+              "schema_version": "v1",
               "profile_name": "p",
               "unit_id_discovery": "static",
               "static_unit_id": 1,
@@ -414,6 +417,7 @@ public sealed class JsonFileConfigurationLoaderTests
         var path = WriteTempJson(
             """
             {
+              "schema_version": "v1",
               "profile_name": "p",
               "unit_id_discovery": "static",
               "static_unit_id": 1,
@@ -451,6 +455,7 @@ public sealed class JsonFileConfigurationLoaderTests
         var path = WriteTempJson(
             """
             {
+              "schema_version": "v1",
               "profile_name": "p",
               "topics": [
                 {
@@ -530,6 +535,7 @@ public sealed class JsonFileConfigurationLoaderTests
         var loader = new JsonFileConfigurationLoader(SchemaDirectory);
         var path = WriteTempJson("""
             {
+              "schema_version": "v1",
               "profile_name": "p",
               "unit_id_discovery": "magic",
               "registers": [
@@ -548,6 +554,7 @@ public sealed class JsonFileConfigurationLoaderTests
         var loader = new JsonFileConfigurationLoader(SchemaDirectory);
         var path = WriteTempJson("""
             {
+              "schema_version": "v1",
               "profile_name": "p",
               "unit_id_discovery": "static",
               "registers": [
@@ -558,6 +565,62 @@ public sealed class JsonFileConfigurationLoaderTests
 
         var ex = Assert.Throws<ConfigurationValidationException>(() => loader.LoadModbusMapping(path));
         Assert.Contains("Schema validation failed", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Modbus_missing_schema_version_fails_pre_check()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson("""
+            {
+              "profile_name": "p",
+              "unit_id_discovery": "static",
+              "static_unit_id": 1,
+              "registers": [
+                { "name": "x", "address": 0, "type": "uint16", "scale_factor": 1, "range": [0, 1], "writable": false, "write_cadence": "cyclic", "auth_required": "none" }
+              ]
+            }
+            """);
+
+        var ex = Assert.Throws<ConfigurationValidationException>(() => loader.LoadModbusMapping(path));
+        Assert.Contains("missing required field 'schema_version'", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Modbus_unsupported_schema_version_fails_pre_check()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson("""
+            {
+              "schema_version": "v2",
+              "profile_name": "p",
+              "unit_id_discovery": "static",
+              "static_unit_id": 1,
+              "registers": [
+                { "name": "x", "address": 0, "type": "uint16", "scale_factor": 1, "range": [0, 1], "writable": false, "write_cadence": "cyclic", "auth_required": "none" }
+              ]
+            }
+            """);
+
+        var ex = Assert.Throws<ConfigurationValidationException>(() => loader.LoadModbusMapping(path));
+        Assert.Contains("unsupported-schema-version", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Mqtt_missing_schema_version_fails_pre_check()
+    {
+        var loader = new JsonFileConfigurationLoader(SchemaDirectory);
+        var path = WriteTempJson("""
+            {
+              "profile_name": "p",
+              "topics": [
+                { "name": "telemetry", "topic": "battery/x/telemetry", "direction": "subscribe", "payload_format": "json", "retained": true, "auth_required": "none" }
+              ]
+            }
+            """);
+
+        var ex = Assert.Throws<ConfigurationValidationException>(() => loader.LoadMqttMapping(path));
+        Assert.Contains("missing required field 'schema_version'", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -783,6 +846,7 @@ public sealed class JsonFileConfigurationLoaderTests
         var path = WriteTempJson(
             """
             {
+              "schema_version": "v1",
               "profile_name": "p",
               "unit_id_discovery": "static",
               "static_unit_id": 1,
@@ -824,6 +888,7 @@ public sealed class JsonFileConfigurationLoaderTests
         var path = WriteTempJson(
             """
             {
+              "schema_version": "v1",
               "profile_name": "p",
               "unit_id_discovery": "static",
               "static_unit_id": 1,
@@ -906,6 +971,7 @@ public sealed class JsonFileConfigurationLoaderTests
         var path = WriteTempJson(
             """
             {
+              "schema_version": "v1",
               "profile_name": "p",
               "unit_id_discovery": "static",
               "static_unit_id": 1,
@@ -943,6 +1009,7 @@ public sealed class JsonFileConfigurationLoaderTests
         var path = WriteTempJson(
             """
             {
+              "schema_version": "v1",
               "profile_name": "p",
               "unit_id_discovery": "static",
               "static_unit_id": 1,
