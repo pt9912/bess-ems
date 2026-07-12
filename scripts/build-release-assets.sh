@@ -146,16 +146,31 @@ test -s "${sbom_file}"
 
 echo "[build-release-assets] packaging device-mapping schema bundle"
 # ADR 0013 §5.1: the config/schema/*.json set is a published, versioned contract that
-# external simulators generate against. Bundle it with the schema CHANGELOG and a
-# manifest carrying schema_version + min_supported (Breaking-Bump-Rollout, ADR §2).
+# an external field simulator generates against. Bundle it with the schema CHANGELOG
+# and a manifest carrying schema_version + min_supported (Breaking-Bump-Rollout, ADR §2).
+# Reproducible: pin entry order, mtime, and ownership, and strip the gzip header mtime
+# (gzip -n), so the SHA256 is stable run-to-run and the published checksum is verifiable.
 schema_bundle="${RELEASE_DIR}/bess-ems-schemas-${vbare}.tar.gz"
-schema_stage="${RELEASE_DIR}/.schema-stage"
-rm -rf "${schema_stage}"
-mkdir -p "${schema_stage}/schema"
-cp config/schema/*.json config/schema/CHANGELOG.md "${schema_stage}/schema/"
-printf '{\n  "name": "bess-ems-device-mapping-schemas",\n  "version": "%s",\n  "schema_version": "v1",\n  "min_supported": "v1"\n}\n' "${vbare}" > "${schema_stage}/schema/bundle.json"
-tar -C "${schema_stage}" -czf "${schema_bundle}" schema
-rm -rf "${schema_stage}"
+SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git -C "${repo_root}" log -1 --format=%ct HEAD)}"
+build_schema_bundle() {
+  local stage="$1" out="$2"
+  rm -rf "${stage}"
+  mkdir -p "${stage}/schema"
+  cp config/schema/*.json config/schema/CHANGELOG.md "${stage}/schema/"
+  printf '{\n  "name": "bess-ems-device-mapping-schemas",\n  "version": "%s",\n  "schema_version": "v1",\n  "min_supported": "v1"\n}\n' "${vbare}" > "${stage}/schema/bundle.json"
+  tar --sort=name --mtime="@${SOURCE_DATE_EPOCH}" --owner=0 --group=0 --numeric-owner \
+    -C "${stage}" -cf - schema | gzip -n > "${out}"
+  rm -rf "${stage}"
+}
+build_schema_bundle "${RELEASE_DIR}/.schema-stage" "${schema_bundle}"
+# Prove the acceptance criterion ("reproduzierbares Release-Asset"): a second
+# independent pack from the same inputs must be byte-identical.
+build_schema_bundle "${RELEASE_DIR}/.schema-stage-verify" "${schema_bundle}.verify"
+if ! cmp -s "${schema_bundle}" "${schema_bundle}.verify"; then
+  echo "[build-release-assets] schema bundle is not reproducible (bytes differ between two packs)" >&2
+  exit 1
+fi
+rm -f "${schema_bundle}.verify"
 test -f "${schema_bundle}"
 
 echo "[build-release-assets] SHA256SUMS"
