@@ -144,6 +144,20 @@ echo "[build-release-assets] generating SBOM via ${SYFT_IMAGE}"
   > "${sbom_file}"
 test -s "${sbom_file}"
 
+echo "[build-release-assets] packaging device-mapping schema bundle"
+# ADR 0013 §5.1: the config/schema/*.json set is a published, versioned contract that
+# external simulators generate against. Bundle it with the schema CHANGELOG and a
+# manifest carrying schema_version + min_supported (Breaking-Bump-Rollout, ADR §2).
+schema_bundle="${RELEASE_DIR}/bess-ems-schemas-${vbare}.tar.gz"
+schema_stage="${RELEASE_DIR}/.schema-stage"
+rm -rf "${schema_stage}"
+mkdir -p "${schema_stage}/schema"
+cp config/schema/*.json config/schema/CHANGELOG.md "${schema_stage}/schema/"
+printf '{\n  "name": "bess-ems-device-mapping-schemas",\n  "version": "%s",\n  "schema_version": "v1",\n  "min_supported": "v1"\n}\n' "${vbare}" > "${schema_stage}/schema/bundle.json"
+tar -C "${schema_stage}" -czf "${schema_bundle}" schema
+rm -rf "${schema_stage}"
+test -f "${schema_bundle}"
+
 echo "[build-release-assets] SHA256SUMS"
 (
   cd "${RELEASE_DIR}"

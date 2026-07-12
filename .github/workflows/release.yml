@@ -218,6 +218,21 @@ jobs:
             --output "artifacts/release/bess-ems-${version}-source.tar.gz" \
             "${tag}"
 
+      - name: Package device-mapping schema bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ steps.tag.outputs.version }}"
+          # ADR 0013 §5.1: publish config/schema/*.json as a versioned contract asset.
+          stage="artifacts/release/.schema-stage"
+          rm -rf "${stage}"
+          mkdir -p "${stage}/schema"
+          cp config/schema/*.json config/schema/CHANGELOG.md "${stage}/schema/"
+          printf '{\n  "name": "bess-ems-device-mapping-schemas",\n  "version": "%s",\n  "schema_version": "v1",\n  "min_supported": "v1"\n}\n' "${version}" > "${stage}/schema/bundle.json"
+          tar -C "${stage}" -czf "artifacts/release/bess-ems-schemas-${version}.tar.gz" schema
+          rm -rf "${stage}"
+          test -f "artifacts/release/bess-ems-schemas-${version}.tar.gz"
+
       - name: Extract native library and header
         shell: bash
         run: |
@@ -320,6 +335,7 @@ jobs:
           files: |
             artifacts/release/bess-ems-${{ steps.tag.outputs.version }}.tgz
             artifacts/release/bess-ems-${{ steps.tag.outputs.version }}-source.tar.gz
+            artifacts/release/bess-ems-schemas-${{ steps.tag.outputs.version }}.tar.gz
             artifacts/release/libbattery_control_core-v${{ steps.tag.outputs.version }}-linux-x86_64.so
             artifacts/release/battery_control_core.h
             artifacts/release/image-inspect.json
