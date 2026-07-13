@@ -13,6 +13,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.1.0] - 2026-07-13
+
+The MQTT field contract gains its acceptance harness: structurally
+compared golden vectors, published inside the schema bundle
+(ADR 0013 §5.2). Native control kernel ABI stays at 0.3.0 (no native
+changes in this release).
+
+### Added
+
+- **MQTT golden-vector suite** (`config/schema/vectors/`): two
+  authority manifests — field-produced cases (telemetry
+  nominal/charging, status, fault active/suppressed, command_ack
+  accepted-echo) lifted from the Go field producer's real serializer
+  paths, and EMS-produced cases (command with and without
+  `reactive_power_kvar`) lifted from the C# wire serializer — plus the
+  `golden-vector-manifest.v1` schema. Payloads are embedded as JSON
+  objects and compared **structurally** (field-normative: names,
+  presence, types, null-omission; not byte order). External field
+  implementations (e.g. a grid-gym publisher) validate against these
+  vectors instead of hand-mirroring the wire format.
+- **`make field-vectors-check`** mandatory gate (repo-root Docker
+  stage, wired into `make gates`, `make ci`, and hosted CI): the field
+  manifest is regenerated through the producer code and compared
+  structurally; the ems manifest is decoded through the simulator's
+  `model.Command` with key-set, envelope-required, and value pins; the
+  exact emitted message set per input is enforced (a new producer
+  topic fails with "add a golden case"). `make field-vectors-refresh`
+  regenerates after deliberate producer changes.
+
+### Changed
+
+- The schema bundle (`bess-ems-schemas-<version>.tar.gz`) now ships
+  `schema/vectors/` and is packed by a single shared script
+  (`scripts/pack-schema-bundle.sh`) for both `make release-assets` and
+  the release workflow — the workflow's former inline packing had
+  already drifted and would have shipped the bundle without vectors.
+- `make field-contract-check` additionally validates the vector
+  manifests and pins payload key sets against the envelope definitions
+  (telemetry/command/command_ack).
+- Helm chart `bess-ems` version/appVersion 2.0.0 → 2.1.0.
+
+### Fixed
+
+- `bess-field-sim`'s test-fixture mapping copy lifted to the shipped
+  example state (it was missing `schema_version` and thus
+  schema-invalid since v2.0.0; the golden-vector generator reads the
+  shipped example directly).
+
 ## [2.0.0] - 2026-07-13
 
 Device mappings become a published, versioned field contract
