@@ -11,11 +11,17 @@ type ModbusMapping struct {
 }
 
 // ModbusRegister mirrors a single register entry in the modbus mapping
-// schema.
+// schema. RegisterTable and WordOrder joined with ADR 0013 §5.4 — their
+// absence in this DTO was the ADR's proven hand-mirror drift (the shipped
+// HIL profile would have been served on the wrong table with the wrong
+// word order). Empty values resolve to the .NET loader defaults
+// (holding / high_low) in the modbus package.
 type ModbusRegister struct {
 	Name               string            `json:"name"`
 	Address            int               `json:"address"`
 	Type               string            `json:"type"`
+	RegisterTable      string            `json:"register_table,omitempty"`
+	WordOrder          string            `json:"word_order,omitempty"`
 	ScaleFactor        float64           `json:"scale_factor"`
 	Range              [2]float64        `json:"range"`
 	Writable           bool              `json:"writable"`

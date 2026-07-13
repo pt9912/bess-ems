@@ -176,3 +176,23 @@ func repoMapping(t *testing.T, name string) string {
 	t.Helper()
 	return filepath.Join("testdata", "mappings", name)
 }
+
+func TestValidateMapping_RejectsInvalidRegisterTableAndWordOrder(t *testing.T) {
+	t.Parallel()
+
+	base := model.ModbusMapping{
+		ProfileName:     "p",
+		UnitIDDiscovery: "none",
+		Registers: []model.ModbusRegister{
+			{Name: "soc_percent", Address: 100, Type: "uint16", RegisterTable: "coil"},
+		},
+	}
+	if err := modbus.ValidateMapping(base); !errors.Is(err, modbus.ErrMappingInvalidRegisterTable) {
+		t.Errorf("want ErrMappingInvalidRegisterTable, got %v", err)
+	}
+
+	base.Registers[0] = model.ModbusRegister{Name: "soc_percent", Address: 100, Type: "float32", WordOrder: "middle_endian"}
+	if err := modbus.ValidateMapping(base); !errors.Is(err, modbus.ErrMappingInvalidWordOrder) {
+		t.Errorf("want ErrMappingInvalidWordOrder, got %v", err)
+	}
+}

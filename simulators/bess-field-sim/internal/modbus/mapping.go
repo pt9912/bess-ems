@@ -35,6 +35,12 @@ var (
 	// ErrMappingRegisterOutOfRange is returned when a mapped register spans
 	// beyond the simulator's holding-register address space.
 	ErrMappingRegisterOutOfRange = errors.New("modbus mapping register out of range")
+	// ErrMappingInvalidRegisterTable is returned for register_table values
+	// outside the schema enum (empty resolves to the holding default).
+	ErrMappingInvalidRegisterTable = errors.New("modbus mapping invalid register_table")
+	// ErrMappingInvalidWordOrder is returned for word_order values outside
+	// the schema enum (empty resolves to the high_low default).
+	ErrMappingInvalidWordOrder = errors.New("modbus mapping invalid word_order")
 )
 
 // LoadMapping reads a ModbusMapping fixture from disk and validates it.
@@ -78,16 +84,29 @@ func ValidateMapping(m model.ModbusMapping) error {
 		return ErrStaticDiscoveryWithoutUnitID
 	}
 	for i, reg := range m.Registers {
-		if !reg.Writable && !isTelemetryRegister(reg.Name) {
-			return fmt.Errorf("%w: index %d name=%q", ErrMappingUnknownRegisterName, i, reg.Name)
+		if err := validateRegister(i, reg); err != nil {
+			return err
 		}
-		if !isSupportedRegisterType(reg.Type) {
-			return fmt.Errorf("%w: index %d type=%q", ErrMappingUnsupportedRegisterType, i, reg.Type)
-		}
-		words := registerWordCount(reg.Type)
-		if reg.Address < 0 || reg.Address+words > holdingRegisterCount {
-			return fmt.Errorf("%w: index %d address=%d type=%q", ErrMappingRegisterOutOfRange, i, reg.Address, reg.Type)
-		}
+	}
+	return nil
+}
+
+func validateRegister(i int, reg model.ModbusRegister) error {
+	if !reg.Writable && !isTelemetryRegister(reg.Name) {
+		return fmt.Errorf("%w: index %d name=%q", ErrMappingUnknownRegisterName, i, reg.Name)
+	}
+	if !isSupportedRegisterType(reg.Type) {
+		return fmt.Errorf("%w: index %d type=%q", ErrMappingUnsupportedRegisterType, i, reg.Type)
+	}
+	words := registerWordCount(reg.Type)
+	if reg.Address < 0 || reg.Address+words > holdingRegisterCount {
+		return fmt.Errorf("%w: index %d address=%d type=%q", ErrMappingRegisterOutOfRange, i, reg.Address, reg.Type)
+	}
+	if reg.RegisterTable != "" && reg.RegisterTable != TableHolding && reg.RegisterTable != TableInput {
+		return fmt.Errorf("%w: index %d register_table=%q", ErrMappingInvalidRegisterTable, i, reg.RegisterTable)
+	}
+	if reg.WordOrder != "" && reg.WordOrder != OrderHighLow && reg.WordOrder != OrderLowHigh {
+		return fmt.Errorf("%w: index %d word_order=%q", ErrMappingInvalidWordOrder, i, reg.WordOrder)
 	}
 	return nil
 }

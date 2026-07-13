@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/modbus"
 	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/model"
 	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/mqtt"
 )
@@ -38,12 +39,14 @@ const (
 	// the C# correlation harness (plan sub-slice 3), not just by convention.
 	nominalCommandID = "cmd-golden-nominal"
 
-	manifestVersion    = "golden-vector-manifest.v1"
-	fieldManifestName  = "mqtt-golden-vectors.field.v1.json"
-	emsManifestName    = "mqtt-golden-vectors.ems.v1.json"
-	defaultMapping     = "config/examples/adapters/mqtt.simulator.json"
-	defaultVectorsDir  = "config/schema/vectors"
-	envelopeSchemaPath = "config/schema/mqtt-telemetry-envelope.schema.json"
+	manifestVersion         = "golden-vector-manifest.v1"
+	fieldManifestName       = "mqtt-golden-vectors.field.v1.json"
+	emsManifestName         = "mqtt-golden-vectors.ems.v1.json"
+	modbusSimulatorManifest = "modbus-golden-vectors.simulator.v1.json"
+	modbusHilManifest       = "modbus-golden-vectors.hil-simulator.v1.json"
+	defaultMapping          = "config/examples/adapters/mqtt.simulator.json"
+	defaultVectorsDir       = "config/schema/vectors"
+	envelopeSchemaPath      = "config/schema/mqtt-telemetry-envelope.schema.json"
 )
 
 type vectorCase struct {
@@ -97,7 +100,10 @@ func run(mode, mappingPath, vectorsDir, out string) error {
 		if err := checkFieldManifest(fresh, filepath.Join(vectorsDir, fieldManifestName)); err != nil {
 			return err
 		}
-		return checkEmsManifest(filepath.Join(vectorsDir, emsManifestName))
+		if err := checkEmsManifest(filepath.Join(vectorsDir, emsManifestName)); err != nil {
+			return err
+		}
+		return checkModbusManifests(vectorsDir)
 	default:
 		return fmt.Errorf("unknown -mode %q (want check or write)", mode)
 	}
@@ -553,6 +559,161 @@ func envelopeCommandRequired() ([]string, error) {
 		return nil, fmt.Errorf("%s carries no $defs.command.required set", envelopeSchemaPath)
 	}
 	return command.Required, nil
+}
+
+// --- Modbus conformance (ADR 0013 §5.4, plan sub-slice 3b) -----------------
+
+type modbusCase struct {
+	Name          string   `json:"name"`
+	Register      string   `json:"register"`
+	Direction     string   `json:"direction"`
+	RegisterTable string   `json:"register_table"`
+	Address       int      `json:"address"`
+	Type          string   `json:"type"`
+	WordOrder     string   `json:"word_order"`
+	ScaleFactor   float64  `json:"scale_factor"`
+	Value         float64  `json:"value"`
+	Words         []uint16 `json:"words"`
+}
+
+type modbusManifest struct {
+	SchemaVersion string       `json:"schema_version"`
+	Contract      string       `json:"contract"`
+	Authority     string       `json:"authority"`
+	Profile       string       `json:"profile"`
+	Cases         []modbusCase `json:"cases"`
+}
+
+// checkModbusManifests gates the simulator against the C#-lifted Modbus
+// vectors: for every read case whose register name the simulator serves
+// (modbus.TelemetryRegisterNames — grid_* registers deliberately have no
+// simulator value and stay contract for external producers), the REAL
+// encoder path must produce exactly the vector words on the case's table.
+// The input snapshot is constructed FROM the committed manifests' value
+// fields (plan-review finding 6: a re-listed Go value table would be the
+// very mirror drift ADR 0013 ends), including the reverse mapping of the
+// two non-numeric snapshot fields (available 1<->true, fault_status
+// 0<->"ok"). The case<->profile equality itself is pinned by the python
+// gate, so a single-register mapping per case runs the real path without
+// the simulator having to load profiles with foreign register names.
+func checkModbusManifests(vectorsDir string) error {
+	simNames := make(map[string]bool)
+	for _, name := range modbus.TelemetryRegisterNames() {
+		simNames[name] = true
+	}
+	for _, name := range []string{modbusSimulatorManifest, modbusHilManifest} {
+		if err := checkModbusManifest(filepath.Join(vectorsDir, name), simNames); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func checkModbusManifest(path string, simNames map[string]bool) error {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read modbus manifest: %w", err)
+	}
+	var m modbusManifest
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return fmt.Errorf("parse modbus manifest: %w", err)
+	}
+	if m.Contract != "modbus" || m.Authority != "ems" {
+		return fmt.Errorf("%s declares contract=%q authority=%q, want modbus/ems", path, m.Contract, m.Authority)
+	}
+	snap, err := snapshotFromCases(path, m.Cases, simNames)
+	if err != nil {
+		return err
+	}
+	checked := 0
+	for _, c := range m.Cases {
+		if c.Direction != "read" || !simNames[c.Register] {
+			continue
+		}
+		if err := checkModbusCase(path, c, snap); err != nil {
+			return err
+		}
+		checked++
+	}
+	if checked == 0 {
+		return fmt.Errorf("%s carries no simulator-served read case — conformance gate would be vacuous", path)
+	}
+	slog.Info("fieldvectors: simulator encoder matches the modbus vectors", "path", path, "cases", checked)
+	return nil
+}
+
+// snapshotFromCases builds the encoder input from the manifest's own value
+// fields; duplicate register names with conflicting values are an error.
+func snapshotFromCases(path string, cases []modbusCase, simNames map[string]bool) (model.TelemetrySnapshot, error) {
+	var snap model.TelemetrySnapshot
+	seen := make(map[string]float64)
+	for _, c := range cases {
+		if c.Direction != "read" || !simNames[c.Register] {
+			continue
+		}
+		if prev, dup := seen[c.Register]; dup && prev != c.Value {
+			return snap, fmt.Errorf("%s: register %q carries conflicting values (%g vs %g)", path, c.Register, prev, c.Value)
+		}
+		seen[c.Register] = c.Value
+		applySnapshotValue(&snap, c.Register, c.Value)
+	}
+	return snap, nil
+}
+
+// applySnapshotValue is the reverse of the encoder's valueFor mapping.
+func applySnapshotValue(snap *model.TelemetrySnapshot, name string, value float64) {
+	switch name {
+	case "soc_percent":
+		snap.SocPercent = value
+	case "soh_percent":
+		snap.SohPercent = value
+	case "active_power_kw":
+		snap.ActivePowerKw = value
+	case "reactive_power_kvar":
+		snap.ReactivePowerKvar = value
+	case "dc_voltage":
+		snap.DcVoltage = value
+	case "dc_current":
+		snap.DcCurrent = value
+	case "temperature_celsius":
+		snap.TemperatureCelsius = value
+	case "available":
+		snap.Available = value >= 1
+	case "fault_status":
+		if value == 0 {
+			snap.FaultStatus = "ok"
+		} else {
+			snap.FaultStatus = "fault-active"
+		}
+	}
+}
+
+func checkModbusCase(path string, c modbusCase, snap model.TelemetrySnapshot) error {
+	mapping := model.ModbusMapping{
+		ProfileName:     "conformance",
+		UnitIDDiscovery: "none",
+		Registers: []model.ModbusRegister{{
+			Name:          c.Register,
+			Address:       c.Address,
+			Type:          c.Type,
+			RegisterTable: c.RegisterTable,
+			WordOrder:     c.WordOrder,
+			ScaleFactor:   c.ScaleFactor,
+		}},
+	}
+	image := modbus.EncodeSnapshot(snap, mapping)
+	space := image.Holding
+	if c.RegisterTable == modbus.TableInput {
+		space = image.Input
+	}
+	for i, want := range c.Words {
+		got, ok := space[c.Address+i]
+		if !ok || got != want {
+			return fmt.Errorf("%s: case %q word %d at address %d: simulator encoder produced %d, vector pins %d — run the encoder against ADR 0013 §5.4 (register_table/word_order drift?)",
+				path, c.Name, i, c.Address+i, got, want)
+		}
+	}
+	return nil
 }
 
 func caseIndex(cases []vectorCase) map[string]vectorCase {
