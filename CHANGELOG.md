@@ -13,6 +13,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.2.0] - 2026-07-13
+
+ADR 0013 §5 is complete: the field contract gains Modbus golden vectors
+and an operator-facing SUT mode. Native control kernel ABI stays at
+0.3.0 (no native changes in this release).
+
+### Added
+
+- **Modbus golden vectors** (`config/schema/vectors/`): per covered
+  mapping profile (`modbus.simulator`, `modbus.hil-simulator`) the
+  register wire images — reads lifted through the C# codec
+  (`RegisterDecoder`), EMS write images captured from the real
+  `ModbusCommandSink` dispatch; engineering values are raw-value exact
+  so `Decode(words) == value` holds without tolerances. The manifest
+  schema gains the `modbus` contract (per-profile manifests, authority
+  pinned to `ems`). The shipped SunSpec profile is a documented
+  exclusion (no in-repo producer path).
+- **SUT mode** (`docs/user/sut-field-endpoint.md`): point bess-ems at
+  an external MQTT field endpoint config-only — full `Bess__Mqtt*` key
+  table (incl. first-time documentation of the QoS defaults),
+  `asset_id`↔`{assetId}` correspondence, cadence rule, security
+  posture, and a verification recipe with distinguishable safe-stop
+  causes. `deploy/compose.sut.yml` + `deploy/compose.field.yml` run
+  bess-ems against a stand-in field stack over a shared external
+  network; `make sut-smoke` proves the path mechanically
+  (JSON-anchored good-case signal `"EventId":1701`) and runs in
+  `make fullbuild`; `make sut-config-check` guards the compose pair as
+  a mandatory gate.
+- **`bess-field-sim` serves the full Modbus contract**: the proven
+  `register_table`/`word_order` hand-mirror drift (ADR 0013 §1) is
+  closed — the simulator honors both fields (separate holding/input
+  register spaces, FC04 handler, word order) with loader-identical
+  defaults, and the golden-vector conformance check in
+  `make field-vectors-check` gates it permanently.
+
+### Changed
+
+- `make field-contract-check` additionally pins Modbus vector cases
+  against their mapping profiles (address/type/scale/table/order with
+  loader defaults resolved, value range, word count, exact
+  `Decode(words) == value`) and rejects vector manifests without a
+  codec gate.
+- `make fullbuild` builds the simulator image once instead of three
+  times (shared `simulator-build` prerequisite) and includes the SUT
+  smoke.
+- MQTT broker security anchoring corrected across docs and ADR 0013:
+  it lives in `quality.md` §2.2.1 (RM-M4-06-FUP), not `LH-PROT-002`
+  (protocol errors → quality flag).
+- Helm chart `bess-ems` version/appVersion 2.1.0 → 2.2.0.
+
+### Fixed
+
+- `GET /health` semantics documented correctly (503 when a critical
+  component is unhealthy — not blanket 200 while the host runs).
+
 ## [2.1.0] - 2026-07-13
 
 The MQTT field contract gains its acceptance harness: structurally

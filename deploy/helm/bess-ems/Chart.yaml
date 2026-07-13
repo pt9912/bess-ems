@@ -2,7 +2,7 @@ apiVersion: v2
 name: bess-ems
 description: Helm chart for the bess-ems worker/API runtime and optional sidecars.
 type: application
-version: 2.1.0
-appVersion: "2.1.0"
+version: 2.2.0
+appVersion: "2.2.0"
 annotations:
   bess-ems.io/roadmap-slice: RM-M6-03
