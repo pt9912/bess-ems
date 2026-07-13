@@ -39,14 +39,49 @@ unter `in-progress/`.
 
 ## Aktueller Stand
 
-> **Stand:** 2026-05-14
-> **Release:** `v1.0.0` veröffentlicht 2026-05-14 — Container
-> (`ghcr.io/pt9912/bess-ems:v1.0.0`, Cosign keyless signiert, SBOM-
-> attestiert) plus 7 Release-Assets (Helm-Chart, Source-Tarball, native
-> `.so`+Header, image-inspect, SBOM, `SHA256SUMS`) auf
-> [github.com/pt9912/bess-ems/releases/tag/v1.0.0](https://github.com/pt9912/bess-ems/releases/tag/v1.0.0).
+> **Stand:** 2026-07-13
+> **Release:** `v2.2.1` veröffentlicht 2026-07-13 (Container Cosign-
+> signiert + SBOM-attestiert, 8 Release-Assets inkl. Schema-Bundle) —
+> [github.com/pt9912/bess-ems/releases/tag/v2.2.1](https://github.com/pt9912/bess-ems/releases/tag/v2.2.1).
+> Die v2.x-Linie: `v2.0.0` (publiziertes Feldvertrags-Bundle mit
+> Pflicht-`schema_version` — Contract-Break, ADR 0013 §5.1), `v2.1.0`
+> (MQTT-Golden-Vector-Suite, §5.2), `v2.2.0` (Modbus-Golden-Vectors +
+> SUT-Doku/Compose — **ADR 0013 §5 vollständig**), `v2.2.1` (Operator-
+> Web-Shell wird jetzt vom Produktions-Host ausgeliefert +
+> [`anwenderhandbuch.md`](../../../user/anwenderhandbuch.md)).
 > Release-Prozess in [`../../../user/releasing.md`](../../../user/releasing.md),
 > Gate-Definitionen in [`../../../user/quality.md`](../../../user/quality.md) §8.
+>
+> **Feldvertrag + Kopplung (ADR 0013):** Status
+> `Accepted — §5.1–§5.4 umgesetzt (§5 vollständig)`. Vier
+> Vector-Manifeste (MQTT field/ems + Modbus simulator/hil) im
+> versionierten Bundle; die im ADR §1 belegte
+> `register_table`/`word_order`-Drift ist geschlossen und mehrfach
+> gegated. Die Kopplung mit der Schwester-Plattform grid-gym ist
+> **beidseitig E2E-verifiziert und beidseitig digest-gepinnt**
+> (grid-gym v0.7.1 ↔ bess-ems v2.2.1); bess-ems-seitige Testumgebung:
+> `make sut-smoke-grid-gym`, Browser-Ansicht beider Web-UIs über die
+> opt-in Ports-Overrides ([`sut-field-endpoint.md`](../../../user/sut-field-endpoint.md) §4).
+>
+> **Offene Fäden (Einstieg für die nächste Session):**
+> 1. **API-Casing-Befund** (aus dem Anwenderhandbuch-Review):
+>    `CommandView.Source`/`.Mode`, `TelemetryQualityView.Flag` und
+>    `ScheduleView.Type` serialisieren PascalCase (string-typisierte
+>    `ToString()`-Properties umgehen die globale SnakeCaseLower-Policy).
+>    Fix ist klein, aber ein Wire-Break auf öffentlichen Endpoints →
+>    Major-Bump-Material. **Entscheidung offen**, ob er in
+>    [`../open/note-internal-refinement-scope.md`](../open/note-internal-refinement-scope.md)
+>    aufgenommen wird (Trigger: nächstes ohnehin brechendes Release).
+> 2. **Internal-Refinement-Paket** (Lock-Eviction + Cluster-Smoke,
+>    [`../open/note-internal-refinement-scope.md`](../open/note-internal-refinement-scope.md)):
+>    wartet auf das nächste freie Minor.
+> 3. **Kommando-Closed-Loop-Wirkung** der Schwester-Plattform bleibt
+>    deferred-with-trigger (ADR 0013 §6, LH-SAFE-007).
+> 4. grid-gym-Digest-Bumps weiterhin bewusst via `GRID_GYM_IMAGE`,
+>    wenn dort neue Releases landen.
+>
+> **Historie der Meilenstein-Abschlüsse (Stand v1.0.0, 2026-05-14):**
+>
 > **Abgeschlossen:** M1 (alle 24 Liefergegenstände grün) und M2 (alle
 > 10 Liefergegenstände RM-M2-01..10 grün). `make fullbuild`
 > reproduzierbar grün, Compose-Stack (bess-ems + Postgres + Mosquitto
