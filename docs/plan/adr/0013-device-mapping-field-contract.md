@@ -117,7 +117,8 @@ Interop-Befunde:
 1. **Kadenz.** Ein einzelner (retained) Publish trieb bess-ems in Dauer-Safe-Stop
    (`decision=snapshot-unusable reason=snapshot-aged-Ns`). Weil Frische
    empfangs-basiert ist, **muss** das Feld Telemetrie **laufend** innerhalb des
-   Freshness-Fensters publizieren (= **10 s**, hartkodiert; §8).
+   Freshness-Fensters publizieren (Default **10 s**; seit §5.1
+   konfigurierbar via `Bess:SnapshotMaxAge`; §8).
 2. **Form.** grid-gyms Push-Surface reicht je schmalem Punkt weiter; bess-ems
    braucht **ein breites Objekt/Tick**. Der Feldadapter muss einen Tick-Frame
    aggregieren + `metric`→Feldname + `device_id`↔`asset_id` mappen.
@@ -138,7 +139,7 @@ dessen **Provider**. Fremdsimulatoren generieren dagegen.
 | Versionierungs-Policy | `schema_version` wird auf **allen drei** Protokoll-Mappings Pflicht (heute nur OPC-UA); Kompatibilität = **`schema_version` (SemVer) + CI-Drift-Gate**, **keine** Runtime-Negotiation (dateibasiert, kein Handshake-Kanal — anders als ADR 0005). `profile_name` bleibt **Label**. | CI-Drift-Gate auf `config/schema/` (heute deckt `make schema-*` nur die Postgres-DDL). |
 | Breaking-Bump-Rollout | Für den handshake-losen Dateivertrag: (a) **`min_supported`**-Kompatibilitätsband im Bundle → Konsument erkennt Inkompatibilität zur Codegen-/Build-Zeit; (b) Breaking-Major wird **N-1-parallel** neben dem Vorgänger-Major für ein Deprecation-Fenster publiziert; (c) **Schema-CHANGELOG** im Bundle; (d) Konsument pinnt `schema_version` und **fail-closed** außerhalb seines Bandes. | Fensterlänge + exaktes `min_supported`-Feldschema = operativ (§8), trigger-basiert bei erstem Breaking-Bump. |
 | Provider-Posture / Anti-Drift | bess-ems ist Vertragsgeber; `bess-field-sim` **und** grid-gym generieren gegen das Bundle statt zu spiegeln. `register_table`/`word_order`-Drift ist der Beleg. | Trigger: `bess-field-sim` → Codegen; Aufnahme in grid-gyms Feld-Surface. |
-| Normative Payload-Form | **Feld-normativ** (§3): Feldnamen/Präsenz/Typen/Null-Weglassung verbindlich, **nicht** Reihenfolge/Whitespace (Konsument ist ein JSON-Parser). Die Feldmenge wird **mechanisch aus `serializer.go`/`MqttPayloads.cs` abgeleitet**; Golden-Vektoren vergleichen **strukturell**, nicht byte-gleich (§3). Topic-Schema `battery/{assetId}/{telemetry,status,fault,command,command/ack}` + `{assetId}`↔`asset_id` (`LH-MQTT-003`). Payload ohne Wall-Clock → **Kadenz-Schranke**. | Golden-Vector-Abnahme; `tick_ms ≤ 10 s` (hartkodiert, `ApplicationServiceRegistration.cs:27`; §8). |
+| Normative Payload-Form | **Feld-normativ** (§3): Feldnamen/Präsenz/Typen/Null-Weglassung verbindlich, **nicht** Reihenfolge/Whitespace (Konsument ist ein JSON-Parser). Die Feldmenge wird **mechanisch aus `serializer.go`/`MqttPayloads.cs` abgeleitet**; Golden-Vektoren vergleichen **strukturell**, nicht byte-gleich (§3). Topic-Schema `battery/{assetId}/{telemetry,status,fault,command,command/ack}` + `{assetId}`↔`asset_id` (`LH-MQTT-003`). Payload ohne Wall-Clock → **Kadenz-Schranke**. | Golden-Vector-Abnahme; `tick_ms ≤ Freshness-Fenster` (Default 10 s, seit §5.1 `Bess:SnapshotMaxAge`; §8). |
 | SUT-Modus | Anbindung an einen externen Feld-Endpoint (= grid-gym) ist **config-only** (`Bess__MqttMappingPath`, `Bess__MqttBrokerHost/Port`; analog `Modbus*`/`OpcUa*`); **kein** Runtime-Code-Pfad. | `deploy/compose.yml`-SUT-Variante + dokumentierter Pfad. |
 | Command-Closed-Loop | **Deferred** (§6), spiegelbildlich zu grid-gyms ausgegliederter Inbound-Write-Rückrichtung. Bis dahin ist die Kopplung **telemetry-read-only**. | Trigger: grid-gyms Inbound-Write-Aktivierung + `LH-SAFE-007`. |
 
@@ -315,16 +316,17 @@ Recording-Pfad). Bis dahin:
   eigene `AR-OPEN`-ID gezogen wird (`spec/architecture.md` §18 endet bei
   AR-OPEN-012) oder es LH-CONF-002-Konkretisierung bleibt, ist eine
   **Owner-Entscheidung** — hier bewusst **nicht** stillschweigend eine ID erfunden.
-- **Freshness-Schwellwert (verortet).** Der „snapshot-aged"-Schwellwert ist
-  **10 s, hartkodiert**: `new InMemorySnapshotStore(TimeSpan.FromSeconds(10))`
-  (`ApplicationServiceRegistration.cs:27`) → Staleness bei `age > _maxAge`
+- **Freshness-Schwellwert (verortet).** Der „snapshot-aged"-Schwellwert war
+  zum Entscheidungszeitpunkt **10 s, hartkodiert** (Literal in der
+  DI-Registrierung): Staleness bei `age > _maxAge`
   (`InMemorySnapshotStore.cs:41`), erzeugt den `snapshot-aged-{age}s`-String
-  (Z. 43), von `ControlCycleUseCase.cs:116` als `snapshot-unusable` re-labelt.
-  **Nicht konfigurierbar** (Literal in der DI-Registrierung, kein `Bess__…`-Key).
-  Falle: `ControlCycleOptions.SafeFallbackValidity` (5 s) ist die **Kommando-
-  Gültigkeit**, nicht die Input-Frische — nicht verwechseln. `maxAge` konfigurierbar
-  machen ist ein Umsetzungsschritt (§5.1), damit ein langsamer als 10 s tickendes
-  SUT-Feld nicht ohne Stellschraube in Safe-Stop läuft.
+  (Z. 43), von `ControlCycleUseCase` als `snapshot-unusable` re-labelt.
+  **Mit §5.1 umgesetzt (v2.0.0):** konfigurierbar via `Bess:SnapshotMaxAge`
+  (Default weiter 10 s, wirkt in Host **und** Api;
+  `docs/user/sut-field-endpoint.md`) — ein langsamer tickendes SUT-Feld hat
+  damit seine Stellschraube. Falle: `ControlCycleOptions.SafeFallbackValidity`
+  (5 s) ist die **Kommando-Gültigkeit**, nicht die Input-Frische — nicht
+  verwechseln.
 - **Breaking-Bump-Rollout — operatives Detail.** Die Protokoll-**Form** ist
   entschieden (§2); offen bleiben nur die **Deprecation-Fensterlänge** und das
   exakte `min_supported`-Feldschema — trigger-basiert beim ersten Breaking-Bump.

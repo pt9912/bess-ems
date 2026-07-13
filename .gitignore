@@ -46,4 +46,3 @@ src/adapters/driven/BatteryEms.Adapters.Persistence/Migrations/**/*.report.yaml
 # locally by `make release-assets` and in CI by the release/build
 # workflows under artifacts/release(-local)/ and artifacts/ci/.
 artifacts/
-deploy/.sut-scenario.json

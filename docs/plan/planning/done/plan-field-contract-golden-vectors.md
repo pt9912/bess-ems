@@ -4,7 +4,7 @@
 **Status:** Abgeschlossen am 2026-07-13 — alle 5 Sub-Slices umgesetzt
 (Plan-Review: 4 Befunde vorab eingearbeitet; Implementierungs-Review:
 9 Befunde, 8 gefixt + 1 dokumentiert akzeptiert, siehe Abschluss),
-`make gates` voll grün. ADR 0013 trägt
+`make gates` voll grün. Die ADR-0013-Status-Klausel wurde zum Abschluss gesetzt auf
 `Accepted — §5.1–§5.2 umgesetzt; §5.3–§5.4 offen`. Umgesetzt auf Branch
 `impl-field-contract-5.2`.
 **Datum:** 2026-07-13

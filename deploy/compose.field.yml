@@ -3,17 +3,19 @@
 # so a SEPARATELY started SUT stack (compose.sut.yml) reaches the broker under
 # the alias `field-mosquitto`. Deliberately NO host ports: the coupling runs
 # over the external network, never over published ports (portable, no 1883
-# collisions). The network is created/removed by `make sut-smoke`
-# (scripts/sut-smoke.sh).
+# collisions). `make sut-smoke` creates the network when absent and removes
+# it only if that run created it; a pre-existing network is reused with a
+# warning and left in place.
 #
 # Scenario: the simulator walks a fixture's ticks ONCE (no loop flag), and
 # bess-ems measures telemetry freshness at receive time — a scenario that
 # stops ticking drives the SUT into safe-stop (that is the contract, ADR 0013
 # §1 cadence rule, and exactly what the first smoke run demonstrated). The
-# smoke therefore GENERATES a long constant-cadence scenario into
-# ./.sut-scenario.json before starting this stack. Standalone use: run
-# `docker network create bess-sut` and provide a continuously ticking
-# scenario via BESS_FIELD_SCENARIO.
+# default is the committed constant-cadence fixture
+# ../simulators/bess-field-sim/testdata/scenarios/sut-smoke-cadence.json
+# (loader-covered by TestAllFixturesLoad). Standalone use: run
+# `docker network create bess-sut` first; override the scenario via
+# BESS_FIELD_SCENARIO if needed.
 services:
   field-mosquitto:
     image: eclipse-mosquitto:2
@@ -42,7 +44,7 @@ services:
       # engine — gitignored, invisible in git status, and wedging every later
       # `make sut-smoke` ("Is a directory") until a manual rmdir.
       - type: bind
-        source: ${BESS_FIELD_SCENARIO:-./.sut-scenario.json}
+        source: ${BESS_FIELD_SCENARIO:-../simulators/bess-field-sim/testdata/scenarios/sut-smoke-cadence.json}
         target: /data/scenario.json
         read_only: true
         bind:

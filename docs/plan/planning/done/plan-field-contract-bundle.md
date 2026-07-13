@@ -2,7 +2,7 @@
 
 **Dokumenttyp:** Slice-Plan / done
 **Status:** Abgeschlossen am 2026-07-13 — alle 5 Sub-Slices umgesetzt, 2
-Review-Runden (alle 9 Befunde gefixt), `make gates` 3× voll grün. ADR 0013 trägt
+Review-Runden (alle 9 Befunde gefixt), `make gates` 3× voll grün. Die ADR-0013-Status-Klausel wurde zum Abschluss gesetzt auf
 `Accepted — §5.1 umgesetzt; §5.2–§5.4 offen`. Umgesetzt auf Branch
 `impl-field-contract-5.1`, per FF-Merge in `main`.
 **Datum:** 2026-07-12

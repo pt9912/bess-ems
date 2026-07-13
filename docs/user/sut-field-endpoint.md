@@ -37,11 +37,11 @@ Topic-Schema: `battery/{assetId}/telemetry` (retained) +
 telemetry-read-only-Kopplung nicht erforderlich (ADR 0013 §6).
 **Erwartbares Log-Bild dabei:** bess-ems publisht seine Kommandos
 (auch Idle) trotzdem und wartet je Zyklus auf den Ack — ein Endpoint
-ohne Command-Unterstützung erzeugt deshalb pro Zyklus eine
-Warning `Command dispatch failed … ack-timeout` (EventId 1903). Das
-ist für die read-only-Kopplung erwartbar und unschädlich; der
-Regelzyklus läuft weiter (das Gutfall-Signal aus §5 erscheint vor dem
-Dispatch).
+ohne Command-Unterstützung erzeugt deshalb pro Zyklus eine Warning
+`Command-sink dispatch failed asset_id=… reason=ack-timeout`
+(EventId 1903). Das ist für die read-only-Kopplung erwartbar und
+unschädlich; der Regelzyklus läuft weiter (das Gutfall-Signal aus §5
+erscheint vor dem Dispatch).
 
 **Kadenz:** bess-ems misst Telemetrie-Frische **beim Empfang**. Der
 Endpoint muss kontinuierlich innerhalb des Freshness-Fensters
@@ -126,20 +126,26 @@ BESS_SUT_BROKER_HOST=<routbare-adresse> BESS_SUT_BROKER_PORT=1883 \
 Im Stand-in-Betrieb koppelt ein shared external Docker-Network
 (`bess-sut`) die SUT-Variante mit dem Feld-Stack
 (`deploy/compose.field.yml`: mosquitto als `field-mosquitto` +
-`bess-field-sim`); es wird von `make sut-smoke` angelegt und
-abgeräumt. Der Smoke generiert sich ein Szenario mit **kontinuierlicher
-1-s-Kadenz** (der Simulator spielt Ticks einmal ab, kein Loop) — mit dem
-Standard-Integrations-Szenario, das nach Tick 0 stillhält, liefe die
-SUT-Variante korrekt in Safe-Stop: genau die Kadenz-Regel aus §1. Für einen echten externen Endpoint ist die Netz-Topologie
+`bess-field-sim`); `make sut-smoke` legt es an, wenn es fehlt, und
+räumt es nur dann ab, wenn dieser Lauf es angelegt hat — ein
+vorbestehendes Netz wird mit Warnung weiterverwendet und belassen.
+Der Feld-Stack spielt das committete Fixture
+`simulators/bess-field-sim/testdata/scenarios/sut-smoke-cadence.json`
+mit **kontinuierlicher 1-s-Kadenz** ab (der Simulator spielt Ticks
+einmal ab, kein Loop) — mit dem Standard-Integrations-Szenario, das
+nach Tick 0 stillhält, liefe die SUT-Variante korrekt in Safe-Stop:
+genau die Kadenz-Regel aus §1. Für einen echten externen Endpoint ist die Netz-Topologie
 Betreibersache — `BESS_SUT_BROKER_HOST` muss aus dem Container heraus
 routbar sein.
 
 ## 5. Verifikation
 
-1. **Health:** `GET /health` liefert 200, sobald der Host läuft —
-   das sagt nichts über die Feldanbindung aus. Die SUT-Variante
-   publisht bewusst keine Host-Ports; von außen also per
-   `docker compose -f deploy/compose.sut.yml exec bess-ems \
+1. **Health:** `GET /health` liefert 200, wenn **alle** registrierten
+   Komponenten healthy sind, und 503, sobald eine kritische Komponente
+   (z. B. Postgres) unhealthy ist — ein 503 heißt also nicht „Host
+   läuft nicht". Über die Feldanbindung sagt der Endpoint nichts aus.
+   Die SUT-Variante publisht bewusst keine Host-Ports; von außen also
+   per `docker compose -f deploy/compose.sut.yml exec bess-ems \
    curl -fsS http://localhost:8080/health` (oder Port-Override).
 2. **Gutfall-Signal:** im Log erscheint zyklisch
    `Control cycle emitted command` (EventId 1701) — der Regelzyklus
@@ -156,8 +162,12 @@ routbar sein.
 | `decision=snapshot-unusable` + `reason=snapshot-aged-<N>s` (N mit einer Nachkommastelle, z. B. `snapshot-aged-12.3s`) | Telemetrie **zu alt** | Publish-Kadenz des Endpoints vs. `Bess__SnapshotMaxAge` (§1 Kadenz) |
 
 `make sut-smoke` automatisiert genau dieses Rezept gegen den
-Stand-in-Stack (Grün = Gutfall-Signal binnen Frist, kein Safe-Stop
-nach Warmup).
+Stand-in-Stack. Grün heißt: das Gutfall-Signal (JSON-Anker
+`"EventId":1701`) erscheint binnen Frist (Default 90 s), und ab dem
+Signal kommt im 20-s-Beobachtungsfenster **keine neue**
+Safe-Stop-Zeile (`"EventId":1702`) hinzu — Anlauf-Safe-Stops **vor**
+dem ersten Gutfall-Signal sind erwartbar (der Zyklus läuft, bevor die
+erste Telemetrie eintrifft) und zählen nicht.
 
 ## 6. Verifikation gegen eine reale externe Feld-Umgebung — OFFEN
 

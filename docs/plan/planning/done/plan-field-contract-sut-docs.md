@@ -2,10 +2,14 @@
 
 **Dokumenttyp:** Slice-Plan / done
 **Status:** Abgeschlossen am 2026-07-13 — alle 3 Sub-Slices umgesetzt
-(aktiviert nach drei Owner-Review-Runden am Plan), `make sut-smoke` grün
-gegen den Stand-in, `sut-config-check` Pflicht-Gate, ADR 0013 trägt
-`Accepted — §5.1–§5.3 umgesetzt; §5.4 offen` (+ `LH-PROT-002`-Korrektur an
-drei Stellen). Branch `impl-field-contract-5.3`. Details im Abschluss.
+(aktiviert nach drei Owner-Review-Runden am Plan; nach der Implementierung
+eine Agent-Review-Runde mit 10 Befunden und eine Owner-Review-Runde mit
+15 Befunden, alle gefixt — siehe Abschluss). `make sut-smoke` grün gegen
+den Stand-in, `sut-config-check` Pflicht-Gate. Die ADR-0013-Status-Klausel
+wurde mit diesem Slice auf `Accepted — §5.1–§5.3 umgesetzt; §5.4 offen`
+gesetzt (Stand Abschluss-Zeitpunkt; §5.4 schreibt sie fort), die
+`LH-PROT-002`-Fehlzitation an **vier** Stellen korrigiert. Branch
+`impl-field-contract-5.3`.
 **Datum:** 2026-07-13
 **Quelle:** [`../../adr/0013-device-mapping-field-contract.md`](../../adr/0013-device-mapping-field-contract.md) §5.3
 **Bezug:**
@@ -18,8 +22,8 @@ drei Stellen). Branch `impl-field-contract-5.3`. Details im Abschluss.
 [`../../../user/quality.md`](../../../user/quality.md) (TLS/Auth-Abschnitt)
 und [`../done/plan-RM-M4-06-FUP-tls-auth.md`](../done/plan-RM-M4-06-FUP-tls-auth.md)
 (Verankerung der MQTT-Plaintext/TLS-Posture — **nicht** `LH-PROT-002`,
-das ist „Protokollfehler → Quality-Flag"; ADR 0013 trägt dieselbe
-Fehlzitation, Korrektur nimmt dieser Slice mit)
+das ist „Protokollfehler → Quality-Flag"; ADR 0013 **trug** dieselbe
+Fehlzitation, mit diesem Slice korrigiert)
 
 ---
 
@@ -45,7 +49,8 @@ Nach Abschluss trägt ADR 0013 die Status-Klausel
 Verifiziert 2026-07-13 (Stand v2.1.0):
 
 - **Der config-only-Mechanismus existiert vollständig** (keine
-  Code-Lücke): `deploy/compose.yml:28-34` konfiguriert den MQTT-Pfad
+  Code-Lücke): der `Bess__Mqtt*`-Env-Block in `deploy/compose.yml`
+  konfiguriert den MQTT-Pfad
   ausschließlich über `Bess__*`-Env-Keys — `MqttMappingPath`,
   `MqttBrokerHost/Port`, `MqttClientId`, `MqttRuntimeProfile`,
   `MqttAllowPlaintext(+Reason)`; dazu die TLS/Auth-Familie
@@ -53,8 +58,9 @@ Verifiziert 2026-07-13 (Stand v2.1.0):
   `BessHostOptions.cs:58-65`) und seit v2.0.0 `Bess__SnapshotMaxAge`
   (Kadenz-Stellschraube, Default 10 s).
 - **Netz-Topologie-Fakt für Sub-Slice 2:** der bestehende Feld-Stack
-  publiziert **keinen** Host-Port (`deploy/compose.yml:56-65`, mosquitto
-  ohne `ports:`), und zwei getrennt gestartete Compose-Projekte bekommen
+  publiziert **keinen** Host-Port (mosquitto-Service in
+  `deploy/compose.yml` ohne `ports:`), und zwei getrennt gestartete
+  Compose-Projekte bekommen
   projekt-eigene Netze — ein „einfach beide starten" verbindet sie
   **nicht**; die Kopplung braucht ein explizites Artefakt (Entscheidung
   unten).
@@ -72,11 +78,11 @@ Verifiziert 2026-07-13 (Stand v2.1.0):
   `MqttAllowPlaintext` verlangt eine dokumentierte `Reason`;
   TLS/Auth-Profile existieren (RM-M4-06-FUP, dokumentiert in
   `quality.md`), bleiben aber Deployment-Thema. **Zitations-Korrektur
-  (Review-Befund 2):** die Posture hängt NICHT an `LH-PROT-002`
-  (= Protokollfehler → Quality-Flag); ADR 0013 zitiert das in Bezug
-  (Z. 26) und §8 falsch — die Ein-Zeilen-Korrektur wird mit der
-  ADR-Status-Klausel dieses Slices miterledigt, damit die Fehlzitation
-  nicht in die permanente User-Doku wandert.
+  (Plan-Review-Runde 2, Befund 2):** die Posture hängt NICHT an
+  `LH-PROT-002` (= Protokollfehler → Quality-Flag); ADR 0013 zitierte
+  das im Bezug-Block und in §8 falsch — mit diesem Slice korrigiert
+  (das vollständige Vier-Stellen-Inventar steht in Liefergegenstand 3),
+  damit die Fehlzitation nicht in die permanente User-Doku wandert.
 
 ---
 
@@ -131,18 +137,24 @@ Verifiziert 2026-07-13 (Stand v2.1.0):
   code-verifiziert; `make docs-check` grün.
 - **Verifikation:** `make docs-check`; Schritt-für-Schritt-Nachvollzug
   im Sub-Slice-2-Smoke.
-- **Release-Feld:** RM-Feld beim Aktivieren vergeben.
+- **Release-Feld:** entfällt — kein eigener RM-Slice (slice-first);
+  Rückverfolgbarkeit über den CHANGELOG-Eintrag des nächsten Releases,
+  das diesen Merge trägt (aufgelöst im Abschluss; ursprünglicher
+  Platzhalter „beim Aktivieren vergeben" war nie einlösbar, weil
+  `done/` eingefroren ist).
 
 ### 2 — Compose-SUT-Variante + Stand-in-Smoke
 
 - **Kopplungs-Artefakt (entschieden, nicht offen):** ein **shared
-  external Docker-Network** (`bess-sut`, angelegt/abgeräumt vom
-  Make-Target). Der Stand-in-Feld-Stack bekommt ein eigenes
+  external Docker-Network** (`bess-sut`; das Make-Target legt es bei
+  Bedarf an und räumt **nur selbst angelegte** Netze wieder ab — ein
+  vorbestehendes Netz wird mit Warnung weiterverwendet und belassen).
+  Der Stand-in-Feld-Stack bekommt ein eigenes
   `deploy/compose.field.yml` (mosquitto + `bess-field-sim`, tritt dem
   externen Netz bei, Broker-Service-Alias z. B. `field-mosquitto`,
   **kein** Host-Port-Publish); `deploy/compose.sut.yml` tritt demselben
   Netz bei. Default `BESS_SUT_BROKER_HOST=field-mosquitto`,
-  `…_PORT=1883`. (Verworfen: Host-Port-Publish + `host.docker.internal`
+  `BESS_SUT_BROKER_PORT=1883`. (Verworfen: Host-Port-Publish + `host.docker.internal`
   — Linux-unportabel ohne `host-gateway`-Zusatz und kollisionsanfällig
   auf 1883.) Für einen **echt** externen Endpoint (grid-gym, andere
   Maschine) dokumentiert die Doku das Env-Override auf eine routbare
@@ -150,25 +162,37 @@ Verifiziert 2026-07-13 (Stand v2.1.0):
 - **Aufgabe:** `deploy/compose.sut.yml` — bess-ems (+ Postgres) **ohne**
   eigenen Broker und **ohne** `bess-field-sim`; Broker-Adresse per Env
   (siehe oben). `make sut-smoke` mit **derselben Dependency-Kette wie
-  `runtime`** (`build` + `$(SIMULATOR_MAKE) build`, `Makefile:414-415`)
-  — beide Stacks nutzen `pull_policy: never`-Images
-  (`bess-ems-runtime:latest`, `bess-field-sim:latest`), standalone auf
-  frischem Checkout wäre der Smoke sonst rot. Ablauf: Netz anlegen → Feld-Stack
+  `runtime`** — umgesetzt als gemeinsames Prerequisite
+  `simulator-build` (Prerequisites dedupliziert make über
+  `runtime`/`test-integration`/`sut-smoke`; wörtliche Rezept-Kopien
+  von `$(SIMULATOR_MAKE) build` hätten den Simulator in `fullbuild`
+  dreimal gebaut, Owner-Review-Befund 15) — beide Stacks nutzen
+  `pull_policy: never`-Images (`bess-ems-runtime:latest`,
+  `bess-field-sim:latest`), standalone auf frischem Checkout wäre der
+  Smoke sonst rot. Ablauf: Netz anlegen (falls fehlend) → Feld-Stack
   (`compose.field.yml`) hoch → SUT-Variante dagegen → Grün-Kriterium
-  **mechanisch** (Review-Befund 1: **nur** der Safe-Stop-Pfad trägt ein
-  `decision=`-Feld, `ControlCycleUseCase.cs:246`; ein Grep auf
-  „`decision=` ≠ Safe-Stop" wäre unerfüllbar): innerhalb N Sekunden
-  (Default im Slice, z. B. 60 s) erscheint die Gutfall-Zeile
-  **`Control cycle emitted command`** (EventId 1701,
-  `ControlCycleUseCase.cs:235`), **plus** nach der Warmup-Phase keine
-  `Control cycle safe-stop`-Zeile mehr (Log-Grep, kein Augenschein) →
-  beide Stacks + Netz abräumen (auch im Fehlerpfad). Ein
-  `decision=`-Feld in die Gutfall-Zeile aufzunehmen wäre ein
-  Runtime-Code-Delta und ist per Nicht-Ziel ausgeschlossen. Damit ist
-  der config-only-Pfad mechanisch belegt.
-- **Gate-Einordnung (entschieden, nicht offen — Review-Befund 2):**
-  zwei Ebenen. (1) **`make sut-config-check`** (`docker compose -f … 
-  config -q` für beide neuen Compose-Dateien) ist **Pflicht-Gate** in
+  **mechanisch** (Plan-Review-Runde 2, Befund 1: **nur** der
+  Safe-Stop-Pfad trägt ein `decision=`-Feld; ein Grep auf
+  „`decision=` ungleich Safe-Stop" wäre unerfüllbar): innerhalb von
+  90 s (Default `SUT_SMOKE_TIMEOUT`) erscheint die Gutfall-Zeile —
+  gematcht am **JSON-Anker `"EventId":1701`** („Control cycle emitted
+  command"), umformulierungsfest; die zunächst umgesetzte
+  Freitext-Variante hätte bei einem Meldungs-Umbau still zum
+  False-Green degenerieren können (Owner-Review-Befund 7). **Ab dem
+  Gutfall-Signal** läuft ein 20-s-Beobachtungsfenster
+  (`SUT_SMOKE_WARMUP`), in dem **keine neue** Safe-Stop-Zeile
+  (`"EventId":1702`) hinzukommen darf; Anlauf-Safe-Stops **vor** dem
+  ersten Gutfall sind erwartbar (der Zyklus läuft, bevor Telemetrie
+  eintrifft) und zählen bewusst nicht — danach endet die Beobachtung:
+  der Smoke ist ein Kopplungs-Beweis, kein Dauer-Monitor. Abschließend
+  beide Stacks abräumen, selbst angelegte Netze entfernen (auch im
+  Fehlerpfad). Ein `decision=`-Feld in die Gutfall-Zeile aufzunehmen
+  wäre ein Runtime-Code-Delta und ist per Nicht-Ziel ausgeschlossen.
+  Damit ist der config-only-Pfad mechanisch belegt.
+- **Gate-Einordnung (entschieden, nicht offen — Plan-Review-Runde 1,
+  Befund 2):** zwei Ebenen. (1) **`make sut-config-check`**
+  (`docker compose -f <datei> config -q` für beide neuen
+  Compose-Dateien) ist **Pflicht-Gate** in
   `make gates`/`ci`/`build.yml` — Sekunden, keine Images; eine nie
   ausgeführte Compose-Datei neben einem Doku-Rezept ist exakt die
   Rott-Drift-Klasse, die ADR 0013 bekämpft. (2) **`make sut-smoke`**
@@ -183,7 +207,8 @@ Verifiziert 2026-07-13 (Stand v2.1.0):
   Config/Doku/Make-Arbeit).
 - **Verifikation:** `make sut-config-check` (Pflicht), `make sut-smoke`
   (fullbuild), `make gates`.
-- **Release-Feld:** RM-Feld beim Aktivieren vergeben.
+- **Release-Feld:** entfällt — wie Sub-Slice 1 (CHANGELOG-Eintrag des
+  nächsten Releases; aufgelöst im Abschluss).
 
 ### 3 — Offener Verifikations-Slot: grid-gym-E2E (trigger-basiert)
 
@@ -193,6 +218,13 @@ Verifiziert 2026-07-13 (Stand v2.1.0):
   CR** (bess-ems-konformer breiter Publisher, dort in Arbeit) und wird
   hier nachgetragen, sobald er geliefert ist — inklusive Flip des
   Doku-Status von „Stand-in-verifiziert" auf „grid-gym-verifiziert".
+  **Abweichung (dokumentiert):** ausgeliefert wurde der Abschnitt als
+  „Verifikation gegen eine reale externe Feld-Umgebung — OFFEN", und
+  die Doku enthält den String `grid-gym` bewusst **nirgends** —
+  stärker anonymisiert, als ADR §8 verlangt (das ADR verbietet nur
+  renummerierbare Fremd-IDs, nicht den Projektnamen); wer die Doku
+  nach dem Projektnamen greppt, findet den Slot über den
+  Abschnittstitel in §6.
 - **Akzeptanz:** der offene Slot ist unübersehbar markiert (kein
   stiller Verifikations-Claim); Trigger **fähigkeits-referenziert**
   gemäß ADR §8 — die permanente User-Doku nennt keine fremd-repo-
@@ -232,13 +264,14 @@ Verifiziert 2026-07-13 (Stand v2.1.0):
    `make sut-config-check` (Pflicht-Gate in gates/ci/build.yml).
 3. ADR 0013 nach Abschluss: Status-Klausel
    `Accepted — §5.1–§5.3 umgesetzt; §5.4 offen` **an beiden Stellen**
-   (Klausel Z. 3 **und** Header-Prosa Z. 12–15, sonst driftet die
-   Prosa), plus die Korrektur der `LH-PROT-002`-Fehlzitation an allen
-   **drei** Stellen: ADR Bezug Z. 26, ADR §8 (Z. 338) **und der
-   Kommentar `deploy/compose.yml:2`** („Mosquitto (LH-PROT-002 MQTT)"
-   — dieselbe Fehlzitation; Sub-Slice 2 arbeitet ohnehin in `deploy/`).
-   Broker-Security-Anker ist `quality.md` §2.2.1/RM-M4-06-FUP, nicht
-   `LH-PROT-002` = Protokollfehler→Quality-Flag.
+   (Status-Zeile **und** Header-Prosa-Absatz, sonst driftet die
+   Prosa), plus die Korrektur der `LH-PROT-002`-Fehlzitation. Geplant
+   waren **drei** Stellen (ADR Bezug-Block, ADR §8, Header-Kommentar
+   `deploy/compose.yml`); die Implementierungs-Review-Runde fand eine
+   **vierte** (`deploy/mosquitto.conf`-Header — die Datei, die beide
+   Stacks mounten), korrigiert im Review-Fix-Commit. Broker-Security-
+   Anker ist `quality.md` §2.2.1/RM-M4-06-FUP, nicht `LH-PROT-002` =
+   Protokollfehler→Quality-Flag.
 
 ---
 
@@ -251,11 +284,12 @@ Verifiziert 2026-07-13 (Stand v2.1.0):
   Rezept unterscheidbar.
 - Der Pfad ist mechanisch belegt: `make sut-smoke` grün gegen den
   Stand-in-Stack über das shared external Network, Grün-Kriterium per
-  Log-Grep (`Control cycle emitted command` binnen N s, keine
-  `Control cycle safe-stop`-Zeile nach Warmup), fortlaufend in
-  `fullbuild`; `make sut-config-check` als Pflicht-Gate hält die
-  Compose-Artefakte gegen Rott-Drift. Der grid-gym-E2E ist als
-  offener, trigger-basierter Slot markiert — kein stiller
+  Log-Grep auf JSON-Anker (`"EventId":1701` binnen 90 s; ab dem
+  Gutfall-Signal keine **neue** `"EventId":1702`-Zeile im
+  20-s-Beobachtungsfenster — Anlauf-Safe-Stops davor zählen nicht),
+  fortlaufend in `fullbuild`; `make sut-config-check` als Pflicht-Gate
+  hält die Compose-Artefakte gegen Rott-Drift. Der grid-gym-E2E ist
+  als offener, trigger-basierter Slot markiert — kein stiller
   Verifikations-Claim.
 - `make gates` bleibt grün; kein Runtime-Verhaltensdelta.
 
@@ -268,34 +302,71 @@ Verifiziert 2026-07-13 (Stand v2.1.0):
       QoS-Semantik inline, `{assetId}`-Korrespondenz, unterscheidbare
       Ursachen-Signale). (`bf1313a`)
 - [x] Sub-Slice 2 — `compose.sut.yml` + `compose.field.yml` +
-      `make sut-smoke` grün (Stand-in; `Control cycle emitted command`
-      binnen 90 s, kein Safe-Stop nach 20 s Warmup; fullbuild) +
-      `sut-config-check` Pflicht-Gate. (`fa4f47f`)
-- [x] Sub-Slice 3 — offener grid-gym-Verifikations-Slot markiert
-      (Doku §6, fähigkeits-referenziert, keine CR-/Plan-IDs).
-- [x] Alle Akzeptanzkriterien erfüllt; `make gates` grün.
+      `make sut-smoke` grün (Stand-in; JSON-Anker `"EventId":1701`
+      binnen 90 s, keine **neue** `"EventId":1702`-Zeile im
+      20-s-Fenster ab Gutfall-Signal; fullbuild) + `sut-config-check`
+      Pflicht-Gate. (`fa4f47f`; gehärtet durch beide Review-Runden —
+      Evidenz-Stand ist der Branch-Tip, nicht `fa4f47f`)
+- [x] Sub-Slice 3 — offener Verifikations-Slot markiert (Doku §6,
+      fähigkeits-referenziert; ausgelieferter Titel weicht bewusst vom
+      Plan-Wortlaut ab, siehe Sub-Slice-3-Abweichungsnotiz).
+- [x] Alle Akzeptanzkriterien erfüllt; alle Pflicht-Gates grün
+      (auf dem Endstand nach beiden Review-Runden).
 - [x] ADR 0013: Status-Klausel
       `Accepted — §5.1–§5.3 umgesetzt; §5.4 offen` an **beiden**
-      Stellen (Z. 3 + Header-Prosa) + `LH-PROT-002`-Zitations-Korrektur
-      an allen **drei** Stellen (ADR Bezug, ADR §8,
-      `deploy/compose.yml:2`).
+      Stellen (Status-Zeile + Header-Prosa) + `LH-PROT-002`-Korrektur
+      an allen **vier** Stellen (ADR Bezug, ADR §8,
+      `deploy/compose.yml`, `deploy/mosquitto.conf` — die vierte fand
+      die Implementierungs-Review).
 
 ---
 
 ## Abschluss (2026-07-13)
 
-Alle 3 Sub-Slices umgesetzt. Bemerkenswert: der **erste** `sut-smoke`-Lauf
-schlug korrekt fehl — das Standard-Integrations-Szenario hält nach Tick 0
-für 24 h still (Einzel-Publish), bess-ems lief nach dem initialen
-Gutfall-Signal in `decision=snapshot-unusable`/`reason=snapshot-aged-Ns`.
-Das ist die Kadenz-Regel aus ADR 0013 §1 in freier Wildbahn und bestätigt
-zugleich die Ursachen-Signale des Doku-Rezepts. Fix: der Smoke generiert
-sich ein Szenario mit kontinuierlicher 1-s-Kadenz
-(`deploy/.sut-scenario.json`, gitignored; `compose.field.yml`-Mount per
-`BESS_FIELD_SCENARIO` parametrisiert), danach grün: Gutfall-Signal binnen
-Frist, kein Safe-Stop im Warmup-Fenster, Cleanup inkl. Netz + Szenario
-auch im Fehlerpfad.
+Alle 3 Sub-Slices umgesetzt; die Evidenz-Kette umfasst **drei Wellen**
+auf dem Branch (die DoD-Haken zertifizieren den Branch-Tip, nicht die
+Sub-Slice-Commits):
+
+1. **Sub-Slice-Commits + Finalisierung.** Bemerkenswert: der **erste**
+   `sut-smoke`-Lauf schlug korrekt fehl — das Standard-Integrations-
+   Szenario hält nach Tick 0 für 24 h still (Einzel-Publish), bess-ems
+   lief nach dem initialen Gutfall-Signal in
+   `decision=snapshot-unusable`/`reason=snapshot-aged-<N>s`. Das ist
+   die Kadenz-Regel aus ADR 0013 §1 in freier Wildbahn und bestätigt
+   die Ursachen-Signale des Doku-Rezepts.
+2. **Agent-Review-Runde: 10 Befunde, alle gefixt** (`2cfd5d3`) —
+   darunter: das Real-Endpoint-Rezept legte das externe Netz nie an
+   (Doku-Hauptkriterium war damit zum ersten Abhak-Zeitpunkt
+   **nicht** erfüllt; erst dieser Fix machte es wahr), ein
+   Bind-Mount-Footgun (fehlende Datei wird als gitignoriertes
+   Verzeichnis angelegt und verklemmt Folge-Läufe →
+   `create_host_path: false`), ein False-Green-Pfad der Log-Erfassung,
+   Env-Pinning, Netz-Lifecycle, die **vierte** `LH-PROT-002`-Stelle
+   (`mosquitto.conf`), Doku-Präzisierungen.
+3. **Owner-Review-Runde: 15 Befunde, alle gefixt** — schwerpunktmäßig
+   Genauigkeit des Done-Records und Härtung: Grün-Kriterium auf
+   **JSON-Anker** `"EventId":1701/1702` umgestellt (Freitext-Greps
+   wären bei Meldungs-Umbau still zum False-Green degeneriert) und die
+   Safe-Stop-Semantik überall auf die tatsächliche Implementierung
+   präzisiert (Beobachtungsfenster **ab** Gutfall-Signal, keine
+   Dauer-Überwachung); das Kadenz-Szenario ist jetzt ein
+   **committetes Fixture**
+   (`simulators/bess-field-sim/testdata/scenarios/sut-smoke-cadence.json`,
+   diff-reviewbar, `TestAllFixturesLoad`-gedeckt) statt einer zur
+   Laufzeit generierten gitignorierten Datei; `simulator-build` als
+   gemeinsames Prerequisite (vorher baute `fullbuild` das
+   Simulator-Image dreimal); zwei falsche Doku-Signale korrigiert
+   (`/health` liefert 503 bei unhealthy Komponenten, nicht pauschal
+   200; das 1903-Zitat lautet real `Command-sink dispatch failed`);
+   drei veraltete „10 s hartkodiert"-Stellen im ADR auf den
+   §5.1-Stand gebracht; Release-Feld-Platzhalter aufgelöst;
+   Zitate/Zeilenanker drift-fest gemacht.
+
+**Bewusst nicht umgesetzt** (Owner-Review, unterschwellige Kandidaten):
+ein mechanischer Wächter gegen künftige `LH-PROT-002`-Fehlzitationen —
+notiert als möglicher d-check-/Sensor-Kandidat, kein §5.3-Scope.
 
 **Verifikations-Kommandos:** `make sut-config-check` (Pflicht-Gate),
-`make sut-smoke` (fullbuild-Mitglied), `make gates` (voll),
-`make docs-check`.
+`make sut-smoke` (fullbuild-Mitglied), `make gates` (voll; auf langsamen
+Maschinen ggf. in Chunks — die `--no-cache-filter`-Simulator-Stages
+laufen je Aufruf neu), `make docs-check`.

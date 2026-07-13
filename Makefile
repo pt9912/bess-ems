@@ -25,7 +25,7 @@ DOCKER_BUILD = $(DOCKER) build $(BUILD_CONTEXT) \
 	test test-safety test-mpc-property test-replay test-integration test-hil-modbus test-hil-opcua test-hil-optimization-core test-optimization-core-compose test-hil-closed-loop test-container coverage-gate \
 	native-build test-native-interop test-native-parity \
 	native-lint native-sanitizer native-coverage-report native-coverage-gate native-coverage-exclusions \
-	simulator-test simulator-race simulator-lint simulator-coverage-gate \
+	simulator-test simulator-race simulator-lint simulator-coverage-gate simulator-build \
 	build ci runtime fullbuild lock-refresh release-assets \
 	schema-validate schema-generate schema-drift-check field-contract-check \
 	field-vectors-check field-vectors-refresh \
@@ -226,8 +226,7 @@ sut-config-check:
 # projects coupled only through the shared external network — proves the
 # config-only path leaves the safety fallback (docs/user/sut-field-endpoint.md).
 # Same dependency chain as `runtime`: both stacks use pull_policy:never images.
-sut-smoke: build
-	$(SIMULATOR_MAKE) build
+sut-smoke: build simulator-build
 	./scripts/sut-smoke.sh
 
 # --- Welle 1 (active) ------------------------------------------------------
@@ -286,8 +285,15 @@ simulator-lint:
 simulator-coverage-gate:
 	$(SIMULATOR_MAKE) coverage-gate
 
-test-integration:
+# Shared prerequisite for every target that needs the simulator runtime
+# image: prerequisites are deduplicated by make within one run, recipe-line
+# `$(SIMULATOR_MAKE) build` calls are not — with test-integration, runtime
+# and sut-smoke all needing the image, a single `make fullbuild` used to
+# build it three times.
+simulator-build:
 	$(SIMULATOR_MAKE) build
+
+test-integration: simulator-build
 	$(DOCKER) compose -f tests/integration/compose.yml up --build --abort-on-container-exit --exit-code-from test-runner; \
 	exit_code=$$?; \
 	$(DOCKER) compose -f tests/integration/compose.yml down -v --remove-orphans >/dev/null 2>&1; \
@@ -430,8 +436,7 @@ build:
 # in-container check covers post-build mishaps (e.g. a volume mount
 # shadowing the path) and proves the production deployment shape
 # stays M3-D2-ready without enabling the routing yet.
-runtime: build
-	$(SIMULATOR_MAKE) build
+runtime: build simulator-build
 	$(DOCKER) compose -f deploy/compose.yml up -d --wait --wait-timeout 60
 	@echo "[runtime] stack is up; probing /health"
 	$(DOCKER) compose -f deploy/compose.yml exec -T bess-ems curl --fail --silent --show-error http://localhost:8080/health
