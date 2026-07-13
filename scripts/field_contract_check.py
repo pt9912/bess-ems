@@ -12,7 +12,7 @@ this gate):
   5. Every shipped example under config/examples/ validates against its schema
      ($refs across schemas resolve through a $id registry).
   6. The schema-bundle CHANGELOG is present.
-  7. ADR 0013 §5.2: both golden-vector manifests are present, validate against
+  7. ADR 0013 §5.2/§5.4: all four golden-vector manifests are present, validate against
      the manifest schema, and every telemetry/command/command_ack payload
      validates against its envelope definition WITH key-set discipline (no key
      beyond properties, all required present — exact set for telemetry, where
@@ -49,12 +49,22 @@ VECTORS_DIR = SCHEMA_DIR / "vectors"
 VECTOR_MANIFEST_SCHEMA = "golden-vector-manifest.schema.json"
 ENVELOPE_SCHEMA = "mqtt-telemetry-envelope.schema.json"
 
-# Both authority manifests must ship (same presence floor as
+# Every published vector manifest must ship (same presence floor as
 # REQUIRED_EXAMPLE_PATTERNS — a vanished vectors/ dir must not false-pass).
 REQUIRED_VECTOR_MANIFESTS = (
     "mqtt-golden-vectors.field.v1.json",
     "mqtt-golden-vectors.ems.v1.json",
+    "modbus-golden-vectors.simulator.v1.json",
+    "modbus-golden-vectors.hil-simulator.v1.json",
 )
+
+# Loader defaults the .NET side applies when a profile omits the fields
+# (ModbusRegisterMapping inits) — the profile comparison must resolve them,
+# otherwise every default-relying register would false-negative.
+MODBUS_CASE_DEFAULTS = {
+    "register_table": "holding",
+    "word_order": "high_low",
+}
 
 # Protocol-mapping schemas whose schema_version pins the contract major.
 MAPPING_SCHEMAS = (
@@ -144,6 +154,46 @@ def vector_payload_errors(path, instance, envelope_defs):
         missing = sorted(set(definition.get("required", [])) - set(payload))
         if missing:
             errs.append(f"{path}: case {name!r} misses envelope-required keys {missing}")
+    return errs
+
+
+def modbus_profile_errors(path, instance):
+    """ADR 0013 §5.4: every modbus vector case must agree with its shipped
+    mapping profile — register exists, direction matches writable, and
+    address/type/scale_factor/register_table/word_order equal the profile
+    (defaults resolved). Catches vector<->profile drift without .NET."""
+    if not isinstance(instance, dict) or instance.get("contract") != "modbus":
+        return []
+    profile_name = instance.get("profile")
+    profile_path = EXAMPLES_DIR / "adapters" / str(profile_name)
+    if not profile_path.is_file():
+        return [f"{path}: profile {profile_name!r} not found under config/examples/adapters/"]
+    errs = []
+    profile = load_json(profile_path, errs)
+    if not isinstance(profile, dict):
+        return errs or [f"{path}: profile {profile_name!r} did not parse"]
+    registers = {r.get("name"): r for r in profile.get("registers", []) if isinstance(r, dict)}
+    cases = instance.get("cases") if isinstance(instance.get("cases"), list) else []
+    for case in cases:
+        if not isinstance(case, dict):
+            continue
+        name = case.get("name")
+        register = registers.get(case.get("register"))
+        if register is None:
+            errs.append(f"{path}: case {name!r} references register {case.get('register')!r} not present in {profile_name}")
+            continue
+        expected_direction = "write" if register.get("writable") else "read"
+        if case.get("direction") != expected_direction:
+            errs.append(f"{path}: case {name!r} direction {case.get('direction')!r} != profile writable={register.get('writable')}")
+        for field in ("address", "type", "scale_factor"):
+            if case.get(field) != register.get(field):
+                errs.append(f"{path}: case {name!r} {field}={case.get(field)!r} != profile {register.get(field)!r}")
+        for field, default in MODBUS_CASE_DEFAULTS.items():
+            if case.get(field) != register.get(field, default):
+                errs.append(
+                    f"{path}: case {name!r} {field}={case.get(field)!r} != profile "
+                    f"{register.get(field, default)!r} (loader default applied)"
+                )
     return errs
 
 
@@ -261,6 +311,7 @@ def main() -> int:
                 loc = "/".join(str(p) for p in err.path) or "(root)"
                 errors.append(f"{path}: fails {VECTOR_MANIFEST_SCHEMA} at {loc}: {err.message}")
             errors.extend(vector_payload_errors(path, instance, envelope_defs))
+            errors.extend(modbus_profile_errors(path, instance))
             vector_count += 1
 
     if errors:
@@ -272,7 +323,7 @@ def main() -> int:
     print(
         f"field-contract-check OK — {len(schemas)} schemas valid (Draft 2020-12), "
         f"{len(REQUIRED_SCHEMAS)} required present, {example_count} examples conform, "
-        f"{vector_count} golden-vector manifests conform (payloads envelope-checked incl. key sets), "
+        f"{vector_count} golden-vector manifests conform (mqtt payloads envelope-checked incl. key sets, modbus cases profile-pinned), "
         f"schema_version pinned to {CONTRACT_MAJOR[0]}, CHANGELOG present"
     )
     return 0
