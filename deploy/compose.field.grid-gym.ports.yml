@@ -1,0 +1,20 @@
+# Optional ports override for compose.field.grid-gym.yml — manual viewing
+# only. Maps the sister platform's web UI to the host (its server listens on
+# :8080 in-container; host port 8000 keeps 8080 free for the SUT override,
+# compose.sut.ports.yml). Localhost-only bind on purpose.
+#
+# Add as a second -f when starting the field project manually
+# (docs/user/sut-field-endpoint.md §4):
+#
+#   docker compose -f deploy/compose.field.grid-gym.yml \
+#                  -f deploy/compose.field.grid-gym.ports.yml \
+#                  -p bess-sut-field up -d --wait
+#
+# Then: web UI at http://localhost:8000 (dashboard, device one-line diagram,
+# run control — see the platform's own manual).
+#
+# GRID_GYM_UI_PORT overrides the host port when 8000 is taken.
+services:
+  grid-gym:
+    ports:
+      - "127.0.0.1:${GRID_GYM_UI_PORT:-8000}:8080"

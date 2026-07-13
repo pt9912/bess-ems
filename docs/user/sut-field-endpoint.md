@@ -152,6 +152,30 @@ genau die Kadenz-Regel aus §1. Für einen echten externen Endpoint ist die Netz
 Betreibersache — `BESS_SUT_BROKER_HOST` muss aus dem Container heraus
 routbar sein.
 
+### Web-UIs im Browser (optionale Ports-Overrides)
+
+Beide Stacks sind bewusst port-los (log-getriebene Verifikation, keine
+Host-Port-Kollisionen). Für die manuelle Ansicht der beiden Web-UIs
+gibt es opt-in Overrides, die localhost-only auf den Host mappen:
+
+```bash
+docker network create bess-sut 2>/dev/null || true
+docker compose -f deploy/compose.field.grid-gym.yml \
+               -f deploy/compose.field.grid-gym.ports.yml \
+               -p bess-sut-field up -d --wait
+docker compose -f deploy/compose.sut.yml \
+               -f deploy/compose.sut.ports.yml \
+               -p bess-sut-ems up -d --wait
+```
+
+Danach: Operator-Konsole unter `http://localhost:8080/operator/`
+(Token-Handhabung: [Anwenderhandbuch §2](anwenderhandbuch.md)) und die
+Plattform-UI unter `http://localhost:8000`. Sind die Ports belegt
+(z. B. weil auf derselben Maschine schon ein anderer gekoppelter Stack
+betrachtet wird), weichen `BESS_SUT_UI_PORT`/`GRID_GYM_UI_PORT` auf
+freie Host-Ports aus. Beide Override-Dateien stehen mit ihrer
+jeweiligen Basis unter dem `sut-config-check`-Gate.
+
 ## 5. Verifikation
 
 1. **Health:** `GET /health` liefert 200, wenn **alle** registrierten

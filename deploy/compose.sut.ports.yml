@@ -1,0 +1,25 @@
+# Optional ports override for compose.sut.yml — manual viewing only.
+#
+# The base compose is deliberately port-less (log-driven verification, no
+# 8080 collisions on shared machines); this override maps the operator API
+# to the host so the web console can be watched during a SUT run. Bind is
+# localhost-only on purpose: a sim-only stack has no business on the LAN.
+#
+# Add as a second -f when starting the SUT project manually
+# (docs/user/sut-field-endpoint.md §4):
+#
+#   docker compose -f deploy/compose.sut.yml -f deploy/compose.sut.ports.yml \
+#                  -p bess-sut-ems up -d --wait
+#
+# Then:
+#   - Operator console: http://localhost:8080/operator/
+#     (dev token per docs/user/anwenderhandbuch.md §2 — already configured
+#     in the base compose; only needed for the stop action)
+#   - Health:           http://localhost:8080/health
+#
+# BESS_SUT_UI_PORT overrides the host port when 8080 is taken (e.g. another
+# coupled stack is already being viewed on this machine).
+services:
+  bess-ems:
+    ports:
+      - "127.0.0.1:${BESS_SUT_UI_PORT:-8080}:8080"

@@ -221,7 +221,9 @@ sut-config-check:
 	$(DOCKER) compose -f deploy/compose.sut.yml config -q
 	$(DOCKER) compose -f deploy/compose.field.yml config -q
 	$(DOCKER) compose -f deploy/compose.field.grid-gym.yml config -q
-	@echo "[sut-config-check] compose.sut.yml + compose.field.yml + compose.field.grid-gym.yml render clean"
+	$(DOCKER) compose -f deploy/compose.sut.yml -f deploy/compose.sut.ports.yml config -q
+	$(DOCKER) compose -f deploy/compose.field.grid-gym.yml -f deploy/compose.field.grid-gym.ports.yml config -q
+	@echo "[sut-config-check] compose.sut.yml + compose.field.yml + compose.field.grid-gym.yml (+ ports overrides) render clean"
 
 # ADR 0013 §5.3: full SUT smoke (fullbuild member, too heavy for gates).
 # Runs the stand-in field stack and the SUT variant as SEPARATE compose
