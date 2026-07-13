@@ -169,18 +169,32 @@ Safe-Stop-Zeile (`"EventId":1702`) hinzu — Anlauf-Safe-Stops **vor**
 dem ersten Gutfall-Signal sind erwartbar (der Zyklus läuft, bevor die
 erste Telemetrie eintrifft) und zählen nicht.
 
-## 6. Verifikation gegen eine reale externe Feld-Umgebung — OFFEN
+## 6. Verifikation gegen eine reale externe Feld-Umgebung — ERFÜLLT
 
-> **Status: offen.** Dieses Rezept ist gegen den Stand-in
-> (`bess-field-sim`, der De-facto-Produzent des Vertrags) verifiziert —
-> **nicht** gegen eine reale externe Feld-Umgebung. Die
-> Schwester-Simulationsplattform besitzt seit kurzem eine
-> Push-Field-Publish-Surface, publiziert dort aber noch ihr eigenes
-> schmales Punkt-Format; ein bess-ems-konformer Publisher (breiter
-> Snapshot je Tick, gegen die Golden-Vektoren abgenommen) ist dort in
-> Arbeit. Sobald er liefert, wird dieser Abschnitt durch den
-> E2E-Befund ersetzt (bess-ems verlässt den Safety-Fallback gegen die
-> reale Surface). Bis dahin gilt: Stand-in-verifiziert.
+> **Status: verifiziert (2026-07-13).** Die Schwester-Simulationsplattform
+> liefert seit ihrem jüngsten Release einen bess-ems-konformen
+> Feld-Publisher (breiter 10-Feld-Envelope je Tick, gegen das
+> publizierte Schema-Bundle und die Golden-Vektoren dieses Vertrags
+> abgenommen; Vorzeichen-Konvention und ID-Mapping dokumentiert dort).
+> Der E2E wurde **beidseitig** gefahren: die Gegenseite nahm das
+> offizielle, unveränderte bess-ems-Image in ihrem Abnahme-Stack ab,
+> und von dieser Seite lief `deploy/compose.sut.yml` **unverändert**
+> (Default `BESS_SUT_BROKER_HOST=field-mosquitto`) gegen das
+> digest-gepinnte, publizierte Image der Gegenseite über das in §4
+> beschriebene external Network: Gutfall-Signal (`"EventId":1701`)
+> binnen Frist, genau ein Anlauf-Safe-Stop und im Beobachtungsfenster
+> **kein** neuer (`"EventId":1702`-Baseline stabil), Draht-Frames als
+> exakter 10-Feld-Envelope inklusive Fault-Semantik
+> (`fault_status`/`available` aus der Fault-Surface der Gegenseite).
+> Die Gegenseite beantwortet zusätzlich `command` mit einem
+> Always-Accept-`command/ack`-Echo — der Warnstrom aus §1
+> (EventId 1903) entfällt dort sogar; der Sollwert-**Effekt** bleibt
+> weiterhin dem Modbus-Pfad bzw. dem deferred Command-Closed-Loop
+> vorbehalten (ADR 0013 §6).
+
+Der Stand-in-Smoke (`make sut-smoke`) bleibt als repo-internes,
+fortlaufendes Gate in `fullbuild` bestehen — er braucht keine externe
+Komponente.
 
 ## Bezug
 
