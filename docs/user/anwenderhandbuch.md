@@ -49,20 +49,28 @@ Datenhaltung (→ [`persistence.md`](persistence.md)).
 
 Ausgangssituation: Sie haben das Repository ausgecheckt, Docker läuft.
 
-1. Starten Sie den Stack:
+1. Bauen Sie die beiden lokalen Images (der Stack lädt sie nicht aus
+   einer Registry):
+
+   ```bash
+   make build simulator-build
+   ```
+
+2. Starten Sie den Stack:
 
    ```bash
    docker compose -f deploy/compose.yml up -d --wait
    ```
 
-2. Prüfen Sie die Gesundheit der Instanz:
+3. Prüfen Sie die Gesundheit der Instanz:
 
    ```bash
    curl -fsS http://localhost:8080/health
    ```
 
 Ergebnis: HTTP 200. Der Stack enthält neben bess-ems einen
-Feld-Simulator und eine Datenbank; die Regelzyklen laufen sofort an.
+Feld-Simulator, einen MQTT-Broker (Mosquitto) und eine Datenbank; die
+Regelzyklen laufen sofort an.
 
 Hinweis: Antwortet `/health` mit **503**, läuft die Instanz, aber eine
 kritische Komponente ist nicht gesund — die Antwort listet die
@@ -128,9 +136,13 @@ Die Kommando-Quelle zeigt, in welchem Modus die Anlage fährt:
 
 | `source` | Bedeutung |
 | -------- | --------- |
-| `optimization` | Normalbetrieb — der Regelzyklus folgt dem optimierten Fahrplan. |
-| `operator` | Ein Operator-Stop ist aktiv (nächste Aufgabe). |
-| `fallback` | Sicherheitsmodus (Safe-Stop) — Ursachen siehe Abschnitt 7. |
+| `Optimization` | Normalbetrieb — der Regelzyklus folgt dem optimierten Fahrplan. |
+| `Operator` | Ein Operator-Stop ist aktiv (nächste Aufgabe). |
+| `Fallback` | Sicherheitsmodus (Safe-Stop) — Ursachen siehe Abschnitt 7. |
+
+Anders als die übrigen JSON-Werte der API sind `source` und `mode`
+in Großschreibung (`Optimization`, nicht `optimization`) — beachten
+Sie das beim Filtern oder Vergleichen.
 
 ### Not-Stopp für eine Anlage setzen (Operator-Stop)
 
@@ -160,10 +172,10 @@ Fahrplan: die Anlage erhält ab sofort 0-kW-Sollwerte.
 #### Ergebnis
 
 Die Antwort auf den Stopp nennt Anlage, Operator, Begründung und
-Aktivierungszeit; die Statusabfrage zeigt `stop: null`, solange kein
-Stopp aktiv ist. Jeder Stopp-Versuch — auch abgelehnte — wird
-revisionssicher protokolliert (Audit-Log), mit der Operator-Identität
-aus Ihrem Token.
+Aktivierungszeit; die Statusabfrage zeigt den aktiven Stopp —
+`stop: null` bedeutet, dass keiner aktiv ist. Jeder Stopp-Versuch —
+auch abgelehnte — wird dauerhaft im Audit-Log protokolliert, mit der
+Operator-Identität aus Ihrem Token.
 
 #### Hinweise
 
@@ -364,7 +376,7 @@ Die Feld-Anbindung (MQTT/Modbus/OPC UA) ist in
 
 ## 7. Fehlerbehebung
 
-### Fehler: Anlage folgt dem Fahrplan nicht (Quelle `fallback` oder `operator`)
+### Fehler: Anlage folgt dem Fahrplan nicht (Quelle `Fallback` oder `Operator`)
 
 #### Ursache
 
@@ -376,9 +388,15 @@ Zyklus (Safe-Stop-Zeilen tragen `"EventId":1702`):
 | Log-Signal | Bedeutung |
 | ---------- | --------- |
 | `decision=no-snapshot` | Es kam **nie** Telemetrie an (Feld-Anbindung, Anlagen-ID prüfen). |
-| `decision=snapshot-unusable` + `reason=snapshot-aged-<N>s` | Telemetrie ist **zu alt** (Feld sendet zu selten oder Verbindung gestört). |
+| `decision=snapshot-unusable` + `reason=snapshot-aged-<Sekunden>s` (z. B. `snapshot-aged-12.3s`) | Telemetrie ist **zu alt** (Feld sendet zu selten oder Verbindung gestört). |
 | `decision=asset-unavailable` | Die Anlage meldet sich selbst als nicht verfügbar (z. B. aktiver Fault). |
 | `decision=operator-stop` | Ein Operator-Stop ist aktiv (Abschnitt 3). |
+| `decision=dispatch-invalid` | Die Fahrplan-Auflösung lieferte für den aktuellen Zeitpunkt keinen gültigen Sollwert (`reason` nennt das Detail) — Fahrplan-Abdeckung prüfen, ggf. neu optimieren. |
+
+Daneben gibt es seltene `decision`-Werte für Konfigurations- und
+Rechenfehler (`asset-not-registered`, `dispatch-target-not-finite`,
+`kernel-non-finite-result`) — kontaktieren Sie in diesen Fällen Ihr
+Betriebsteam.
 
 #### Lösung
 
@@ -426,6 +444,7 @@ unter `/optimization/runs/<run_id>`) benennt die Klasse,
 | `status` | Bedeutung |
 | -------- | --------- |
 | `infeasible` | Kein Fahrplan erfüllt die Anlagengrenzen (Horizont, SoC-/Leistungsgrenzen prüfen). |
+| `unbounded` | Das Optimierungsproblem ist unbeschränkt — deutet auf fehlerhafte Preis- oder Grenzwert-Eingaben. |
 | `time_limit` / `iteration_limit` | Der Solver hat sein Rechenbudget erreicht. |
 | `failed` | Solver- oder Eingabefehler — `termination_reason` nennt das Detail. |
 
@@ -447,7 +466,7 @@ Gar nicht per API — das ist eine bewusste Sicherheitsentscheidung. Der
 Stopp gilt bis zum Neustart der Instanz durch den Administrator.
 
 **Woran erkenne ich, dass alles normal läuft?**
-`/health` = 200, Kommando-Quelle `optimization`, im Log zyklisch
+`/health` = 200, Kommando-Quelle `Optimization`, im Log zyklisch
 `Control cycle emitted command` (`"EventId":1701`).
 
 **Kann ich mehrere Anlagen bedienen?**
