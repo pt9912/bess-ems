@@ -113,15 +113,29 @@ Broker und **ohne** Feld-Simulator; die Broker-Adresse kommt per Env:
 
 ```bash
 # Stand-in-Betrieb (lokal): shared external Network + Feld-Stack
-make sut-smoke        # legt Netz an, fährt beide Stacks, prüft, räumt ab
+make sut-smoke            # legt Netz an, fährt beide Stacks, prüft, räumt ab
 
-# Gegen einen echten externen Endpoint: das externe Netz muss existieren
-# (compose.sut.yml deklariert es als external; make sut-smoke legt es nur
-# für den Stand-in-Lauf an):
+# Gegen die reale Schwester-Plattform (digest-gepinntes Image, eigenes
+# Test-Szenario in deploy/scenarios/grid-gym-sut.yaml — optional, braucht
+# Registry-Zugriff; identisches Grün-Kriterium):
+make sut-smoke-grid-gym
+
+# Gegen einen beliebigen anderen externen Endpoint: das externe Netz muss
+# existieren (compose.sut.yml deklariert es als external; die Smoke-Targets
+# legen es nur für ihren eigenen Lauf an):
 docker network create bess-sut 2>/dev/null || true
 BESS_SUT_BROKER_HOST=<routbare-adresse> BESS_SUT_BROKER_PORT=1883 \
   docker compose -f deploy/compose.sut.yml up
 ```
+
+Die Real-Variante (`deploy/compose.field.grid-gym.yml`) ist der
+Drop-in-Ersatz des Stand-in-Stacks: gleicher Broker-Alias, gleiches
+Netz, aber die Feld-Seite ist der bess-ems-konforme Envelope-Publisher
+der Schwester-Plattform. Das Plattform-Image ist **per Digest gepinnt**
+(symmetrisch zu deren Pinning des bess-ems-Images in ihrem
+Abnahme-Stack); das Szenario ist **unser** Test-Fixture in deren
+Format und enthält eine späte, auto-recovernde Fault-Phase (~120 s) —
+für manuelle Läufe, bewusst außerhalb des Smoke-Fensters.
 
 Im Stand-in-Betrieb koppelt ein shared external Docker-Network
 (`bess-sut`) die SUT-Variante mit dem Feld-Stack

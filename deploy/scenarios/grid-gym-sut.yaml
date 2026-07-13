@@ -1,0 +1,83 @@
+# ============================================================
+# SIMULATION ONLY — NOT APPROVED FOR PRODUCTION GRID CONTROL.
+# ============================================================
+#
+# bess-ems-side SUT fixture for coupling against the sister simulation
+# platform's bess-ems-conform field publisher (docs/user/
+# sut-field-endpoint.md §4/§6; consumed by deploy/compose.field.grid-gym.yml
+# via `make sut-smoke-grid-gym`).
+#
+# This file is OUR test intent (what bess-ems wants exercised), authored in
+# the platform's scenario format. Format drift is bounded the same way the
+# counterpart bounds it for us: the compose file pins the platform image BY
+# DIGEST, and the platform validates this file fail-fast at startup.
+#
+# Test intent:
+#   - battery `single-bess-1` (== asset_id of config/examples/
+#     asset.single-bess.json — identity mapping) with ALL four
+#     field-envelope blocks, so the publisher emits the full 10-field
+#     telemetry frame; values aligned with the bess-ems asset config
+#     (capacity 100 kWh, ±50 kW) and the golden-vector nominals
+#     (initial SoC ~60, SoH 99, DC bus 800 V).
+#   - continuous cadence well inside Bess__SnapshotMaxAge (tick 1 s sim,
+#     ~0.1 s wall) for the whole run (3600 s sim ≈ 360 s wall).
+#   - one late fault phase (cell_failure at 1200 s sim ≈ 120 s wall,
+#     auto-recovering) to exercise the doc §5 fault symptoms in manual
+#     runs — deliberately AFTER the smoke's watch window, so
+#     `make sut-smoke-grid-gym` never races it.
+
+schema_version: "grid-gym.scenario.v1"
+
+metadata:
+  id: "bess-ems-sut-fixture"
+  name: "bess-ems SUT coupling fixture (bess-ems-side test intent)"
+
+simulation:
+  tick_ms: 1000
+  duration_s: 3600
+  seed: 42
+
+devices:
+  - id: "single-bess-1"
+    type: "battery"
+    params:
+      capacity_kwh: "100"
+      initial_soc_pct: "60"
+      min_soc_pct: "10"
+      max_soc_pct: "90"
+      max_charge_kw: "50"
+      max_discharge_kw: "50"
+      charge_efficiency: "0.95"
+      discharge_efficiency: "0.95"
+      ramp_kw_per_s: "25"
+      thermal:
+        ambient_temp_c: "22"
+        thermal_rise_c_at_full_load: "15"
+        thermal_time_constant_s: "600"
+      health:
+        initial_soh_pct: "99"
+        degradation_pct_per_full_cycle: "0"
+      dc_bus:
+        nominal_voltage_v: "800"
+        ocv_soc_slope_v: "40"
+        internal_resistance_ohm: "0.05"
+      reactive:
+        power_factor: "0.95"
+  - id: "grid-connection-1"
+    type: "grid_connection"
+    params:
+      nominal_voltage_v: "400"
+      max_import_kw: "100"
+      max_export_kw: "100"
+  - id: "load-1"
+    type: "load"
+    params:
+      rated_power_kw: "30"
+
+faults:
+  - start_simulation_time: 1200000
+    duration_ms: 300000
+    target: "single-bess-1"
+    type: "cell_failure"
+    payload: {}
+    recovery: "auto-recover-after-N-ticks"

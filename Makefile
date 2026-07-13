@@ -29,7 +29,7 @@ DOCKER_BUILD = $(DOCKER) build $(BUILD_CONTEXT) \
 	build ci runtime fullbuild lock-refresh release-assets \
 	schema-validate schema-generate schema-drift-check field-contract-check \
 	field-vectors-check field-vectors-refresh \
-	sut-config-check sut-smoke \
+	sut-config-check sut-smoke sut-smoke-grid-gym \
 	helm-lint docs-check
 
 help:
@@ -89,6 +89,7 @@ help:
 	@echo "  make field-vectors-refresh Regenerate config/schema/vectors/ field manifest"
 	@echo "  make sut-config-check     Render check for deploy/compose.{sut,field}.yml (ADR 0013 §5.3)"
 	@echo "  make sut-smoke            SUT smoke vs stand-in field stack over external network (fullbuild)"
+	@echo "  make sut-smoke-grid-gym   Optional: same smoke vs the sister platform (digest-pinned image)"
 	@echo "  make helm-lint            Lint/render Kubernetes Helm chart (RM-M6-03)"
 	@echo ""
 	@echo "Welle 5 (Closure, active):"
@@ -213,13 +214,14 @@ field-vectors-refresh:
 	$(DOCKER_BUILD) --target field-vectors-refresh --output type=local,dest=config/schema/vectors
 	chmod 755 config/schema/vectors
 
-# ADR 0013 §5.3: cheap render check for the SUT compose pair (mandatory gate).
+# ADR 0013 §5.3: cheap render check for the SUT compose set (mandatory gate).
 # A compose file that ships next to a doc recipe rots silently without it.
 # Static render only — no images, no external network required.
 sut-config-check:
 	$(DOCKER) compose -f deploy/compose.sut.yml config -q
 	$(DOCKER) compose -f deploy/compose.field.yml config -q
-	@echo "[sut-config-check] compose.sut.yml + compose.field.yml render clean"
+	$(DOCKER) compose -f deploy/compose.field.grid-gym.yml config -q
+	@echo "[sut-config-check] compose.sut.yml + compose.field.yml + compose.field.grid-gym.yml render clean"
 
 # ADR 0013 §5.3: full SUT smoke (fullbuild member, too heavy for gates).
 # Runs the stand-in field stack and the SUT variant as SEPARATE compose
@@ -228,6 +230,14 @@ sut-config-check:
 # Same dependency chain as `runtime`: both stacks use pull_policy:never images.
 sut-smoke: build simulator-build
 	./scripts/sut-smoke.sh
+
+# Optional (pattern test-hil-modbus): same smoke, but the field side is the
+# sister platform's REAL bess-ems-conform envelope publisher — digest-pinned
+# external image (deploy/compose.field.grid-gym.yml), our test intent in
+# deploy/scenarios/grid-gym-sut.yaml. Needs registry access; deliberately
+# NOT in gates/fullbuild (the repo-internal stand-in smoke is the gate).
+sut-smoke-grid-gym: build
+	SUT_FIELD_COMPOSE=deploy/compose.field.grid-gym.yml ./scripts/sut-smoke.sh
 
 # --- Welle 1 (active) ------------------------------------------------------
 

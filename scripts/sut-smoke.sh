@@ -22,12 +22,18 @@
 # TestAllFixturesLoad in `make simulator-test`.
 #
 # Environment:
+#   SUT_FIELD_COMPOSE — field-stack compose file (default: the stand-in
+#                       deploy/compose.field.yml; pass
+#                       deploy/compose.field.grid-gym.yml to couple against
+#                       the sister platform's real envelope publisher —
+#                       wired as `make sut-smoke-grid-gym`)
 #   SUT_SMOKE_TIMEOUT — seconds to wait for the good-case signal (default 90)
 #   SUT_SMOKE_WARMUP  — seconds to watch for new safe-stops (default 20)
 #   DOCKER            — docker binary (default docker)
 set -euo pipefail
 
 DOCKER="${DOCKER:-docker}"
+FIELD_COMPOSE="${SUT_FIELD_COMPOSE:-deploy/compose.field.yml}"
 TIMEOUT="${SUT_SMOKE_TIMEOUT:-90}"
 WARMUP="${SUT_SMOKE_WARMUP:-20}"
 NETWORK="bess-sut"
@@ -43,8 +49,8 @@ unset BESS_SUT_BROKER_HOST BESS_SUT_BROKER_PORT
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${repo_root}"
 
-field() { "${DOCKER}" compose -f deploy/compose.field.yml -p bess-sut-field "$@"; }
-sut()   { "${DOCKER}" compose -f deploy/compose.sut.yml   -p bess-sut-ems   "$@"; }
+field() { "${DOCKER}" compose -f "${FIELD_COMPOSE}" -p bess-sut-field "$@"; }
+sut()   { "${DOCKER}" compose -f deploy/compose.sut.yml -p bess-sut-ems "$@"; }
 
 created_network=0
 cleanup() {
@@ -66,7 +72,7 @@ else
   created_network=1
 fi
 
-echo "[sut-smoke] starting the stand-in field stack (separate compose project)"
+echo "[sut-smoke] starting the field stack (${FIELD_COMPOSE}, separate compose project)"
 field up -d --wait --wait-timeout 60
 
 echo "[sut-smoke] starting the SUT variant against it (config-only coupling)"

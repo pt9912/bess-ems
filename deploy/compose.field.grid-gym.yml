@@ -1,0 +1,47 @@
+# Real-field variant of the SUT coupling (docs/user/sut-field-endpoint.md
+# §4/§6): the sister simulation platform serves as bess-ems's field via its
+# bess-ems-conform envelope publisher — broker + platform on the shared
+# external `bess-sut` network (alias `field-mosquitto`, NO host ports),
+# drop-in replacement for the stand-in stack (compose.field.yml).
+#
+# The platform image is pinned BY DIGEST — symmetric to how the platform's
+# own acceptance stack pins the bess-ems image — so the scenario format in
+# deploy/scenarios/grid-gym-sut.yaml (our test intent, validated fail-fast
+# by the platform at startup) cannot drift silently underneath us. Bump the
+# pin deliberately via GRID_GYM_IMAGE.
+#
+# Run via `make sut-smoke-grid-gym` (optional target: depends on pulling the
+# external image; the repo-internal stand-in smoke stays the fullbuild gate).
+# Standalone use: `docker network create bess-sut` first.
+services:
+  field-mosquitto:
+    image: eclipse-mosquitto:2
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    healthcheck:
+      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-p", "1883", "-t", "healthcheck", "-m", "ping"]
+      interval: 2s
+      timeout: 1s
+      retries: 10
+    networks: [bess-sut]
+
+  grid-gym:
+    image: ${GRID_GYM_IMAGE:-ghcr.io/pt9912/grid-gym:v0.7.0@sha256:a7e2f7ab0d16b8aa16f724a2b18788e69c73ea5189ab44d479427c50dbb3d5c7}
+    depends_on:
+      field-mosquitto:
+        condition: service_healthy
+    environment:
+      GRID_GYM_DEMO_SCENARIO_PATH: /scenarios/grid-gym-sut.yaml
+      GRID_GYM_BESS_EMS_MQTT_BROKER: field-mosquitto:1883
+    volumes:
+      - type: bind
+        source: ./scenarios/grid-gym-sut.yaml
+        target: /scenarios/grid-gym-sut.yaml
+        read_only: true
+        bind:
+          create_host_path: false
+    networks: [bess-sut]
+
+networks:
+  bess-sut:
+    external: true
