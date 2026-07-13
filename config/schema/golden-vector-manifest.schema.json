@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://bess-ems.io/schema/golden-vector-manifest.json",
-  "title": "Golden-vector manifest (ADR 0013 5.2)",
-  "description": "Structurally compared golden vectors for the MQTT field contract. Payloads are embedded as JSON objects because the contract is field-normative (names/presence/types/null-omission binding; member order and whitespace are not): an embedded object cannot pin a byte form. One manifest file per authority ('field' = lifted from the Go producer paths, 'ems' = lifted from the C# MqttJson serializer); each side regenerates only its own file.",
+  "title": "Golden-vector manifest (ADR 0013 5.2 / 5.4)",
+  "description": "Structurally compared golden vectors for the published field contract. MQTT (ADR 0013 5.2): payloads embedded as JSON objects because the contract is field-normative (names/presence/types/null-omission binding; member order and whitespace are not) — one manifest per authority ('field' = lifted from the Go producer paths, 'ems' = lifted from the C# MqttJson serializer), each side regenerates only its own file. Modbus (ADR 0013 5.4): register wire images (words per address/table) lifted through the C# codec (RegisterDecoder / the real ModbusCommandSink write path) — one manifest per shipped mapping profile, both authority 'ems' (the wire layout is fully determined by profile + schema semantics; bess-ems is the contract provider), both regenerated from C#.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "contract", "authority", "cases"],
@@ -14,20 +14,44 @@
     },
     "contract": {
       "type": "string",
-      "enum": ["mqtt"],
-      "description": "Which field contract the vectors pin. Modbus vectors (ADR 0013 5.4) will extend this enum."
+      "enum": ["mqtt", "modbus"],
+      "description": "Which field contract the vectors pin; selects the case shape (mqtt -> message cases, modbus -> register cases)."
     },
     "authority": {
       "type": "string",
       "enum": ["field", "ems"],
-      "description": "Producer authority per ADR 0013 3: 'field' covers telemetry/status/fault/command_ack (Go simulator is the de-facto producer), 'ems' covers command (C# EMS produces)."
+      "description": "Producer authority. MQTT per ADR 0013 3: 'field' covers telemetry/status/fault/command_ack (Go simulator is the de-facto producer), 'ems' covers command (C# EMS produces). Modbus: always 'ems' — the C# codec is the contract's reference implementation for both directions."
+    },
+    "profile": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Modbus only: file name of the mapping profile under config/examples/adapters/ these vectors are lifted from (e.g. modbus.simulator.json)."
     },
     "cases": {
       "type": "array",
-      "minItems": 1,
-      "items": { "$ref": "#/$defs/vector_case" }
+      "minItems": 1
     }
   },
+  "allOf": [
+    {
+      "if": { "properties": { "contract": { "const": "mqtt" } } },
+      "then": {
+        "properties": {
+          "cases": { "items": { "$ref": "#/$defs/vector_case" } },
+          "profile": false
+        }
+      }
+    },
+    {
+      "if": { "properties": { "contract": { "const": "modbus" } } },
+      "then": {
+        "required": ["profile"],
+        "properties": {
+          "cases": { "items": { "$ref": "#/$defs/modbus_vector_case" } }
+        }
+      }
+    }
+  ],
   "$defs": {
     "vector_case": {
       "type": "object",
@@ -74,6 +98,71 @@
           "type": "boolean",
           "enum": [true],
           "description": "The producer emits NO message for this input (e.g. fault topic with fault_status ok/empty). Mutually exclusive with payload."
+        }
+      }
+    },
+    "modbus_vector_case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "register", "direction", "register_table", "address", "type", "word_order", "scale_factor", "value", "words", "description"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique case name within the manifest."
+        },
+        "register": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Register name exactly as declared in the mapping profile."
+        },
+        "direction": {
+          "type": "string",
+          "enum": ["read", "write"],
+          "description": "read = the field serves this register (EMS FC03/FC04 read); write = the EMS writes it (FC06/FC16 holding write, lifted from the real ModbusCommandSink)."
+        },
+        "register_table": {
+          "type": "string",
+          "enum": ["holding", "input"],
+          "description": "Resolved register table (loader default 'holding' applied when the profile omits it)."
+        },
+        "address": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Start address from the mapping profile."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["uint16", "int16", "uint32", "int32", "float32"],
+          "description": "Register data type (mapping-schema vocabulary; 'string' registers carry no golden vectors)."
+        },
+        "word_order": {
+          "type": "string",
+          "enum": ["high_low", "low_high"],
+          "description": "Resolved 32-bit word order (loader default 'high_low' applied when the profile omits it; irrelevant for single-word types but pinned for completeness)."
+        },
+        "scale_factor": {
+          "type": "number",
+          "description": "Scale factor from the profile: engineering value = raw wire value * scale_factor."
+        },
+        "value": {
+          "type": "number",
+          "description": "Engineering value. Chosen so raw = value / scale_factor is float32-exact (float32) or integral within type and range bounds (int types) — Decode(words) == value holds exactly, no tolerances in the contract."
+        },
+        "words": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "description": "The normative wire image: register words in transmission order starting at 'address'."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }

@@ -34,3 +34,17 @@ Initial published contract:
   (`MqttJson.Options`): command with and without `reactive_power_kvar`.
 
 Contract major stays `v1` (additive change, no mapping-file impact).
+
+### Additive: Modbus golden vectors (ADR 0013 §5.4)
+
+- `golden-vector-manifest` gains the `modbus` contract: register
+  wire-image cases (`words` per address/table, resolved
+  `register_table`/`word_order`/`scale_factor`, exact engineering
+  `value`), one manifest per shipped mapping profile, lifted through
+  the C# codec (`RegisterDecoder` / the real `ModbusCommandSink`).
+- `vectors/modbus-golden-vectors.simulator.v1.json` and
+  `vectors/modbus-golden-vectors.hil-simulator.v1.json` — read wire
+  images for every profile register plus the EMS write images
+  (setpoints / operating mode).
+
+Contract major stays `v1` (additive change, no mapping-file impact).
