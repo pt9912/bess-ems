@@ -1,5 +1,6 @@
 # LH-DEPLOY-002 production-shaped compose for the bess-ems M1 stack.
-# Sidecars: Postgres (LH-PERSIST-005), Mosquitto (LH-PROT-002 MQTT), and
+# Sidecars: Postgres (LH-PERSIST-005), Mosquitto (MQTT broker; security
+# profile per docs/user/quality.md §2.2.1 — sim-only plaintext here), and
 # the Go field-simulator that stands in for real BMS / inverter hardware.
 # `make build` produces the bess-ems image consumed here; `make runtime`
 # drives a smoke-up + /health probe + down loop on top of this file.

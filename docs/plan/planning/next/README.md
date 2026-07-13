@@ -22,4 +22,4 @@ Ein Eintrag wechselt typischerweise:
 | [`note-v2.2.0-scope.md`](note-v2.2.0-scope.md) | Internal-Refinement-Scope (Lock-Eviction + Cluster-Smoke), zweifach umgewidmet (v1.1.0 → v2.1.0 → v2.2.0) | Scope-Bestätigung, sobald keine Feldvertrags-Arbeit vorbeizieht |
 
 *(ADR 0013 §5.3 (`plan-field-contract-sut-docs.md`) ist am 2026-07-13
-nach dreifachem Owner-Review nach `in-progress/` promotet.)*
+nach dreifachem Owner-Review promotet und am selben Tag nach `done/` abgeschlossen.)*

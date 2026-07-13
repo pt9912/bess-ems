@@ -1,10 +1,11 @@
 # Plan: SUT-Doku + config-only-Pfad (ADR 0013 §5.3)
 
-**Dokumenttyp:** Slice-Plan / in-progress
-**Status:** In Progress — aktiviert 2026-07-13 nach drei Owner-Review-Runden
-(u. a. Grün-Kriterium auf `Control cycle emitted command` korrigiert,
-`LH-PROT-002`-Fehlzitation dreistellig im Korrektur-Scope, Netz-Kopplung
-via shared external Network fixiert). Branch `impl-field-contract-5.3`.
+**Dokumenttyp:** Slice-Plan / done
+**Status:** Abgeschlossen am 2026-07-13 — alle 3 Sub-Slices umgesetzt
+(aktiviert nach drei Owner-Review-Runden am Plan), `make sut-smoke` grün
+gegen den Stand-in, `sut-config-check` Pflicht-Gate, ADR 0013 trägt
+`Accepted — §5.1–§5.3 umgesetzt; §5.4 offen` (+ `LH-PROT-002`-Korrektur an
+drei Stellen). Branch `impl-field-contract-5.3`. Details im Abschluss.
 **Datum:** 2026-07-13
 **Quelle:** [`../../adr/0013-device-mapping-field-contract.md`](../../adr/0013-device-mapping-field-contract.md) §5.3
 **Bezug:**
@@ -262,16 +263,39 @@ Verifiziert 2026-07-13 (Stand v2.1.0):
 
 ## Definition of Done (DoD)
 
-- [ ] Sub-Slice 1 — SUT-Doku, key-verifiziert (inkl. TLS/Auth-Zeilen,
-      `{assetId}`-Korrespondenz, unterscheidbare Ursachen-Signale).
-- [ ] Sub-Slice 2 — `compose.sut.yml` + `compose.field.yml` +
+- [x] Sub-Slice 1 — SUT-Doku, key-verifiziert (alle 20 `Mqtt*`-Properties
+      als Tabellenzeilen = Code→Doku-Richtung erfüllt; TLS/Auth-Zeilen,
+      QoS-Semantik inline, `{assetId}`-Korrespondenz, unterscheidbare
+      Ursachen-Signale). (`bf1313a`)
+- [x] Sub-Slice 2 — `compose.sut.yml` + `compose.field.yml` +
       `make sut-smoke` grün (Stand-in; `Control cycle emitted command`
-      binnen N s, kein Safe-Stop nach Warmup; fullbuild) +
-      `sut-config-check` Pflicht-Gate.
-- [ ] Sub-Slice 3 — offener grid-gym-Verifikations-Slot markiert.
-- [ ] Alle Akzeptanzkriterien erfüllt; `make gates` grün.
-- [ ] ADR 0013: Status-Klausel
+      binnen 90 s, kein Safe-Stop nach 20 s Warmup; fullbuild) +
+      `sut-config-check` Pflicht-Gate. (`fa4f47f`)
+- [x] Sub-Slice 3 — offener grid-gym-Verifikations-Slot markiert
+      (Doku §6, fähigkeits-referenziert, keine CR-/Plan-IDs).
+- [x] Alle Akzeptanzkriterien erfüllt; `make gates` grün.
+- [x] ADR 0013: Status-Klausel
       `Accepted — §5.1–§5.3 umgesetzt; §5.4 offen` an **beiden**
       Stellen (Z. 3 + Header-Prosa) + `LH-PROT-002`-Zitations-Korrektur
       an allen **drei** Stellen (ADR Bezug, ADR §8,
       `deploy/compose.yml:2`).
+
+---
+
+## Abschluss (2026-07-13)
+
+Alle 3 Sub-Slices umgesetzt. Bemerkenswert: der **erste** `sut-smoke`-Lauf
+schlug korrekt fehl — das Standard-Integrations-Szenario hält nach Tick 0
+für 24 h still (Einzel-Publish), bess-ems lief nach dem initialen
+Gutfall-Signal in `decision=snapshot-unusable`/`reason=snapshot-aged-Ns`.
+Das ist die Kadenz-Regel aus ADR 0013 §1 in freier Wildbahn und bestätigt
+zugleich die Ursachen-Signale des Doku-Rezepts. Fix: der Smoke generiert
+sich ein Szenario mit kontinuierlicher 1-s-Kadenz
+(`deploy/.sut-scenario.json`, gitignored; `compose.field.yml`-Mount per
+`BESS_FIELD_SCENARIO` parametrisiert), danach grün: Gutfall-Signal binnen
+Frist, kein Safe-Stop im Warmup-Fenster, Cleanup inkl. Netz + Szenario
+auch im Fehlerpfad.
+
+**Verifikations-Kommandos:** `make sut-config-check` (Pflicht-Gate),
+`make sut-smoke` (fullbuild-Mitglied), `make gates` (voll),
+`make docs-check`.

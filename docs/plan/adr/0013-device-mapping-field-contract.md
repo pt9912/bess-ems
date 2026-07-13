@@ -1,6 +1,6 @@
 # ADR 0013 — Geräte-Mappings als publizierter, versionierter Feldvertrag (SUT-Kopplung)
 
-**Status:** Accepted — §5.1–§5.2 umgesetzt; §5.3–§5.4 offen. Design-first,
+**Status:** Accepted — §5.1–§5.3 umgesetzt; §5.4 offen. Design-first,
 Owner-Sign-off 2026-07-12, gezogen aus einem SUT-Kopplungs-Smoke gegen das
 Schwesterprojekt `grid-gym`. bess-ems macht seine Geräte-Mapping-Schemas
 (`config/schema/*.schema.json`) von einer internen Konfigurations-Detailebene zu
@@ -10,9 +10,10 @@ einem **publizierten, versionierten Feldvertrag**, gegen den Fremdsimulatoren
 „intern versioniert" auf „extern konsumierbar". Gegenstück zu `grid-gym`s
 geplanter Feld-Server-Surface, deren Plan die bess-ems-Seite explizit diesem Repo
 zuweist. Die Umsetzung erfolgt als Folgearbeit in `docs/plan/planning/` (§5):
-§5.1 (Vertrags-Bundle + Envelope-Schema + Versionierung + `maxAge`-Stellschraube)
-und §5.2 (Golden-Vector-Suite MQTT, strukturell verglichen, im Bundle publiziert)
-sind umgesetzt; §5.3 (SUT-Doku) und §5.4 (Modbus-Vektoren) sind offen.
+§5.1 (Vertrags-Bundle + Envelope-Schema + Versionierung + `maxAge`-Stellschraube),
+§5.2 (Golden-Vector-Suite MQTT, strukturell verglichen, im Bundle publiziert) und
+§5.3 (SUT-Doku + config-only-Pfad + Compose-SUT-Variante mit Stand-in-Smoke)
+sind umgesetzt; §5.4 (Modbus-Vektoren) ist offen.
 **Datum:** 2026-07-12
 **Bezug:**
 
@@ -23,7 +24,10 @@ sind umgesetzt; §5.3 (SUT-Doku) und §5.4 (Modbus-Vektoren) sind offen.
   Registermapping-über-Konfiguration), `LH-SAFE-007` (Schreibbegrenzung vor
   Feldkommunikation — Anker für den **ausgegliederten** Command-Pfad, §6),
   `LH-RISK-002` (Herstellerabhängige Protokollmappings — der Drift-Risiko-Anker),
-  `LH-PROT-002` (MQTT-Broker-Security: Plaintext lokal, TLS/Auth deferred).
+  MQTT-Broker-Security (Plaintext lokal, TLS/Auth-Profil) ist in
+  `docs/user/quality.md` §2.2.1 verankert (RM-M4-06-FUP-F04) — die frühere
+  `LH-PROT-002`-Zuschreibung hier war eine Fehlzitation (`LH-PROT-002` =
+  Protokollfehler → Quality-Flag; korrigiert 2026-07-13 mit §5.3).
 - [`0005-optimization-core-sidecar-transport.md`](0005-optimization-core-sidecar-transport.md)
   — Präzedenz für das **Muster** „versioniertes Vertrags-Artefakt an einer
   Prozessgrenze". **Nur das Muster** wird übernommen, nicht der Mechanismus: ADR
@@ -335,8 +339,9 @@ Recording-Pfad). Bis dahin:
   `modbus.hil-simulator.json` als Anker.
 - **Command-Closed-Loop** → §6.
 - **Auth/TLS der publizierten Feld-Surface** → Deployment-/Profil-Thema
-  (`LH-PROT-002`); der lokale Plaintext-Mosquitto (`deploy/compose.yml`) bleibt
-  Nur-Sim-Netz.
+  (`docs/user/quality.md` §2.2.1, RM-M4-06-FUP-F04 — nicht `LH-PROT-002`,
+  Fehlzitation korrigiert 2026-07-13); der lokale Plaintext-Mosquitto
+  (`deploy/compose.yml`) bleibt Nur-Sim-Netz.
 - **Fremd-Repo-Kopplung.** Dieses ADR referenziert grid-gyms Gegenrolle bewusst
   über **Fähigkeit** (Push-Field-Publish- / Pull-Device-Server-Surface), nicht
   über grid-gym-interne, renummerierbare Bezeichner (ADR-/Slice-Nummern,
