@@ -15,6 +15,9 @@ Ein Eintrag wechselt typischerweise:
 `open/` (Trigger entsteht) → `next/` (Scope skizziert) → `in-progress/`
 (Slice-Plan aktiv) → `done/` (geliefert).
 
-Aktuell leer. Erste Einträge entstehen, sobald die ersten v1.x-Slices
-einen Scope haben — z. B. wenn ein RM-M4-Follow-up (`open/note-RM-M4-followups.md`)
-durch einen externen Trigger zu einem konkreten Plan-Slice eskaliert wird.
+## Bestand
+
+| Datei | Inhalt | Aktivierung |
+| ----- | ------ | ----------- |
+| [`plan-field-contract-sut-docs.md`](plan-field-contract-sut-docs.md) | ADR 0013 §5.3 — SUT-Doku + config-only-Pfad + Compose-SUT-Variante (zweifach owner-reviewt, Befunde eingearbeitet) | Owner-Go nach Plan-Review |
+| [`note-v2.2.0-scope.md`](note-v2.2.0-scope.md) | Internal-Refinement-Scope (Lock-Eviction + Cluster-Smoke), zweifach umgewidmet (v1.1.0 → v2.1.0 → v2.2.0) | Scope-Bestätigung, sobald keine Feldvertrags-Arbeit vorbeizieht |
