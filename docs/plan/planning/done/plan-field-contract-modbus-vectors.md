@@ -1,11 +1,12 @@
 # Plan: Modbus-Golden-Vectors (ADR 0013 §5.4)
 
-**Dokumenttyp:** Slice-Plan / in-progress
-**Status:** In Progress — aktiviert 2026-07-13 nach Owner-Review (7 Befunde
-+ 1 Kleinigkeit eingearbeitet: Roh-Wert-Exaktheit, Write-Round-trip,
-ehrliche word_order-Deckung, Scope-Note-Abgleich in Sub-Slice 5,
-Schema-Beschreibungstexte, Manifest-als-Snapshot-Quelle,
-Python-Default-Auflösung). Branch `impl-field-contract-5.4`.
+**Dokumenttyp:** Slice-Plan / done
+**Status:** Abgeschlossen am 2026-07-13 — alle 5 Sub-Slices umgesetzt
+(Plan aktiviert nach Owner-Review mit 7 Befunden + 1 Kleinigkeit; nach der
+Implementierung eine Agent-Review-Runde mit 8 Befunden, alle gefixt —
+siehe Abschluss). Die ADR-0013-Status-Klausel wurde mit diesem Slice auf
+`Accepted — §5.1–§5.4 umgesetzt (§5 vollständig)` gesetzt (Stand
+Abschluss-Zeitpunkt). Branch `impl-field-contract-5.4`.
 **Datum:** 2026-07-13
 **Quelle:** [`../../adr/0013-device-mapping-field-contract.md`](../../adr/0013-device-mapping-field-contract.md) §5.4
 **Bezug:**
@@ -333,10 +334,52 @@ Verifiziert 2026-07-13 (Stand nach §5.3-Merge):
 
 ## Definition of Done (DoD)
 
-- [ ] Sub-Slice 1 — Manifest-Schema-Erweiterung + CHANGELOG.
-- [ ] Sub-Slice 2 — zwei Profil-Manifeste + C#-Drift-Gate + Round-trip.
-- [ ] Sub-Slice 3 — Sim-Drift-Fix + Go-Konformanz-Check.
-- [ ] Sub-Slice 4 — Python-Gate + Bundle-Dry-Run.
-- [ ] Sub-Slice 5 — ADR-Klausel (beide Stellen), Scope-Note
-      versions-agnostisch umbenannt, Plan nach `done/`, Reviews +
-      Gates auf dem Endstand.
+Die Haken zertifizieren den **Branch-Tip nach der Review-Runde**, nicht
+die Sub-Slice-Commits (§5.3-Lektion: das Done-Record entsteht **nach**
+dem Review).
+
+- [x] Sub-Slice 1 — Manifest-Schema-Erweiterung + CHANGELOG (`c7605c5`;
+      Negativ-Formen demonstriert; `authority: ems`-Pin für Modbus im
+      Review-Fix nachgezogen).
+- [x] Sub-Slice 2 — zwei Profil-Manifeste + C#-Drift-Gate + Round-trip
+      Read **und** Write (`198d50d`; Rot-Demo beidseitig;
+      string-Register-Filter im Review-Fix).
+- [x] Sub-Slice 3 — Sim-Drift-Fix + Go-Konformanz-Check (`425fb27`;
+      Rot-Demo „encoder produced 15744, vector pins 0"; die
+      **Serving-Hälfte** — FC04/Space-Unabhängigkeit — erst im
+      Review-Fix gegated).
+- [x] Sub-Slice 4 — Python-Gate + Bundle-Dry-Run (`ad0ba82`; Range- und
+      Wortzahl-Pins + Unbekannt-Manifest-Ablehnung im Review-Fix).
+- [x] Sub-Slice 5 — ADR-Klausel (beide Stellen) + drei
+      Stale-Claim-Marker, Scope-Note versions-agnostisch umbenannt,
+      Sunspec-Ausschluss dokumentiert, Plan nach `done/`, alle
+      Pflicht-Gates einzeln grün auf dem Endstand.
+
+---
+
+## Abschluss (2026-07-13)
+
+Alle 5 Sub-Slices umgesetzt; Evidenz in **zwei Wellen** (Sub-Slice-
+Commits + Agent-Review). Das Agent-Review fand **8 Befunde, alle
+gefixt** (`1832a0f`) — die drei gewichtigsten: (1) die
+**Serving-Hälfte** des bewiesenen Drifts (FC04/Input-Raum) war von
+keinem Pflicht-Gate gedeckt — ein vertauschtes `applyWords` wäre grün
+geblieben; jetzt pinnt ein Server-Test die Space-Unabhängigkeit mit der
+HIL-typischen Adress-Kollision (input@1 + holding@1) inkl.
+Write-Leak-Check; (2) die **Range-Hälfte** von Entscheidung 3 war reine
+Konvention — jetzt Python-Pin; (3) ein **drittes ausgeliefertes
+Profil** (`modbus.sunspec-simulator.json`) war schlicht übersehen — der
+Ausschluss ist jetzt begründet dokumentiert (kein in-repo-
+Produzentenpfad: fremdes Vokabular, sunspec-Discovery, network-Auth),
+die davon abhängige high_low-Multi-Word-Deckungsaussage korrigiert, und
+das Python-Gate lehnt unbekannte Vektor-Manifeste ab (publiziert-aber-
+ungegated ist unmöglich). Dazu: drei Stale-Claim-Marker im ADR
+(§1/§5/§7, `Instanz geschlossen, Klasse Codegen-deferred`-Muster),
+`authority: ems`-Pin, Wortzahl-Pin, string-Register-Pfad,
+Diagnose-/Validierungs-Nits im Konformanz-Check.
+
+**Verifikations-Kommandos:** `make field-vectors-check` (Vektor- +
+Konformanz-Gate), `make field-contract-check` (Schema/Profil-Pins),
+`make test` (C#-Drift + Round-trip), `make simulator-test`
+(FC04-/Encoder-Tests), `make release-assets VERSION=<v>` (Bundle mit 4
+Manifesten), `make gates` (voll; auf langsamen Maschinen in Chunks).

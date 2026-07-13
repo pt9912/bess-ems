@@ -23,5 +23,6 @@ Ein Eintrag wechselt typischerweise:
 
 *(ADR 0013 §5.3 (`plan-field-contract-sut-docs.md`) ist am 2026-07-13
 nach dreifachem Owner-Review promotet und am selben Tag nach `done/` abgeschlossen;
-ADR 0013 §5.4 (`plan-field-contract-modbus-vectors.md`) ist am 2026-07-13 nach
-Owner-Review nach `in-progress/` promotet.)*
+ADR 0013 §5.4 (`plan-field-contract-modbus-vectors.md`) ist am 2026-07-13
+aktiviert und am selben Tag nach `done/` abgeschlossen — ADR 0013 §5 ist
+damit vollständig.)*
