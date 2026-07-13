@@ -9,13 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [2.2.1] - 2026-07-13
+
+Patch release: the operator web shell is now actually served by the
+production host, and the new operator user manual documents the operator
+surface end to end. Native control kernel ABI stays at 0.3.0 (no native
+changes in this release).
+
+### Added
+
 - **Operator user manual** (`docs/user/anwenderhandbuch.md`): task-based
   manual for operators (status, operator stop, price import, day-ahead +
   intraday optimization, troubleshooting) with UI screenshots, bound to
   the software version; authored per
   `docs/user/benutzerhandbuch-standard.md` (also added).
-
-### Changed
 
 ### Fixed
 
