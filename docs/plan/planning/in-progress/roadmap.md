@@ -70,10 +70,10 @@ unter `in-progress/`.
 >    `ToString()`-Properties umgehen die globale SnakeCaseLower-Policy).
 >    Fix ist klein, aber ein Wire-Break auf öffentlichen Endpoints →
 >    Major-Bump-Material. **Entscheidung offen**, ob er in
->    [`../open/note-internal-refinement-scope.md`](../open/note-internal-refinement-scope.md)
+>    [`../next/note-internal-refinement-scope.md`](../next/note-internal-refinement-scope.md)
 >    aufgenommen wird (Trigger: nächstes ohnehin brechendes Release).
 > 2. **Internal-Refinement-Paket** (Lock-Eviction + Cluster-Smoke,
->    [`../open/note-internal-refinement-scope.md`](../open/note-internal-refinement-scope.md)):
+>    [`../next/note-internal-refinement-scope.md`](../next/note-internal-refinement-scope.md)):
 >    wartet auf das nächste freie Minor.
 > 3. **Kommando-Closed-Loop-Wirkung** der Schwester-Plattform bleibt
 >    deferred-with-trigger (ADR 0013 §6, LH-SAFE-007).
