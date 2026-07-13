@@ -19,8 +19,9 @@ Ein Eintrag wechselt typischerweise:
 
 | Datei | Inhalt | Aktivierung |
 | ----- | ------ | ----------- |
-| [`plan-field-contract-modbus-vectors.md`](plan-field-contract-modbus-vectors.md) | ADR 0013 §5.4 — Modbus-Golden-Vectors je Profil (C#-Codec-gehoben) + Fix des bewiesenen `register_table`/`word_order`-Drifts im Sim | Owner-Go nach Plan-Review |
 | [`note-v2.2.0-scope.md`](note-v2.2.0-scope.md) | Internal-Refinement-Scope (Lock-Eviction + Cluster-Smoke), zweifach umgewidmet (v1.1.0 → v2.1.0 → v2.2.0) | Scope-Bestätigung, sobald keine Feldvertrags-Arbeit vorbeizieht |
 
 *(ADR 0013 §5.3 (`plan-field-contract-sut-docs.md`) ist am 2026-07-13
-nach dreifachem Owner-Review promotet und am selben Tag nach `done/` abgeschlossen.)*
+nach dreifachem Owner-Review promotet und am selben Tag nach `done/` abgeschlossen;
+ADR 0013 §5.4 (`plan-field-contract-modbus-vectors.md`) ist am 2026-07-13 nach
+Owner-Review nach `in-progress/` promotet.)*

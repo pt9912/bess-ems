@@ -1,7 +1,11 @@
 # Plan: Modbus-Golden-Vectors (ADR 0013 §5.4)
 
-**Dokumenttyp:** Slice-Plan / next
-**Status:** Draft — vor Aktivierung (Review + Scope-Bestätigung ausstehend).
+**Dokumenttyp:** Slice-Plan / in-progress
+**Status:** In Progress — aktiviert 2026-07-13 nach Owner-Review (7 Befunde
++ 1 Kleinigkeit eingearbeitet: Roh-Wert-Exaktheit, Write-Round-trip,
+ehrliche word_order-Deckung, Scope-Note-Abgleich in Sub-Slice 5,
+Schema-Beschreibungstexte, Manifest-als-Snapshot-Quelle,
+Python-Default-Auflösung). Branch `impl-field-contract-5.4`.
 **Datum:** 2026-07-13
 **Quelle:** [`../../adr/0013-device-mapping-field-contract.md`](../../adr/0013-device-mapping-field-contract.md) §5.4
 **Bezug:**
