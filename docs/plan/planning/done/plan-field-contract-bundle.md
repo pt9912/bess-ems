@@ -1,7 +1,10 @@
 # Plan: Feldvertrag-Bundle + Versionierung (ADR 0013 §5.1)
 
-**Dokumenttyp:** Slice-Plan / in-progress
-**Status:** In Progress — §5.1 **vollständig umgesetzt** + 2 Review-Runden (alle Befunde gefixt), `make gates` grün. Nur **Finalisierung** offen — siehe „Stand (2026-07-12)" am Ende. Branch `impl-field-contract-5.1`, 13 Commits vor `main` (nichts gepusht).
+**Dokumenttyp:** Slice-Plan / done
+**Status:** Abgeschlossen am 2026-07-13 — alle 5 Sub-Slices umgesetzt, 2
+Review-Runden (alle 9 Befunde gefixt), `make gates` 3× voll grün. ADR 0013 trägt
+`Accepted — §5.1 umgesetzt; §5.2–§5.4 offen`. Umgesetzt auf Branch
+`impl-field-contract-5.1`, per FF-Merge in `main`.
 **Datum:** 2026-07-12
 **Quelle:** [`../../adr/0013-device-mapping-field-contract.md`](../../adr/0013-device-mapping-field-contract.md) §5.1
 **Bezug:**
@@ -146,11 +149,17 @@ Compose-Pfad erhält der Sim die gehobenen `*.simulator.json` via Bind-Mount
 
 ### 4 — CI-Drift-Gate auf `config/schema/`
 
-- **Aufgabe:** Gate, das (a) jedes `config/schema/*.schema.json` als gültiges
-  JSON-Schema prüft, (b) die mitgelieferten Beispiel-Mappings gegen ihre Schemas
-  validiert, (c) den Envelope-C#↔Schema-Drift-Check (Sub-Slice 2) fährt. In
-  `make gates` + `.github/workflows/build.yml` verdrahten. Schließt die heutige
-  Lücke (`make schema-*` deckt nur die DDL). **Bewusst getrennter Name** — nicht in
+- **Aufgabe (wie umgesetzt):** Gate `make field-contract-check` (Dockerfile-Stage,
+  jsonschema auf `${PYTHON_IMAGE}`), das (a) jedes `config/schema/*.schema.json`
+  Draft-2020-12-**meta-validiert** und (b) die mitgelieferten
+  `config/examples/`-Mappings gegen ihre Schemas validiert (Cross-`$ref` über
+  `$id`-Registry; `REQUIRED_EXAMPLE_PATTERNS` erzwingt je ein Mapping-Beispiel pro
+  Protokoll). Der Envelope-C#↔Schema-Drift-Check (Sub-Slice 2) läuft **nicht** in
+  diesem Gate, sondern in `EnvelopeSchemaTests` (`make test`) — er braucht die
+  C#-Quelle (`MqttPayloads.cs`) und kann nicht in Python leben — und damit im
+  selben `make gates`-Aggregat. In `make gates` + `.github/workflows/build.yml`
+  verdrahtet. Schließt die heutige Lücke (`make schema-*` deckt nur die DDL).
+  **Bewusst getrennter Name** — nicht in
   `schema-*` (`Makefile:122/138/151`, Postgres-DDL via d-migrate) gefaltet; der
   Feldvertrag ist eine andere Domäne, die Gates nicht zusammenlegen/verwechseln.
 - **Akzeptanz:** Gate grün im vollen `make gates`; ein absichtlich gebrochenes
@@ -238,34 +247,19 @@ Compose-Pfad erhält der Sim die gehobenen `*.simulator.json` via Bind-Mount
 - [x] Sub-Slice 4 — `make field-contract-check` als Pflicht-Gate (make + CI). (`ba2667f`; auf Meta+Mapping-Validierung verschärft `a5c0015`, Rest-Fix `e4c0463`)
 - [x] Sub-Slice 5 — `Bess__SnapshotMaxAge` konfigurierbar. (`fbefacb`; Config-Test + Doku `f019e92`; Drift-Guard `e4c0463`)
 - [x] Alle Akzeptanzkriterien erfüllt; `make gates` grün. (3× voller Lauf grün: nach §5.1-Impl, nach Review-Runde 1, nach Review-Runde 2)
-- [ ] ADR 0013 Status-Klausel auf `Accepted — §5.1 umgesetzt; §5.2–§5.4 offen` aktualisiert (bleibt Accepted; kanonischer String = Ziel). **← morgen zuerst**
+- [x] ADR 0013 Status-Klausel auf `Accepted — §5.1 umgesetzt; §5.2–§5.4 offen` aktualisiert (bleibt Accepted). (Finalisierung 2026-07-13)
 
 ---
 
-## Stand (2026-07-12) — hier morgen weiter
+## Abschluss (2026-07-13)
 
-**Erledigt:** Alle 5 Sub-Slices von §5.1 implementiert, committet und in **zwei
-Review-Runden** (per Agent) adversarisch geprüft; alle 9 Befunde (5 + 4 Rest) gefixt
-und je einzeln + im vollen `make gates`-Aggregat verifiziert. `make gates` dreimal voll
-grün. Branch `impl-field-contract-5.1` = **13 Commits** vor `main`, Working Tree sauber,
-**nichts gepusht**.
+Alle 5 Sub-Slices von §5.1 implementiert, committet und in **zwei Review-Runden**
+(per Agent) adversarisch geprüft; alle 9 Befunde (5 + 4 Rest) gefixt und je einzeln
++ im vollen `make gates`-Aggregat verifiziert. `make gates` dreimal voll grün.
+Finalisierung: ADR 0013 Status-Klausel gesetzt, Sub-Slice-4-Wortlaut an die
+Umsetzung angeglichen (Gate = Meta- + Beispiel-Validierung; der Envelope-Drift-Check
+lebt in `EnvelopeSchemaTests` im selben `make gates`-Aggregat), Plan nach `done/`
+verschoben, Branch `impl-field-contract-5.1` per FF-Merge in `main`.
 
-**Design-Notiz zu Sub-Slice 4** (für den Wortlaut-Abgleich unten): `make
-field-contract-check` läuft als Dockerfile-Stage (jsonschema auf `${PYTHON_IMAGE}`) und
-leistet (a) Draft-2020-12-**Meta-Validierung** jedes Schemas + (b)
-**Beispiel-gegen-Schema**-Validierung aller `config/examples/`-Mappings (Cross-`$ref` über
-`$id`-Registry, `REQUIRED_EXAMPLE_PATTERNS` erzwingt je ein Mapping-Beispiel pro
-Protokoll). Der ursprünglich hier genannte (c) **Envelope-C#↔Schema-Drift** bleibt
-bewusst in `EnvelopeSchemaTests` (`make test`) — er braucht die C#-Quelle
-(`MqttPayloads.cs`) und kann nicht in Python leben; er läuft im selben `make gates`.
-
-**Offen — Finalisierung (Reihenfolge):**
-1. **ADR 0013 Status-Klausel** setzen: `Accepted — §5.1 umgesetzt; §5.2–§5.4 offen`
-   (Ziel-String steht in §Ziel oben). Dabei den Sub-Slice-4-Wortlaut in diesem Plan an
-   die Design-Notiz angleichen (Gate = (a)+(b); (c) im C#-Aggregat).
-2. **Diesen Plan** `in-progress/ → done/` verschieben (analog `plan-RM-*`).
-3. **Merge** `impl-field-contract-5.1` → `main` (FF) + push — nach deinem üblichen Flow
-   und deiner Freigabe; ggf. vorher nochmal drüberschauen.
-
-**Verifikations-Kommandos** (falls morgen frischer Nachweis gewünscht): `make gates`
-(voll), `make field-contract-check` (nur Feldvertrag-Gate).
+**Verifikations-Kommandos:** `make gates` (voll), `make field-contract-check`
+(nur Feldvertrag-Gate).
