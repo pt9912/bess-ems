@@ -99,23 +99,31 @@ public sealed class GoldenVectorsTests
             Reason: commandPayload["reason"]!.GetValue<string>(),
             Source: Enum.Parse<CommandSource>(commandPayload["source"]!.GetValue<string>()));
 
+        var emsCase = EmsCase("command-nominal");
+        var ackCase = FieldCase("command-ack-accepted-echo");
+        var ackTopic = ackCase["topic"]!.GetValue<string>();
+
         var client = new FakeMqttClient();
         var sink = new MqttCommandSink(client, MqttFixtures.SimulatorMapping(), MqttFixtures.SampleAsset(), MqttFixtures.Defaults(), new MqttFixtures.FixedClock());
         var write = sink.WriteAsync(command, CancellationToken.None);
 
         await TestHelpers.WaitUntil(
-            () => client.Publishes.Count > 0 && client.SubscribedTopicNames.Contains("battery/asset-1/command/ack", StringComparer.Ordinal),
+            () => client.Publishes.Count > 0 && client.SubscribedTopicNames.Contains(ackTopic, StringComparer.Ordinal),
             TimeSpan.FromSeconds(1));
 
         // The real sink output must structurally equal the manifest payload
-        // (values sit inside the SampleAsset limits, so no clamping applies).
-        var published = JsonNode.Parse(client.Publishes[0].Payload);
+        // (values sit inside the SampleAsset limits, so no clamping applies),
+        // and topic/retained must match the manifest facts — the manifest is
+        // only honest if the SINK, not just the mapping text, produces them.
+        var publish = client.Publishes[0];
+        Assert.Equal(emsCase["topic"]!.GetValue<string>(), publish.Topic);
+        Assert.Equal(emsCase["retained"]!.GetValue<bool>(), publish.Retained);
+        var published = JsonNode.Parse(publish.Payload);
         Assert.True(
             JsonNode.DeepEquals(published, commandPayload),
             $"MqttCommandSink wire payload drifted from the ems manifest:\n{published?.ToJsonString()}");
 
-        var ack = FieldCase("command-ack-accepted-echo")["payload"]!;
-        await client.DeliverAsync("battery/asset-1/command/ack", Encoding.UTF8.GetBytes(ack.ToJsonString()));
+        await client.DeliverAsync(ackTopic, Encoding.UTF8.GetBytes(ackCase["payload"]!.ToJsonString()));
 
         var result = await write;
         Assert.True(result.Success, "field-manifest ack did not correlate with the ems-manifest command — echo invariant broken");
@@ -123,14 +131,35 @@ public sealed class GoldenVectorsTests
     }
 
     [Fact]
-    public void Field_ack_payload_decodes_via_CommandAckPayload()
+    public void Field_ack_payload_decodes_via_CommandAckPayload_and_matches_the_envelope()
     {
-        var ack = FieldCase("command-ack-accepted-echo")["payload"]!;
-        var decoded = JsonSerializer.Deserialize<CommandAckPayload>(ack.ToJsonString(), MqttJson.Options);
+        var ack = FieldCase("command-ack-accepted-echo")["payload"]!.AsObject();
 
+        // The ack payload must satisfy the published command_ack definition:
+        // schema-valid, no keys beyond its properties, all required present.
+        // Without this the Go producer could rename dispatched_at, refresh the
+        // vectors, and stay green while the bundled envelope schema disagrees.
+        using var doc = JsonDocument.Parse(ack.ToJsonString());
+        Assert.True(
+            EnvelopeSchema.CommandAckSchema().Evaluate(doc.RootElement).IsValid,
+            "field-producer ack payload does not validate against the envelope command_ack definition");
+        var (properties, required) = EnvelopeDefKeys("command_ack");
+        foreach (var key in ack.Select(p => p.Key))
+        {
+            Assert.Contains(key, properties);
+        }
+        foreach (var key in required)
+        {
+            Assert.Contains(key, ack.Select(p => p.Key));
+        }
+
+        var decoded = JsonSerializer.Deserialize<CommandAckPayload>(ack.ToJsonString(), MqttJson.Options);
         Assert.NotNull(decoded);
         Assert.Equal(GoldenVectors.NominalCommandId, decoded!.CommandId);
         Assert.True(decoded.Accepted);
+        // Positional record without `required`: a missing/renamed member binds
+        // default(DateTimeOffset) silently — pin the Go `Z`-form decode.
+        Assert.Equal(DateTimeOffset.UnixEpoch, decoded.DispatchedAt);
         Assert.Equal("accepted", decoded.Reason);
     }
 
@@ -165,6 +194,15 @@ public sealed class GoldenVectorsTests
             .Select(p => p.Key)
             .OrderBy(k => k, StringComparer.Ordinal)
             .ToArray();
+    }
+
+    // properties + required of a $defs entry in the COMMITTED envelope schema.
+    private static (string[] Properties, string[] Required) EnvelopeDefKeys(string defName)
+    {
+        var def = JsonNode.Parse(File.ReadAllText(GoldenVectors.EnvelopeSchemaPath))!["$defs"]![defName]!;
+        var properties = def["properties"]!.AsObject().Select(p => p.Key).ToArray();
+        var required = def["required"]!.AsArray().Select(r => r!.GetValue<string>()).ToArray();
+        return (properties, required);
     }
 
     private static Task<BatteryTelemetry> ReadFirst(MqttTelemetrySource source, CancellationToken ct) => Task.Run(async () =>

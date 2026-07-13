@@ -13,10 +13,12 @@ this gate):
      ($refs across schemas resolve through a $id registry).
   6. The schema-bundle CHANGELOG is present.
   7. ADR 0013 §5.2: both golden-vector manifests are present, validate against
-     the manifest schema, and every telemetry payload validates against the
-     envelope's telemetry definition WITH exact key-set equality (the envelope
-     has no additionalProperties:false, so validation alone cannot catch an
-     ADDED producer field). Python mirror of the C# asserts — runs without .NET.
+     the manifest schema, and every telemetry/command/command_ack payload
+     validates against its envelope definition WITH key-set discipline (no key
+     beyond properties, all required present — exact set for telemetry, where
+     properties == required). The envelope has no additionalProperties:false,
+     so validation alone cannot catch an ADDED producer field. Python mirror
+     of the C#/Go asserts — runs without .NET.
 
 The one contract check deliberately NOT here is the MQTT envelope C#<->schema drift:
 it needs the C# source (MqttPayloads.cs) and lives in EnvelopeSchemaTests under
@@ -104,30 +106,44 @@ def match_rule(rel):
     return None, None
 
 
-def telemetry_payload_errors(path, instance, telemetry_def):
-    """ADR 0013 §5.2: every telemetry payload must validate against the
-    envelope's telemetry definition AND carry exactly its property key set."""
-    if not isinstance(telemetry_def, dict):
-        return [f"{path}: envelope telemetry definition unavailable — cannot check telemetry payloads"]
+def vector_payload_errors(path, instance, envelope_defs):
+    """ADR 0013 §5.2: every telemetry/command/command_ack payload must validate
+    against its envelope definition, carry no key beyond its properties, and
+    carry every required key. properties == required for telemetry, so the
+    generic rule IS the exact-key-set check there; command/command_ack keep
+    their optional members (reactive_power_kvar, reason). The subset rule is
+    what the schema alone (no additionalProperties:false) cannot enforce.
+    status/fault payloads have no envelope definition by design (§5.1
+    non-goal) and are pinned by the Go drift gate instead."""
+    if not isinstance(envelope_defs, dict):
+        return [f"{path}: envelope $defs unavailable — cannot check vector payloads"]
     errs = []
-    expected_keys = sorted(telemetry_def.get("properties", {}))
     cases = instance.get("cases") if isinstance(instance, dict) else None
     for case in cases if isinstance(cases, list) else []:
-        if not isinstance(case, dict) or case.get("topic_name") != "telemetry":
+        if not isinstance(case, dict):
             continue
+        definition = envelope_defs.get(case.get("topic_name"))
+        if not isinstance(definition, dict):
+            continue  # status/fault: no envelope definition by design
         name = case.get("name")
         payload = case.get("payload")
         if not isinstance(payload, dict):
-            errs.append(f"{path}: telemetry case {name!r} has no payload object")
+            if not case.get("suppressed"):
+                errs.append(f"{path}: case {name!r} has no payload object")
             continue
-        for err in Draft202012Validator(telemetry_def).iter_errors(payload):
+        for err in Draft202012Validator(definition).iter_errors(payload):
             loc = "/".join(str(p) for p in err.path) or "(root)"
-            errs.append(f"{path}: case {name!r} fails the envelope telemetry definition at {loc}: {err.message}")
-        if sorted(payload) != expected_keys:
+            errs.append(f"{path}: case {name!r} fails the envelope {case.get('topic_name')} definition at {loc}: {err.message}")
+        properties = set(definition.get("properties", {}))
+        extra = sorted(set(payload) - properties)
+        if extra:
             errs.append(
-                f"{path}: case {name!r} payload keys {sorted(payload)} != envelope telemetry properties "
-                f"{expected_keys} (exact key set required — the schema alone cannot catch added fields)"
+                f"{path}: case {name!r} carries keys {extra} beyond the envelope "
+                f"{case.get('topic_name')} properties (added producer fields cannot pass silently)"
             )
+        missing = sorted(set(definition.get("required", [])) - set(payload))
+        if missing:
+            errs.append(f"{path}: case {name!r} misses envelope-required keys {missing}")
     return errs
 
 
@@ -233,7 +249,7 @@ def main() -> int:
             errors.append(f"{VECTORS_DIR / name}: required golden-vector manifest is missing")
     manifest_schema = schemas.get(VECTOR_MANIFEST_SCHEMA)
     envelope = schemas.get(ENVELOPE_SCHEMA)
-    telemetry_def = envelope.get("$defs", {}).get("telemetry") if isinstance(envelope, dict) else None
+    envelope_defs = envelope.get("$defs") if isinstance(envelope, dict) else None
     if not isinstance(manifest_schema, dict) or VECTOR_MANIFEST_SCHEMA in invalid_schemas:
         errors.append(f"{SCHEMA_DIR / VECTOR_MANIFEST_SCHEMA}: unavailable — cannot validate golden-vector manifests")
     elif VECTORS_DIR.is_dir():
@@ -244,7 +260,7 @@ def main() -> int:
             for err in Draft202012Validator(manifest_schema, registry=registry).iter_errors(instance):
                 loc = "/".join(str(p) for p in err.path) or "(root)"
                 errors.append(f"{path}: fails {VECTOR_MANIFEST_SCHEMA} at {loc}: {err.message}")
-            errors.extend(telemetry_payload_errors(path, instance, telemetry_def))
+            errors.extend(vector_payload_errors(path, instance, envelope_defs))
             vector_count += 1
 
     if errors:
@@ -256,7 +272,7 @@ def main() -> int:
     print(
         f"field-contract-check OK — {len(schemas)} schemas valid (Draft 2020-12), "
         f"{len(REQUIRED_SCHEMAS)} required present, {example_count} examples conform, "
-        f"{vector_count} golden-vector manifests conform (telemetry payloads envelope-checked, exact key set), "
+        f"{vector_count} golden-vector manifests conform (payloads envelope-checked incl. key sets), "
         f"schema_version pinned to {CONTRACT_MAJOR[0]}, CHANGELOG present"
     )
     return 0
