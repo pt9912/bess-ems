@@ -21,3 +21,16 @@ Initial published contract:
 - `asset`, `assets`, `schedule`, `retention` — supporting config schemas.
 
 `min_supported: v1`.
+
+### Additive: golden vectors (ADR 0013 §5.2)
+
+- `golden-vector-manifest` — manifest schema for structurally compared golden
+  vectors (`golden-vector-manifest.v1`); payloads embedded as JSON objects
+  (field-normative, no byte canon).
+- `vectors/mqtt-golden-vectors.field.v1.json` — lifted from the Go field
+  producer (`serializer.go` via `ResolveTelemetry`, `model.CommandAck`):
+  telemetry / status / fault (incl. suppression case) / command_ack.
+- `vectors/mqtt-golden-vectors.ems.v1.json` — lifted from the C# EMS producer
+  (`MqttJson.Options`): command with and without `reactive_power_kvar`.
+
+Contract major stays `v1` (additive change, no mapping-file impact).

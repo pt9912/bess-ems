@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bess-ems.io/schema/golden-vector-manifest.json",
+  "title": "Golden-vector manifest (ADR 0013 5.2)",
+  "description": "Structurally compared golden vectors for the MQTT field contract. Payloads are embedded as JSON objects because the contract is field-normative (names/presence/types/null-omission binding; member order and whitespace are not): an embedded object cannot pin a byte form. One manifest file per authority ('field' = lifted from the Go producer paths, 'ems' = lifted from the C# MqttJson serializer); each side regenerates only its own file.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract", "authority", "cases"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["golden-vector-manifest.v1"],
+      "description": "Manifest format version. Naming follows the replay-manifest.v1 precedent."
+    },
+    "contract": {
+      "type": "string",
+      "enum": ["mqtt"],
+      "description": "Which field contract the vectors pin. Modbus vectors (ADR 0013 5.4) will extend this enum."
+    },
+    "authority": {
+      "type": "string",
+      "enum": ["field", "ems"],
+      "description": "Producer authority per ADR 0013 3: 'field' covers telemetry/status/fault/command_ack (Go simulator is the de-facto producer), 'ems' covers command (C# EMS produces)."
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/vector_case" }
+    }
+  },
+  "$defs": {
+    "vector_case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "topic_name", "direction", "topic", "retained", "description"],
+      "oneOf": [
+        { "required": ["payload"] },
+        { "required": ["suppressed"] }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique case name within the manifest."
+        },
+        "topic_name": {
+          "type": "string",
+          "enum": ["telemetry", "status", "fault", "command", "command_ack"],
+          "description": "Logical topic name as declared in the mqtt-mapping profile."
+        },
+        "direction": {
+          "type": "string",
+          "enum": ["subscribe", "publish"],
+          "description": "Direction from the .NET-EMS adapter's perspective, same vocabulary as mqtt-mapping.json."
+        },
+        "topic": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Resolved broker topic with the fixed test asset id substituted (e.g. battery/asset-1/telemetry)."
+        },
+        "retained": {
+          "type": "boolean",
+          "description": "Retained flag from the mqtt-mapping profile."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "payload": {
+          "type": "object",
+          "description": "The normative payload as a JSON object (field-normative; never a byte-encoded string)."
+        },
+        "suppressed": {
+          "type": "boolean",
+          "enum": [true],
+          "description": "The producer emits NO message for this input (e.g. fault topic with fault_status ok/empty). Mutually exclusive with payload."
+        }
+      }
+    }
+  }
+}
