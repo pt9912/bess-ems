@@ -1,0 +1,173 @@
+{
+  "schema_version": "golden-vector-manifest.v1",
+  "contract": "modbus",
+  "authority": "ems",
+  "profile": "modbus.simulator.json",
+  "cases": [
+    {
+      "name": "soc_percent-read",
+      "register": "soc_percent",
+      "direction": "read",
+      "register_table": "holding",
+      "address": 100,
+      "type": "uint16",
+      "word_order": "high_low",
+      "scale_factor": 0.1,
+      "value": 60.5,
+      "words": [
+        605
+      ],
+      "description": "Field-served read register; words lifted through RegisterDecoder.Encode, Decode(words) == value exactly."
+    },
+    {
+      "name": "soh_percent-read",
+      "register": "soh_percent",
+      "direction": "read",
+      "register_table": "holding",
+      "address": 102,
+      "type": "uint16",
+      "word_order": "high_low",
+      "scale_factor": 0.1,
+      "value": 99.0,
+      "words": [
+        990
+      ],
+      "description": "Field-served read register; words lifted through RegisterDecoder.Encode, Decode(words) == value exactly."
+    },
+    {
+      "name": "active_power_kw-read",
+      "register": "active_power_kw",
+      "direction": "read",
+      "register_table": "holding",
+      "address": 110,
+      "type": "int16",
+      "word_order": "high_low",
+      "scale_factor": 0.1,
+      "value": -25.5,
+      "words": [
+        65281
+      ],
+      "description": "Field-served read register; words lifted through RegisterDecoder.Encode, Decode(words) == value exactly."
+    },
+    {
+      "name": "reactive_power_kvar-read",
+      "register": "reactive_power_kvar",
+      "direction": "read",
+      "register_table": "holding",
+      "address": 112,
+      "type": "int16",
+      "word_order": "high_low",
+      "scale_factor": 0.1,
+      "value": 12.5,
+      "words": [
+        125
+      ],
+      "description": "Field-served read register; words lifted through RegisterDecoder.Encode, Decode(words) == value exactly."
+    },
+    {
+      "name": "dc_voltage-read",
+      "register": "dc_voltage",
+      "direction": "read",
+      "register_table": "holding",
+      "address": 114,
+      "type": "uint16",
+      "word_order": "high_low",
+      "scale_factor": 1,
+      "value": 800.0,
+      "words": [
+        800
+      ],
+      "description": "Field-served read register; words lifted through RegisterDecoder.Encode, Decode(words) == value exactly."
+    },
+    {
+      "name": "dc_current-read",
+      "register": "dc_current",
+      "direction": "read",
+      "register_table": "holding",
+      "address": 116,
+      "type": "int16",
+      "word_order": "high_low",
+      "scale_factor": 0.1,
+      "value": -313.1,
+      "words": [
+        62405
+      ],
+      "description": "Field-served read register; words lifted through RegisterDecoder.Encode, Decode(words) == value exactly."
+    },
+    {
+      "name": "temperature_celsius-read",
+      "register": "temperature_celsius",
+      "direction": "read",
+      "register_table": "holding",
+      "address": 118,
+      "type": "int16",
+      "word_order": "high_low",
+      "scale_factor": 0.1,
+      "value": 22.0,
+      "words": [
+        220
+      ],
+      "description": "Field-served read register; words lifted through RegisterDecoder.Encode, Decode(words) == value exactly."
+    },
+    {
+      "name": "available-read",
+      "register": "available",
+      "direction": "read",
+      "register_table": "holding",
+      "address": 120,
+      "type": "uint16",
+      "word_order": "high_low",
+      "scale_factor": 1,
+      "value": 1.0,
+      "words": [
+        1
+      ],
+      "description": "Field-served read register; words lifted through RegisterDecoder.Encode, Decode(words) == value exactly."
+    },
+    {
+      "name": "fault_status-read",
+      "register": "fault_status",
+      "direction": "read",
+      "register_table": "holding",
+      "address": 122,
+      "type": "uint16",
+      "word_order": "high_low",
+      "scale_factor": 1,
+      "value": 0.0,
+      "words": [
+        0
+      ],
+      "description": "Field-served read register; words lifted through RegisterDecoder.Encode, Decode(words) == value exactly."
+    },
+    {
+      "name": "active_power_setpoint_kw-write",
+      "register": "active_power_setpoint_kw",
+      "direction": "write",
+      "register_table": "holding",
+      "address": 200,
+      "type": "int16",
+      "word_order": "high_low",
+      "scale_factor": 0.1,
+      "value": 25.5,
+      "words": [
+        255
+      ],
+      "description": "EMS write image lifted from the real ModbusCommandSink dispatch (unclamped: value inside the asset limits)."
+    },
+    {
+      "name": "operating_mode-write",
+      "register": "operating_mode",
+      "direction": "write",
+      "register_table": "holding",
+      "address": 202,
+      "type": "uint16",
+      "word_order": "high_low",
+      "scale_factor": 1,
+      "value": 3.0,
+      "words": [
+        3
+      ],
+      "description": "EMS write image lifted from the real ModbusCommandSink dispatch (unclamped: value inside the asset limits)."
+    }
+  ]
+}

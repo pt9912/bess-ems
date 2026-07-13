@@ -1,0 +1,184 @@
+{
+  "schema_version": "golden-vector-manifest.v1",
+  "contract": "modbus",
+  "authority": "ems",
+  "profile": "modbus.hil-simulator.json",
+  "cases": [
+    {
+      "name": "active_power_kw-read",
+      "register": "active_power_kw",
+      "direction": "read",
+      "register_table": "input",
+      "address": 1,
+      "type": "float32",
+      "word_order": "low_high",
+      "scale_factor": 1000,
+      "value": 62.5,
+      "words": [
+        0,
+        15744
+      ],
+      "description": "Field-served read register; words lifted through RegisterDecoder.Encode, Decode(words) == value exactly."
+    },
+    {
+      "name": "reactive_power_kvar-read",
+      "register": "reactive_power_kvar",
+      "direction": "read",
+      "register_table": "input",
+      "address": 3,
+      "type": "float32",
+      "word_order": "low_high",
+      "scale_factor": 1000,
+      "value": 31.25,
+      "words": [
+        0,
+        15616
+      ],
+      "description": "Field-served read register; words lifted through RegisterDecoder.Encode, Decode(words) == value exactly."
+    },
+    {
+      "name": "grid_voltage_pu-read",
+      "register": "grid_voltage_pu",
+      "direction": "read",
+      "register_table": "input",
+      "address": 5,
+      "type": "float32",
+      "word_order": "low_high",
+      "scale_factor": 1,
+      "value": 1.0,
+      "words": [
+        0,
+        16256
+      ],
+      "description": "Field-served read register; words lifted through RegisterDecoder.Encode, Decode(words) == value exactly."
+    },
+    {
+      "name": "grid_frequency_hz-read",
+      "register": "grid_frequency_hz",
+      "direction": "read",
+      "register_table": "input",
+      "address": 7,
+      "type": "float32",
+      "word_order": "low_high",
+      "scale_factor": 1,
+      "value": 50.0,
+      "words": [
+        0,
+        16968
+      ],
+      "description": "Field-served read register; words lifted through RegisterDecoder.Encode, Decode(words) == value exactly."
+    },
+    {
+      "name": "grid_current_ka-read",
+      "register": "grid_current_ka",
+      "direction": "read",
+      "register_table": "input",
+      "address": 9,
+      "type": "float32",
+      "word_order": "low_high",
+      "scale_factor": 1,
+      "value": 0.5,
+      "words": [
+        0,
+        16128
+      ],
+      "description": "Field-served read register; words lifted through RegisterDecoder.Encode, Decode(words) == value exactly."
+    },
+    {
+      "name": "available-read",
+      "register": "available",
+      "direction": "read",
+      "register_table": "input",
+      "address": 11,
+      "type": "float32",
+      "word_order": "low_high",
+      "scale_factor": 1,
+      "value": 1.0,
+      "words": [
+        0,
+        16256
+      ],
+      "description": "Field-served read register; words lifted through RegisterDecoder.Encode, Decode(words) == value exactly."
+    },
+    {
+      "name": "soc_percent-read",
+      "register": "soc_percent",
+      "direction": "read",
+      "register_table": "input",
+      "address": 13,
+      "type": "float32",
+      "word_order": "low_high",
+      "scale_factor": 1,
+      "value": 60.5,
+      "words": [
+        0,
+        17010
+      ],
+      "description": "Field-served read register; words lifted through RegisterDecoder.Encode, Decode(words) == value exactly."
+    },
+    {
+      "name": "soh_percent-read",
+      "register": "soh_percent",
+      "direction": "read",
+      "register_table": "input",
+      "address": 15,
+      "type": "float32",
+      "word_order": "low_high",
+      "scale_factor": 1,
+      "value": 99.0,
+      "words": [
+        0,
+        17094
+      ],
+      "description": "Field-served read register; words lifted through RegisterDecoder.Encode, Decode(words) == value exactly."
+    },
+    {
+      "name": "temperature_celsius-read",
+      "register": "temperature_celsius",
+      "direction": "read",
+      "register_table": "input",
+      "address": 17,
+      "type": "float32",
+      "word_order": "low_high",
+      "scale_factor": 1,
+      "value": 22.0,
+      "words": [
+        0,
+        16816
+      ],
+      "description": "Field-served read register; words lifted through RegisterDecoder.Encode, Decode(words) == value exactly."
+    },
+    {
+      "name": "active_power_setpoint_kw-write",
+      "register": "active_power_setpoint_kw",
+      "direction": "write",
+      "register_table": "holding",
+      "address": 1,
+      "type": "float32",
+      "word_order": "low_high",
+      "scale_factor": 1000,
+      "value": 31.25,
+      "words": [
+        0,
+        15616
+      ],
+      "description": "EMS write image lifted from the real ModbusCommandSink dispatch (unclamped: value inside the asset limits)."
+    },
+    {
+      "name": "reactive_power_setpoint_kvar-write",
+      "register": "reactive_power_setpoint_kvar",
+      "direction": "write",
+      "register_table": "holding",
+      "address": 3,
+      "type": "float32",
+      "word_order": "low_high",
+      "scale_factor": 1000,
+      "value": 15.625,
+      "words": [
+        0,
+        15488
+      ],
+      "description": "EMS write image lifted from the real ModbusCommandSink dispatch (unclamped: value inside the asset limits)."
+    }
+  ]
+}
