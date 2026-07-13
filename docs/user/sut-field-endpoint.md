@@ -21,8 +21,8 @@ Der Feldvertrag ist als versioniertes Release-Asset publiziert:
 [`releasing.md`](releasing.md)) enthält
 
 - die Geräte-Mapping-Schemas (`schema/*.schema.json`), darunter das
-  **MQTT-Envelope-Schema** (`mqtt-telemetry-envelope.json`) mit den
-  verbindlichen Payload-Definitionen für `telemetry`, `command` und
+  **MQTT-Envelope-Schema** (`mqtt-telemetry-envelope.schema.json`) mit
+  den verbindlichen Payload-Definitionen für `telemetry`, `command` und
   `command_ack`, und
 - die **Golden-Vektoren** (`schema/vectors/mqtt-golden-vectors.
   {field,ems}.v1.json`) — das Abnahme-Geschirr: ein konformer Endpoint
@@ -35,6 +35,13 @@ Topic-Schema: `battery/{assetId}/telemetry` (retained) +
 (non-retained, nur bei Fault). bess-ems konsumiert im SUT-Modus nur
 `telemetry`; `command`/`command/ack` sind für die
 telemetry-read-only-Kopplung nicht erforderlich (ADR 0013 §6).
+**Erwartbares Log-Bild dabei:** bess-ems publisht seine Kommandos
+(auch Idle) trotzdem und wartet je Zyklus auf den Ack — ein Endpoint
+ohne Command-Unterstützung erzeugt deshalb pro Zyklus eine
+Warning `Command dispatch failed … ack-timeout` (EventId 1903). Das
+ist für die read-only-Kopplung erwartbar und unschädlich; der
+Regelzyklus läuft weiter (das Gutfall-Signal aus §5 erscheint vor dem
+Dispatch).
 
 **Kadenz:** bess-ems misst Telemetrie-Frische **beim Empfang**. Der
 Endpoint muss kontinuierlich innerhalb des Freshness-Fensters
@@ -108,7 +115,10 @@ Broker und **ohne** Feld-Simulator; die Broker-Adresse kommt per Env:
 # Stand-in-Betrieb (lokal): shared external Network + Feld-Stack
 make sut-smoke        # legt Netz an, fährt beide Stacks, prüft, räumt ab
 
-# Gegen einen echten externen Endpoint:
+# Gegen einen echten externen Endpoint: das externe Netz muss existieren
+# (compose.sut.yml deklariert es als external; make sut-smoke legt es nur
+# für den Stand-in-Lauf an):
+docker network create bess-sut 2>/dev/null || true
 BESS_SUT_BROKER_HOST=<routbare-adresse> BESS_SUT_BROKER_PORT=1883 \
   docker compose -f deploy/compose.sut.yml up
 ```
@@ -127,7 +137,10 @@ routbar sein.
 ## 5. Verifikation
 
 1. **Health:** `GET /health` liefert 200, sobald der Host läuft —
-   das sagt nichts über die Feldanbindung aus.
+   das sagt nichts über die Feldanbindung aus. Die SUT-Variante
+   publisht bewusst keine Host-Ports; von außen also per
+   `docker compose -f deploy/compose.sut.yml exec bess-ems \
+   curl -fsS http://localhost:8080/health` (oder Port-Override).
 2. **Gutfall-Signal:** im Log erscheint zyklisch
    `Control cycle emitted command` (EventId 1701) — der Regelzyklus
    verarbeitet frische Telemetrie und emittiert Kommandos (ohne
@@ -140,7 +153,7 @@ routbar sein.
 | Log-Signal | Ursache | Prüfen |
 | ---------- | ------- | ------ |
 | `decision=no-snapshot` | **Nie** Telemetrie empfangen | `asset_id`↔`{assetId}`-Korrespondenz (§2), Topic-Schema, Broker-Adresse/Netz-Routbarkeit |
-| `decision=snapshot-unusable` + `reason=snapshot-aged-<N>s` | Telemetrie **zu alt** | Publish-Kadenz des Endpoints vs. `Bess__SnapshotMaxAge` (§1 Kadenz) |
+| `decision=snapshot-unusable` + `reason=snapshot-aged-<N>s` (N mit einer Nachkommastelle, z. B. `snapshot-aged-12.3s`) | Telemetrie **zu alt** | Publish-Kadenz des Endpoints vs. `Bess__SnapshotMaxAge` (§1 Kadenz) |
 
 `make sut-smoke` automatisiert genau dieses Rezept gegen den
 Stand-in-Stack (Grün = Gutfall-Signal binnen Frist, kein Safe-Stop

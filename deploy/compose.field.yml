@@ -37,7 +37,16 @@ services:
       - "-mqtt-broker=tcp://field-mosquitto:1883"
       - "-mqtt-client-id=bess-field-sim"
     volumes:
-      - ${BESS_FIELD_SCENARIO:-./.sut-scenario.json}:/data/scenario.json:ro
+      # Long syntax with create_host_path:false on purpose: with the short
+      # syntax a MISSING scenario file would be created as a directory by the
+      # engine — gitignored, invisible in git status, and wedging every later
+      # `make sut-smoke` ("Is a directory") until a manual rmdir.
+      - type: bind
+        source: ${BESS_FIELD_SCENARIO:-./.sut-scenario.json}
+        target: /data/scenario.json
+        read_only: true
+        bind:
+          create_host_path: false
       - ../config/examples/adapters/modbus.simulator.json:/data/modbus.json:ro
       - ../config/examples/adapters/mqtt.simulator.json:/data/mqtt.json:ro
     depends_on:

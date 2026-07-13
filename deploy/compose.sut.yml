@@ -5,6 +5,10 @@
 # (compose.field.yml). Config-only: same runtime image as deploy/compose.yml,
 # no code path. No host ports on purpose (log-driven verification; add an
 # override if the operator API is needed).
+#
+# The `bess-sut` network is external: `make sut-smoke` creates it for the
+# stand-in run; against a real external endpoint create it once yourself
+# (`docker network create bess-sut`) before `up` — see the doc §4.
 services:
   bess-ems:
     image: bess-ems-runtime:latest

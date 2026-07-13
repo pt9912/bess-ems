@@ -29,17 +29,28 @@ DURATION="${SUT_SMOKE_DURATION:-600}"
 NETWORK="bess-sut"
 SCENARIO="deploy/.sut-scenario.json"
 
+# Pin the coupling inputs: a leftover BESS_FIELD_SCENARIO or
+# BESS_SUT_BROKER_HOST/PORT export from a manual doc walkthrough would make
+# this smoke silently test something other than the stand-in coupling.
+export BESS_FIELD_SCENARIO="./.sut-scenario.json"
+unset BESS_SUT_BROKER_HOST BESS_SUT_BROKER_PORT
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${repo_root}"
 
 field() { "${DOCKER}" compose -f deploy/compose.field.yml -p bess-sut-field "$@"; }
 sut()   { "${DOCKER}" compose -f deploy/compose.sut.yml   -p bess-sut-ems   "$@"; }
 
+created_network=0
 cleanup() {
   sut down -v --remove-orphans >/dev/null 2>&1 || true
   field down -v --remove-orphans >/dev/null 2>&1 || true
-  "${DOCKER}" network rm "${NETWORK}" >/dev/null 2>&1 || true
-  rm -f "${SCENARIO}"
+  # Only remove the network if THIS run created it — never delete a
+  # pre-existing network of the same name that something else owns.
+  if (( created_network )); then
+    "${DOCKER}" network rm "${NETWORK}" >/dev/null 2>&1 || true
+  fi
+  rm -rf "${SCENARIO}"
 }
 trap cleanup EXIT
 
@@ -49,6 +60,9 @@ trap cleanup EXIT
 # safe-stop. Generate a constant-cadence scenario instead: 1s ticks, nominal
 # values, long enough to outlive TIMEOUT + WARMUP.
 echo "[sut-smoke] generating ${DURATION}s constant-cadence scenario at ${SCENARIO}"
+# A stale directory at this path (short-syntax bind-mount mishap from older
+# runs) would wedge the redirect below with "Is a directory".
+rm -rf "${SCENARIO}"
 python3 - "$DURATION" > "${SCENARIO}" <<'EOF'
 import json
 import sys
@@ -77,9 +91,13 @@ print(json.dumps({
 }, indent=2))
 EOF
 
-echo "[sut-smoke] creating shared external network '${NETWORK}'"
-"${DOCKER}" network inspect "${NETWORK}" >/dev/null 2>&1 \
-  || "${DOCKER}" network create "${NETWORK}" >/dev/null
+if "${DOCKER}" network inspect "${NETWORK}" >/dev/null 2>&1; then
+  echo "[sut-smoke] WARNING: network '${NETWORK}' already exists — reusing it and leaving it in place afterwards"
+else
+  echo "[sut-smoke] creating shared external network '${NETWORK}'"
+  "${DOCKER}" network create "${NETWORK}" >/dev/null
+  created_network=1
+fi
 
 echo "[sut-smoke] starting the stand-in field stack (separate compose project)"
 field up -d --wait --wait-timeout 60
@@ -87,12 +105,19 @@ field up -d --wait --wait-timeout 60
 echo "[sut-smoke] starting the SUT variant against it (config-only coupling)"
 sut up -d --wait --wait-timeout 60
 
+# Logs are always captured into a variable first: (a) grep -q on a live pipe
+# can SIGPIPE `docker compose logs` under pipefail, (b) a failing log fetch
+# must FAIL the smoke instead of counting as zero matches (no false green).
+fetch_logs() {
+  sut logs bess-ems
+}
+
 echo "[sut-smoke] waiting up to ${TIMEOUT}s for 'Control cycle emitted command'"
 deadline=$(( SECONDS + TIMEOUT ))
-until sut logs bess-ems 2>/dev/null | grep -q "Control cycle emitted command"; do
+until logs="$(fetch_logs)" && grep -q "Control cycle emitted command" <<<"${logs}"; do
   if (( SECONDS >= deadline )); then
     echo "[sut-smoke] FAILED — no good-case signal within ${TIMEOUT}s; last log lines:" >&2
-    sut logs --tail 40 bess-ems >&2 || true
+    tail -40 <<<"${logs:-<no logs readable>}" >&2
     exit 1
   fi
   sleep 2
@@ -100,14 +125,16 @@ done
 echo "[sut-smoke] good-case signal seen; watching ${WARMUP}s for late safe-stops"
 
 safe_stop_count() {
-  sut logs bess-ems 2>/dev/null | grep -c "Control cycle safe-stop" || true
+  local logs
+  logs="$(fetch_logs)" || return 1
+  grep -c "Control cycle safe-stop" <<<"${logs}" || true
 }
 before="$(safe_stop_count)"
 sleep "${WARMUP}"
 after="$(safe_stop_count)"
 if (( after > before )); then
   echo "[sut-smoke] FAILED — ${after} safe-stop lines after warmup (was ${before}); the loop fell back:" >&2
-  sut logs bess-ems 2>/dev/null | grep "Control cycle safe-stop" | tail -5 >&2
+  fetch_logs | grep "Control cycle safe-stop" | tail -5 >&2 || true
   exit 1
 fi
 
