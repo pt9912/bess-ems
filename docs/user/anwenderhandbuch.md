@@ -1,7 +1,7 @@
 # Benutzerhandbuch: bess-ems
 
-Version: 1.0
-Software-Version: 2.2.0
+Version: 1.1
+Software-Version: 2.2.1
 Stand: 13.07.2026
 
 ## 1. Einleitung
@@ -84,9 +84,27 @@ Komponenten einzeln auf (siehe Abschnitt 7).
 http://localhost:8080/operator/
 ```
 
-Die Oberfläche zeigt die registrierten Anlagen mit ihrem aktuellen
-Zustand (Anlagen-Auswahl, Status, letztes Kommando, aktive
-Operator-Stopps).
+![Operator-Oberfläche im Normalbetrieb: Statusband mit System-Health, Regelleistung, Anlage und Operator-Stop; darunter die Panels Status, Command, Schedules, Run und Stop. Die Kommando-Quelle zeigt Optimization, die Telemetrie-Qualität Valid.](images/operator-ui.png)
+
+Die Oberfläche zeigt auf einer Seite:
+
+* **Statusband** — System-Health, Regelleistung-Status, gewählte
+  Anlage (mit Kapazität) und den Operator-Stop-Zustand.
+* **Status** — aktuelle Telemetrie der Anlage (SoC, Leistung,
+  Verfügbarkeit, Fault, Telemetrie-Qualität).
+* **Command** — das zuletzt gesendete Kommando (Mode, Leistung,
+  Begründung, Gültigkeit, Quelle).
+* **Schedules** — die aktiven Fahrpläne (Typ, Version, Horizont,
+  Fensteranzahl).
+* **Run** — Detail-Ansicht eines Optimierungslaufs; geben Sie links
+  unter **Run lookup** eine `run_id` ein und klicken Sie **Load**.
+* **Stop** — Operator-Stop auslösen (einzige schreibende Aktion;
+  benötigt Ihr Token im Feld **Operator token**).
+
+Die Anlage wählen Sie links oben im Feld **Asset**; **Refresh** lädt
+alle Ansichten neu. Optimierungen anstoßen und Preisreihen
+importieren sind nicht Teil der Oberfläche — dafür nutzen Sie die
+API (Abschnitt 3).
 
 ### Grundlegende Bedienung der API
 
@@ -179,6 +197,9 @@ Operator-Identität aus Ihrem Token.
 
 #### Hinweise
 
+* Alternativ über die Operator-Oberfläche (Abschnitt 2): Anlage
+  wählen, Token in **Operator token** eintragen, Begründung in das
+  Feld **reason**, dann **Activate stop** klicken.
 * **Es gibt bewusst keinen „Stopp aufheben“-Endpoint.** Ein aktiver
   Stopp gilt bis zum Neustart der Instanz. Ein erneuter Stopp auf
   dieselbe Anlage ersetzt nur Begründung und Operator.
@@ -382,8 +403,13 @@ Die Feld-Anbindung (MQTT/Modbus/OPC UA) ist in
 
 Der Regelzyklus geht in den Sicherheitsmodus (Safe-Stop), wenn er
 keine verwertbare Telemetrie hat, die Anlage nicht verfügbar ist oder
-ein Operator-Stop gilt. Das Log der Instanz nennt die Ursache je
-Zyklus (Safe-Stop-Zeilen tragen `"EventId":1702`):
+ein Operator-Stop gilt. In der Operator-Oberfläche erkennen Sie den
+Zustand an Quelle `Fallback` und der Telemetrie-Qualität:
+
+![Operator-Oberfläche im Safe-Stop: das Command-Panel zeigt Mode Stop, Reason snapshot-aged-34.0s und Quelle Fallback; das Status-Panel zeigt die Telemetrie-Qualität Stale.](images/operator-ui-safe-stop.png)
+
+Das Log der Instanz nennt die Ursache je Zyklus (Safe-Stop-Zeilen
+tragen `"EventId":1702`):
 
 | Log-Signal | Bedeutung |
 | ---------- | --------- |
@@ -503,4 +529,5 @@ bereit: Software-Version (Release-Tag des Deployments), betroffene
 
 | Handbuch-Version | Software-Version | Datum | Änderung |
 | ---------------- | ---------------- | ----- | -------- |
+| 1.1 | 2.2.1 | 13.07.2026 | Screenshots der Operator-Oberfläche ergänzt; Oberflächen-Beschreibung vervollständigt (Statusband, Fahrplan-Tabelle, Run-Lookup); Stop-Aufgabe um den Oberflächen-Weg ergänzt. Erfordert 2.2.1: erst dort liefert der Compose-Stack `/operator/` aus. |
 | 1.0 | 2.2.0 | 13.07.2026 | Erstausgabe (Operator-Aufgaben, Fehlerbehebung, FAQ, Glossar). |

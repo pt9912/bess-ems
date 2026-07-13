@@ -9,9 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Operator user manual** (`docs/user/anwenderhandbuch.md`): task-based
+  manual for operators (status, operator stop, price import, day-ahead +
+  intraday optimization, troubleshooting) with UI screenshots, bound to
+  the software version; authored per
+  `docs/user/benutzerhandbuch-standard.md` (also added).
+
 ### Changed
 
 ### Fixed
+
+- **Operator web shell now served by the production host**: the shell
+  assets (`wwwroot/operator/`) were published into the runtime image but
+  `BessHostBuilder` never wired `UseOperatorUiStaticShell`, so
+  `/operator/` returned 404 in the compose stack (RM-M6-01-B defines the
+  shell as part of the operator surface). Pinned twice: an in-process
+  host-composition test asserts the `/operator` → `/operator/` redirect,
+  and `make runtime` now probes `/operator/` in the running container.
 
 ## [2.2.0] - 2026-07-13
 
