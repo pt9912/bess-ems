@@ -28,6 +28,7 @@ DOCKER_BUILD = $(DOCKER) build $(BUILD_CONTEXT) \
 	simulator-test simulator-race simulator-lint simulator-coverage-gate \
 	build ci runtime fullbuild lock-refresh release-assets \
 	schema-validate schema-generate schema-drift-check field-contract-check \
+	field-vectors-check field-vectors-refresh \
 	helm-lint docs-check
 
 help:
@@ -83,6 +84,8 @@ help:
 	@echo "  make schema-validate      Validate schema/schema.yaml via d-migrate (RM-M2-MIG-02)"
 	@echo "  make schema-generate      Generate ?001_initial.sql from schema/schema.yaml (RM-M2-MIG-02)"
 	@echo "  make docs-check           Validate Markdown refs (d-check) + host paths (rest sensor)"
+	@echo "  make field-vectors-check  Golden-vector drift gate vs Go field producer (ADR 0013 §5.2)"
+	@echo "  make field-vectors-refresh Regenerate config/schema/vectors/ field manifest"
 	@echo "  make helm-lint            Lint/render Kubernetes Helm chart (RM-M6-03)"
 	@echo ""
 	@echo "Welle 5 (Closure, active):"
@@ -190,6 +193,20 @@ docs-check:
 field-contract-check:
 	$(DOCKER_BUILD) --target field-contract-check -t $(IMAGE_PREFIX)-field-contract-check:latest
 
+# ADR 0013 §5.2: golden-vector drift gate. Regenerates the field-authority
+# MQTT vectors through the real Go producer paths (serializer.go via
+# ResolveTelemetry, model.CommandAck) and structurally compares them against
+# config/schema/vectors/. Repo-root Dockerfile stage on ${GO_IMAGE}: the
+# module-context simulator-* builds cannot see config/, so the gate cannot
+# live there (plan-field-contract-golden-vectors.md, sub-slice 2).
+field-vectors-check:
+	$(DOCKER_BUILD) --target field-vectors-check -t $(IMAGE_PREFIX)-field-vectors-check:latest
+
+# Regenerate the committed field-vector manifest after a deliberate producer
+# change; review the diff before committing.
+field-vectors-refresh:
+	$(DOCKER_BUILD) --target field-vectors-refresh --output type=local,dest=config/schema/vectors
+
 # --- Welle 1 (active) ------------------------------------------------------
 
 solid-suppression-gate:
@@ -221,13 +238,13 @@ coverage-gate:
 # --- Aggregated gates ------------------------------------------------------
 
 gates: lint arch-check test test-safety test-mpc-property test-replay coverage-gate \
-	docs-check field-contract-check \
+	docs-check field-contract-check field-vectors-check \
 	simulator-lint simulator-test simulator-race simulator-coverage-gate \
 	native-build native-lint native-sanitizer \
 	native-coverage-gate native-coverage-exclusions \
 	test-native-interop test-native-parity \
 	test-hil-opcua test-hil-optimization-core test-optimization-core-compose
-	@echo "[gates] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, docs-check, field-contract-check, simulator-{lint,test,race,coverage-gate}) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + M5 (test-hil-optimization-core, test-optimization-core-compose, test-mpc-property, test-replay)"
+	@echo "[gates] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, docs-check, field-contract-check, field-vectors-check, simulator-{lint,test,race,coverage-gate}) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + M5 (test-hil-optimization-core, test-optimization-core-compose, test-mpc-property, test-replay)"
 
 # --- Welle 3 (partially active) --------------------------------------------
 
@@ -414,13 +431,13 @@ test-container: runtime
 ci: lint arch-check test test-safety test-mpc-property test-replay coverage-gate \
     docs-check \
     simulator-lint simulator-test simulator-race simulator-coverage-gate \
-    schema-validate schema-drift-check field-contract-check \
+    schema-validate schema-drift-check field-contract-check field-vectors-check \
     native-build native-lint native-sanitizer \
     native-coverage-gate native-coverage-exclusions \
     test-native-interop test-native-parity \
     test-hil-opcua test-hil-optimization-core \
     test-optimization-core-compose test-integration
-	@echo "[ci] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, docs-check, simulator-*) + M2 schema (validate, drift-check) + field-contract-check + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + M5 (test-hil-optimization-core, test-optimization-core-compose, test-mpc-property, test-replay) + test-integration"
+	@echo "[ci] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, docs-check, simulator-*) + M2 schema (validate, drift-check) + field-contract-check + field-vectors-check + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + M5 (test-hil-optimization-core, test-optimization-core-compose, test-mpc-property, test-replay) + test-integration"
 
 # Fresh-clone-naher Komplettlauf: alle CI-Gates plus Runtime-Image und
 # Compose-Smoke. Letzte Stufe vor einem M1-Tag (RM-M1-20).

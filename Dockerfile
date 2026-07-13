@@ -3,6 +3,8 @@
 ARG DOTNET_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0
 ARG DOTNET_RUNTIME_IMAGE=mcr.microsoft.com/dotnet/aspnet:10.0
 ARG PYTHON_IMAGE=python:3.12-slim
+# Mirrors the simulator's own toolchain base (simulators/bess-field-sim/Dockerfile).
+ARG GO_IMAGE=golang:1.26
 ARG BUILD_CONFIGURATION=Release
 
 # ---------------------------------------------------------------------------
@@ -65,6 +67,36 @@ RUN pip install --no-cache-dir jsonschema==4.23.0
 COPY config/ config/
 COPY scripts/field_contract_check.py scripts/
 RUN python scripts/field_contract_check.py
+
+# ---------------------------------------------------------------------------
+# field-vectors-* (ADR 0013 §5.2): golden-vector drift gate + generator for
+# the MQTT field contract. Builds the Go generator from the simulator module
+# but runs it with the REPO ROOT as working directory: the module-context
+# `make simulator-*` builds cannot see config/schema/vectors/ or
+# config/examples/, which is why this gate lives here (plan sub-slice 2).
+#   field-vectors-check   — regenerate through the real producer paths and
+#                           structurally compare against the committed manifest
+#   field-vectors-refresh — export the regenerated manifest (scratch stage,
+#                           consumed via `docker build --output`)
+# ---------------------------------------------------------------------------
+FROM ${GO_IMAGE} AS field-vectors-src
+ENV GOFLAGS="-mod=readonly" CGO_ENABLED=0
+WORKDIR /src/simulators/bess-field-sim
+COPY simulators/bess-field-sim/go.mod simulators/bess-field-sim/go.su[m] ./
+RUN go mod download
+COPY simulators/bess-field-sim/ ./
+RUN go build -o /usr/local/bin/fieldvectors ./cmd/fieldvectors
+WORKDIR /src
+COPY config/ config/
+
+FROM field-vectors-src AS field-vectors-check
+RUN fieldvectors -mode check
+
+FROM field-vectors-src AS field-vectors-generate
+RUN mkdir -p /out && fieldvectors -mode write -out /out
+
+FROM scratch AS field-vectors-refresh
+COPY --from=field-vectors-generate /out/ /
 
 # ---------------------------------------------------------------------------
 # lint: dotnet build -warnaserror (RM-M1-01, RM-M1-21)

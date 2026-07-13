@@ -1,8 +1,10 @@
 {
+  "schema_version": "v1",
   "profile_name": "mqtt-simulator",
   "topics": [
     {
       "name": "telemetry",
+      "display_name": "Battery telemetry snapshot",
       "topic": "battery/{assetId}/telemetry",
       "direction": "subscribe",
       "payload_format": "json",

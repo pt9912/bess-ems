@@ -1,0 +1,95 @@
+{
+  "schema_version": "golden-vector-manifest.v1",
+  "contract": "mqtt",
+  "authority": "field",
+  "cases": [
+    {
+      "name": "telemetry-nominal",
+      "topic_name": "telemetry",
+      "direction": "subscribe",
+      "topic": "battery/asset-1/telemetry",
+      "retained": true,
+      "description": "Wide snapshot, one frame per tick and asset; nominal values from the ADR 0013 SUT smoke.",
+      "payload": {
+        "offset_millis": 0,
+        "soc_percent": 60.5,
+        "soh_percent": 99,
+        "active_power_kw": 0,
+        "reactive_power_kvar": 0,
+        "dc_voltage": 800,
+        "dc_current": 0,
+        "temperature_celsius": 22,
+        "available": true,
+        "fault_status": "ok"
+      }
+    },
+    {
+      "name": "telemetry-charging",
+      "topic_name": "telemetry",
+      "direction": "subscribe",
+      "topic": "battery/asset-1/telemetry",
+      "retained": true,
+      "description": "Charging tick: negative active_power_kw with non-zero reactive power and DC current.",
+      "payload": {
+        "offset_millis": 1000,
+        "soc_percent": 61.2,
+        "soh_percent": 99,
+        "active_power_kw": -250.5,
+        "reactive_power_kvar": 12.5,
+        "dc_voltage": 798.5,
+        "dc_current": -313.1,
+        "temperature_celsius": 23.5,
+        "available": true,
+        "fault_status": "ok"
+      }
+    },
+    {
+      "name": "status-nominal",
+      "topic_name": "status",
+      "direction": "subscribe",
+      "topic": "battery/asset-1/status",
+      "retained": true,
+      "description": "Focused subset {available, fault_status, offset_millis} the field republishes each tick.",
+      "payload": {
+        "available": true,
+        "fault_status": "ok",
+        "offset_millis": 0
+      }
+    },
+    {
+      "name": "fault-active",
+      "topic_name": "fault",
+      "direction": "subscribe",
+      "topic": "battery/asset-1/fault",
+      "retained": false,
+      "description": "Emitted only while fault_status is outside {ok, \"\"}.",
+      "payload": {
+        "fault_status": "overtemperature",
+        "offset_millis": 2000
+      }
+    },
+    {
+      "name": "fault-suppressed-ok",
+      "topic_name": "fault",
+      "direction": "subscribe",
+      "topic": "battery/asset-1/fault",
+      "retained": false,
+      "description": "fault_status \"ok\" suppresses the fault message entirely: no payload may appear on the wire.",
+      "suppressed": true
+    },
+    {
+      "name": "command-ack-accepted-echo",
+      "topic_name": "command_ack",
+      "direction": "subscribe",
+      "topic": "battery/asset-1/command/ack",
+      "retained": false,
+      "description": "Always-accepted echo the CommandHandler publishes; command_id echoes the nominal command case of the ems manifest.",
+      "payload": {
+        "command_id": "cmd-golden-nominal",
+        "accepted": true,
+        "dispatched_at": "1970-01-01T00:00:00Z",
+        "reason": "accepted"
+      }
+    }
+  ]
+}
