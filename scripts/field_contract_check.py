@@ -3,7 +3,8 @@
 
 Runs in the `field-contract-check` Docker stage, which provides `jsonschema`.
 
-Checks (a deliberately broken schema OR example mapping fails this gate):
+Checks (a deliberately broken schema OR example mapping OR vector manifest fails
+this gate):
   1. Every config/schema/*.schema.json parses as a JSON object and declares $schema.
   2. Every schema is a valid JSON Schema (Draft 2020-12 meta-validation).
   3. The required contract set is present.
@@ -11,6 +12,11 @@ Checks (a deliberately broken schema OR example mapping fails this gate):
   5. Every shipped example under config/examples/ validates against its schema
      ($refs across schemas resolve through a $id registry).
   6. The schema-bundle CHANGELOG is present.
+  7. ADR 0013 §5.2: both golden-vector manifests are present, validate against
+     the manifest schema, and every telemetry payload validates against the
+     envelope's telemetry definition WITH exact key-set equality (the envelope
+     has no additionalProperties:false, so validation alone cannot catch an
+     ADDED producer field). Python mirror of the C# asserts — runs without .NET.
 
 The one contract check deliberately NOT here is the MQTT envelope C#<->schema drift:
 it needs the C# source (MqttPayloads.cs) and lives in EnvelopeSchemaTests under
@@ -34,6 +40,18 @@ REQUIRED_SCHEMAS = (
     "mqtt-mapping.schema.json",
     "opcua-mapping.schema.json",
     "mqtt-telemetry-envelope.schema.json",
+    "golden-vector-manifest.schema.json",
+)
+
+VECTORS_DIR = SCHEMA_DIR / "vectors"
+VECTOR_MANIFEST_SCHEMA = "golden-vector-manifest.schema.json"
+ENVELOPE_SCHEMA = "mqtt-telemetry-envelope.schema.json"
+
+# Both authority manifests must ship (same presence floor as
+# REQUIRED_EXAMPLE_PATTERNS — a vanished vectors/ dir must not false-pass).
+REQUIRED_VECTOR_MANIFESTS = (
+    "mqtt-golden-vectors.field.v1.json",
+    "mqtt-golden-vectors.ems.v1.json",
 )
 
 # Protocol-mapping schemas whose schema_version pins the contract major.
@@ -84,6 +102,33 @@ def match_rule(rel):
         if rel.match(pattern):
             return pattern, target
     return None, None
+
+
+def telemetry_payload_errors(path, instance, telemetry_def):
+    """ADR 0013 §5.2: every telemetry payload must validate against the
+    envelope's telemetry definition AND carry exactly its property key set."""
+    if not isinstance(telemetry_def, dict):
+        return [f"{path}: envelope telemetry definition unavailable — cannot check telemetry payloads"]
+    errs = []
+    expected_keys = sorted(telemetry_def.get("properties", {}))
+    cases = instance.get("cases") if isinstance(instance, dict) else None
+    for case in cases if isinstance(cases, list) else []:
+        if not isinstance(case, dict) or case.get("topic_name") != "telemetry":
+            continue
+        name = case.get("name")
+        payload = case.get("payload")
+        if not isinstance(payload, dict):
+            errs.append(f"{path}: telemetry case {name!r} has no payload object")
+            continue
+        for err in Draft202012Validator(telemetry_def).iter_errors(payload):
+            loc = "/".join(str(p) for p in err.path) or "(root)"
+            errs.append(f"{path}: case {name!r} fails the envelope telemetry definition at {loc}: {err.message}")
+        if sorted(payload) != expected_keys:
+            errs.append(
+                f"{path}: case {name!r} payload keys {sorted(payload)} != envelope telemetry properties "
+                f"{expected_keys} (exact key set required — the schema alone cannot catch added fields)"
+            )
+    return errs
 
 
 def main() -> int:
@@ -180,6 +225,28 @@ def main() -> int:
             if matched.get(pattern, 0) == 0:
                 errors.append(f"{EXAMPLES_DIR}: no example matches required pattern '{pattern}' — a protocol mapping example must ship")
 
+    # ADR 0013 §5.2: golden-vector manifests (presence + manifest-schema
+    # validation + telemetry payloads against the envelope, exact key set).
+    vector_count = 0
+    for name in REQUIRED_VECTOR_MANIFESTS:
+        if not (VECTORS_DIR / name).is_file():
+            errors.append(f"{VECTORS_DIR / name}: required golden-vector manifest is missing")
+    manifest_schema = schemas.get(VECTOR_MANIFEST_SCHEMA)
+    envelope = schemas.get(ENVELOPE_SCHEMA)
+    telemetry_def = envelope.get("$defs", {}).get("telemetry") if isinstance(envelope, dict) else None
+    if not isinstance(manifest_schema, dict) or VECTOR_MANIFEST_SCHEMA in invalid_schemas:
+        errors.append(f"{SCHEMA_DIR / VECTOR_MANIFEST_SCHEMA}: unavailable — cannot validate golden-vector manifests")
+    elif VECTORS_DIR.is_dir():
+        for path in sorted(VECTORS_DIR.glob("*.json")):
+            instance = load_json(path, errors)
+            if instance is None:
+                continue
+            for err in Draft202012Validator(manifest_schema, registry=registry).iter_errors(instance):
+                loc = "/".join(str(p) for p in err.path) or "(root)"
+                errors.append(f"{path}: fails {VECTOR_MANIFEST_SCHEMA} at {loc}: {err.message}")
+            errors.extend(telemetry_payload_errors(path, instance, telemetry_def))
+            vector_count += 1
+
     if errors:
         print("field-contract-check FAILED:", file=sys.stderr)
         for err in errors:
@@ -189,6 +256,7 @@ def main() -> int:
     print(
         f"field-contract-check OK — {len(schemas)} schemas valid (Draft 2020-12), "
         f"{len(REQUIRED_SCHEMAS)} required present, {example_count} examples conform, "
+        f"{vector_count} golden-vector manifests conform (telemetry payloads envelope-checked, exact key set), "
         f"schema_version pinned to {CONTRACT_MAJOR[0]}, CHANGELOG present"
     )
     return 0

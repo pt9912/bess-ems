@@ -163,8 +163,11 @@ esac
 build_schema_bundle() {
   local stage="$1" out="$2"
   rm -rf "${stage}"
-  mkdir -p "${stage}/schema"
+  mkdir -p "${stage}/schema/vectors"
   cp config/schema/*.json config/schema/CHANGELOG.md "${stage}/schema/"
+  # ADR 0013 §5.2: the golden-vector manifests ship inside the same bundle —
+  # one field-contract artefact (schemas + acceptance vectors) per release.
+  cp config/schema/vectors/*.json "${stage}/schema/vectors/"
   printf '{\n  "name": "bess-ems-device-mapping-schemas",\n  "version": "%s",\n  "schema_version": "v1",\n  "min_supported": "v1"\n}\n' "${vbare}" > "${stage}/schema/bundle.json"
   tar --sort=name --mtime="@${SOURCE_DATE_EPOCH}" --owner=0 --group=0 --numeric-owner \
     -C "${stage}" -cf - schema | gzip -n > "${out}"
