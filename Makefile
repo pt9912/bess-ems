@@ -450,7 +450,9 @@ runtime: build simulator-build
 	$(DOCKER) compose -f deploy/compose.yml up -d --wait --wait-timeout 60
 	@echo "[runtime] stack is up; probing /health"
 	$(DOCKER) compose -f deploy/compose.yml exec -T bess-ems curl --fail --silent --show-error http://localhost:8080/health
-	@echo "[runtime] /health ok; verifying native control library is in place"
+	@echo "[runtime] /health ok; probing the operator shell (/operator/)"
+	$(DOCKER) compose -f deploy/compose.yml exec -T bess-ems curl --fail --silent --show-error --output /dev/null http://localhost:8080/operator/
+	@echo "[runtime] /operator/ ok; verifying native control library is in place"
 	$(DOCKER) compose -f deploy/compose.yml exec -T bess-ems test -f /app/native/libbattery_control_core.so
 	$(DOCKER) compose -f deploy/compose.yml exec -T bess-ems sh -c 'ldd /app/native/libbattery_control_core.so > /tmp/ldd 2>&1; if grep -q "not found" /tmp/ldd; then cat /tmp/ldd >&2; exit 1; fi'
 	@echo "[runtime] native control library at /app/native/ resolves cleanly; tearing down"

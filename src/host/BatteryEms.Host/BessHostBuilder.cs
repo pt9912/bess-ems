@@ -180,6 +180,10 @@ public static class BessHostBuilder
         _ = app.Services.GetRequiredService<ApiTokenRegistry>();
         app.UseAuthentication();
         app.UseAuthorization();
+        // RM-M6-01-B: the operator web shell ships inside the runtime image
+        // (wwwroot/operator). Wire it in the production-shaped host exactly
+        // like the standalone API host does — same pipeline position.
+        app.UseOperatorUiStaticShell();
         app.MapOpenApi();
         app.MapBatteryEms();
         app.MapMetrics();

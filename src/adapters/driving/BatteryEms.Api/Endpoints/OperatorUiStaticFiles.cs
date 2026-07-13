@@ -2,7 +2,10 @@ using Microsoft.AspNetCore.Builder;
 
 namespace BatteryEms.Api.Endpoints;
 
-internal static class OperatorUiStaticFiles
+// Public so the production-shaped BatteryEms.Host composition can wire the
+// same operator shell as the standalone API host — the shell assets are
+// published into the runtime image either way (RM-M6-01-B).
+public static class OperatorUiStaticFiles
 {
     public static WebApplication UseOperatorUiStaticShell(this WebApplication app)
     {
