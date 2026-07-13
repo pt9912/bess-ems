@@ -81,14 +81,17 @@ Encodings desselben Vertrags, driftanfällig.
   Feldvertrag, aber **nicht** den MQTT-Payload-Vertrag — genau die Stelle, die
   driftet (§2 Achse „Payload-Envelope").
 - **Bewiesener Drift:** `simulators/bess-field-sim/internal/model/modbus.go`
-  spiegelt `modbus-mapping.schema.json` von Hand und hat `register_table` (Z. 42
-  im Schema) + `word_order` (Z. 47) **nie** nachgezogen — genau die Fehlerklasse,
-  die `LH-RISK-002` benennt. **Bereits mit Live-Trigger:** das mitgelieferte Profil
+  spiegelte `modbus-mapping.schema.json` von Hand und hatte `register_table`
+  + `word_order` **nie** nachgezogen — genau die Fehlerklasse, die
+  `LH-RISK-002` benennt. **Bereits mit Live-Trigger:** das mitgelieferte Profil
   `config/examples/adapters/modbus.hil-simulator.json` setzt `word_order:"low_high"`
   auf allen 11 Registern (9 Mess-Register `register_table:"input"`/FC04 + 2
-  Setpoint-Register `holding`); der Go-DTO, der beide Felder wegwirft, würde dieses
-  **reale, im Repo liegende** Profil aktiv falsch bedienen (die 9 Mess-Register als
+  Setpoint-Register `holding`); der Go-DTO, der beide Felder wegwarf, hätte dieses
+  **reale, im Repo liegende** Profil aktiv falsch bedient (die 9 Mess-Register als
   FC03/high_low statt FC04/low_high). Ein Single-Source-Vertrag verhindert das.
+  **Instanz mit §5.4 geschlossen (2026-07-13):** DTO/Encoder/Server honorieren
+  beide Felder; die Modbus-Golden-Vectors gaten sie dauerhaft
+  (`make field-vectors-check`). Die Drift-**Klasse** bleibt Codegen-deferred (§7).
 
 **Smoke-Evidenz (der De-facto-MQTT-Feldvertrag, den bess-ems heute konsumiert):**
 `deploy/compose.yml` (bess-ems MQTT-only ← mosquitto ← `bess-field-sim`) lief
@@ -245,9 +248,10 @@ Reihenfolge der Umsetzungsschritte:
    Feld-Regeln §3; das Abnahme-Geschirr, das grid-gyms Push-Surface treffen muss.
 3. **SUT-Doku + config-only-Pfad:** „richte bess-ems auf einen externen
    Feld-Endpoint (grid-gym)".
-4. **Später (Modbus, Pull-Surface):** bess-ems hat mit
-   `config/examples/adapters/modbus.hil-simulator.json` das Register-Profil
-   **bereits**; es fehlen nur die Modbus-Golden-Vectors.
+4. **Modbus, Pull-Surface (mit §5.4 umgesetzt, 2026-07-13):** Modbus-Golden-
+   Vectors je profiliertem Register-Profil (`modbus.simulator` +
+   `modbus.hil-simulator`), gehoben durch den C#-Codec; zugleich wurde die
+   in §1 bewiesene Drift-Instanz im Simulator geschlossen und gegated.
 
 Jeder Umsetzungsschritt trägt Akzeptanzkriterien, Verifikationspfad und Release-Feld
 in seiner Planungs-Einheit; Verifikation (`make gates`) lebt dort.
@@ -284,9 +288,12 @@ Recording-Pfad). Bis dahin:
 - **Single Source of Truth (gestaffelt).** Die **Publikation + `schema_version` +
   CI-Drift-Gate** beenden **Transkriptions-Drift innerhalb des Schema-Sets** (inkl.
   MQTT-Payload dank Envelope-Schema, §2). Der **cross-language-Drift** (Go-DTO lässt
-  Schema-Felder fallen — der *bewiesene* Fall) endet erst mit **Codegen**
+  Schema-Felder fallen) endet als **Klasse** erst mit **Codegen**
   (Provider-Posture, deferred-mit-Trigger); ein Gate über Schema-Dateien fängt ihn
-  nicht (ein fehlendes Struct-Feld ändert keine Datei unter `config/schema/`). Der
+  nicht (ein fehlendes Struct-Feld ändert keine Datei unter `config/schema/`) —
+  die *bewiesene Instanz* (`register_table`/`word_order`) ist allerdings seit §5.4
+  geschlossen und wird durch die Golden-Vector-Konformanz gefangen (gerade **kein**
+  Schema-Datei-Gate, sondern ein Producer-Pfad-Gate). Der
   **Versions-Skew-Drift** hängt am Breaking-Bump-Rollout (§2). „Strukturell beendet"
   gilt also je Drift-Klasse zu unterschiedlichen Triggern.
 - **Kopplung wird real** und **prüfbar** (Golden Vectors aus dem Code), nicht

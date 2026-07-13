@@ -76,8 +76,10 @@ public sealed class ModbusGoldenVectorsTests
                 .Select(c => c!.AsObject())
                 .ToDictionary(c => c["register"]!.GetValue<string>());
 
-            Assert.Equal(mapping.Registers.Count, byRegister.Count);
-            foreach (var register in mapping.Registers)
+            // string registers carry no vectors by schema promise.
+            var vectorised = mapping.Registers.Where(r => r.Type != "string").ToList();
+            Assert.Equal(vectorised.Count, byRegister.Count);
+            foreach (var register in vectorised)
             {
                 var vectorCase = byRegister[register.Name];
                 Assert.Equal(register.Writable ? "write" : "read", vectorCase["direction"]!.GetValue<string>());

@@ -56,7 +56,21 @@ Verifiziert 2026-07-13 (Stand nach §5.3-Merge):
   Holding-Register-Raum (FC03 + FC06/16-Writes, kein FC04, kein
   Input-Raum). Unsichtbar, weil `modbus.simulator.json` nur
   Single-Word-Typen (int16/uint16) mit Default-Tabelle nutzt.
-- **Zwei ausgelieferte Profile, zwei verschiedene Produzenten:**
+- **Drei ausgelieferte Profile — zwei mit Produzentenpfad, eines bewusst
+  ausgeschlossen** (Implementierungs-Review-Befund 3):
+  `modbus.sunspec-simulator.json` erhält **keine** Vektoren — es spricht
+  ein fremdes Vokabular (`der_*`, `battery_soc` statt der
+  bess-ems-Feldnamen), nutzt `unit_id_discovery: "sunspec"` (der reale
+  Sink verlangt eine statische Unit-ID) und durchgängig
+  `auth_required: "network"` (der Sink verweigert) — es existiert
+  **kein** in-repo-Produzentenpfad, weder Encode-Lifting mit
+  Vertrags-Semantik noch Sink-Capture; erfundene Wert-Tabellen ohne
+  Codec-Gate wären genau das Anti-Muster dieser Suite. Konsequenz: die
+  `high_low`-Multi-Word-Deckung (das Sunspec-Profil trägt
+  `uint32`/`int32` mit Default `high_low`) bleibt auf Unit-Ebene
+  (`RegisterDecoderTests`); das Python-Gate lehnt unbekannte
+  Vektor-Manifeste ab, ein Sunspec-Manifest ist also nur **bewusst**
+  (mit eigenem Gate) nachrüstbar. Die zwei **gedeckten** Profile:
   - `modbus.simulator.json` (batterie-seitig: 9 Mess- + 2
     Schreib-Register, int16/uint16, Defaults) — Produzent ist
     `bess-field-sim` (M1-Pflichtpfad, Integrations-Roundtrip).
@@ -181,11 +195,13 @@ Verifiziert 2026-07-13 (Stand nach §5.3-Merge):
   (`0.3 / 0.1 → 2` statt 3); ohne den Write-Round-trip produzierte ein
   ungünstiger Wert kommentarlos ein in sich falsches Manifest, das
   kein Gate bemerkt (Drift-Test vergleicht nur Regenerat↔committet —
-  beide gleich falsch). Deckung ehrlich benannt (Review-Befund 3): die
-  Profil-Vektoren decken für Multi-Word-Typen nur den
-  **`low_high`**-Pfad (kein ausgeliefertes Profil hat
-  high_low-Multi-Word); der `high_low`-32-bit-Pfad bleibt auf
-  Unit-Ebene gedeckt (`RegisterDecoderTests`).
+  beide gleich falsch). Deckung ehrlich benannt (Plan-Review-Befund 3,
+  präzisiert nach Implementierungs-Review-Befund 3): die Profil-Vektoren
+  decken für Multi-Word-Typen nur den **`low_high`**-Pfad — kein
+  **gedecktes** Profil hat high_low-Multi-Word; das bewusst
+  ausgeschlossene Sunspec-Profil hätte es (Ausgangslage); der
+  `high_low`-32-bit-Pfad bleibt auf Unit-Ebene gedeckt
+  (`RegisterDecoderTests`).
 - **Akzeptanz:** beide Manifeste validieren gegen das erweiterte
   Schema; Drift-Test rot bei mutiertem Codec/Manifest (einmalig
   demonstriert); Round-trip grün für **alle** Cases beider Profile

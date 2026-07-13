@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://bess-ems.io/schema/golden-vector-manifest.json",
   "title": "Golden-vector manifest (ADR 0013 5.2 / 5.4)",
-  "description": "Structurally compared golden vectors for the published field contract. MQTT (ADR 0013 5.2): payloads embedded as JSON objects because the contract is field-normative (names/presence/types/null-omission binding; member order and whitespace are not) — one manifest per authority ('field' = lifted from the Go producer paths, 'ems' = lifted from the C# MqttJson serializer), each side regenerates only its own file. Modbus (ADR 0013 5.4): register wire images (words per address/table) lifted through the C# codec (RegisterDecoder / the real ModbusCommandSink write path) — one manifest per shipped mapping profile, both authority 'ems' (the wire layout is fully determined by profile + schema semantics; bess-ems is the contract provider), both regenerated from C#.",
+  "description": "Structurally compared golden vectors for the published field contract. MQTT (ADR 0013 5.2): payloads embedded as JSON objects because the contract is field-normative (names/presence/types/null-omission binding; member order and whitespace are not) — one manifest per authority ('field' = lifted from the Go producer paths, 'ems' = lifted from the C# MqttJson serializer), each side regenerates only its own file. Modbus (ADR 0013 5.4): register wire images (words per address/table) lifted through the C# codec (RegisterDecoder / the real ModbusCommandSink write path) — one manifest per COVERED mapping profile (the shipped SunSpec profile is deliberately out: foreign vocabulary, sunspec unit discovery, network auth — no in-repo producer path; see the 5.4 plan), authority always 'ems', regenerated from C#.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "contract", "authority", "cases"],
@@ -47,6 +47,7 @@
       "then": {
         "required": ["profile"],
         "properties": {
+          "authority": { "const": "ems" },
           "cases": { "items": { "$ref": "#/$defs/modbus_vector_case" } }
         }
       }

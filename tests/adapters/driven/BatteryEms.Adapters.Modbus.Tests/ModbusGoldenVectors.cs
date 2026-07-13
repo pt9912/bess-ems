@@ -100,6 +100,15 @@ internal static class ModbusGoldenVectors
         var cases = new JsonArray();
         foreach (var register in mapping.Registers)
         {
+            if (register.Type == "string")
+            {
+                // Schema promise: string registers carry no golden vectors
+                // (no numeric wire image; RegisterDecoder does not encode
+                // them). Review finding 7: filter here AND in the coverage
+                // test so a future string register fails loud in neither.
+                continue;
+            }
+
             var value = values[register.Name];
             var direction = register.Writable ? "write" : "read";
             var words = register.Writable

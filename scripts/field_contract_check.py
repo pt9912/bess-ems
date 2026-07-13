@@ -194,6 +194,27 @@ def modbus_profile_errors(path, instance):
                     f"{path}: case {name!r} {field}={case.get(field)!r} != profile "
                     f"{register.get(field, default)!r} (loader default applied)"
                 )
+        # Plan decision 3, second half (review finding 2): the engineering
+        # value must sit inside the profile's range — without this pin an
+        # out-of-range refresh would pass every language green.
+        value = case.get("value")
+        range_bounds = register.get("range")
+        if (
+            isinstance(value, (int, float))
+            and isinstance(range_bounds, list)
+            and len(range_bounds) == 2
+            and not range_bounds[0] <= value <= range_bounds[1]
+        ):
+            errs.append(f"{path}: case {name!r} value={value!r} outside profile range {range_bounds!r}")
+        # Word count is type-determined (review finding 6): the schema's
+        # generic 1..2 bound cannot pin it, and python is the only .NET-free
+        # gate external bundle consumers can replicate.
+        words = case.get("words")
+        expected_words = 1 if case.get("type") in ("uint16", "int16") else 2
+        if isinstance(words, list) and len(words) != expected_words:
+            errs.append(
+                f"{path}: case {name!r} carries {len(words)} words, type {case.get('type')!r} needs {expected_words}"
+            )
     return errs
 
 
@@ -304,6 +325,15 @@ def main() -> int:
         errors.append(f"{SCHEMA_DIR / VECTOR_MANIFEST_SCHEMA}: unavailable — cannot validate golden-vector manifests")
     elif VECTORS_DIR.is_dir():
         for path in sorted(VECTORS_DIR.glob("*.json")):
+            # Review finding 5: the bundle packs every vectors/*.json, but
+            # only listed manifests carry a codec/conformance gate — an
+            # unlisted file would ship published-but-ungated.
+            if path.name not in REQUIRED_VECTOR_MANIFESTS:
+                errors.append(
+                    f"{path}: vector manifest is not in REQUIRED_VECTOR_MANIFESTS — "
+                    "every published manifest needs a codec gate; add it deliberately"
+                )
+                continue
             instance = load_json(path, errors)
             if instance is None:
                 continue

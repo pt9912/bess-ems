@@ -701,6 +701,13 @@ func checkModbusCase(path string, c modbusCase, snap model.TelemetrySnapshot) er
 			ScaleFactor:   c.ScaleFactor,
 		}},
 	}
+	// The single-register mapping runs through the same structural
+	// validation the simulator applies to real fixtures (review finding 8b:
+	// notably the address+wordcount bound the server's applyWords would
+	// otherwise enforce only by silently dropping the second word).
+	if err := modbus.ValidateMapping(mapping); err != nil {
+		return fmt.Errorf("%s: case %q does not form a valid simulator mapping: %w", path, c.Name, err)
+	}
 	image := modbus.EncodeSnapshot(snap, mapping)
 	space := image.Holding
 	if c.RegisterTable == modbus.TableInput {
@@ -708,7 +715,11 @@ func checkModbusCase(path string, c modbusCase, snap model.TelemetrySnapshot) er
 	}
 	for i, want := range c.Words {
 		got, ok := space[c.Address+i]
-		if !ok || got != want {
+		if !ok {
+			return fmt.Errorf("%s: case %q word %d at address %d: simulator encoder produced no word there, vector pins %d — run the encoder against ADR 0013 §5.4 (register_table/word_order drift?)",
+				path, c.Name, i, c.Address+i, want)
+		}
+		if got != want {
 			return fmt.Errorf("%s: case %q word %d at address %d: simulator encoder produced %d, vector pins %d — run the encoder against ADR 0013 §5.4 (register_table/word_order drift?)",
 				path, c.Name, i, c.Address+i, got, want)
 		}
