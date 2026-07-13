@@ -1,21 +1,24 @@
-# Notiz: v2.2.0 Scope (Internal Refinement)
+# Notiz: Internal-Refinement-Scope (nächste freie Minor)
 
 **Status:** Planning — vor Slice-Aktivierung. Diese Notiz fixiert den
 Scope-Wurf für die nächste Minor-Version; sie ersetzt **keinen**
 Slice-Plan und wird in `done/` (nach Release) oder umgeräumt
 (falls Theme verworfen wird).
-**Umwidmung (zweifach):** ursprünglich als v1.1.0-Scope geschrieben
-(Datum 2026-05-14). Der Feldvertrag (ADR 0013, externer Trigger
-grid-gym-Kopplung) hat diese Planung zweimal überholt: §5.1 wurde —
-wegen des config-brechenden `schema_version`-Enforcements — als
-**v2.0.0** veröffentlicht (2026-07-13; eine v1.1.0 hat es nie gegeben),
-§5.2 (Golden-Vector-Suite, additiv) als **v2.1.0** (2026-07-13). Das
-Internal-Refinement-Theme zielt unverändert auf die nächste freie
-Minor, jetzt v2.2.0; Versionsbezüge im Text sind entsprechend
-umgeschrieben (v1.1.0 → v2.1.0 → v2.2.0, v1.2+ → v2.3+). Falls der
-Feldvertrag (§5.3/§5.4) erneut vorbeizieht, ist zu erwägen, diese
-Notiz versions-agnostisch zu benennen statt weiter nachzunummerieren.
-Inhaltlich ist die Notiz Stand 2026-05-14.
+**Umwidmung (jetzt versions-agnostisch):** ursprünglich als
+v1.1.0-Scope geschrieben (Datum 2026-05-14). Der Feldvertrag (ADR 0013,
+externer Trigger grid-gym-Kopplung) hat diese Planung wiederholt
+überholt: §5.1 wurde — wegen des config-brechenden
+`schema_version`-Enforcements — als **v2.0.0** veröffentlicht
+(2026-07-13; eine v1.1.0 hat es nie gegeben), §5.2 (Golden-Vector-Suite,
+additiv) als **v2.1.0** (2026-07-13); §5.3/§5.4 (SUT-Doku,
+Modbus-Vektoren) liegen auf `main` und landen im nächsten Release. Nach
+der zweiten Nachnummerierung (v1.1.0 → v2.1.0 → v2.2.0) ist die Notiz
+mit dem §5.4-Abschluss **versions-agnostisch benannt** — die Option,
+die sie selbst vorschlug. Das Theme zielt auf die **nächste freie
+Minor**; die konkrete Nummer wird erst bei Aktivierung vergeben.
+Versionsbezüge im Text sind historisch (lies „v2.2.0" als „die
+Ziel-Minor dieser Notiz", „v2.3+" als „spätere Minors"). Inhaltlich ist
+die Notiz Stand 2026-05-14.
 **Datum:** 2026-05-14
 **Theme:** Internal Refinement — Items ohne externen Anlass, die
 präventiv technischen Wert haben oder Carve-outs aus M2/M3 abräumen.

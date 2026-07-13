@@ -1,6 +1,6 @@
 # ADR 0013 — Geräte-Mappings als publizierter, versionierter Feldvertrag (SUT-Kopplung)
 
-**Status:** Accepted — §5.1–§5.3 umgesetzt; §5.4 offen. Design-first,
+**Status:** Accepted — §5.1–§5.4 umgesetzt (§5 vollständig). Design-first,
 Owner-Sign-off 2026-07-12, gezogen aus einem SUT-Kopplungs-Smoke gegen das
 Schwesterprojekt `grid-gym`. bess-ems macht seine Geräte-Mapping-Schemas
 (`config/schema/*.schema.json`) von einer internen Konfigurations-Detailebene zu
@@ -9,11 +9,12 @@ einem **publizierten, versionierten Feldvertrag**, gegen den Fremdsimulatoren
 [`LH-CONF-002`](../../../spec/lastenheft.md) (Versionierte Gerätemappings) von
 „intern versioniert" auf „extern konsumierbar". Gegenstück zu `grid-gym`s
 geplanter Feld-Server-Surface, deren Plan die bess-ems-Seite explizit diesem Repo
-zuweist. Die Umsetzung erfolgt als Folgearbeit in `docs/plan/planning/` (§5):
-§5.1 (Vertrags-Bundle + Envelope-Schema + Versionierung + `maxAge`-Stellschraube),
-§5.2 (Golden-Vector-Suite MQTT, strukturell verglichen, im Bundle publiziert) und
-§5.3 (SUT-Doku + config-only-Pfad + Compose-SUT-Variante mit Stand-in-Smoke)
-sind umgesetzt; §5.4 (Modbus-Vektoren) ist offen.
+zuweist. Die Umsetzung erfolgte als Folgearbeit in `docs/plan/planning/` (§5)
+und ist **vollständig**: §5.1 (Vertrags-Bundle + Envelope-Schema +
+Versionierung + `maxAge`-Stellschraube), §5.2 (Golden-Vector-Suite MQTT),
+§5.3 (SUT-Doku + config-only-Pfad + Compose-SUT-Variante) und §5.4
+(Modbus-Golden-Vectors je Profil + Schließung des in §1 bewiesenen
+`register_table`/`word_order`-Drifts im Simulator, dauerhaft gegated).
 **Datum:** 2026-07-12
 **Bezug:**
 
