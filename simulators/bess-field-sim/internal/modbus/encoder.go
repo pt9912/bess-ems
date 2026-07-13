@@ -2,6 +2,7 @@ package modbus
 
 import (
 	"math"
+	"sort"
 
 	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/model"
 )
@@ -77,46 +78,54 @@ func EncodeSnapshot(snap model.TelemetrySnapshot, mapping model.ModbusMapping) I
 	return image
 }
 
-func valueFor(snap model.TelemetrySnapshot, name string) (float64, bool) {
-	switch name {
-	case "soc_percent":
-		return snap.SocPercent, true
-	case "soh_percent":
-		return snap.SohPercent, true
-	case "active_power_kw":
-		return snap.ActivePowerKw, true
-	case "reactive_power_kvar":
-		return snap.ReactivePowerKvar, true
-	case "dc_voltage":
-		return snap.DcVoltage, true
-	case "dc_current":
-		return snap.DcCurrent, true
-	case "temperature_celsius":
-		return snap.TemperatureCelsius, true
-	case "available":
-		if snap.Available {
-			return 1, true
-		}
-		return 0, true
-	case "fault_status":
-		if snap.FaultStatus == "" || snap.FaultStatus == "ok" {
-			return 0, true
-		}
-		return 1, true
-	default:
-		return 0, false
+// telemetryAccessors is the SINGLE canonical name→snapshot-field mapping.
+// valueFor, isTelemetryRegister (mapping.go) and TelemetryRegisterNames all
+// derive from it — a second hand-maintained name list was exactly the
+// mirror-drift class this slice exists to end (second-review finding 1).
+func telemetryAccessors() map[string]func(model.TelemetrySnapshot) float64 {
+	return map[string]func(model.TelemetrySnapshot) float64{
+		"soc_percent":         func(s model.TelemetrySnapshot) float64 { return s.SocPercent },
+		"soh_percent":         func(s model.TelemetrySnapshot) float64 { return s.SohPercent },
+		"active_power_kw":     func(s model.TelemetrySnapshot) float64 { return s.ActivePowerKw },
+		"reactive_power_kvar": func(s model.TelemetrySnapshot) float64 { return s.ReactivePowerKvar },
+		"dc_voltage":          func(s model.TelemetrySnapshot) float64 { return s.DcVoltage },
+		"dc_current":          func(s model.TelemetrySnapshot) float64 { return s.DcCurrent },
+		"temperature_celsius": func(s model.TelemetrySnapshot) float64 { return s.TemperatureCelsius },
+		"available": func(s model.TelemetrySnapshot) float64 {
+			if s.Available {
+				return 1
+			}
+			return 0
+		},
+		"fault_status": func(s model.TelemetrySnapshot) float64 {
+			if s.FaultStatus == "" || s.FaultStatus == "ok" {
+				return 0
+			}
+			return 1
+		},
 	}
 }
 
-// TelemetryRegisterNames returns the snapshot-backed register names the
-// simulator can serve — the same set valueFor answers. Exported so the
-// golden-vector conformance check scopes itself to sim-served registers
-// without re-listing the names.
-func TelemetryRegisterNames() []string {
-	return []string{
-		"soc_percent", "soh_percent", "active_power_kw", "reactive_power_kvar",
-		"dc_voltage", "dc_current", "temperature_celsius", "available", "fault_status",
+func valueFor(snap model.TelemetrySnapshot, name string) (float64, bool) {
+	accessor, ok := telemetryAccessors()[name]
+	if !ok {
+		return 0, false
 	}
+	return accessor(snap), true
+}
+
+// TelemetryRegisterNames returns the snapshot-backed register names the
+// simulator can serve, derived from the canonical accessor map (sorted for
+// determinism). Exported so the golden-vector conformance check scopes
+// itself to sim-served registers without a second list.
+func TelemetryRegisterNames() []string {
+	accessors := telemetryAccessors()
+	names := make([]string, 0, len(accessors))
+	for name := range accessors {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func writeRegister(out map[int]uint16, addr int, typ, order string, raw float64) {

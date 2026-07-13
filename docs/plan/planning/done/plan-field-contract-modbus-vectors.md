@@ -2,7 +2,8 @@
 
 **Dokumenttyp:** Slice-Plan / done
 **Status:** Abgeschlossen am 2026-07-13 — alle 5 Sub-Slices umgesetzt
-(Plan aktiviert nach Owner-Review mit 7 Befunden + 1 Kleinigkeit; nach der
+(Plan aktiviert nach Owner-Review mit 7 Befunden + 1 Kleinigkeit — der
+asymmetrischen Write-Case-Menge, fixiert in Sub-Slice 2; nach der
 Implementierung eine Agent-Review-Runde mit 8 Befunden, alle gefixt —
 siehe Abschluss). Die ADR-0013-Status-Klausel wurde mit diesem Slice auf
 `Accepted — §5.1–§5.4 umgesetzt (§5 vollständig)` gesetzt (Stand
@@ -133,11 +134,15 @@ Verifiziert 2026-07-13 (Stand nach §5.3-Merge):
    funktioniert. Nur so gilt `Decode(Encode(v)) == v` **exakt** und der
    Vergleich bleibt strukturell (keine Toleranzen im Vertrag). Je
    Profil eine Wert-Tabelle, die **jedes** Register des Profils abdeckt
-   (auch grid_*) und dessen `range` respektiert (die MQTT-Werte
-   −250.5/−313.1 liegen z. B. außerhalb der ±100-Range des
-   Simulator-Profils). **Suite-Kohärenz mit den MQTT-§5.2-Snapshots
-   gilt deshalb nur für scale-1-Register** (soc, soh, temperature,
-   grid_*), nicht pauschal.
+   (auch grid_*) und dessen `range` respektiert (der MQTT-Wert
+   −250.5 liegt z. B. außerhalb der ±100-Range des
+   `active_power_kw`-Simulator-Registers; −313.1 passt dagegen in die
+   ±500-Range von `dc_current` und wird dort verwendet).
+   **Suite-Kohärenz mit den MQTT-§5.2-Snapshots ist nicht pauschal
+   garantiert, sondern gilt genau dort, wo der Roh-Wert exakt bleibt
+   und die Range es erlaubt** — am Endstand trifft das im
+   Simulator-Profil (scale 0.1) auf 60.5/99.0/22.0/−313.1 zu und im
+   HIL-Profil auf die scale-1-Register.
 4. **Der bewiesene Drift wird geschlossen, nicht nur dokumentiert:**
    `bess-field-sim` erhält `register_table`/`word_order` im DTO, der
    Encoder honoriert die Wortreihenfolge, der Server bekommt einen
@@ -359,8 +364,9 @@ dem Review).
 
 ## Abschluss (2026-07-13)
 
-Alle 5 Sub-Slices umgesetzt; Evidenz in **zwei Wellen** (Sub-Slice-
-Commits + Agent-Review). Das Agent-Review fand **8 Befunde, alle
+Alle 5 Sub-Slices umgesetzt; Evidenz in **drei Wellen** (Sub-Slice-
+Commits + zwei Agent-Review-Runden; die DoD-Haken zertifizieren den
+Branch-Tip nach beiden Runden). Runde 1 fand **8 Befunde, alle
 gefixt** (`1832a0f`) — die drei gewichtigsten: (1) die
 **Serving-Hälfte** des bewiesenen Drifts (FC04/Input-Raum) war von
 keinem Pflicht-Gate gedeckt — ein vertauschtes `applyWords` wäre grün
@@ -372,11 +378,27 @@ Profil** (`modbus.sunspec-simulator.json`) war schlicht übersehen — der
 Ausschluss ist jetzt begründet dokumentiert (kein in-repo-
 Produzentenpfad: fremdes Vokabular, sunspec-Discovery, network-Auth),
 die davon abhängige high_low-Multi-Word-Deckungsaussage korrigiert, und
-das Python-Gate lehnt unbekannte Vektor-Manifeste ab (publiziert-aber-
-ungegated ist unmöglich). Dazu: drei Stale-Claim-Marker im ADR
+publiziert-aber-ungegated ist zweifach verriegelt (Zweit-Review,
+Befund 2): das Python-Gate lehnt Manifeste außerhalb
+`REQUIRED_VECTOR_MANIFESTS` ab, und ein C#-Set-Gleichheits-Test pinnt
+die publizierte Modbus-Manifest-Menge an `ProfileFiles` — ein neues
+Manifest erzwingt damit mechanisch sein Codec-Gate. Dazu: drei Stale-Claim-Marker im ADR
 (§1/§5/§7, `Instanz geschlossen, Klasse Codegen-deferred`-Muster),
 `authority: ems`-Pin, Wortzahl-Pin, string-Register-Pfad,
 Diagnose-/Validierungs-Nits im Konformanz-Check.
+
+Runde 2 (Fokus Done-Record-Genauigkeit + Rest-Lücken) fand **7 Befunde,
+alle gefixt**: die Namensmenge der sim-servierten Register hat jetzt
+EINE kanonische Quelle (`telemetryAccessors`-Map, aus der `valueFor`,
+`isTelemetryRegister` und `TelemetryRegisterNames` abgeleitet sind —
+die Exportfunktion war eine dritte Hand-Kopie); der
+„ungegated-unmöglich"-Claim wurde mechanisch wahr gemacht
+(C#-Set-Gleichheits-Test) statt nur behauptet; das falsche
+Range-Beispiel und der Kohärenz-Satz in Entscheidung 3 korrigiert;
+`Decode(words)==value` ist jetzt auch im .NET-freien Python-Gate
+geprüft (extern replizierbar); CHANGELOG-Formulierung präzisiert;
+Kleinigkeit-Anker aufgelöst; Scope-Note-Formulierung auf den
+Branch-Tip-Wahrheitsstand gebracht.
 
 **Verifikations-Kommandos:** `make field-vectors-check` (Vektor- +
 Konformanz-Gate), `make field-contract-check` (Schema/Profil-Pins),

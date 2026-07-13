@@ -31,9 +31,11 @@ internal static class ModbusGoldenVectors
         "modbus.hil-simulator.json",
     };
 
+    public static string VectorsDir() =>
+        Path.Combine(RepoRoot(), "config", "schema", "vectors");
+
     public static string ManifestPath(string profileFile) =>
-        Path.Combine(RepoRoot(), "config", "schema", "vectors",
-            $"modbus-golden-vectors.{ProfileKey(profileFile)}.v1.json");
+        Path.Combine(VectorsDir(), $"modbus-golden-vectors.{ProfileKey(profileFile)}.v1.json");
 
     public static string ProfileKey(string profileFile) =>
         profileFile.Split('.')[1];

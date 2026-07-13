@@ -111,21 +111,11 @@ func validateRegister(i int, reg model.ModbusRegister) error {
 	return nil
 }
 
+// isTelemetryRegister delegates to the canonical accessor map in encoder.go
+// — one source for the sim-served name set (second-review finding 1).
 func isTelemetryRegister(name string) bool {
-	switch name {
-	case "soc_percent",
-		"soh_percent",
-		"active_power_kw",
-		"reactive_power_kvar",
-		"dc_voltage",
-		"dc_current",
-		"temperature_celsius",
-		"available",
-		"fault_status":
-		return true
-	default:
-		return false
-	}
+	_, ok := telemetryAccessors()[name]
+	return ok
 }
 
 func isSupportedRegisterType(typ string) bool {

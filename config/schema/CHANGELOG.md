@@ -46,8 +46,8 @@ Contract major stays `v1` (additive change, no mapping-file impact).
   deliberately excluded (foreign vocabulary, sunspec unit discovery,
   network auth: no in-repo producer path).
 - `vectors/modbus-golden-vectors.simulator.v1.json` and
-  `vectors/modbus-golden-vectors.hil-simulator.v1.json` — read wire
-  images for every profile register plus the EMS write images
-  (setpoints / operating mode).
+  `vectors/modbus-golden-vectors.hil-simulator.v1.json` — wire images
+  for every covered profile register: reads lifted through the codec,
+  plus the EMS write images (setpoints / operating mode).
 
 Contract major stays `v1` (additive change, no mapping-file impact).

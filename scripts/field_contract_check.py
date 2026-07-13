@@ -25,6 +25,7 @@ it needs the C# source (MqttPayloads.cs) and lives in EnvelopeSchemaTests under
 `make test`, in the same `make gates` aggregate.
 """
 import json
+import struct
 import pathlib
 import sys
 
@@ -215,7 +216,39 @@ def modbus_profile_errors(path, instance):
             errs.append(
                 f"{path}: case {name!r} carries {len(words)} words, type {case.get('type')!r} needs {expected_words}"
             )
+        # value<->words consistency, replicable without .NET (second-review
+        # finding 4): Decode(words) must equal the case value exactly — an
+        # internally inconsistent manifest must not pass the bundle gate.
+        if (
+            isinstance(words, list)
+            and len(words) == expected_words
+            and isinstance(value, (int, float))
+            and all(isinstance(w, int) for w in words)
+        ):
+            decoded = decode_words(case.get("type"), case.get("word_order"), case.get("scale_factor"), words)
+            if decoded is not None and decoded != value:
+                errs.append(f"{path}: case {name!r} Decode(words) == {decoded!r} != value {value!r}")
     return errs
+
+
+def decode_words(reg_type, word_order, scale, words):
+    """Mirror of RegisterDecoder.Decode (raw * scale in IEEE-754 double)."""
+    if reg_type == "uint16":
+        raw = words[0]
+    elif reg_type == "int16":
+        raw = words[0] - 0x10000 if words[0] >= 0x8000 else words[0]
+    elif reg_type in ("uint32", "int32", "float32"):
+        high, low = (words[1], words[0]) if word_order == "low_high" else (words[0], words[1])
+        combined = (high << 16) | low
+        if reg_type == "int32":
+            raw = combined - 0x100000000 if combined >= 0x80000000 else combined
+        elif reg_type == "float32":
+            raw = struct.unpack(">f", struct.pack(">I", combined))[0]
+        else:
+            raw = combined
+    else:
+        return None
+    return raw * scale if isinstance(scale, (int, float)) else None
 
 
 def main() -> int:

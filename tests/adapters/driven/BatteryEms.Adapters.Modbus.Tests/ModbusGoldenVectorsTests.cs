@@ -66,6 +66,26 @@ public sealed class ModbusGoldenVectorsTests
     }
 
     [Fact]
+    public void Every_published_modbus_manifest_has_a_codec_gate()
+    {
+        // Second-review finding 2: python's REQUIRED_VECTOR_MANIFESTS is a
+        // presence floor, not a codec gate — a manifest added there but not
+        // here would ship published-but-ungated. This pin makes the two
+        // sets mechanically equal: publishing a new modbus manifest REQUIRES
+        // wiring it into ProfileFiles (and thereby into drift + round-trip).
+        var published = Directory.GetFiles(ModbusGoldenVectors.VectorsDir(), "modbus-golden-vectors.*.v1.json")
+            .Select(Path.GetFileName)
+            .OrderBy(n => n, StringComparer.Ordinal)
+            .ToArray();
+        var gated = ModbusGoldenVectors.ProfileFiles
+            .Select(p => Path.GetFileName(ModbusGoldenVectors.ManifestPath(p)))
+            .OrderBy(n => n, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(gated, published);
+    }
+
+    [Fact]
     public void Case_set_covers_every_profile_register_exactly_once()
     {
         foreach (var profileFile in ModbusGoldenVectors.ProfileFiles)

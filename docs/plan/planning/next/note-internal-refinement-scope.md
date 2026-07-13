@@ -10,8 +10,8 @@ externer Trigger grid-gym-Kopplung) hat diese Planung wiederholt
 überholt: §5.1 wurde — wegen des config-brechenden
 `schema_version`-Enforcements — als **v2.0.0** veröffentlicht
 (2026-07-13; eine v1.1.0 hat es nie gegeben), §5.2 (Golden-Vector-Suite,
-additiv) als **v2.1.0** (2026-07-13); §5.3/§5.4 (SUT-Doku,
-Modbus-Vektoren) liegen auf `main` und landen im nächsten Release. Nach
+additiv) als **v2.1.0** (2026-07-13); §5.3 (SUT-Doku) liegt auf `main`; §5.4 (Modbus-Vektoren) landet mit dem
+Merge seines Slices — beides im nächsten Release. Nach
 der zweiten Nachnummerierung (v1.1.0 → v2.1.0 → v2.2.0) ist die Notiz
 mit dem §5.4-Abschluss **versions-agnostisch benannt** — die Option,
 die sie selbst vorschlug. Das Theme zielt auf die **nächste freie
