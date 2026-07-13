@@ -222,28 +222,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          version="${{ steps.tag.outputs.version }}"
-          epoch="${{ steps.tag.outputs.source_date_epoch }}"
-          case "${epoch}" in ''|*[!0-9]*) echo "source_date_epoch invalid: '${epoch}'" >&2; exit 1 ;; esac
-          # ADR 0013 §5.1: publish config/schema/*.json as a reproducible, versioned
-          # contract asset — pinned entry order/mtime/ownership + gzip -n, so the SHA256
-          # in SHA256SUMS is stable and verifiable (mirrors build-release-assets.sh).
-          pack() {
-            local stage="$1" out="$2"
-            rm -rf "${stage}"
-            mkdir -p "${stage}/schema"
-            cp config/schema/*.json config/schema/CHANGELOG.md "${stage}/schema/"
-            printf '{\n  "name": "bess-ems-device-mapping-schemas",\n  "version": "%s",\n  "schema_version": "v1",\n  "min_supported": "v1"\n}\n' "${version}" > "${stage}/schema/bundle.json"
-            tar --sort=name --mtime="@${epoch}" --owner=0 --group=0 --numeric-owner \
-              -C "${stage}" -cf - schema | gzip -n > "${out}"
-            rm -rf "${stage}"
-          }
-          bundle="artifacts/release/bess-ems-schemas-${version}.tar.gz"
-          pack "artifacts/release/.schema-stage" "${bundle}"
-          pack "artifacts/release/.schema-stage-verify" "${bundle}.verify"
-          cmp -s "${bundle}" "${bundle}.verify" || { echo "schema bundle not reproducible" >&2; exit 1; }
-          rm -f "${bundle}.verify"
-          test -f "${bundle}"
+          # ADR 0013 §5.1/§5.2: schemas + golden vectors as one reproducible
+          # contract asset. SINGLE packing path shared with `make
+          # release-assets` — scripts/pack-schema-bundle.sh. This step used to
+          # carry an inline mirror of that logic; it drifted the moment §5.2
+          # added the vectors. Keep it a script call.
+          scripts/pack-schema-bundle.sh \
+            "${{ steps.tag.outputs.version }}" \
+            "${{ steps.tag.outputs.source_date_epoch }}" \
+            "artifacts/release/bess-ems-schemas-${{ steps.tag.outputs.version }}.tar.gz"
 
       - name: Extract native library and header
         shell: bash

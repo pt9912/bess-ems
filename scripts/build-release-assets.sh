@@ -145,43 +145,12 @@ echo "[build-release-assets] generating SBOM via ${SYFT_IMAGE}"
 test -s "${sbom_file}"
 
 echo "[build-release-assets] packaging device-mapping schema bundle"
-# ADR 0013 §5.1: the config/schema/*.json set is a published, versioned contract that
-# an external field simulator generates against. Bundle it with the schema CHANGELOG
-# and a manifest carrying schema_version + min_supported (Breaking-Bump-Rollout, ADR §2).
-# Reproducible: pin entry order, mtime, and ownership, and strip the gzip header mtime
-# (gzip -n), so the SHA256 is stable run-to-run and the published checksum is verifiable.
+# ADR 0013 §5.1/§5.2: schemas + golden vectors as one reproducible contract
+# asset. Single packing path shared with the release workflow — see
+# scripts/pack-schema-bundle.sh (an inline mirror there drifted once).
 schema_bundle="${RELEASE_DIR}/bess-ems-schemas-${vbare}.tar.gz"
 SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git -C "${repo_root}" log -1 --format=%ct HEAD)}"
-# A malformed epoch makes tar --mtime="@" silently substitute a constant (warn, exit 0);
-# the cmp self-check proves determinism, not timestamp correctness, so guard it here.
-case "${SOURCE_DATE_EPOCH}" in
-  ''|*[!0-9]*)
-    echo "[build-release-assets] SOURCE_DATE_EPOCH='${SOURCE_DATE_EPOCH}' is not a positive integer epoch" >&2
-    exit 1
-    ;;
-esac
-build_schema_bundle() {
-  local stage="$1" out="$2"
-  rm -rf "${stage}"
-  mkdir -p "${stage}/schema/vectors"
-  cp config/schema/*.json config/schema/CHANGELOG.md "${stage}/schema/"
-  # ADR 0013 §5.2: the golden-vector manifests ship inside the same bundle —
-  # one field-contract artefact (schemas + acceptance vectors) per release.
-  cp config/schema/vectors/*.json "${stage}/schema/vectors/"
-  printf '{\n  "name": "bess-ems-device-mapping-schemas",\n  "version": "%s",\n  "schema_version": "v1",\n  "min_supported": "v1"\n}\n' "${vbare}" > "${stage}/schema/bundle.json"
-  tar --sort=name --mtime="@${SOURCE_DATE_EPOCH}" --owner=0 --group=0 --numeric-owner \
-    -C "${stage}" -cf - schema | gzip -n > "${out}"
-  rm -rf "${stage}"
-}
-build_schema_bundle "${RELEASE_DIR}/.schema-stage" "${schema_bundle}"
-# Prove the acceptance criterion ("reproduzierbares Release-Asset"): a second
-# independent pack from the same inputs must be byte-identical.
-build_schema_bundle "${RELEASE_DIR}/.schema-stage-verify" "${schema_bundle}.verify"
-if ! cmp -s "${schema_bundle}" "${schema_bundle}.verify"; then
-  echo "[build-release-assets] schema bundle is not reproducible (bytes differ between two packs)" >&2
-  exit 1
-fi
-rm -f "${schema_bundle}.verify"
+scripts/pack-schema-bundle.sh "${vbare}" "${SOURCE_DATE_EPOCH}" "${schema_bundle}"
 test -f "${schema_bundle}"
 
 echo "[build-release-assets] SHA256SUMS"
