@@ -13,6 +13,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.0] - 2026-07-13
+
+Device mappings become a published, versioned field contract
+(ADR 0013 §5.1). Native control kernel ABI stays at 0.3.0 (no native
+changes in this release).
+
+### Changed
+
+- **BREAKING — `schema_version` is now required on Modbus and MQTT
+  mapping files.** The configuration loader hard-rejects any
+  `modbus-mapping`/`mqtt-mapping` file without `"schema_version": "v1"`
+  (pre-check before schema validation, same pattern OPC-UA mappings
+  already enforced). **Migration:** add `"schema_version": "v1"` as a
+  top-level field to every Modbus/MQTT mapping file; all bundled
+  example mappings are already lifted.
+- Markdown docs gate migrated to `d-check` plus a host-path sensor
+  (absolute local paths in committed docs fail the gate).
+- Release workflow actions bumped to Node 24 runtimes.
+- Helm chart `bess-ems` version/appVersion 1.0.0 → 2.0.0.
+
+### Added
+
+- **MQTT telemetry envelope schema**
+  (`config/schema/mqtt-telemetry-envelope.schema.json`): the wide
+  telemetry snapshot, command and command-ack payloads are now
+  machine-readable, generated from the C# wire types
+  (`MqttPayloads.cs`) with a two-sided drift check (generated-schema
+  diff plus serializer round-trip validation) in the test gates.
+- **Versioned schema bundle as release asset**: `config/schema/` ships
+  as a reproducible `bess-ems-schemas-<version>.tar.gz` (including a
+  schema CHANGELOG and `min_supported` floor) next to chart/tarball/
+  SBOM, listed in `SHA256SUMS` — external simulators can generate
+  against the contract instead of mirroring it (ADR 0013).
+- **`make field-contract-check` gate**: Draft 2020-12 meta-validation
+  of every schema in `config/schema/` plus validation of all bundled
+  example mappings against their schemas; wired into `make gates` and
+  CI.
+- **`Bess:SnapshotMaxAge` config key**: the telemetry snapshot
+  freshness window (previously hardcoded 10 s) is configurable in both
+  the Host and Api processes; default remains `00:00:10`.
+- ADR 0013 (device mappings as published versioned field contract);
+  ADRs 0010–0012 close AR-OPEN-009/-008/-011.
+- English `README.md` (German original moved to `README.de.md`).
+
+### Security
+
+- Pin `Microsoft.OpenApi` to patched 2.7.5 (CVE-2026-49451).
+
 ## [1.0.0] - 2026-05-14
 
 First production release. Milestones M1–M6 are closed; native control

@@ -1,9 +1,18 @@
-# Notiz: v1.1.0 Scope (Internal Refinement)
+# Notiz: v2.1.0 Scope (Internal Refinement)
 
 **Status:** Planning — vor Slice-Aktivierung. Diese Notiz fixiert den
 Scope-Wurf für die nächste Minor-Version; sie ersetzt **keinen**
 Slice-Plan und wird in `done/` (nach Release) oder umgeräumt
 (falls Theme verworfen wird).
+**Umwidmung 2026-07-13:** ursprünglich als v1.1.0-Scope geschrieben
+(Datum 2026-05-14). Der Feldvertrag (ADR 0013 §5.1, externer Trigger
+grid-gym-Kopplung) hat diese Planung überholt und wurde — wegen des
+config-brechenden `schema_version`-Enforcements auf Modbus/MQTT-
+Mappings — als **v2.0.0** veröffentlicht; eine v1.1.0 hat es nie
+gegeben. Das Internal-Refinement-Theme zielt unverändert auf die
+nächste Minor, jetzt v2.1.0; Versionsbezüge im Text sind entsprechend
+umgeschrieben (v1.1.0 → v2.1.0, v1.2+ → v2.2+). Inhaltlich ist die
+Notiz Stand 2026-05-14.
 **Datum:** 2026-05-14
 **Theme:** Internal Refinement — Items ohne externen Anlass, die
 präventiv technischen Wert haben oder Carve-outs aus M2/M3 abräumen.
@@ -33,8 +42,8 @@ sauberer machen.
 
 Diese Notiz fixiert pro Kandidat:
 - die Quelle (welcher Follow-up-Eintrag)
-- den Stand „heute" vs. „nach v1.1.0"
-- ob es eine offene Entscheidung gibt, die v1.1.0 braucht
+- den Stand „heute" vs. „nach v2.1.0"
+- ob es eine offene Entscheidung gibt, die v2.1.0 braucht
 - den Aktivierungs-Pfad (eigener Slice-Plan in `open/` oder direkt
   `in-progress/`)
 
@@ -72,13 +81,13 @@ Vertrags-Anteil, nicht eine breite Feature-Fläche.
   unbeschränkt. **Scope-Erweiterung gegenüber Ursprungs-Notiz:**
   Die Originalformulierung in
   [`note-RM-M3-followups.md` Item 7](../open/note-RM-M3-followups.md)
-  nennt nur `DefaultScheduleOptimizationUseCase`. v1.1.0 zieht den
+  nennt nur `DefaultScheduleOptimizationUseCase`. v2.1.0 zieht den
   Intraday-Use-Case mit hinein, weil er dieselbe Klasse von
   Memory-Leak hat und die Closure-Definition sonst die Hälfte des
   Problems übrig lässt. Die Ursprungs-Notiz wird in derselben
   Slice-Welle nachgezogen, damit FUP-03-Closure und Followup-Note
   konsistent bleiben.
-- **Nach v1.1.0:** Geteilter Eviction-Mechanismus (LRU oder TTL)
+- **Nach v2.1.0:** Geteilter Eviction-Mechanismus (LRU oder TTL)
   mit konfigurierbarer Schwelle plus Gauge-Metrik
   `bess_optimization_lock_table_size{use_case="..."}` (Label
   unterscheidet die zwei Pfade). Implementiert entweder als eigener
@@ -300,7 +309,7 @@ Vertrags-Anteil, nicht eine breite Feature-Fläche.
   optimization-core-mtls, mqtt) — aber **kein** Smoke-Lauf fährt
   das Chart tatsächlich gegen einen Cluster (k3d/kind/minikube),
   prüft Pod-Health und tear-down.
-- **Nach v1.1.0:** Neuer Make-Target `make helm-cluster-smoke`
+- **Nach v2.1.0:** Neuer Make-Target `make helm-cluster-smoke`
   (Cluster-Tool als Slice-Plan-Entscheidung, Vorschlag k3d,
   Compose-Smoke-Vorbild). Workflow-Integration
   bewusst **nicht als blockierendes Gate**, sondern als
@@ -312,7 +321,7 @@ Vertrags-Anteil, nicht eine breite Feature-Fläche.
   worker-pro-asset** (`topology.mode=shared` plus
   `topology.mode=workerPerAsset`), jeweils Rollout-Wait,
   Health-Probe und sauberes Uninstall. Ohne beide Topologien
-  schließt v1.1.0 F-M6-03-01 nur partiell. Optionaler mTLS-
+  schließt v2.1.0 F-M6-03-01 nur partiell. Optionaler mTLS-
   Pfad nur mit Test-Secrets, falls Slice das einschließt.
 
   **Image-Strategie (Pflicht-Slice-Entscheidung):** Das Chart
@@ -338,9 +347,9 @@ Vertrags-Anteil, nicht eine breite Feature-Fläche.
      unverändert im Release-Workflow gegen den frisch gebauten
      Tag.
 
-  **Empfehlung für v1.1.0:** Strategie **(2)** Published Image,
+  **Empfehlung für v2.1.0:** Strategie **(2)** Published Image,
   weil der PR-Smoke explizit nur Chart-Installierbarkeit
-  validieren soll. Strategie (1) ist v1.2+-Erweiterung, wenn
+  validieren soll. Strategie (1) ist v2.2+-Erweiterung, wenn
   Bedarf entsteht.
 
   **Pull-Path-Pflicht (Strategie 2):** `ghcr.io/pt9912/bess-ems`
@@ -368,9 +377,9 @@ Vertrags-Anteil, nicht eine breite Feature-Fläche.
   Release-Workflow baut zwar das Image, fährt aber kein
   `helm install` gegen den frisch gebauten Tag. Diese Lücke ist
   ein separates Folge-Item (vermutlich „Release-time chart-smoke
-  gate" als neuer F-M6-03-Folge-Slice nach v1.1.0); der v1.1.0-
+  gate" als neuer F-M6-03-Folge-Slice nach v2.1.0); der v2.1.0-
   Smoke schließt sie nicht und beansprucht das auch nicht. Wer
-  in v1.1.0 Code-vs-Chart-Drift einführt, sieht es erst beim
+  in v2.1.0 Code-vs-Chart-Drift einführt, sieht es erst beim
   Operator-`helm install` — derselbe Stand wie heute.
 
   Mit Strategie (2) deckt der Path-Filter alle Inputs des
@@ -379,7 +388,7 @@ Vertrags-Anteil, nicht eine breite Feature-Fläche.
   Filtern, und nur ein verlässlich jede Nacht laufender Job
   beweist die für die Promotion geforderte Stabilitäts-Serie).
   Der Filter-Mechanismus wechselt **bei der Required-Promotion**:
-  - **v1.1.0 (Stufe 1, optionaler PR-Check):** GitHub-`paths`-
+  - **v2.1.0 (Stufe 1, optionaler PR-Check):** GitHub-`paths`-
     Filter im Workflow-Trigger. Wenn keiner der unten genannten
     Pfade berührt ist, startet der Job nicht.
   - **Ab Stufe 2 (required):** GitHub erlaubt für `required`-
@@ -425,7 +434,7 @@ Vertrags-Anteil, nicht eine breite Feature-Fläche.
 - **Slice-Plan:** `plan-RM-M6-FUP-03-01.md`.
 - **Promotion-Pfad** (explizit, damit „optional" nicht „dauerhaft
   optional" wird):
-  1. **v1.1.0:** Path-filtered PR-Check mit dem oben genannten
+  1. **v2.1.0:** Path-filtered PR-Check mit dem oben genannten
      vollständigen Filter (`deploy/helm/**` + `Makefile` +
      Workflow-Datei + ggf. `scripts/helm-cluster-smoke*`) plus
      **unconditional** nightly auf `main` (kein Path-Filter, weil
@@ -437,7 +446,7 @@ Vertrags-Anteil, nicht eine breite Feature-Fläche.
      Issue-Anlage ist **explizit nicht** Bestandteil dieses Slices —
      falls gewünscht, ist das ein eigener Folge-Slice
      (z. B. `peter-evans/create-issue-from-file` oder ähnlich),
-     der den v1.1.0-Cluster-Smoke-Scope nicht aufbläht.
+     der den v2.1.0-Cluster-Smoke-Scope nicht aufbläht.
   2. **Nach 4 Wochen ununterbrochen grünem Nightly:** Promotion
      zu `required`. **Pflicht-Begleitänderung:** Trigger wird auf
      `pull_request` ohne `paths`-Filter umgestellt und der Job
@@ -464,22 +473,22 @@ Aktivierung.**
   Domain-Primitive vorhanden (RM-M2-08), per Wire-Tests gegen die
   native `.so` validiert (RM-M3-13), aber **nicht** produktiv im
   Regelzyklus verdrahtet.
-- **Nach v1.1.0 (wenn aktiviert):** `IPidKernel`-Driven-Port plus
+- **Nach v2.1.0 (wenn aktiviert):** `IPidKernel`-Driven-Port plus
   `ManagedPidKernel`/`NativePidFallbackKernel` plus DI-Verdrahtung
   plus Replay-Parity-Fixture (`pid_cases.v1.json`).
 - **Aufwand:** ~1-2 Wochen, vergleichbar mit M3-D2.
 - **Slice-Plan:** `plan-RM-M3-D3.md` (würde direkt in `in-progress/`).
-- **Blocker (= offene Entscheidung für v1.1.0):** Ohne konkreten
+- **Blocker (= offene Entscheidung für v2.1.0):** Ohne konkreten
   Konsumenten ist die Routing-Infrastruktur Selbstzweck. Bevor
-  M3-D3 in v1.1.0 zugesagt wird, muss **einer** der folgenden
+  M3-D3 in v2.1.0 zugesagt wird, muss **einer** der folgenden
   Konsumenten definiert sein:
   - Power-Following-Use-Case (weicher Setpoint-Tracking) in
     `IControlCycleUseCase`
   - Frequency-Tracking / FCR-naher Pfad mit PI/PID-Stabilisierung
   - Ein Operator-/Customer-Use-Case, der konkret „X soll PID
     nutzen" formuliert
-- **Empfehlung:** **Erst Kandidat A + B liefern und v1.1.0 damit
-  closen.** M3-D3 in v1.2.0 oder einem späteren Release, sobald
+- **Empfehlung:** **Erst Kandidat A + B liefern und v2.1.0 damit
+  closen.** M3-D3 in v2.2.0 oder einem späteren Release, sobald
   ein Konsument materialisiert. Andernfalls bauen wir Routing-
   Infrastruktur auf Verdacht — exakt das Anti-Muster, gegen das
   ADR 0009/0011/0012 systematisch entscheiden.
@@ -505,32 +514,32 @@ zuerst Follow-up-Note bereinigen.**
   Die übrigen drei Carve-outs (Operator-Replay-CLI, Multi-Asset-
   Replay-Koordination, Compare-against-Production-Replay) sind
   vermutlich noch offen, müssen aber gegen RM-M5-04-Output
-  gegengeprüft werden, bevor sie als „v1.1.0-Kandidat" oder
+  gegengeprüft werden, bevor sie als „v2.1.0-Kandidat" oder
   „weiterhin offen" qualifiziert werden können.
-- **Empfehlung für v1.1.0:** **Aus Scope**, plus vorgelagerter
+- **Empfehlung für v2.1.0:** **Aus Scope**, plus vorgelagerter
   Mini-Task: **Followup-Note `note-RM-M3-followups.md` Item 8
   vor jeder weiteren Scope-Entscheidung an den RM-M5-04-Lieferstand
   anpassen** (was bleibt offen, was ist geschlossen). Diese
   Bereinigung passt eher in eine separate „Source-Note-Refresh"-
-  Welle als in den v1.1.0-Slice-Strang; sie ist die Voraussetzung,
-  damit Kandidat D in v1.2+ überhaupt sauber bewertet werden kann.
+  Welle als in den v2.1.0-Slice-Strang; sie ist die Voraussetzung,
+  damit Kandidat D in v2.2+ überhaupt sauber bewertet werden kann.
 
 ---
 
-## Empfohlener v1.1.0-Scope (Stand 2026-05-14)
+## Empfohlener v2.1.0-Scope (Stand 2026-05-14)
 
 | Item | Kandidat | Entscheidung |
 | ---- | -------- | ------------ |
 | RM-M3-FUP-03 Lock-Eviction (beide Use Cases) | A | **In Scope** — präventiv, deckt beide unbounded `_locks`-Tabellen ab |
 | F-M6-03-01 Cluster-Smoke (path-filtered + nightly, kein Gate) | B | **In Scope** — klein, deckt Lücke ab; Promotion zu Gate über mehrere Releases |
-| M3-D3 PID-Routing               | C | **Aus Scope** — braucht Konsumenten-Entscheidung; v1.2+ |
+| M3-D3 PID-Routing               | C | **Aus Scope** — braucht Konsumenten-Entscheidung; v2.2+ |
 | M3-FUP-04 Replay-Carve-outs     | D | **Aus Scope** — Source-Note zuerst refreshen (RM-M5-04 hat den JSON-Loader bereits geliefert); verbleibende Varianten danach trigger-getrieben |
 
-**Geschätzte Größe v1.1.0:** ~7-9 PT (Kandidat A 4-5 PT, Kandidat B
+**Geschätzte Größe v2.1.0:** ~7-9 PT (Kandidat A 4-5 PT, Kandidat B
 3-4 PT) plus Release-Vorbereitung gemäß `releasing.md` §2 — knapp
 zwei Arbeitswochen Brutto.
 
-**SemVer-Begründung:** Minor (v1.0.x → v1.1.0), weil **drei**
+**SemVer-Begründung:** Minor (v2.0.x → v2.1.0), weil **drei**
 additive Änderungen kommen:
 - Lock-Eviction-Konfiguration in beiden Optimization-Use-Cases.
 - Optionaler Cluster-Smoke (CI/Workflow-Erweiterung).
@@ -547,10 +556,10 @@ das ist die Definition von additiv.
 
 ---
 
-## Out of Scope (bewusst nicht in v1.1.0)
+## Out of Scope (bewusst nicht in v2.1.0)
 
 Diese Items sind weiterhin trigger-getrieben dokumentiert; ein
-Drift in v1.1.0 wäre Anti-Muster:
+Drift in v2.1.0 wäre Anti-Muster:
 
 - **OIDC/mTLS** (AR-OPEN-007 Folge-ADR) — wartet auf konkretes
   Production-Deployment
@@ -600,7 +609,7 @@ Drift in v1.1.0 wäre Anti-Muster:
    (folgt der App-Version), `version` konsistent erhöhen
    (voraussichtlich ebenfalls `1.1.0`, weil das Chart keine
    eigenen Änderungen unabhängig von der App hat). Per
-   `releasing.md` §1 dürfen `version` und `appVersion` ab v1.1.0
+   `releasing.md` §1 dürfen `version` und `appVersion` ab v2.1.0
    divergieren — für diese spezifische Minor ist Synchronisierung
    aber die naheliegende Wahl.
 6. **Pflicht-Voraussetzungen vor Tag** durchgehen
@@ -610,19 +619,19 @@ Drift in v1.1.0 wäre Anti-Muster:
    - `make lock-refresh` produziert zero-diff.
    - `make helm-lint` grün.
    - Native-ABI-Bump prüfen: hat sich `native/battery_control_core/`
-     verändert? (Für v1.1.0 unwahrscheinlich, weil Kandidaten A+B
+     verändert? (Für v2.1.0 unwahrscheinlich, weil Kandidaten A+B
      den Native-Kernel nicht anfassen — verifizieren!)
    - `docs/plan/planning/open/note-RM-M*-followups.md`-Scan: kein
-     Eintrag durch v1.1.0-Auslieferung zwingend getriggert.
-7. **`make release-assets VERSION=v1.1.0`** lokale Trockenübung
+     Eintrag durch v2.1.0-Auslieferung zwingend getriggert.
+7. **`make release-assets VERSION=v2.1.0`** lokale Trockenübung
    (`releasing.md` §7 — produziert die 7 Asset-Dateien, ohne Push).
    Dieser Schritt **ersetzt nicht** Punkt 6; er ist eine zusätzliche
    Sanity-Übung der Asset-Pipeline.
 8. **Tag setzen** (`releasing.md` §3): annotierter Tag
-   `git tag -a v1.1.0 -m "..."` plus `git push origin v1.1.0`.
+   `git tag -a v2.1.0 -m "..."` plus `git push origin v2.1.0`.
    Release-Workflow auf GitHub beobachten.
 9. **Diese Notiz** nach `done/` (analog zu wie Slice-Pläne nach
-   Abschluss umziehen) oder löschen, falls v1.1.0-Scope sich noch
+   Abschluss umziehen) oder löschen, falls v2.1.0-Scope sich noch
    verschiebt.
 
 ---
@@ -640,6 +649,6 @@ Drift in v1.1.0 wäre Anti-Muster:
    verleiten.
 3. **Cluster-Smoke-Tool** für F-M6-03-01 (Vorschlag: k3d).
 4. **Cluster-Smoke-Promotion-Pfad** bestätigen: path-filtered
-   optional + nightly in v1.1.0 → PR-required (mit Sentinel-Skip-
+   optional + nightly in v2.1.0 → PR-required (mit Sentinel-Skip-
    Check und Trigger-Wechsel zu allen PRs) nach 4 Wochen grün →
    `make ci`-Aufnahme nach weiteren 4 Wochen.
