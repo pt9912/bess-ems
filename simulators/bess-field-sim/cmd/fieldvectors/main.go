@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/pt9912/bess-ems/simulators/bess-field-sim/internal/model"
@@ -37,11 +38,12 @@ const (
 	// the C# correlation harness (plan sub-slice 3), not just by convention.
 	nominalCommandID = "cmd-golden-nominal"
 
-	manifestVersion   = "golden-vector-manifest.v1"
-	fieldManifestName = "mqtt-golden-vectors.field.v1.json"
-	emsManifestName   = "mqtt-golden-vectors.ems.v1.json"
-	defaultMapping    = "config/examples/adapters/mqtt.simulator.json"
-	defaultVectorsDir = "config/schema/vectors"
+	manifestVersion    = "golden-vector-manifest.v1"
+	fieldManifestName  = "mqtt-golden-vectors.field.v1.json"
+	emsManifestName    = "mqtt-golden-vectors.ems.v1.json"
+	defaultMapping     = "config/examples/adapters/mqtt.simulator.json"
+	defaultVectorsDir  = "config/schema/vectors"
+	envelopeSchemaPath = "config/schema/mqtt-telemetry-envelope.schema.json"
 )
 
 type vectorCase struct {
@@ -115,15 +117,29 @@ func buildFieldManifest(mappingPath string) (manifest, error) {
 		}
 	}
 
+	// Every input pins the EXACT emitted message set: a new producer branch
+	// (payloadFor emitting on a further topic) must fail here with "add a
+	// golden case", never fall out of the manifest silently. The nominal and
+	// charging inputs also pin the fault suppression (no fault message for
+	// fault_status "ok").
 	nominal, err := resolveByName(nominalSnapshot(), mapping, topics)
+	if err == nil {
+		err = assertEmittedExactly(nominal, []string{"telemetry", "status"}, "nominal")
+	}
 	if err != nil {
 		return manifest{}, err
 	}
 	charging, err := resolveByName(chargingSnapshot(), mapping, topics)
+	if err == nil {
+		err = assertEmittedExactly(charging, []string{"telemetry", "status"}, "charging")
+	}
 	if err != nil {
 		return manifest{}, err
 	}
 	faulted, err := resolveByName(faultedSnapshot(), mapping, topics)
+	if err == nil {
+		err = assertEmittedExactly(faulted, []string{"telemetry", "status", "fault"}, "faulted")
+	}
 	if err != nil {
 		return manifest{}, err
 	}
@@ -178,12 +194,28 @@ func resolveByName(snap model.TelemetrySnapshot, mapping model.MqttMapping, topi
 	return out, nil
 }
 
-// assembleFieldCases turns the resolved producer output into the fixed case
-// set and enforces the emission invariants (fault suppression, presence).
-func assembleFieldCases(topics map[string]topicInfo, nominal, charging, faulted map[string]mqtt.Resolved) ([]vectorCase, error) {
-	if _, leaked := nominal["fault"]; leaked {
-		return nil, errors.New(`producer emitted a fault message for fault_status "ok" — suppression contract broken`)
+// assertEmittedExactly fails on BOTH a missing and an extra producer message
+// for the given input, so the golden cases always cover the full emitted
+// surface (review finding 5).
+func assertEmittedExactly(set map[string]mqtt.Resolved, want []string, input string) error {
+	wanted := make(map[string]bool, len(want))
+	for _, name := range want {
+		wanted[name] = true
+		if _, ok := set[name]; !ok {
+			return fmt.Errorf("producer emitted no %q message for the %s snapshot", name, input)
+		}
 	}
+	for name := range set {
+		if !wanted[name] {
+			return fmt.Errorf("producer emitted an unexpected %q message for the %s snapshot — add a golden case for it (or the suppression contract broke)", name, input)
+		}
+	}
+	return nil
+}
+
+// assembleFieldCases turns the resolved producer output into the fixed case
+// set (the emission invariants are already enforced by assertEmittedExactly).
+func assembleFieldCases(topics map[string]topicInfo, nominal, charging, faulted map[string]mqtt.Resolved) ([]vectorCase, error) {
 	need := func(set map[string]mqtt.Resolved, name, input string) (mqtt.Resolved, error) {
 		r, ok := set[name]
 		if !ok {
@@ -250,15 +282,11 @@ func fromResolved(name, topicName string, r mqtt.Resolved, description string) v
 	}
 }
 
-// ackPayload marshals the same struct the CommandHandler publishes
-// (internal/mqtt/commands.go), with a deterministic clock value.
+// ackPayload lifts the ack through the same policy constructor the
+// CommandHandler publishes (mqtt.AcceptedEcho — review finding 6: the policy
+// VALUES are shared code now, not a hand mirror), with a deterministic clock.
 func ackPayload() (json.RawMessage, error) {
-	ack := model.CommandAck{
-		CommandID:    nominalCommandID,
-		Accepted:     true,
-		DispatchedAt: time.Unix(0, 0).UTC(),
-		Reason:       "accepted",
-	}
+	ack := mqtt.AcceptedEcho(nominalCommandID, time.Unix(0, 0).UTC())
 	body, err := json.Marshal(ack)
 	if err != nil {
 		return nil, fmt.Errorf("marshal command ack: %w", err)
@@ -381,11 +409,15 @@ func reportDrift(committedRaw []byte, fresh manifest) {
 
 // checkEmsManifest decodes every command payload of the ems-authority
 // manifest through the simulator's model.Command — proving the field side
-// consumes what the EMS produces (plan sub-slice 4). Timestamps decode the
-// C# serializer's `+00:00` RFC 3339 offset form; the WhenWritingNull-dropped
-// reactive_power_kvar must land as a nil pointer. The negative direction
-// (missing command_id → CommandHandler drops the message without an ACK) is
-// pinned by internal/mqtt/commands_test.go and not duplicated here.
+// consumes what the EMS produces (plan sub-slice 4). Beyond decoding it pins
+// (review finding 3): every payload key maps to a model.Command json tag
+// (catches renamed AND added EMS fields after a vector refresh), the
+// envelope's command `required` set is present, and the core values survive
+// the round-trip (a rename like asset_id→assetId would otherwise decode to a
+// silent zero value). Timestamps cover the C# `+00:00` RFC 3339 offset form;
+// the WhenWritingNull-dropped reactive_power_kvar must land as a nil pointer.
+// The negative direction (missing command_id → CommandHandler drops the
+// message without an ACK) is pinned by internal/mqtt/commands_test.go.
 func checkEmsManifest(path string) error {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -398,12 +430,17 @@ func checkEmsManifest(path string) error {
 	if m.Authority != "ems" {
 		return fmt.Errorf("%s declares authority %q, want \"ems\"", path, m.Authority)
 	}
+	required, err := envelopeCommandRequired()
+	if err != nil {
+		return err
+	}
+	known := commandWireKeys()
 	commands := 0
 	for _, c := range m.Cases {
 		if c.TopicName != "command" || c.Payload == nil {
 			continue
 		}
-		if err := checkCommandCase(c); err != nil {
+		if err := checkCommandCase(c, known, required); err != nil {
 			return err
 		}
 		commands++
@@ -415,34 +452,107 @@ func checkEmsManifest(path string) error {
 	return nil
 }
 
-func checkCommandCase(c vectorCase) error {
+func checkCommandCase(c vectorCase, known map[string]bool, required []string) error {
 	var cmd model.Command
 	if err := json.Unmarshal(c.Payload, &cmd); err != nil {
 		return fmt.Errorf("case %q: payload does not decode into model.Command: %w", c.Name, err)
-	}
-	if cmd.CommandID == "" {
-		return fmt.Errorf("case %q: command_id is empty — the CommandHandler would drop it without an ACK", c.Name)
-	}
-	modes := map[string]bool{"Stop": true, "Charge": true, "Discharge": true, "Idle": true}
-	if !modes[cmd.Mode] {
-		return fmt.Errorf("case %q: mode %q is outside the documented wire vocabulary", c.Name, cmd.Mode)
-	}
-	sources := map[string]bool{"Schedule": true, "Operator": true, "RegelLeistung": true, "Safety": true, "Optimization": true, "Fallback": true}
-	if !sources[cmd.Source] {
-		return fmt.Errorf("case %q: source %q is outside the documented wire vocabulary", c.Name, cmd.Source)
-	}
-	if cmd.Timestamp.IsZero() || cmd.ValidUntil.IsZero() {
-		return fmt.Errorf("case %q: timestamp/valid_until did not decode as RFC 3339", c.Name)
 	}
 	var probe map[string]json.RawMessage
 	if err := json.Unmarshal(c.Payload, &probe); err != nil {
 		return fmt.Errorf("case %q: payload does not probe as an object: %w", c.Name, err)
 	}
-	_, present := probe["reactive_power_kvar"]
-	if present != (cmd.ReactivePowerKvar != nil) {
-		return fmt.Errorf("case %q: reactive_power_kvar presence (%t) does not round into the pointer field (nil=%t)", c.Name, present, cmd.ReactivePowerKvar == nil)
+	if err := checkCommandKeys(c.Name, probe, known, required); err != nil {
+		return err
+	}
+	return checkCommandValues(c.Name, cmd, probe)
+}
+
+func checkCommandKeys(name string, probe map[string]json.RawMessage, known map[string]bool, required []string) error {
+	for key := range probe {
+		if !known[key] {
+			return fmt.Errorf("case %q: payload key %q has no model.Command field — the field consumer would drop it silently", name, key)
+		}
+	}
+	for _, key := range required {
+		if _, ok := probe[key]; !ok {
+			return fmt.Errorf("case %q: envelope-required command key %q is missing from the payload", name, key)
+		}
 	}
 	return nil
+}
+
+func checkCommandValues(name string, cmd model.Command, probe map[string]json.RawMessage) error {
+	if cmd.CommandID == "" {
+		return fmt.Errorf("case %q: command_id is empty — the CommandHandler would drop it without an ACK", name)
+	}
+	if cmd.AssetID != assetID {
+		return fmt.Errorf("case %q: asset_id decoded to %q, want %q — a renamed wire field decodes to a silent zero value", name, cmd.AssetID, assetID)
+	}
+	if cmd.ActivePowerKw == 0 {
+		return fmt.Errorf("case %q: active_power_kw decoded to 0 — golden commands carry non-zero power so a dropped field is visible", name)
+	}
+	if cmd.Reason == "" {
+		return fmt.Errorf("case %q: reason decoded to empty", name)
+	}
+	if !vocab(model.WireModes())[cmd.Mode] {
+		return fmt.Errorf("case %q: mode %q is outside the wire vocabulary %v", name, cmd.Mode, model.WireModes())
+	}
+	if !vocab(model.WireSources())[cmd.Source] {
+		return fmt.Errorf("case %q: source %q is outside the wire vocabulary %v", name, cmd.Source, model.WireSources())
+	}
+	if cmd.Timestamp.IsZero() || cmd.ValidUntil.IsZero() {
+		return fmt.Errorf("case %q: timestamp/valid_until did not decode as RFC 3339", name)
+	}
+	_, present := probe["reactive_power_kvar"]
+	if present != (cmd.ReactivePowerKvar != nil) {
+		return fmt.Errorf("case %q: reactive_power_kvar presence (%t) does not round into the pointer field (nil=%t)", name, present, cmd.ReactivePowerKvar == nil)
+	}
+	return nil
+}
+
+func vocab(entries []string) map[string]bool {
+	set := make(map[string]bool, len(entries))
+	for _, entry := range entries {
+		set[entry] = true
+	}
+	return set
+}
+
+// commandWireKeys reflects the json tag names off model.Command — the
+// authoritative Go-side key set, never hand-listed.
+func commandWireKeys() map[string]bool {
+	commandType := reflect.TypeOf(model.Command{})
+	keys := make(map[string]bool, commandType.NumField())
+	for i := range commandType.NumField() {
+		tag := commandType.Field(i).Tag.Get("json")
+		name, _, _ := strings.Cut(tag, ",")
+		if name != "" && name != "-" {
+			keys[name] = true
+		}
+	}
+	return keys
+}
+
+// envelopeCommandRequired reads the published envelope schema's command
+// `required` set — lifted from the contract artefact, not re-listed here.
+func envelopeCommandRequired() ([]string, error) {
+	raw, err := os.ReadFile(envelopeSchemaPath)
+	if err != nil {
+		return nil, fmt.Errorf("read envelope schema: %w", err)
+	}
+	var envelope struct {
+		Defs map[string]struct {
+			Required []string `json:"required"`
+		} `json:"$defs"`
+	}
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return nil, fmt.Errorf("parse envelope schema: %w", err)
+	}
+	command, ok := envelope.Defs["command"]
+	if !ok || len(command.Required) == 0 {
+		return nil, fmt.Errorf("%s carries no $defs.command.required set", envelopeSchemaPath)
+	}
+	return command.Required, nil
 }
 
 func caseIndex(cases []vectorCase) map[string]vectorCase {

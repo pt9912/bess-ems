@@ -111,12 +111,7 @@ func (h *CommandHandler) handle(ctx context.Context, topic string, payload []byt
 			"topic", topic)
 		return
 	}
-	ack := model.CommandAck{
-		CommandID:    cmd.CommandID,
-		Accepted:     true,
-		DispatchedAt: h.clock(),
-		Reason:       "accepted",
-	}
+	ack := AcceptedEcho(cmd.CommandID, h.clock())
 	body, err := json.Marshal(ack)
 	if err != nil {
 		h.logger.Error("mqtt: encode ack",
@@ -126,6 +121,20 @@ func (h *CommandHandler) handle(ctx context.Context, topic string, payload []byt
 	if err := h.client.Publish(ctx, h.ackTopic, h.ackRetained, body); err != nil {
 		h.logger.Error("mqtt: publish ack",
 			"command_id", cmd.CommandID, "error", err)
+	}
+}
+
+// AcceptedEcho is the always-accepted ACK policy (SIM-M1-11) the
+// CommandHandler publishes. Exported so the golden-vector generator lifts
+// the SAME policy values instead of hand-mirroring them (ADR 0013 §5.2):
+// if this policy changes, the committed ack vector drifts and the
+// field-vectors gate goes red.
+func AcceptedEcho(commandID string, dispatchedAt time.Time) model.CommandAck {
+	return model.CommandAck{
+		CommandID:    commandID,
+		Accepted:     true,
+		DispatchedAt: dispatchedAt,
+		Reason:       "accepted",
 	}
 }
 

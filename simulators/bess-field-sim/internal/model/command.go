@@ -26,6 +26,19 @@ type Command struct {
 	Source            string    `json:"source,omitempty"`
 }
 
+// WireModes returns the Mode wire vocabulary — the .NET enum names
+// System.Text.Json's JsonStringEnumConverter emits (see the Command doc
+// comment above). Single Go-side source: consumers (e.g. the golden-vector
+// consumption check) must reference this instead of re-listing the strings.
+func WireModes() []string {
+	return []string{"Stop", "Charge", "Discharge", "Idle"}
+}
+
+// WireSources returns the Source wire vocabulary; same contract as WireModes.
+func WireSources() []string {
+	return []string{"Schedule", "Operator", "RegelLeistung", "Safety", "Optimization", "Fallback"}
+}
+
 // CommandAck is the acknowledgment payload the simulator publishes on
 // the EMS-`subscribe` command_ack topic. SIM-M1-11 specifies an
 // always-accepted echo ACK so the EMS adapter can validate Correlation
