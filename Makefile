@@ -203,9 +203,12 @@ field-vectors-check:
 	$(DOCKER_BUILD) --target field-vectors-check -t $(IMAGE_PREFIX)-field-vectors-check:latest
 
 # Regenerate the committed field-vector manifest after a deliberate producer
-# change; review the diff before committing.
+# change; review the diff before committing. BuildKit's local export creates
+# the destination directory 0700, which the containerized docs-check (other
+# UID) cannot enter — restore world-readable perms after every export.
 field-vectors-refresh:
 	$(DOCKER_BUILD) --target field-vectors-refresh --output type=local,dest=config/schema/vectors
+	chmod 755 config/schema/vectors
 
 # --- Welle 1 (active) ------------------------------------------------------
 
