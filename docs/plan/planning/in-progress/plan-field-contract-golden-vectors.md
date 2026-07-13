@@ -1,7 +1,10 @@
 # Plan: Golden-Vector-Suite MQTT (ADR 0013 §5.2)
 
-**Dokumenttyp:** Slice-Plan / next
-**Status:** Draft — vor Aktivierung (Review + Scope-Bestätigung ausstehend).
+**Dokumenttyp:** Slice-Plan / in-progress
+**Status:** In Progress — aktiviert 2026-07-13 nach Owner-Review (4 Befunde
+eingearbeitet: Repo-Root-Gate-Topologie, Key-Set-Gleichheit beidseitig,
+gate-geprüfte Echo-Kopplung, `REQUIRED_SCHEMAS`/Coverage-Hinweis). Branch
+`impl-field-contract-5.2`.
 **Datum:** 2026-07-13
 **Quelle:** [`../../adr/0013-device-mapping-field-contract.md`](../../adr/0013-device-mapping-field-contract.md) §5.2
 **Bezug:**
