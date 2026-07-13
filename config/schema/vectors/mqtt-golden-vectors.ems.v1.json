@@ -1,0 +1,44 @@
+{
+  "schema_version": "golden-vector-manifest.v1",
+  "contract": "mqtt",
+  "authority": "ems",
+  "cases": [
+    {
+      "name": "command-nominal",
+      "topic_name": "command",
+      "direction": "publish",
+      "topic": "battery/asset-1/command",
+      "retained": false,
+      "description": "Full command as the EMS dispatches it; command_id is echoed by the command_ack case of the field manifest.",
+      "payload": {
+        "command_id": "cmd-golden-nominal",
+        "timestamp": "1970-01-01T00:00:00+00:00",
+        "asset_id": "asset-1",
+        "mode": "Charge",
+        "active_power_kw": -25.5,
+        "reactive_power_kvar": 12.5,
+        "valid_until": "1970-01-01T00:01:00+00:00",
+        "reason": "schedule-dispatch",
+        "source": "Schedule"
+      }
+    },
+    {
+      "name": "command-no-reactive-power",
+      "topic_name": "command",
+      "direction": "publish",
+      "topic": "battery/asset-1/command",
+      "retained": false,
+      "description": "reactive_power_kvar is null and WhenWritingNull drops the member entirely: the field must not appear on the wire.",
+      "payload": {
+        "command_id": "cmd-golden-no-reactive",
+        "timestamp": "1970-01-01T00:00:00+00:00",
+        "asset_id": "asset-1",
+        "mode": "Discharge",
+        "active_power_kw": 25,
+        "valid_until": "1970-01-01T00:01:00+00:00",
+        "reason": "operator-dispatch",
+        "source": "Operator"
+      }
+    }
+  ]
+}
