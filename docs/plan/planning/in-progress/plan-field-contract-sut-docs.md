@@ -1,7 +1,10 @@
 # Plan: SUT-Doku + config-only-Pfad (ADR 0013 §5.3)
 
-**Dokumenttyp:** Slice-Plan / next
-**Status:** Draft — vor Aktivierung (Review + Scope-Bestätigung ausstehend).
+**Dokumenttyp:** Slice-Plan / in-progress
+**Status:** In Progress — aktiviert 2026-07-13 nach drei Owner-Review-Runden
+(u. a. Grün-Kriterium auf `Control cycle emitted command` korrigiert,
+`LH-PROT-002`-Fehlzitation dreistellig im Korrektur-Scope, Netz-Kopplung
+via shared external Network fixiert). Branch `impl-field-contract-5.3`.
 **Datum:** 2026-07-13
 **Quelle:** [`../../adr/0013-device-mapping-field-contract.md`](../../adr/0013-device-mapping-field-contract.md) §5.3
 **Bezug:**
