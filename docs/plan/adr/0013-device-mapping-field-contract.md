@@ -1,6 +1,6 @@
 # ADR 0013 — Geräte-Mappings als publizierter, versionierter Feldvertrag (SUT-Kopplung)
 
-**Status:** Accepted — §5.1 umgesetzt; §5.2–§5.4 offen. Design-first,
+**Status:** Accepted — §5.1–§5.2 umgesetzt; §5.3–§5.4 offen. Design-first,
 Owner-Sign-off 2026-07-12, gezogen aus einem SUT-Kopplungs-Smoke gegen das
 Schwesterprojekt `grid-gym`. bess-ems macht seine Geräte-Mapping-Schemas
 (`config/schema/*.schema.json`) von einer internen Konfigurations-Detailebene zu
@@ -11,8 +11,8 @@ einem **publizierten, versionierten Feldvertrag**, gegen den Fremdsimulatoren
 geplanter Feld-Server-Surface, deren Plan die bess-ems-Seite explizit diesem Repo
 zuweist. Die Umsetzung erfolgt als Folgearbeit in `docs/plan/planning/` (§5):
 §5.1 (Vertrags-Bundle + Envelope-Schema + Versionierung + `maxAge`-Stellschraube)
-ist umgesetzt; §5.2 (Golden-Vektoren), §5.3 (SUT-Doku) und §5.4 (Modbus-Vektoren)
-sind offen.
+und §5.2 (Golden-Vector-Suite MQTT, strukturell verglichen, im Bundle publiziert)
+sind umgesetzt; §5.3 (SUT-Doku) und §5.4 (Modbus-Vektoren) sind offen.
 **Datum:** 2026-07-12
 **Bezug:**
 

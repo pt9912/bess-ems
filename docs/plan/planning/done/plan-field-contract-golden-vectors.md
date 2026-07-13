@@ -1,9 +1,11 @@
 # Plan: Golden-Vector-Suite MQTT (ADR 0013 §5.2)
 
-**Dokumenttyp:** Slice-Plan / in-progress
-**Status:** In Progress — aktiviert 2026-07-13 nach Owner-Review (4 Befunde
-eingearbeitet: Repo-Root-Gate-Topologie, Key-Set-Gleichheit beidseitig,
-gate-geprüfte Echo-Kopplung, `REQUIRED_SCHEMAS`/Coverage-Hinweis). Branch
+**Dokumenttyp:** Slice-Plan / done
+**Status:** Abgeschlossen am 2026-07-13 — alle 5 Sub-Slices umgesetzt
+(Plan-Review: 4 Befunde vorab eingearbeitet; Implementierungs-Review:
+9 Befunde, 8 gefixt + 1 dokumentiert akzeptiert, siehe Abschluss),
+`make gates` voll grün. ADR 0013 trägt
+`Accepted — §5.1–§5.2 umgesetzt; §5.3–§5.4 offen`. Umgesetzt auf Branch
 `impl-field-contract-5.2`.
 **Datum:** 2026-07-13
 **Quelle:** [`../../adr/0013-device-mapping-field-contract.md`](../../adr/0013-device-mapping-field-contract.md) §5.2
@@ -351,11 +353,43 @@ Verifiziert 2026-07-13 (Stand v2.0.0):
 
 ## Definition of Done (DoD)
 
-- [ ] Sub-Slice 1 — Manifest-Schema + `vectors/`-Ablage + CHANGELOG.
-- [ ] Sub-Slice 2 — Feld-Vektoren + Generator + Go-Drift-Gate + Refresh-Target.
-- [ ] Sub-Slice 3 — EMS-Vektoren + C#-Drift-Gate + Feld-Vektor-Konsum-Tests.
-- [ ] Sub-Slice 4 — Go-Konsum-Test der EMS-Vektoren.
-- [ ] Sub-Slice 5 — Bundle + `field-contract-check`-Erweiterung.
-- [ ] Alle Akzeptanzkriterien erfüllt; `make gates` voll grün.
-- [ ] ADR 0013 Status-Klausel auf
+- [x] Sub-Slice 1 — Manifest-Schema + `vectors/`-Ablage + CHANGELOG. (`5cdbf42`)
+- [x] Sub-Slice 2 — Feld-Vektoren + Generator + Go-Drift-Gate + Refresh-Target. (`3f1f813`; Perms-Fix des `--output`-Exports separat)
+- [x] Sub-Slice 3 — EMS-Vektoren + C#-Drift-Gate + Feld-Vektor-Konsum-Tests. (`0b54f84`)
+- [x] Sub-Slice 4 — Go-Konsum-Test der EMS-Vektoren. (`802897a`; verschärft im Review-Fix)
+- [x] Sub-Slice 5 — Bundle + `field-contract-check`-Erweiterung. (Sub-Slice-Commit + Review-Fix 1: Single-Pack-Pfad `scripts/pack-schema-bundle.sh` für `make release-assets` UND `release.yml`)
+- [x] Alle Akzeptanzkriterien erfüllt; `make gates` voll grün (inkl. neuem Pflicht-Gate `field-vectors-check` in gates, ci und `build.yml`).
+- [x] ADR 0013 Status-Klausel auf
       `Accepted — §5.1–§5.2 umgesetzt; §5.3–§5.4 offen` aktualisiert.
+
+---
+
+## Abschluss (2026-07-13)
+
+Alle 5 Sub-Slices umgesetzt und in einer adversarischen Review-Runde (per
+Agent) geprüft: **9 Befunde, 8 gefixt**, je einzeln verifiziert —
+darunter zwei gewichtige: (1) der Release-Workflow packte das Schema-Bundle
+über einen Inline-Mirror **ohne** `schema/vectors/` (behoben durch den
+gemeinsamen Pack-Pfad `scripts/pack-schema-bundle.sh` für beide Aufrufer);
+(2) `field-vectors-check` fehlte in der gehosteten CI (`build.yml`,
+explizite `run_gate`-Liste). Dazu Härtungen: EMS-Konsum-Check pinnt
+Key-Set (Reflection über `model.Command`-Tags) + Envelope-`required` +
+Kernwerte; exakte Emissions-Menge je Input-Snapshot; Ack-Policy über
+`mqtt.AcceptedEcho` geteilt statt hand-gespiegelt; Ack-Blindfleck
+`dispatched_at` beidseitig geschlossen (C# + Python, generalisierte
+Payload-Checks); Echo-Roundtrip pinnt Sink-Topic/Retained;
+Wire-Vokabular einfach verankert (`model.WireModes/WireSources`).
+
+**Befund 9 — dokumentiert akzeptiert:** die Rot-Demonstrationen der Gates
+(oneOf-Ausschluss, Drift-Richtungen, Python-Fehlermodi) sind einmalig
+durchgeführt und in den Commit-Messages festgehalten — plan-konform
+(„einmalig demonstriert"); ein repo-persistenter Negativ-Fixture-Selbsttest
+wäre eine mögliche §5.4-Beigabe, wird hier nicht stillschweigend nachgeschoben.
+
+Betriebs-Nebenbefund: BuildKit-`--output` legt das Export-Verzeichnis mit
+`0700` an — `field-vectors-refresh` stellt die Permissions seither selbst
+wieder her (docs-check-Kompatibilität).
+
+**Verifikations-Kommandos:** `make gates` (voll), `make field-vectors-check`
+(nur Vektor-Gate), `make field-contract-check` (Schema-/Vektor-Konformität),
+`make release-assets VERSION=<v>` (Bundle-Dry-Run inkl. Vektoren).
