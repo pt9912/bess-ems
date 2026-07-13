@@ -39,6 +39,7 @@ const (
 
 	manifestVersion   = "golden-vector-manifest.v1"
 	fieldManifestName = "mqtt-golden-vectors.field.v1.json"
+	emsManifestName   = "mqtt-golden-vectors.ems.v1.json"
 	defaultMapping    = "config/examples/adapters/mqtt.simulator.json"
 	defaultVectorsDir = "config/schema/vectors"
 )
@@ -91,7 +92,10 @@ func run(mode, mappingPath, vectorsDir, out string) error {
 		}
 		return writeManifest(fresh, filepath.Join(out, fieldManifestName))
 	case "check":
-		return checkFieldManifest(fresh, filepath.Join(vectorsDir, fieldManifestName))
+		if err := checkFieldManifest(fresh, filepath.Join(vectorsDir, fieldManifestName)); err != nil {
+			return err
+		}
+		return checkEmsManifest(filepath.Join(vectorsDir, emsManifestName))
 	default:
 		return fmt.Errorf("unknown -mode %q (want check or write)", mode)
 	}
@@ -373,6 +377,72 @@ func reportDrift(committedRaw []byte, fresh manifest) {
 			fmt.Fprintf(os.Stderr, "fieldvectors: case %q exists only in the committed manifest\n", cc.Name)
 		}
 	}
+}
+
+// checkEmsManifest decodes every command payload of the ems-authority
+// manifest through the simulator's model.Command — proving the field side
+// consumes what the EMS produces (plan sub-slice 4). Timestamps decode the
+// C# serializer's `+00:00` RFC 3339 offset form; the WhenWritingNull-dropped
+// reactive_power_kvar must land as a nil pointer. The negative direction
+// (missing command_id → CommandHandler drops the message without an ACK) is
+// pinned by internal/mqtt/commands_test.go and not duplicated here.
+func checkEmsManifest(path string) error {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read ems manifest: %w", err)
+	}
+	var m manifest
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return fmt.Errorf("parse ems manifest: %w", err)
+	}
+	if m.Authority != "ems" {
+		return fmt.Errorf("%s declares authority %q, want \"ems\"", path, m.Authority)
+	}
+	commands := 0
+	for _, c := range m.Cases {
+		if c.TopicName != "command" || c.Payload == nil {
+			continue
+		}
+		if err := checkCommandCase(c); err != nil {
+			return err
+		}
+		commands++
+	}
+	if commands == 0 {
+		return fmt.Errorf("%s carries no command case — nothing to consume", path)
+	}
+	slog.Info("fieldvectors: ems manifest decodes through model.Command", "path", path, "commands", commands)
+	return nil
+}
+
+func checkCommandCase(c vectorCase) error {
+	var cmd model.Command
+	if err := json.Unmarshal(c.Payload, &cmd); err != nil {
+		return fmt.Errorf("case %q: payload does not decode into model.Command: %w", c.Name, err)
+	}
+	if cmd.CommandID == "" {
+		return fmt.Errorf("case %q: command_id is empty — the CommandHandler would drop it without an ACK", c.Name)
+	}
+	modes := map[string]bool{"Stop": true, "Charge": true, "Discharge": true, "Idle": true}
+	if !modes[cmd.Mode] {
+		return fmt.Errorf("case %q: mode %q is outside the documented wire vocabulary", c.Name, cmd.Mode)
+	}
+	sources := map[string]bool{"Schedule": true, "Operator": true, "RegelLeistung": true, "Safety": true, "Optimization": true, "Fallback": true}
+	if !sources[cmd.Source] {
+		return fmt.Errorf("case %q: source %q is outside the documented wire vocabulary", c.Name, cmd.Source)
+	}
+	if cmd.Timestamp.IsZero() || cmd.ValidUntil.IsZero() {
+		return fmt.Errorf("case %q: timestamp/valid_until did not decode as RFC 3339", c.Name)
+	}
+	var probe map[string]json.RawMessage
+	if err := json.Unmarshal(c.Payload, &probe); err != nil {
+		return fmt.Errorf("case %q: payload does not probe as an object: %w", c.Name, err)
+	}
+	_, present := probe["reactive_power_kvar"]
+	if present != (cmd.ReactivePowerKvar != nil) {
+		return fmt.Errorf("case %q: reactive_power_kvar presence (%t) does not round into the pointer field (nil=%t)", c.Name, present, cmd.ReactivePowerKvar == nil)
+	}
+	return nil
 }
 
 func caseIndex(cases []vectorCase) map[string]vectorCase {
