@@ -117,7 +117,10 @@ Im Stand-in-Betrieb koppelt ein shared external Docker-Network
 (`bess-sut`) die SUT-Variante mit dem Feld-Stack
 (`deploy/compose.field.yml`: mosquitto als `field-mosquitto` +
 `bess-field-sim`); es wird von `make sut-smoke` angelegt und
-abgeräumt. Für einen echten externen Endpoint ist die Netz-Topologie
+abgeräumt. Der Smoke generiert sich ein Szenario mit **kontinuierlicher
+1-s-Kadenz** (der Simulator spielt Ticks einmal ab, kein Loop) — mit dem
+Standard-Integrations-Szenario, das nach Tick 0 stillhält, liefe die
+SUT-Variante korrekt in Safe-Stop: genau die Kadenz-Regel aus §1. Für einen echten externen Endpoint ist die Netz-Topologie
 Betreibersache — `BESS_SUT_BROKER_HOST` muss aus dem Container heraus
 routbar sein.
 

@@ -29,6 +29,7 @@ DOCKER_BUILD = $(DOCKER) build $(BUILD_CONTEXT) \
 	build ci runtime fullbuild lock-refresh release-assets \
 	schema-validate schema-generate schema-drift-check field-contract-check \
 	field-vectors-check field-vectors-refresh \
+	sut-config-check sut-smoke \
 	helm-lint docs-check
 
 help:
@@ -86,6 +87,8 @@ help:
 	@echo "  make docs-check           Validate Markdown refs (d-check) + host paths (rest sensor)"
 	@echo "  make field-vectors-check  Golden-vector drift gate vs Go field producer (ADR 0013 §5.2)"
 	@echo "  make field-vectors-refresh Regenerate config/schema/vectors/ field manifest"
+	@echo "  make sut-config-check     Render check for deploy/compose.{sut,field}.yml (ADR 0013 §5.3)"
+	@echo "  make sut-smoke            SUT smoke vs stand-in field stack over external network (fullbuild)"
 	@echo "  make helm-lint            Lint/render Kubernetes Helm chart (RM-M6-03)"
 	@echo ""
 	@echo "Welle 5 (Closure, active):"
@@ -210,6 +213,23 @@ field-vectors-refresh:
 	$(DOCKER_BUILD) --target field-vectors-refresh --output type=local,dest=config/schema/vectors
 	chmod 755 config/schema/vectors
 
+# ADR 0013 §5.3: cheap render check for the SUT compose pair (mandatory gate).
+# A compose file that ships next to a doc recipe rots silently without it.
+# Static render only — no images, no external network required.
+sut-config-check:
+	$(DOCKER) compose -f deploy/compose.sut.yml config -q
+	$(DOCKER) compose -f deploy/compose.field.yml config -q
+	@echo "[sut-config-check] compose.sut.yml + compose.field.yml render clean"
+
+# ADR 0013 §5.3: full SUT smoke (fullbuild member, too heavy for gates).
+# Runs the stand-in field stack and the SUT variant as SEPARATE compose
+# projects coupled only through the shared external network — proves the
+# config-only path leaves the safety fallback (docs/user/sut-field-endpoint.md).
+# Same dependency chain as `runtime`: both stacks use pull_policy:never images.
+sut-smoke: build
+	$(SIMULATOR_MAKE) build
+	./scripts/sut-smoke.sh
+
 # --- Welle 1 (active) ------------------------------------------------------
 
 solid-suppression-gate:
@@ -241,13 +261,13 @@ coverage-gate:
 # --- Aggregated gates ------------------------------------------------------
 
 gates: lint arch-check test test-safety test-mpc-property test-replay coverage-gate \
-	docs-check field-contract-check field-vectors-check \
+	docs-check field-contract-check field-vectors-check sut-config-check \
 	simulator-lint simulator-test simulator-race simulator-coverage-gate \
 	native-build native-lint native-sanitizer \
 	native-coverage-gate native-coverage-exclusions \
 	test-native-interop test-native-parity \
 	test-hil-opcua test-hil-optimization-core test-optimization-core-compose
-	@echo "[gates] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, docs-check, field-contract-check, field-vectors-check, simulator-{lint,test,race,coverage-gate}) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + M5 (test-hil-optimization-core, test-optimization-core-compose, test-mpc-property, test-replay)"
+	@echo "[gates] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, docs-check, field-contract-check, field-vectors-check, sut-config-check, simulator-{lint,test,race,coverage-gate}) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + M5 (test-hil-optimization-core, test-optimization-core-compose, test-mpc-property, test-replay)"
 
 # --- Welle 3 (partially active) --------------------------------------------
 
@@ -435,17 +455,18 @@ ci: lint arch-check test test-safety test-mpc-property test-replay coverage-gate
     docs-check \
     simulator-lint simulator-test simulator-race simulator-coverage-gate \
     schema-validate schema-drift-check field-contract-check field-vectors-check \
+    sut-config-check \
     native-build native-lint native-sanitizer \
     native-coverage-gate native-coverage-exclusions \
     test-native-interop test-native-parity \
     test-hil-opcua test-hil-optimization-core \
     test-optimization-core-compose test-integration
-	@echo "[ci] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, docs-check, simulator-*) + M2 schema (validate, drift-check) + field-contract-check + field-vectors-check + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + M5 (test-hil-optimization-core, test-optimization-core-compose, test-mpc-property, test-replay) + test-integration"
+	@echo "[ci] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, docs-check, simulator-*) + M2 schema (validate, drift-check) + field-contract-check + field-vectors-check + sut-config-check + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + M5 (test-hil-optimization-core, test-optimization-core-compose, test-mpc-property, test-replay) + test-integration"
 
 # Fresh-clone-naher Komplettlauf: alle CI-Gates plus Runtime-Image und
 # Compose-Smoke. Letzte Stufe vor einem M1-Tag (RM-M1-20).
-fullbuild: ci build runtime
-	@echo "[fullbuild] M1 closure: all gates + runtime image + compose smoke green"
+fullbuild: ci build runtime sut-smoke
+	@echo "[fullbuild] M1 closure: all gates + runtime image + compose smoke + SUT smoke green"
 
 # --- Release-Trockenübung (docs/user/releasing.md §7) ----------------------
 #

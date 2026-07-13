@@ -1,0 +1,52 @@
+# SUT variant (ADR 0013 §5.3, docs/user/sut-field-endpoint.md): bess-ems +
+# Postgres only — NO broker, NO field simulator. The MQTT broker address comes
+# from the environment (BESS_SUT_BROKER_HOST/PORT); the default targets the
+# stand-in stack's alias on the shared external `bess-sut` network
+# (compose.field.yml). Config-only: same runtime image as deploy/compose.yml,
+# no code path. No host ports on purpose (log-driven verification; add an
+# override if the operator API is needed).
+services:
+  bess-ems:
+    image: bess-ems-runtime:latest
+    pull_policy: never
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      ASPNETCORE_ENVIRONMENT: Production
+      Bess__SchemaDirectory: /app/config/schema
+      Bess__AssetConfigPath: /app/config/examples/asset.single-bess.json
+      Bess__PersistenceConnectionString: Host=postgres;Port=5432;Database=bessems;Username=bessems;Password=bessems;Include Error Detail=true
+      Bess__ScheduleSolver__Backend: or_tools
+      Bess__MqttMappingPath: /app/config/examples/adapters/mqtt.simulator.json
+      Bess__MqttBrokerHost: ${BESS_SUT_BROKER_HOST:-field-mosquitto}
+      Bess__MqttBrokerPort: ${BESS_SUT_BROKER_PORT:-1883}
+      Bess__MqttClientId: bess-ems-sut
+      Bess__MqttRuntimeProfile: HilSimulator
+      Bess__MqttAllowPlaintext: "true"
+      Bess__MqttAllowPlaintextReason: SUT-mode broker on a sim-only network (stand-in or external field endpoint)
+      Worker__CycleInterval: "00:00:01"
+      ApiTokens__Tokens__0__Token: dev-operator-token
+      ApiTokens__Tokens__0__Operator: operator-1
+      ApiTokens__Tokens__0__Role: operator
+    networks: [bess-sut, sutlocal]
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: bessems
+      POSTGRES_USER: bessems
+      POSTGRES_PASSWORD: bessems
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bessems -d bessems"]
+      interval: 2s
+      timeout: 1s
+      retries: 10
+    networks: [sutlocal]
+
+networks:
+  bess-sut:
+    external: true
+  sutlocal:
+    driver: bridge

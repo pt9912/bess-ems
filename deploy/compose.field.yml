@@ -1,0 +1,50 @@
+# Stand-in field stack for the SUT mode (ADR 0013 §5.3): mosquitto broker +
+# Go field simulator, joined to the shared external Docker network `bess-sut`
+# so a SEPARATELY started SUT stack (compose.sut.yml) reaches the broker under
+# the alias `field-mosquitto`. Deliberately NO host ports: the coupling runs
+# over the external network, never over published ports (portable, no 1883
+# collisions). The network is created/removed by `make sut-smoke`
+# (scripts/sut-smoke.sh).
+#
+# Scenario: the simulator walks a fixture's ticks ONCE (no loop flag), and
+# bess-ems measures telemetry freshness at receive time — a scenario that
+# stops ticking drives the SUT into safe-stop (that is the contract, ADR 0013
+# §1 cadence rule, and exactly what the first smoke run demonstrated). The
+# smoke therefore GENERATES a long constant-cadence scenario into
+# ./.sut-scenario.json before starting this stack. Standalone use: run
+# `docker network create bess-sut` and provide a continuously ticking
+# scenario via BESS_FIELD_SCENARIO.
+services:
+  field-mosquitto:
+    image: eclipse-mosquitto:2
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    healthcheck:
+      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-p", "1883", "-t", "healthcheck", "-m", "ping"]
+      interval: 2s
+      timeout: 1s
+      retries: 10
+    networks: [bess-sut]
+
+  field-simulator:
+    image: bess-field-sim:latest
+    pull_policy: never
+    command:
+      - "-scenario=data/scenario.json"
+      - "-modbus-mapping=data/modbus.json"
+      - "-modbus-addr=:5020"
+      - "-mqtt-mapping=data/mqtt.json"
+      - "-mqtt-broker=tcp://field-mosquitto:1883"
+      - "-mqtt-client-id=bess-field-sim"
+    volumes:
+      - ${BESS_FIELD_SCENARIO:-./.sut-scenario.json}:/data/scenario.json:ro
+      - ../config/examples/adapters/modbus.simulator.json:/data/modbus.json:ro
+      - ../config/examples/adapters/mqtt.simulator.json:/data/mqtt.json:ro
+    depends_on:
+      field-mosquitto:
+        condition: service_healthy
+    networks: [bess-sut]
+
+networks:
+  bess-sut:
+    external: true

@@ -88,6 +88,7 @@ jobs:
           run_gate schema-drift-check
           run_gate field-contract-check field-contract-check
           run_gate field-vectors-check field-vectors-check
+          run_gate sut-config-check
           run_gate native-build native-build
           run_gate native-sanitizer native-sanitizer
           run_gate native-coverage-gate native-coverage-gate
