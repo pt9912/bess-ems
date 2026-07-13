@@ -211,3 +211,63 @@ func TestEncodeSnapshot_DefaultsAreHoldingHighLow(t *testing.T) {
 		t.Errorf("default high_low/holding: want -100000, got %d", int32(combined))
 	}
 }
+
+// Second-review finding 1: TelemetryRegisterNames, valueFor and
+// isTelemetryRegister must stay one set. Building a mapping from the
+// exported list and encoding a fully populated snapshot exercises every
+// accessor: a name the encoder cannot source would stay at word 0 here.
+func TestTelemetryRegisterNames_EveryNameEncodes(t *testing.T) {
+	t.Parallel()
+
+	snap := model.TelemetrySnapshot{
+		SocPercent: 1, SohPercent: 2, ActivePowerKw: 3, ReactivePowerKvar: 4,
+		DcVoltage: 5, DcCurrent: 6, TemperatureCelsius: 7,
+		Available: true, FaultStatus: "overtemperature",
+	}
+	want := map[string]uint16{
+		"soc_percent": 1, "soh_percent": 2, "active_power_kw": 3,
+		"reactive_power_kvar": 4, "dc_voltage": 5, "dc_current": 6,
+		"temperature_celsius": 7, "available": 1, "fault_status": 1,
+	}
+
+	names := modbus.TelemetryRegisterNames()
+	if len(names) != len(want) {
+		t.Fatalf("TelemetryRegisterNames: want %d names, got %d (%v)", len(want), len(names), names)
+	}
+	registers := make([]model.ModbusRegister, 0, len(names))
+	for i, name := range names {
+		registers = append(registers, model.ModbusRegister{Name: name, Address: i * 2, Type: "uint16", ScaleFactor: 1})
+	}
+	mapping := model.ModbusMapping{ProfileName: "sync", UnitIDDiscovery: "none", Registers: registers}
+	if err := modbus.ValidateMapping(mapping); err != nil {
+		t.Fatalf("every exported name must pass isTelemetryRegister: %v", err)
+	}
+
+	image := modbus.EncodeSnapshot(snap, mapping)
+	for i, name := range names {
+		got, ok := image.Holding[i*2]
+		if !ok {
+			t.Errorf("name %q: valueFor answered nothing — name lists drifted", name)
+			continue
+		}
+		if got != want[name] {
+			t.Errorf("name %q: want word %d, got %d", name, want[name], got)
+		}
+	}
+
+	// Zero-value snapshot covers the false/ok accessor branches.
+	zero := modbus.EncodeSnapshot(model.TelemetrySnapshot{FaultStatus: "ok"}, mapping)
+	availableIdx := -1
+	faultIdx := -1
+	for i, name := range names {
+		if name == "available" {
+			availableIdx = i * 2
+		}
+		if name == "fault_status" {
+			faultIdx = i * 2
+		}
+	}
+	if zero.Holding[availableIdx] != 0 || zero.Holding[faultIdx] != 0 {
+		t.Errorf("zero snapshot: available/fault words want 0/0, got %d/%d", zero.Holding[availableIdx], zero.Holding[faultIdx])
+	}
+}
