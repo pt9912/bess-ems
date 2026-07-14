@@ -315,7 +315,7 @@ Die Modulnamen folgen der Verzeichnisstruktur aus §4.2. Die Spalte
 Application-interne Funktionsbereiche (Realtime, Control, Markets,
 Optimization-Interface) leben innerhalb von `BatteryEms.Application` als
 Namespaces; eine spätere Aufspaltung in eigene .NET-Projekte ist optional
-(siehe AR-OPEN-008).
+und trigger-basiert.
 
 | Modul                                    | Hexagon              | Verantwortung                                                | LH-Bezug             |
 | ---------------------------------------- | -------------------- | ------------------------------------------------------------ | -------------------- |
@@ -650,8 +650,7 @@ Ausgabe + persistierter Reason. Tritt ein bei:
 Softwareseitige Stop-Funktionen ersetzen keinen Hardware-Not-Aus, keine
 BMS-Schutztechnik und keine Wechselrichter-Schutzfunktionen. Harte
 Echtzeit-/Schutzanforderungen werden außerhalb des Docker-EMS abgegrenzt
-(LH-SAFE-001 Hinweis, LH-RISK-001). RM-M6-05 normiert diese Grenze in
-[`docs/plan/adr/0008-edge-controller-boundary.md`](../docs/plan/adr/0008-edge-controller-boundary.md):
+(LH-SAFE-001 Hinweis, LH-RISK-001). RM-M6-05 normiert diese Grenze so:
 Das EMS bleibt supervisory/1-s-Dispatch; Edge-/Herstellercontroller,
 BMS/PCS und Hardware-Schutzketten uebernehmen sub-cycle oder
 zertifizierungsnahe Schutzaufgaben.
@@ -675,9 +674,7 @@ Migrations-Strategie: versionierter Pfad ab M2 (RM-M2-MIG-05) —
 DDL aus einer neutralen `schema.yaml` per `d-migrate` (Build-Time)
 generiert, zur Laufzeit per `DbUp` mit Tracking-Tabelle
 `__schema_versions` angewendet. EF Core Migrations und FluentMigrator
-sind als Alternativen geprüft und in
-[`docs/plan/adr/0001-persistence-migrations.md`](../docs/plan/adr/0001-persistence-migrations.md)
-mit Begründung ausgeschlossen worden. `BessDbMigrator.MigrateAsync` ist
+sind als Alternativen geprüft und mit Begründung ausgeschlossen worden. `BessDbMigrator.MigrateAsync` ist
 idempotent beim Worker-Start anwendbar und setzt vor DbUp einen
 `pg_advisory_lock(hashtextextended('bess-ems:migrations', 0))`, sodass
 mehrere Repliken sicher boot-rennen können (RM-M2-MIG-OPEN-06).
@@ -794,8 +791,7 @@ docker-compose.yml
 
 Der kombinierte Worker/API-Host ist die Default-Topologie. Eine spaetere
 API-Auskopplung als eigener `bess-ems-api`-Service aus demselben
-Codebestand oder als separates Image ist trigger-basiert und folgt
-[ADR 0009](../docs/plan/adr/0009-api-service-extraction-criteria.md);
+Codebestand oder als separates Image ist trigger-basiert;
 sie ist kein impliziter `replicaCount > 1`-Skalierungsschritt fuer den
 gemeinsamen Host.
 
@@ -853,18 +849,9 @@ zu finden.
 
 | Kennung    | Frage                                                               | Status |
 | ---------- | ------------------------------------------------------------------- | ------ |
-| AR-OPEN-001 | Nach welchen Kriterien wird die API als eigener Service ausgekoppelt? | Geschlossen mit [ADR 0009](../docs/plan/adr/0009-api-service-extraction-criteria.md) — kombinierter Worker/API-Host bleibt Default; API-Auskopplung erfolgt erst bei Scaling-, Security-/Mandanten-, Fault-Isolation-, API-only- oder Release-Cadence-Triggern und braucht explizite API-only/Worker-only Topologie- und Testnachweise. |
-| AR-OPEN-002 | gRPC vs. REST-only für externe Optimierungs-Sidecars in Phase 3?  | Geschlossen mit [ADR 0005](../docs/plan/adr/0005-optimization-core-sidecar-transport.md) — gRPC über HTTP/2 (UDS-Default für Loopback, mTLS für Cross-Host) ist der Sidecar-**Transport** für den `optimization-core`. Geltungsbereich: LP-Linie (M5-01-`Optimize`-RPC) ist aktiv über gRPC; MPC-Linie hat den `OptimizeMpc`-RPC heute nur als Vertrag (M5-01-D-08) und das produktive **Backend** ist per [ADR 0006](../docs/plan/adr/0006-mpc-kernel-backend-and-solver.md) local-first (OSQP in-process) — die Transport-Achse aus ADR 0005 bleibt für die F-M5-12-Sidecar-MPC-Aktivierung wiederverwendbar. |
-| AR-OPEN-003 | Persistenz-Stack: EF Core, Dapper oder Mischung?                  | Geschlossen mit [ADR 0001](../docs/plan/adr/0001-persistence-migrations.md) — Dapper/Npgsql-Repositories sind der Runtime-Persistenzpfad; d-migrate erzeugt SQL-Migrationen und DbUp fuehrt sie aus. EF Core und FluentMigrator bleiben explizit verworfen. |
 | AR-OPEN-004 | Fahrplanimport-Format (CSV, JSON, ENTSO-E, proprietär)?           | Offen  |
-| AR-OPEN-005 | Konkrete Topic-/Registerprofile für die ersten Hersteller?        | Geschlossen mit LH-OPEN-001 — Reihenfolge: SunSpec/Socomec, Victron, SMA; Sungrow nur nach Rechtsklärung. |
-| AR-OPEN-006 | Strategie für Multi-Asset-Hosting (Worker-pro-Asset vs. shared)?  | Geschlossen mit [ADR 0007](../docs/plan/adr/0007-multi-asset-hosting-strategy.md) — shared Worker mit per-Asset fan-out ist der M6-Default; Worker-pro-Asset bleibt ein Deployment-/Isolation-Pattern fuer harte Fault-Domain-, Mandanten- oder Edge-Anforderungen. |
 | AR-OPEN-007 | Authentifizierungsverfahren (API-Token, OIDC, mTLS)?              | Teilweise geschlossen — API-Token + Operator-Rolle sind mit RM-M1-16 live; OIDC und mTLS sind Folge-ADR-Trigger (konsistent mit RM-OPEN-04 in der Roadmap). |
-| AR-OPEN-008 | Wann wird `BatteryEms.Application` in eigene Projekte (Realtime, Control, Markets, Optimization) gesplittet, oder bleibt es ein Modul mit Namespaces? | Geschlossen mit [ADR 0011](../docs/plan/adr/0011-application-monolithic-module.md) — monolithisches Modul mit Sub-Namespaces bleibt Default; Split ist trigger-basiert (Build-Zeit, Test-Zeit, Ownership-Konflikte, Boundary-Tabu-Wildwuchs, externer Konsumenten-Footprint, Cross-Modul-Recompile-Zwang). |
-| AR-OPEN-009 | Boundary-Test-Tooling: NetArchTest oder ArchUnitNET?              | Geschlossen mit [ADR 0010](../docs/plan/adr/0010-boundary-test-tooling.md) — NetArchTest.Rules 1.3.2 ist seit M1 produktiv in `tests/BatteryEms.ArchitectureTests/` und wird als `make arch-check`-Gate erzwungen; ArchUnitNET bleibt verworfen. |
-| AR-OPEN-010 | Welche Marktprodukte werden in M2 fachlich zuerst umgesetzt: Day-Ahead-only oder Day-Ahead + Tarifmodell? | Geschlossen mit RM-M2/RM-M4 — M2 lieferte Day-Ahead-Energiekosten und Market-Commitments als erste Marktlinie; Regelleistung/OPC-UA folgte in M4. Tarif- und externe Preisadapter bleiben trigger-basierte Folgearbeit. |
-| AR-OPEN-011 | Northbound Export als eigener Adapter oder als Telemetry-Adapter-Untermodul? | Geschlossen mit [ADR 0012](../docs/plan/adr/0012-northbound-export-adapter-structure.md) — kein Northbound-Export heute; Struktur-Entscheidung (eigener Adapter vs. Untermodul) trigger-basiert beim ersten konkreten Konsumenten (Data Warehouse / Customer Portal / regulatorische Berichtspflicht / Cross-System-Integration). |
-| AR-OPEN-012 | MPC-Backend-Topologie: in-process Local-First vs. Sidecar-First vs. Bi-Modal? | Reserviert — heute geschlossen mit [ADR 0006](../docs/plan/adr/0006-mpc-kernel-backend-and-solver.md) auf Local-First mit OSQP; Sidecar-Erweiterung ist F-M5-12-Folgearbeit mit fünf Triggern (siehe ADR 0006 §6 + `docs/plan/planning/open/note-RM-M5-followups.md`). |
+| AR-OPEN-012 | MPC-Backend-Topologie: in-process Local-First vs. Sidecar-First vs. Bi-Modal? | Reserviert — heute geschlossen auf Local-First mit OSQP; Sidecar-Erweiterung ist F-M5-12-Folgearbeit mit fünf Triggern (siehe `docs/plan/planning/open/note-RM-M5-followups.md`). |
 
 ---
 

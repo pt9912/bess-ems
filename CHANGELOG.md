@@ -31,6 +31,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   references in `quality.md` are tracked via `codepaths.ignore-refs`
   rather than silently accepted (see Fixed).
 
+- **Reference matrix (`matrix`) enforced: the specification no longer
+  references ADRs downward.** `spec/lastenheft.md` and
+  `spec/architecture.md` are the authoritative stratum; an architecture
+  decision is settled in its ADR (which references the requirement
+  upward), so the spec now states outcomes without pointing back at ADRs.
+  All ADR references were removed from both spec files, and section 18
+  "Offene architektonische Punkte" of the architecture document was
+  trimmed to the genuinely open points — the closed ones were redundant
+  with their deciding ADRs, which remain the authoritative record.
+  `matrix` additionally forbids references to `superseded`/`deprecated`
+  ADRs.
+
 ### Removed
 
 - **`tools/check_markdown_links.py` and its `docs-check` Dockerfile
