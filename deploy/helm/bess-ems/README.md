@@ -13,7 +13,7 @@ helm template bess-ems deploy/helm/bess-ems
 ```
 
 `topology.mode=shared` renders one bess-ems Deployment and one Service.
-The asset config is mounted as `assets.json`, matching ADR 0007's shared
+The asset config is mounted as `assets.json`, matching [ADR 0007](../../../docs/plan/adr/0007-multi-asset-hosting-strategy.md)'s shared
 Worker default.
 
 `replicaCount` is fixed at `1`. bess-ems does not yet provide leader

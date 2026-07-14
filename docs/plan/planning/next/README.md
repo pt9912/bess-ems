@@ -21,8 +21,8 @@ Ein Eintrag wechselt typischerweise:
 | ----- | ------ | ----------- |
 | [`note-internal-refinement-scope.md`](note-internal-refinement-scope.md) | Internal-Refinement-Scope (Lock-Eviction + Cluster-Smoke), nach zweifacher Nachnummerierung versions-agnostisch benannt — Ziel: nächste freie Minor | Scope-Bestätigung, sobald keine Feldvertrags-Arbeit vorbeizieht |
 
-*(ADR 0013 §5.3 (`plan-field-contract-sut-docs.md`) ist am 2026-07-13
+*([ADR 0013 §5.3](../../adr/0013-device-mapping-field-contract.md#5-umsetzung-reihenfolge) (`plan-field-contract-sut-docs.md`) ist am 2026-07-13
 nach dreifachem Owner-Review promotet und am selben Tag nach `done/` abgeschlossen;
-ADR 0013 §5.4 (`plan-field-contract-modbus-vectors.md`) ist am 2026-07-13
-aktiviert und am selben Tag nach `done/` abgeschlossen — ADR 0013 §5 ist
+[ADR 0013 §5.4](../../adr/0013-device-mapping-field-contract.md#5-umsetzung-reihenfolge) (`plan-field-contract-modbus-vectors.md`) ist am 2026-07-13
+aktiviert und am selben Tag nach `done/` abgeschlossen — [ADR 0013 §5](../../adr/0013-device-mapping-field-contract.md#5-umsetzung-reihenfolge) ist
 damit vollständig.)*
