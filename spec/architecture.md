@@ -37,7 +37,7 @@ referenzieren ihre `LH-*`-Kennung; Architekturkomponenten erhalten
 | AR-P-008  | Konfigurations-, nicht codegetriebene Geräte- und Marktparameter | [LH-CONF-001](lastenheft.md#lh-conf-001--externe-konfiguration)  |
 | AR-P-009  | Native Core ist optional, nicht zentral; austauschbar gegen .NET | [LH-ARCH-006](lastenheft.md#lh-arch-006--native-core-als-optionaler-beschleuniger), [LH-NF-002](lastenheft.md#lh-nf-002--performance-kritische-komponenten) |
 | AR-P-010  | Containerisiert lauffähig auf Linux                             | [LH-NF-003](lastenheft.md#lh-nf-003--betriebssystem)/4   |
-| AR-P-011  | Hexagonal: Driving/Driven-Trennung, Dependency Rule, Architektur-Tabus per Boundary-Test | [LH-ARCH-001](lastenheft.md#lh-arch-001--modulare-systemarchitektur)..005 |
+| AR-P-011  | Hexagonal: Driving/Driven-Trennung, Dependency Rule, Architektur-Tabus per Boundary-Test | [LH-ARCH-001](lastenheft.md#lh-arch-001--modulare-systemarchitektur)..[005](lastenheft.md#lh-arch-005--austauschbare-kommunikationsadapter) |
 
 ---
 
@@ -227,14 +227,14 @@ hier.
 
 | Driving Port (Use Case)         | Eingang aus               | Verantwortung                                                  | LH-Bezug         |
 | ------------------------------- | ------------------------- | -------------------------------------------------------------- | ---------------- |
-| `IControlCycleUseCase`          | Worker-Loop               | Ein Regelzyklus: Snapshot lesen → State Machine → Limiter → Command | [LH-CTRL-001](lastenheft.md#lh-ctrl-001--zyklischer-regelkreis)/007 |
-| `IOperatorCommandUseCase`       | HTTP API                  | Operator-Stop, manuelle Sollwerte, Quittierung von FAULT       | [LH-API-006](lastenheft.md#lh-api-006--operator-stop)/007, [LH-OPS-004](lastenheft.md#lh-ops-004--auditierbarkeit) |
-| `IBatteryStatusQuery`           | HTTP API                  | aktueller Status, letzter Command, Datenqualität               | [LH-API-002](lastenheft.md#lh-api-002--batterie-status)/003   |
+| `IControlCycleUseCase`          | Worker-Loop               | Ein Regelzyklus: Snapshot lesen → State Machine → Limiter → Command | [LH-CTRL-001](lastenheft.md#lh-ctrl-001--zyklischer-regelkreis)/[007](lastenheft.md#lh-ctrl-007--fallback-bei-ungültigem-snapshot) |
+| `IOperatorCommandUseCase`       | HTTP API                  | Operator-Stop, manuelle Sollwerte, Quittierung von FAULT       | [LH-API-006](lastenheft.md#lh-api-006--operator-stop)/[007](lastenheft.md#lh-api-007--authentifizierung-und-autorisierung), [LH-OPS-004](lastenheft.md#lh-ops-004--auditierbarkeit) |
+| `IBatteryStatusQuery`           | HTTP API                  | aktueller Status, letzter Command, Datenqualität               | [LH-API-002](lastenheft.md#lh-api-002--batterie-status)/[003](lastenheft.md#lh-api-003--aktueller-command)   |
 | `IScheduleQuery`                | HTTP API                  | aktiven/historischen Fahrplan abfragen                         | [LH-API-004](lastenheft.md#lh-api-004--fahrplanabfrage)       |
-| `IScheduleImport`               | HTTP API / Worker         | Day-Ahead-/Intraday-Fahrplan importieren                       | [LH-MKT-001](lastenheft.md#lh-mkt-001--day-ahead-fahrplan)/002   |
-| `IScheduleOptimizationUseCase`  | HTTP API                  | Horizon-Optimierung auslösen und Ergebnis speichern            | [LH-API-005](lastenheft.md#lh-api-005--optimierungsauslösung), [LH-OPT-001](lastenheft.md#lh-opt-001--fahrplanoptimierung)/007/009 |
+| `IScheduleImport`               | HTTP API / Worker         | Day-Ahead-/Intraday-Fahrplan importieren                       | [LH-MKT-001](lastenheft.md#lh-mkt-001--day-ahead-fahrplan)/[002](lastenheft.md#lh-mkt-002--intraday-reoptimierung)   |
+| `IScheduleOptimizationUseCase`  | HTTP API                  | Horizon-Optimierung auslösen und Ergebnis speichern            | [LH-API-005](lastenheft.md#lh-api-005--optimierungsauslösung), [LH-OPT-001](lastenheft.md#lh-opt-001--fahrplanoptimierung)/[007](lastenheft.md#lh-opt-007--trennung-von-horizon-optimierung-und-echtzeit-dispatch)/[009](lastenheft.md#lh-opt-009--optimierungsergebnis-und-objective-breakdown) |
 | `IIntradayReoptimizationUseCase` | HTTP API                 | Intraday-Resthorizont reoptimieren und Fahrplan ersetzen       | [LH-MKT-002](lastenheft.md#lh-mkt-002--intraday-reoptimierung), [LH-API-005](lastenheft.md#lh-api-005--optimierungsauslösung) |
-| `IRegelleistungActivationUseCase` | Aktivierungs-Adapter    | Regelleistungsaktivierung validieren, deduplizieren und für Dispatch bereitstellen | [LH-MKT-005](lastenheft.md#lh-mkt-005--regelleistungsaktivierung)/006 |
+| `IRegelleistungActivationUseCase` | Aktivierungs-Adapter    | Regelleistungsaktivierung validieren, deduplizieren und für Dispatch bereitstellen | [LH-MKT-005](lastenheft.md#lh-mkt-005--regelleistungsaktivierung)/[006](lastenheft.md#lh-mkt-006--priorisierung-von-markt--und-sicherheitsanforderungen) |
 | `IHealthQuery`                  | HTTP API                  | Health-Endpunkt                                                | [LH-API-001](lastenheft.md#lh-api-001--health-endpoint)       |
 | `IRegelleistungHealthQuery`     | HTTP API                  | Health der Regelleistungs-Aktivierungspipeline                 | [LH-MKT-005](lastenheft.md#lh-mkt-005--regelleistungsaktivierung), [LH-MON-002](lastenheft.md#lh-mon-002--metriken) |
 
@@ -248,15 +248,15 @@ hier.
 | `ICommandRepository`              | Persistence                                     | Commands speichern, Reason erhalten                        | [LH-PERSIST-002](lastenheft.md#lh-persist-002--speicherung-von-commands)        |
 | `IScheduleRepository`             | Persistence                                     | Fahrpläne versioniert speichern                            | [LH-PERSIST-003](lastenheft.md#lh-persist-003--speicherung-von-fahrplänen)        |
 | `IOperatorAuditLog`               | Persistence                                     | Operator-Aktionen auditierbar speichern                    | [LH-PERSIST-004](lastenheft.md#lh-persist-004--speicherung-von-operator-kommandos), [LH-OPS-004](lastenheft.md#lh-ops-004--auditierbarkeit) |
-| `IScheduleOptimizer`              | Optimization (LP ab M2; MILP/heuristisch optional) | Fahrpläne über Horizon erzeugen oder aktualisieren       | [LH-OPT-001](lastenheft.md#lh-opt-001--fahrplanoptimierung)..009       |
+| `IScheduleOptimizer`              | Optimization (LP ab M2; MILP/heuristisch optional) | Fahrpläne über Horizon erzeugen oder aktualisieren       | [LH-OPT-001](lastenheft.md#lh-opt-001--fahrplanoptimierung)..[009](lastenheft.md#lh-opt-009--optimierungsergebnis-und-objective-breakdown)       |
 | `IDispatchOptimizer`              | Optimization (Schedule-Following; MPC später)   | Single-Step-Dispatch im Regelzyklus                        | [LH-OPT-007](lastenheft.md#lh-opt-007--trennung-von-horizon-optimierung-und-echtzeit-dispatch), [LH-CTRL-005](lastenheft.md#lh-ctrl-005--mpc-unterstützung) |
 | `IPriceSeriesSource`              | Price-Source-Adapter / Import                    | quellenneutrale Preisreihen für Optimierung liefern        | [LH-MKT-008](lastenheft.md#lh-mkt-008--tarif--und-preiszeitfenster), LH-OPEN-003 |
 | `IOptimizationRunRepository`       | Persistence                                     | Optimierungsläufe und Objective Breakdown speichern         | [LH-PERSIST-007](lastenheft.md#lh-persist-007--speicherung-von-optimierungsläufen)        |
-| `IActivationDispatchSource`        | Application / Markets                          | aktive Regelleistungsaktivierung für den Dispatch-Tick halten | [LH-MKT-005](lastenheft.md#lh-mkt-005--regelleistungsaktivierung)/006        |
-| `IControlKernel`                  | Application (`ManagedControlKernel`) und NativeInterop (`NativeFallbackControlKernel`, ab M3) | Constraint/Ramp/PID ausführen; Native bevorzugt mit deterministischem Managed-Fallback bei nativem Fehler | [LH-NATIVE-001](lastenheft.md#lh-native-001--cc-für-performance-kritische-komponenten)/004     |
+| `IActivationDispatchSource`        | Application / Markets                          | aktive Regelleistungsaktivierung für den Dispatch-Tick halten | [LH-MKT-005](lastenheft.md#lh-mkt-005--regelleistungsaktivierung)/[006](lastenheft.md#lh-mkt-006--priorisierung-von-markt--und-sicherheitsanforderungen)        |
+| `IControlKernel`                  | Application (`ManagedControlKernel`) und NativeInterop (`NativeFallbackControlKernel`, ab M3) | Constraint/Ramp/PID ausführen; Native bevorzugt mit deterministischem Managed-Fallback bei nativem Fehler | [LH-NATIVE-001](lastenheft.md#lh-native-001--cc-für-performance-kritische-komponenten)/[004](lastenheft.md#lh-native-004--native-fehlercodes)     |
 | `IClock`                          | Infrastructure                                  | UTC-Zeit, deterministisch in Tests                         | [LH-MKT-007](lastenheft.md#lh-mkt-007--zeitmodell-für-fahrpläne)            |
-| `ITelemetryExporter`              | Telemetry                                       | Logs/Metrics/Traces nach außen                             | [LH-MON-001](lastenheft.md#lh-mon-001--logging)/002/003    |
-| `IConfigurationProvider`          | Infrastructure                                  | validierte Konfiguration bereitstellen                     | [LH-CONF-001](lastenheft.md#lh-conf-001--externe-konfiguration)..003      |
+| `ITelemetryExporter`              | Telemetry                                       | Logs/Metrics/Traces nach außen                             | [LH-MON-001](lastenheft.md#lh-mon-001--logging)/[002](lastenheft.md#lh-mon-002--metriken)/[003](lastenheft.md#lh-mon-003--tracing)    |
+| `IConfigurationProvider`          | Infrastructure                                  | validierte Konfiguration bereitstellen                     | [LH-CONF-001](lastenheft.md#lh-conf-001--externe-konfiguration)..[003](lastenheft.md#lh-conf-003--validierung-der-konfiguration)      |
 
 #### Dependency Rule (verbindlich)
 
@@ -302,7 +302,7 @@ ArchUnitNET) durchgesetzt; Verstöße brechen den Build ([LH-NF-006](lastenheft.
 | Infrastructure            | `BatteryEms.Infrastructure` (Composition Root) + Driven Adapter (Persistence, Telemetry) |
 | Native Core               | Driven Adapter (`BatteryEms.Adapters.NativeInterop`) + native Bibliothek unter `native/` |
 
-Bezug: [LH-ARCH-001](lastenheft.md#lh-arch-001--modulare-systemarchitektur)..005, [LH-NF-006](lastenheft.md#lh-nf-006--wartbarkeit)/007/008.
+Bezug: [LH-ARCH-001](lastenheft.md#lh-arch-001--modulare-systemarchitektur)..[005](lastenheft.md#lh-arch-005--austauschbare-kommunikationsadapter), [LH-NF-006](lastenheft.md#lh-nf-006--wartbarkeit)/[007](lastenheft.md#lh-nf-007--erweiterbarkeit)/[008](lastenheft.md#lh-nf-008--nachvollziehbarkeit).
 
 ---
 
@@ -319,8 +319,8 @@ und trigger-basiert.
 
 | Modul                                    | Hexagon              | Verantwortung                                                | LH-Bezug             |
 | ---------------------------------------- | -------------------- | ------------------------------------------------------------ | -------------------- |
-| `BatteryEms.Domain`                      | Hexagon-Kern         | Entitäten, Wertobjekte, Vorzeichenkonvention, State Machine, Limiter | LH-DOM-*, LH-SM-*, [LH-CTRL-002](lastenheft.md#lh-ctrl-002--constraint-limiter)/003, [LH-DOM-007](lastenheft.md#lh-dom-007--vorzeichenkonvention) |
-| `BatteryEms.Application`                 | Hexagon-Application  | Use Cases, Driving + Driven Port-Interfaces, Snapshot Store, Markt-/Fahrplanauflösung, Optimierungs-Interface | [LH-CTRL-001](lastenheft.md#lh-ctrl-001--zyklischer-regelkreis)/007, LH-RT-*, LH-MKT-*, [LH-OPT-001](lastenheft.md#lh-opt-001--fahrplanoptimierung) |
+| `BatteryEms.Domain`                      | Hexagon-Kern         | Entitäten, Wertobjekte, Vorzeichenkonvention, State Machine, Limiter | LH-DOM-*, LH-SM-*, [LH-CTRL-002](lastenheft.md#lh-ctrl-002--constraint-limiter)/[003](lastenheft.md#lh-ctrl-003--ramp-limiter), [LH-DOM-007](lastenheft.md#lh-dom-007--vorzeichenkonvention) |
+| `BatteryEms.Application`                 | Hexagon-Application  | Use Cases, Driving + Driven Port-Interfaces, Snapshot Store, Markt-/Fahrplanauflösung, Optimierungs-Interface | [LH-CTRL-001](lastenheft.md#lh-ctrl-001--zyklischer-regelkreis)/[007](lastenheft.md#lh-ctrl-007--fallback-bei-ungültigem-snapshot), LH-RT-*, LH-MKT-*, [LH-OPT-001](lastenheft.md#lh-opt-001--fahrplanoptimierung) |
 | `BatteryEms.Api`                         | Driving Adapter      | REST-API, AuthN/AuthZ, Operator-Endpunkte, Audit             | LH-API-*             |
 | `BatteryEms.Worker`                      | Driving Adapter      | Hosted Service: Regelzyklus, Scheduler                       | [LH-CTRL-001](lastenheft.md#lh-ctrl-001--zyklischer-regelkreis), LH-OPS-* |
 | `BatteryEms.Adapters.Modbus`             | Driven Adapter       | Modbus-TCP-Adapter (Lesen + Schreiben)                       | LH-MODB-*            |
@@ -328,7 +328,7 @@ und trigger-basiert.
 | `BatteryEms.Adapters.OpcUa`              | Driven Adapter (M4)  | OPC-UA Lesen, Schreiben, Subscriptions                       | LH-OPCUA-*           |
 | `BatteryEms.Adapters.Persistence`        | Driven Adapter       | Repositories (EF Core/Dapper), Migrationen, Retention        | LH-PERSIST-*         |
 | `BatteryEms.Adapters.Telemetry`          | Driven Adapter       | OTel-Tracing, Prometheus-Metriken, Logging-Exporter          | LH-MON-*             |
-| `BatteryEms.Adapters.Optimization`       | Driven Adapter       | Solver-Bindings für Horizon-Optimierung; Schedule-Following-/Single-Step-Dispatch | [LH-OPT-001](lastenheft.md#lh-opt-001--fahrplanoptimierung)..009 |
+| `BatteryEms.Adapters.Optimization`       | Driven Adapter       | Solver-Bindings für Horizon-Optimierung; Schedule-Following-/Single-Step-Dispatch | [LH-OPT-001](lastenheft.md#lh-opt-001--fahrplanoptimierung)..[009](lastenheft.md#lh-opt-009--optimierungsergebnis-und-objective-breakdown) |
 | `BatteryEms.Adapters.NativeInterop`      | Driven Adapter (M3)  | P/Invoke-Bindings, ABI-Check, Fallback-Routing               | LH-NATIVE-*          |
 | `BatteryEms.Infrastructure`              | Composition Root     | DI-Wiring, Konfigurations-Loader, Health, Startvalidierung   | LH-CONF-*, [LH-OPS-001](lastenheft.md#lh-ops-001--sicherer-start) |
 | `BatteryEms.ArchitectureTests`           | Test-Modul           | Boundary-Tests für Dependency Rule und Architektur-Tabus aus [§4.2](#42-hexagonale-sicht-driving--driven-ports) | [LH-NF-006](lastenheft.md#lh-nf-006--wartbarkeit), [LH-ARCH-002](lastenheft.md#lh-arch-002--schichtentrennung) |
@@ -471,7 +471,7 @@ Vorzeichenkonvention: positiv = Entladen, negativ = Laden, 0 = neutral.
 Konvention gilt in allen Modellen, Limitern, Persistenz und Commands;
 Geräteumrechnung erfolgt ausschließlich in den Adaptern ([LH-DOM-007](lastenheft.md#lh-dom-007--vorzeichenkonvention)).
 
-Bezug: [LH-DOM-001](lastenheft.md#lh-dom-001--batteriespeicher-modell)..006, [LH-MKT-003](lastenheft.md#lh-mkt-003--marktverpflichtungen)/7/8/9, [LH-OPT-007](lastenheft.md#lh-opt-007--trennung-von-horizon-optimierung-und-echtzeit-dispatch)/8/9.
+Bezug: [LH-DOM-001](lastenheft.md#lh-dom-001--batteriespeicher-modell)..[006](lastenheft.md#lh-dom-006--geräte-capabilities), [LH-MKT-003](lastenheft.md#lh-mkt-003--marktverpflichtungen)/7/8/9, [LH-OPT-007](lastenheft.md#lh-opt-007--trennung-von-horizon-optimierung-und-echtzeit-dispatch)/8/9.
 
 ---
 
@@ -524,7 +524,7 @@ stellt seit M2 LP-basierte Horizon-Optimierung bereit; MILP- und
 heuristische Varianten bleiben austauschbare Solver-Ausprägungen. MPC
 kann später `IDispatchOptimizer` für Single-Step-Entscheidungen oder
 `IScheduleOptimizer` für rollierende Horizonte implementieren
-([LH-OPT-001](lastenheft.md#lh-opt-001--fahrplanoptimierung)..009).
+([LH-OPT-001](lastenheft.md#lh-opt-001--fahrplanoptimierung)..[009](lastenheft.md#lh-opt-009--optimierungsergebnis-und-objective-breakdown)).
 
 ### 8.3 Preisquellen und Open-Source-Policy
 
@@ -565,7 +565,7 @@ Bezug: LH-OPEN-003, [LH-MKT-008](lastenheft.md#lh-mkt-008--tarif--und-preiszeitf
 | `/battery/{assetId}/status`             | GET     | read-only intern; produktiv TLS/optional AuthN | [LH-API-002](lastenheft.md#lh-api-002--batterie-status) |
 | `/battery/{assetId}/command/current`    | GET     | read-only intern; produktiv TLS/optional AuthN | [LH-API-003](lastenheft.md#lh-api-003--aktueller-command) |
 | `/markets/schedules/current`            | GET     | read-only intern; produktiv TLS/optional AuthN | [LH-API-004](lastenheft.md#lh-api-004--fahrplanabfrage) |
-| `/operator/stop`                        | POST    | AuthN+AuthZ + Audit                         | [LH-API-006](lastenheft.md#lh-api-006--operator-stop)/007 |
+| `/operator/stop`                        | POST    | AuthN+AuthZ + Audit                         | [LH-API-006](lastenheft.md#lh-api-006--operator-stop)/[007](lastenheft.md#lh-api-007--authentifizierung-und-autorisierung) |
 | `/markets/day-ahead/optimize`           | POST    | AuthN+AuthZ + Audit                         | [LH-API-005](lastenheft.md#lh-api-005--optimierungsauslösung) |
 | `/markets/intraday/reoptimize`          | POST    | AuthN+AuthZ + Audit                         | [LH-MKT-002](lastenheft.md#lh-mkt-002--intraday-reoptimierung), [LH-API-005](lastenheft.md#lh-api-005--optimierungsauslösung) |
 | `/optimization/runs/{runId}`            | GET     | read-only intern; produktiv TLS/optional AuthN | [LH-PERSIST-007](lastenheft.md#lh-persist-007--speicherung-von-optimierungsläufen), [LH-OPT-009](lastenheft.md#lh-opt-009--optimierungsergebnis-und-objective-breakdown) |
@@ -613,7 +613,7 @@ Produktiv: TLS-Terminierung oder dokumentierter Reverse-Proxy-Betrieb
 ([LH-SM-002](lastenheft.md#lh-sm-002--sicherheitszustände-haben-vorrang)). `FAULT → READY` nur nach definierter Quittierung
 ([LH-SM-003](lastenheft.md#lh-sm-003--quittierung-von-fehlerzuständen)).
 
-Bezug: [LH-SM-001](lastenheft.md#lh-sm-001--explizite-betriebszustände)..003, [LH-SAFE-001](lastenheft.md#lh-safe-001--emergency-stop).
+Bezug: [LH-SM-001](lastenheft.md#lh-sm-001--explizite-betriebszustände)..[003](lastenheft.md#lh-sm-003--quittierung-von-fehlerzuständen), [LH-SAFE-001](lastenheft.md#lh-safe-001--emergency-stop).
 
 ---
 
@@ -686,7 +686,7 @@ mehrere Repliken sicher boot-rennen können.
 - Quelle: YAML/JSON-Dateien + Environment Variables, hierarchisch überlagernd.
 - Bereiche: Assets, Capabilities, Device Points, Adapter, Mappings, Limits,
   Rampen, Markt-/Tarifparameter, Optimierungsparameter, Sicherheitsparameter
-  und Northbound-Exports ([LH-CONF-001](lastenheft.md#lh-conf-001--externe-konfiguration)/004).
+  und Northbound-Exports ([LH-CONF-001](lastenheft.md#lh-conf-001--externe-konfiguration)/[004](lastenheft.md#lh-conf-004--export--und-northbound-konfiguration)).
 - Mappings (Modbus, MQTT, OPC-UA) versioniert in `config/`
   ([LH-CONF-002](lastenheft.md#lh-conf-002--versionierte-gerätemappings)).
 - Validierung beim Start; bei Fehlern kein aktiver Regelbetrieb ([LH-CONF-003](lastenheft.md#lh-conf-003--validierung-der-konfiguration),
@@ -825,23 +825,23 @@ zu finden.
 
 | Architekturkomponente         | LH-Anforderung(en)                            |
 | ----------------------------- | --------------------------------------------- |
-| Schichten 1–9                 | [LH-ARCH-001](lastenheft.md#lh-arch-001--modulare-systemarchitektur)/002                               |
-| Hexagonale Sicht ([§4.2](#42-hexagonale-sicht-driving--driven-ports))       | [LH-ARCH-001](lastenheft.md#lh-arch-001--modulare-systemarchitektur)..005, [LH-NF-006](lastenheft.md#lh-nf-006--wartbarkeit)/007/008           |
+| Schichten 1–9                 | [LH-ARCH-001](lastenheft.md#lh-arch-001--modulare-systemarchitektur)/[002](lastenheft.md#lh-arch-002--schichtentrennung)                               |
+| Hexagonale Sicht ([§4.2](#42-hexagonale-sicht-driving--driven-ports))       | [LH-ARCH-001](lastenheft.md#lh-arch-001--modulare-systemarchitektur)..[005](lastenheft.md#lh-arch-005--austauschbare-kommunikationsadapter), [LH-NF-006](lastenheft.md#lh-nf-006--wartbarkeit)/[007](lastenheft.md#lh-nf-007--erweiterbarkeit)/[008](lastenheft.md#lh-nf-008--nachvollziehbarkeit)           |
 | Architektur-Tabus / Boundary-Tests | [LH-ARCH-002](lastenheft.md#lh-arch-002--schichtentrennung), [LH-NF-006](lastenheft.md#lh-nf-006--wartbarkeit)                   |
 | Adapter-Interface             | [LH-PROT-001](lastenheft.md#lh-prot-001--einheitliches-adapterinterface), [LH-ARCH-005](lastenheft.md#lh-arch-005--austauschbare-kommunikationsadapter)                      |
-| Device Point / Capability Model | [LH-DOM-005](lastenheft.md#lh-dom-005--gerätepunkt-modell)/006, [LH-CONF-002](lastenheft.md#lh-conf-002--versionierte-gerätemappings)                 |
-| Tarif- und Marktproduktmodell | [LH-MKT-008](lastenheft.md#lh-mkt-008--tarif--und-preiszeitfenster)/009                                |
-| Optimierungs-Interfaces       | [LH-ARCH-004](lastenheft.md#lh-arch-004--keine-direkte-geräteansteuerung-aus-optimierung), [LH-OPT-001](lastenheft.md#lh-opt-001--fahrplanoptimierung)/002/006/007/008/009   |
-| Snapshot Store                | [LH-RT-001](lastenheft.md#lh-rt-001--realtime-snapshot-store)/002/003/005                         |
-| Control Layer (Limiter, SM)   | [LH-CTRL-001](lastenheft.md#lh-ctrl-001--zyklischer-regelkreis)/002/003/007, [LH-SM-001](lastenheft.md#lh-sm-001--explizite-betriebszustände)/002/003    |
-| Sicherheitsfallback           | [LH-SAFE-001](lastenheft.md#lh-safe-001--emergency-stop)..007, [LH-CTRL-007](lastenheft.md#lh-ctrl-007--fallback-bei-ungültigem-snapshot)                 |
-| Native Core                   | [LH-NATIVE-001](lastenheft.md#lh-native-001--cc-für-performance-kritische-komponenten)..006, [LH-ARCH-006](lastenheft.md#lh-arch-006--native-core-als-optionaler-beschleuniger), [LH-NF-002](lastenheft.md#lh-nf-002--performance-kritische-komponenten)    |
-| Persistenz                    | [LH-PERSIST-001](lastenheft.md#lh-persist-001--speicherung-von-messdaten)..007                           |
-| API + AuthN/AuthZ             | [LH-API-001](lastenheft.md#lh-api-001--health-endpoint)..008                               |
-| Observability                 | [LH-MON-001](lastenheft.md#lh-mon-001--logging)..004, [LH-NF-008](lastenheft.md#lh-nf-008--nachvollziehbarkeit)                    |
-| Konfiguration                 | [LH-CONF-001](lastenheft.md#lh-conf-001--externe-konfiguration)..004                              |
-| Deployment                    | [LH-DEPLOY-001](lastenheft.md#lh-deploy-001--dockerfile)..004, [LH-NF-003](lastenheft.md#lh-nf-003--betriebssystem)/004             |
-| Tests                         | [LH-TEST-001](lastenheft.md#lh-test-001--unit-tests-für-regelung)..007                              |
+| Device Point / Capability Model | [LH-DOM-005](lastenheft.md#lh-dom-005--gerätepunkt-modell)/[006](lastenheft.md#lh-dom-006--geräte-capabilities), [LH-CONF-002](lastenheft.md#lh-conf-002--versionierte-gerätemappings)                 |
+| Tarif- und Marktproduktmodell | [LH-MKT-008](lastenheft.md#lh-mkt-008--tarif--und-preiszeitfenster)/[009](lastenheft.md#lh-mkt-009--marktprodukt-differenzierung)                                |
+| Optimierungs-Interfaces       | [LH-ARCH-004](lastenheft.md#lh-arch-004--keine-direkte-geräteansteuerung-aus-optimierung), [LH-OPT-001](lastenheft.md#lh-opt-001--fahrplanoptimierung)/[002](lastenheft.md#lh-opt-002--unterstützte-optimierungsverfahren)/[006](lastenheft.md#lh-opt-006--solver-abstraktion)/[007](lastenheft.md#lh-opt-007--trennung-von-horizon-optimierung-und-echtzeit-dispatch)/[008](lastenheft.md#lh-opt-008--einheiten--und-zeitschritt-konsistenz)/[009](lastenheft.md#lh-opt-009--optimierungsergebnis-und-objective-breakdown)   |
+| Snapshot Store                | [LH-RT-001](lastenheft.md#lh-rt-001--realtime-snapshot-store)/[002](lastenheft.md#lh-rt-002--zusammenführung-mehrerer-datenquellen)/[003](lastenheft.md#lh-rt-003--maximales-messwertalter)/[005](lastenheft.md#lh-rt-005--event--und-polling-unterstützung)                         |
+| Control Layer (Limiter, SM)   | [LH-CTRL-001](lastenheft.md#lh-ctrl-001--zyklischer-regelkreis)/[002](lastenheft.md#lh-ctrl-002--constraint-limiter)/[003](lastenheft.md#lh-ctrl-003--ramp-limiter)/[007](lastenheft.md#lh-ctrl-007--fallback-bei-ungültigem-snapshot), [LH-SM-001](lastenheft.md#lh-sm-001--explizite-betriebszustände)/[002](lastenheft.md#lh-sm-002--sicherheitszustände-haben-vorrang)/[003](lastenheft.md#lh-sm-003--quittierung-von-fehlerzuständen)    |
+| Sicherheitsfallback           | [LH-SAFE-001](lastenheft.md#lh-safe-001--emergency-stop)..[007](lastenheft.md#lh-safe-007--schreibbegrenzung-vor-feldkommunikation), [LH-CTRL-007](lastenheft.md#lh-ctrl-007--fallback-bei-ungültigem-snapshot)                 |
+| Native Core                   | [LH-NATIVE-001](lastenheft.md#lh-native-001--cc-für-performance-kritische-komponenten)..[006](lastenheft.md#lh-native-006--container-build), [LH-ARCH-006](lastenheft.md#lh-arch-006--native-core-als-optionaler-beschleuniger), [LH-NF-002](lastenheft.md#lh-nf-002--performance-kritische-komponenten)    |
+| Persistenz                    | [LH-PERSIST-001](lastenheft.md#lh-persist-001--speicherung-von-messdaten)..[007](lastenheft.md#lh-persist-007--speicherung-von-optimierungsläufen)                           |
+| API + AuthN/AuthZ             | [LH-API-001](lastenheft.md#lh-api-001--health-endpoint)..[008](lastenheft.md#lh-api-008--transport--und-netzwerkschutz)                               |
+| Observability                 | [LH-MON-001](lastenheft.md#lh-mon-001--logging)..[004](lastenheft.md#lh-mon-004--entscheidungsbegründung), [LH-NF-008](lastenheft.md#lh-nf-008--nachvollziehbarkeit)                    |
+| Konfiguration                 | [LH-CONF-001](lastenheft.md#lh-conf-001--externe-konfiguration)..[004](lastenheft.md#lh-conf-004--export--und-northbound-konfiguration)                              |
+| Deployment                    | [LH-DEPLOY-001](lastenheft.md#lh-deploy-001--dockerfile)..[004](lastenheft.md#lh-deploy-004--native-build), [LH-NF-003](lastenheft.md#lh-nf-003--betriebssystem)/[004](lastenheft.md#lh-nf-004--containerisierung)             |
+| Tests                         | [LH-TEST-001](lastenheft.md#lh-test-001--unit-tests-für-regelung)..[007](lastenheft.md#lh-test-007--container-tests)                              |
 
 ---
 

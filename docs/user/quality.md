@@ -210,7 +210,7 @@ make test           # = docker build --target test
 ```
 
 Filter: `Category!=Integration & Category!=Replay & Category!=Container`.
-Pflicht ab M1 ([LH-TEST-001](../../spec/lastenheft.md#lh-test-001--unit-tests-für-regelung)/002).
+Pflicht ab M1 ([LH-TEST-001](../../spec/lastenheft.md#lh-test-001--unit-tests-für-regelung)/[002](../../spec/lastenheft.md#lh-test-002--unit-tests-für-marktlogik)).
 
 Mindestumfang:
 
@@ -218,7 +218,7 @@ Mindestumfang:
 | ----------------------- | -------------------------- |
 | Constraint Limiter      | [LH-CTRL-002](../../spec/lastenheft.md#lh-ctrl-002--constraint-limiter), [LH-SAFE-002](../../spec/lastenheft.md#lh-safe-002--kein-laden-außerhalb-soc-grenzen)/3 |
 | Ramp Limiter            | [LH-CTRL-003](../../spec/lastenheft.md#lh-ctrl-003--ramp-limiter)                |
-| State Machine           | [LH-SM-001](../../spec/lastenheft.md#lh-sm-001--explizite-betriebszustände)..003             |
+| State Machine           | [LH-SM-001](../../spec/lastenheft.md#lh-sm-001--explizite-betriebszustände)..[003](../../spec/lastenheft.md#lh-sm-003--quittierung-von-fehlerzuständen)             |
 | Snapshot Validation     | [LH-RT-003](../../spec/lastenheft.md#lh-rt-003--maximales-messwertalter), [LH-DOM-004](../../spec/lastenheft.md#lh-dom-004--datenqualität)      |
 | Vorzeichenkonvention    | [LH-DOM-007](../../spec/lastenheft.md#lh-dom-007--vorzeichenkonvention) |
 | Day-Ahead-Fahrplanlogik | [LH-MKT-001](../../spec/lastenheft.md#lh-mkt-001--day-ahead-fahrplan), [LH-MKT-007](../../spec/lastenheft.md#lh-mkt-007--zeitmodell-für-fahrpläne)     |
@@ -239,11 +239,11 @@ werden mit M4 aktiv.
 
 | Adapter / Pfad                    | Aktiv ab | LH-Bezug                      |
 | --------------------------------- | -------- | ----------------------------- |
-| Modbus-TCP gegen Simulator        | M1       | [LH-MODB-001](../../spec/lastenheft.md#lh-modb-001--modbus-tcp-lesen)..005, [LH-TEST-003](../../spec/lastenheft.md#lh-test-003--integrationstests-für-protokolladapter) |
-| MQTT gegen Mosquitto              | M1       | [LH-MQTT-001](../../spec/lastenheft.md#lh-mqtt-001--mqtt-telemetrie-empfang)..005              |
-| Postgres-Persistenz               | M1       | [LH-PERSIST-001](../../spec/lastenheft.md#lh-persist-001--speicherung-von-messdaten)..005           |
-| API gegen `WebApplicationFactory` | M1       | [LH-API-001](../../spec/lastenheft.md#lh-api-001--health-endpoint)..007               |
-| OPC-UA gegen Simulator            | M4       | [LH-OPCUA-001](../../spec/lastenheft.md#lh-opcua-001--opc-ua-lesen)..005             |
+| Modbus-TCP gegen Simulator        | M1       | [LH-MODB-001](../../spec/lastenheft.md#lh-modb-001--modbus-tcp-lesen)..[005](../../spec/lastenheft.md#lh-modb-005--timeout), [LH-TEST-003](../../spec/lastenheft.md#lh-test-003--integrationstests-für-protokolladapter) |
+| MQTT gegen Mosquitto              | M1       | [LH-MQTT-001](../../spec/lastenheft.md#lh-mqtt-001--mqtt-telemetrie-empfang)..[005](../../spec/lastenheft.md#lh-mqtt-005--command-acknowledgement)              |
+| Postgres-Persistenz               | M1       | [LH-PERSIST-001](../../spec/lastenheft.md#lh-persist-001--speicherung-von-messdaten)..[005](../../spec/lastenheft.md#lh-persist-005--datenbank)           |
+| API gegen `WebApplicationFactory` | M1       | [LH-API-001](../../spec/lastenheft.md#lh-api-001--health-endpoint)..[007](../../spec/lastenheft.md#lh-api-007--authentifizierung-und-autorisierung)               |
+| OPC-UA gegen Simulator            | M4       | [LH-OPCUA-001](../../spec/lastenheft.md#lh-opcua-001--opc-ua-lesen)..[005](../../spec/lastenheft.md#lh-opcua-005--opc-ua-security)             |
 | Optimization-Sidecar (gRPC)       | M5       | [LH-OPT-006](../../spec/lastenheft.md#lh-opt-006--solver-abstraktion)                    |
 
 #### 2.2.1 MQTT-Security-Profil
@@ -502,7 +502,7 @@ make test-native-parity    # Replay-basierte Native↔Managed-Parität (Category
 | Loader-Pfade `Disabled` / `LibraryMissing` / `Loaded` mit echtem Gateway    | [LH-NATIVE-005](../../spec/lastenheft.md#lh-native-005--abi-versionierung) |
 | Native-Contract bei nicht-finiten Inputs (Snapshot/Limits/Request/Previous) | [LH-NATIVE-004](../../spec/lastenheft.md#lh-native-004--native-fehlercodes) |
 | Negatives `dt` mit `has_previous=1` → `BCC_STATUS_NEGATIVE_DT`              | [LH-NATIVE-004](../../spec/lastenheft.md#lh-native-004--native-fehlercodes) |
-| Telemetrie-Filter-Export gegen echte `.so` inkl. IIR-Update, Drift, Sample-Period und Non-Finite | [LH-NATIVE-001](../../spec/lastenheft.md#lh-native-001--cc-für-performance-kritische-komponenten)/004 |
+| Telemetrie-Filter-Export gegen echte `.so` inkl. IIR-Update, Drift, Sample-Period und Non-Finite | [LH-NATIVE-001](../../spec/lastenheft.md#lh-native-001--cc-für-performance-kritische-komponenten)/[004](../../spec/lastenheft.md#lh-native-004--native-fehlercodes) |
 
 `make test-native-parity` deckt den replay-basierten
 Parity-Vergleich gegen den versionierten Datensatz unter
@@ -715,7 +715,7 @@ Das Runtime-Image ist gehärtet und folgt dem Multi-Stage-Pattern aus
   prüft zusätzlich `test -f /app/native/libbattery_control_core.so`
   plus `ldd` im laufenden Container
 
-Smoke-Test ([LH-DEPLOY-001](../../spec/lastenheft.md#lh-deploy-001--dockerfile)/002, [LH-TEST-007](../../spec/lastenheft.md#lh-test-007--container-tests)):
+Smoke-Test ([LH-DEPLOY-001](../../spec/lastenheft.md#lh-deploy-001--dockerfile)/[002](../../spec/lastenheft.md#lh-deploy-002--docker-compose), [LH-TEST-007](../../spec/lastenheft.md#lh-test-007--container-tests)):
 
 ```bash
 make runtime
@@ -802,7 +802,7 @@ CI-Gate validiert alle Beispiel-Mappings unter `config/examples/`.
 
 ### 5.4 OpenAPI-Vertrag
 
-Pflicht ab M1 ([LH-API-001](../../spec/lastenheft.md#lh-api-001--health-endpoint)..007). Die API exportiert eine OpenAPI-3.1-
+Pflicht ab M1 ([LH-API-001](../../spec/lastenheft.md#lh-api-001--health-endpoint)..[007](../../spec/lastenheft.md#lh-api-007--authentifizierung-und-autorisierung)). Die API exportiert eine OpenAPI-3.1-
 Beschreibung. Drei Gates:
 
 - Schema-Wohlgeformtheit (gegen offizielles Meta-Schema)

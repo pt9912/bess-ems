@@ -1,7 +1,7 @@
 # Persistenz-Runbook
 
 **Bezug:** [`spec/lastenheft.md`](../../spec/lastenheft.md) [§19](../../spec/lastenheft.md#19-persistenz-anforderungen)
-([LH-PERSIST-001](../../spec/lastenheft.md#lh-persist-001--speicherung-von-messdaten)..007), [`spec/architecture.md`](../../spec/architecture.md)
+([LH-PERSIST-001](../../spec/lastenheft.md#lh-persist-001--speicherung-von-messdaten)..[007](../../spec/lastenheft.md#lh-persist-007--speicherung-von-optimierungsläufen)), [`spec/architecture.md`](../../spec/architecture.md)
 [§11](../../spec/architecture.md#11-persistenz) (Persistenz)
 
 Dieses Dokument fixiert das Betriebsverhalten der Persistenzschicht für
