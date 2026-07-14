@@ -1,6 +1,6 @@
 # Native ↔ .NET Control Kernel Parity Replay Dataset
 
-RM-M3-10 versioned golden dataset. Every case is a `(snapshot, limits,
+[RM-M3-10](../../../docs/plan/planning/done/plan-RM-M3.md) versioned golden dataset. Every case is a `(snapshot, limits,
 request, expected)` tuple that must produce **identical** commands when
 fed through:
 
@@ -38,7 +38,7 @@ to see; mismatch is a hard fail at test time, not a soft warning.
 ## Scope and exclusions
 
 This dataset is deliberately limited to cases the production
-managed-precheck pipeline accepts. Per the RM-M3-10 plan entry,
+managed-precheck pipeline accepts. Per the [RM-M3-10](../../../docs/plan/planning/done/plan-RM-M3.md) plan entry,
 the following are **not** parity cases:
 
 - Negative `dt` — managed control raises before reaching the kernel.
@@ -112,6 +112,6 @@ value used in `expected.reason` must be a key in that table.
 
 ## Excluded path: PID
 
-PID is RM-M3-13 scope. When that slice lands it ships `cases.v2.json`
+PID is [RM-M3-13](../../../docs/plan/planning/done/plan-RM-M3.md) scope. When that slice lands it ships `cases.v2.json`
 (or extends `cases.v1.json` if the schema is forward-compatible — to
-be decided in the RM-M3-13 plan).
+be decided in the [RM-M3-13](../../../docs/plan/planning/done/plan-RM-M3.md) plan).

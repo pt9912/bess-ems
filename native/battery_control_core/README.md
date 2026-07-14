@@ -2,7 +2,7 @@
 
 Native C implementation of the safety-critical primitives that today
 live in `BatteryEms.Domain` (`ConstraintLimiter`, `RampLimiter`,
-`PidController`) plus the RM-M5-03 high-frequency telemetry filter.
+`PidController`) plus the [RM-M5-03](../../docs/plan/planning/done/plan-RM-M5-03.md) high-frequency telemetry filter.
 The .NET path stays the production reference and the parity oracle;
 the native library is loaded only when explicitly configured
 (`NativeControl:Enabled=true`) and falls back to managed on ABI
@@ -29,14 +29,14 @@ paths referenced by `docs/user/quality.md` §5.2 and the M3 plan
 
 | Slice                          | Status |
 | ------------------------------ | ------ |
-| RM-M3-01 C-ABI header          | ✅      |
-| RM-M3-02 C impl (Constraint+Ramp) | ✅      |
-| RM-M3-06 part 1 build skeleton | ✅ (CMakeLists + Dockerfile native-build stage; `make native-build` runs cmake + ctest) |
-| RM-M3-08 C++ unit tests        | ✅ (doctest suite in tests/test_compute.cpp; sanitizer/coverage/lint gates active) |
-| RM-M3-13 PID                   | ✅      |
-| RM-M5-03 Telemetry filter      | ✅      |
+| [RM-M3-01](../../docs/plan/planning/done/plan-RM-M3.md) C-ABI header          | ✅      |
+| [RM-M3-02](../../docs/plan/planning/done/plan-RM-M3.md) C impl (Constraint+Ramp) | ✅      |
+| [RM-M3-06](../../docs/plan/planning/done/plan-RM-M3.md) part 1 build skeleton | ✅ (CMakeLists + Dockerfile native-build stage; `make native-build` runs cmake + ctest) |
+| [RM-M3-08](../../docs/plan/planning/done/plan-RM-M3.md) C++ unit tests        | ✅ (doctest suite in tests/test_compute.cpp; sanitizer/coverage/lint gates active) |
+| [RM-M3-13](../../docs/plan/planning/done/plan-RM-M3.md) PID                   | ✅      |
+| [RM-M5-03](../../docs/plan/planning/done/plan-RM-M5-03.md) Telemetry filter      | ✅      |
 
-The M3 plan is closed; RM-M5-03 extends the same ABI additively with
+The M3 plan is closed; [RM-M5-03](../../docs/plan/planning/done/plan-RM-M5-03.md) extends the same ABI additively with
 `battery_control_core_filter_telemetry`. See
 `docs/plan/planning/done/plan-RM-M5-03.md` for the filter slice.
 

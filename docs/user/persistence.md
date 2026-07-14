@@ -75,7 +75,7 @@ enden (`MAX(window_end) < cutoff`); die `schedule_windows`-Zeilen
 verschwinden über die `ON DELETE CASCADE`-Beziehung mit.
 
 Der Use Case ist stateless. M1 wired ihn noch nicht periodisch ein; das
-übernimmt der Worker in **RM-M1-19** (Composition Root). Operatoren
+übernimmt der Worker in **[RM-M1-19](../plan/planning/done/plan-RM-M1.md)** (Composition Root). Operatoren
 können das Verhalten heute über Integrationstests oder spätere
 Worker-Endpunkte triggern.
 
@@ -90,7 +90,7 @@ Aggregates) ist explizit Nach-MVP (LH-PERSIST-005, Roadmap M6).
 
 ### TimescaleDB-Erweiterung (RM-M6-04)
 
-PostgreSQL bleibt der Default. Ab RM-M6-04 enthält die
+PostgreSQL bleibt der Default. Ab [RM-M6-04](../plan/planning/done/plan-RM-M6-04.md) enthält die
 RunOnce-Migration `0005_timescale_telemetry_hypertable.sql` einen
 optionalen TimescaleDB-Pfad:
 
@@ -156,9 +156,9 @@ mit aggressiveren Werten), dann den Worker neu anlaufen lassen.
 
 ### Initialisierungsfehler
 
-`BessDbMigrator.MigrateAsync` läuft beim Worker-Start (RM-M2-MIG-05).
+`BessDbMigrator.MigrateAsync` läuft beim Worker-Start ([RM-M2-MIG-05](../plan/planning/done/plan-RM-M2-migration.md)).
 Schlägt der Aufruf fehl, **darf der Regelbetrieb nicht starten** — das
-ist Architektur-§11 + LH-CONF-003. Die Composition-Root-Wiring (RM-M1-19)
+ist Architektur-§11 + LH-CONF-003. Die Composition-Root-Wiring ([RM-M1-19](../plan/planning/done/plan-RM-M1.md))
 muss diesen Fehler explizit behandeln.
 
 ---
@@ -177,11 +177,11 @@ muss diesen Fehler explizit behandeln.
 ## 5. Bekannte Lücken (post-M1)
 
 - **Periodische Ausführung**: M1 liefert den Use Case, kein
-  Scheduler. RM-M1-19 verdrahtet ihn.
+  Scheduler. [RM-M1-19](../plan/planning/done/plan-RM-M1.md) verdrahtet ihn.
 - **Pro-Asset-Retention**: M1-14 schaltet Retention global per
   Datenklasse. Asset-spezifische Retention (z. B. "behalte
   Sicherheits-Asset-Telemetrie länger") ist Nach-MVP.
 - **Archivierung statt Löschung**: M1 löscht; Cold-Storage-Archivierung
   ist Nach-MVP (z. B. TimescaleDB-Aggregates oder S3-Export, Roadmap M6).
 - **TimescaleDB**: Native Time-Series-Optimierungen folgen mit
-  RM-M6-04, ohne fachliche Persistenz-API zu ändern (LH-PERSIST-005).
+  [RM-M6-04](../plan/planning/done/plan-RM-M6-04.md), ohne fachliche Persistenz-API zu ändern (LH-PERSIST-005).
