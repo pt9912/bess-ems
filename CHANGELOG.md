@@ -20,6 +20,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   retired checker (the d-check default omits it). `spans` newly flags
   unclosed code spans and nested links. Config lives in `.d-check.yml`.
 
+- **Docs gate extended with the `codepaths` + `tracked` modules, wired
+  via the `d-check --print-mk` fragment.** The Makefile now `include`s
+  `d-check.mk` (targets `doc-check`, `doc-tracked`, `doc-doctor`, …;
+  digest-pinned through `DCHECK_DIGEST`), and `make docs-check` runs
+  `doc-check` (now also `codepaths` — inline-code path existence) plus
+  `doc-tracked` (reference targets must be git-tracked). Historical and
+  immutable docs (`done/` plans, Accepted ADRs, `archive/`) are
+  `exempt-paths`; a documented runtime path and two genuine dangling
+  references in `quality.md` are tracked via `codepaths.ignore-refs`
+  rather than silently accepted (see Fixed).
+
 ### Removed
 
 - **`tools/check_markdown_links.py` and its `docs-check` Dockerfile
@@ -29,6 +40,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   container instead of two.
 
 ### Fixed
+
+- **Stale file paths in the operator quality manual**
+  (`docs/user/quality.md`), surfaced by the new `codepaths` check: the
+  JSON-Schema table pointed at `config/schema/*.json` (the files are
+  `*.schema.json`) and the native-tooling table at `native/*` (the files
+  live under `native/battery_control_core/`). Corrected. Two references
+  remain flagged as real gaps rather than removed —
+  `native/battery_control_core/.clang-format` (no clang-format config
+  exists; only `.clang-tidy`) and `config/schema/limits.schema.json`
+  (there is no `limits` schema) — tracked via `codepaths.ignore-refs`
+  for follow-up.
 
 ## [2.2.1] - 2026-07-13
 

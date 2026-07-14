@@ -18,6 +18,12 @@ DOCKER_BUILD = $(DOCKER) build $(BUILD_CONTEXT) \
 	--build-arg BUILD_CONFIGURATION=$(BUILD_CONFIGURATION) \
 	$(DOCKER_BUILD_ARGS)
 
+# d-check Makefile-Fragment (doc-check, doc-tracked, doc-doctor, …), erzeugt per
+# `d-check --print-mk`. Der Digest-Pin auf v0.42.0 (Release-Notes /
+# version.md#aktuell) sticht den :v0.42.0-Tag im Fragment; einzige Pin-Quelle.
+DCHECK_DIGEST := sha256:bdd9dad22390782ba1f5ab6c3bc09ea7720be0b1b159af6418280d69b84d8db4
+include d-check.mk
+
 .DEFAULT_GOAL := help
 
 .PHONY: help \
@@ -84,7 +90,7 @@ help:
 	@echo "  make lock-refresh    Refresh packages.lock.json files in Docker (per docs/user/quality.md §1.4)"
 	@echo "  make schema-validate      Validate schema/schema.yaml via d-migrate (RM-M2-MIG-02)"
 	@echo "  make schema-generate      Generate ?001_initial.sql from schema/schema.yaml (RM-M2-MIG-02)"
-	@echo "  make docs-check           Validate Markdown refs, host paths & spans (d-check)"
+	@echo "  make docs-check           Validate Markdown refs, paths, spans & tracking (d-check)"
 	@echo "  make field-vectors-check  Golden-vector drift gate vs Go field producer (ADR 0013 §5.2)"
 	@echo "  make field-vectors-refresh Regenerate config/schema/vectors/ field manifest"
 	@echo "  make sut-config-check     Render check for deploy/compose.{sut,field}.yml (ADR 0013 §5.3)"
@@ -178,16 +184,15 @@ helm-lint:
 		--set topology.mode=workerPerAsset \
 		--set mqtt.enabled=true >/tmp/bess-ems-helm-mqtt.yaml
 
-# Referenz-Checks via d-check (Digest-Pin auf v0.42.0,
-# https://github.com/pt9912/d-check/releases/tag/v0.42.0; Konfiguration in
-# .d-check.yml): Links, Anker, host-lokale absolute Pfade (Modul hostpaths,
-# loest den frueheren tools/check_markdown_links.py-Rest-Sensor samt eigener
-# Dockerfile-Stage ab) und ungeschlossene Code-Spans (Modul spans).
-# --network none haelt den Gate hermetisch (kein Netz-Modul aktiv, DC-QA-03).
-D_CHECK_IMAGE ?= ghcr.io/pt9912/d-check@sha256:bdd9dad22390782ba1f5ab6c3bc09ea7720be0b1b159af6418280d69b84d8db4
-
-docs-check:
-	docker run --rm --network none -v "$(CURDIR)":/repo:ro $(D_CHECK_IMAGE)
+# Referenz-Checks via d-check (Fragment d-check.mk, Digest-Pin auf v0.42.0;
+# Konfiguration in .d-check.yml). doc-check prueft Links, Anker, host-lokale
+# absolute Pfade (Modul hostpaths, loest den frueheren
+# tools/check_markdown_links.py-Rest-Sensor samt eigener Dockerfile-Stage ab),
+# ungeschlossene Code-Spans (spans) und Inline-Code-Pfade (codepaths).
+# doc-tracked prueft zusaetzlich, dass Referenzziele git-getrackt sind.
+# Beide hermetisch (--network none); docs-check buendelt sie unter dem
+# bestehenden Gate-Namen (gates/ci/CI rufen docs-check).
+docs-check: doc-check doc-tracked
 
 # ADR 0013 §5.1: integrity + conformance gate for the published device-mapping
 # field contract. Meta-validates every schema (Draft 2020-12), validates the

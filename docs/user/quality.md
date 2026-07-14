@@ -145,9 +145,9 @@ make native-sanitizer   # = docker build --target native-sanitizer
 | `Directory.Build.props`    | `TreatWarningsAsErrors=true`, `AnalysisLevel=latest-all`, `RestorePackagesWithLockFile=true` (siehe §1.4), gemeinsame Analyzer-PackageReference |
 | `Directory.Packages.props` | Zentrale Package-Versionen inkl. `Microsoft.CodeAnalysis.NetAnalyzers`                                                                          |
 | `**/packages.lock.json`    | Pro Projekt eingecheckte Lock-Datei mit Content-Hashes (siehe §1.4)                                                                             |
-| `native/.clang-format`     | C/C++ Layout                                                                                                                                    |
-| `native/.clang-tidy`       | C/C++ Check-Profil                                                                                                                              |
-| `native/CMakeLists.txt`    | Compiler-Flags `-Wall -Wextra -Wpedantic -Werror`                                                                                               |
+| `native/battery_control_core/.clang-format`     | C/C++ Layout                                                                                                                                    |
+| `native/battery_control_core/.clang-tidy`       | C/C++ Check-Profil                                                                                                                              |
+| `native/battery_control_core/CMakeLists.txt`    | Compiler-Flags `-Wall -Wextra -Wpedantic -Werror`                                                                                               |
 
 ### 1.4 Supply-Chain: NuGet-Lock-Files
 
@@ -793,11 +793,11 @@ JSON-Schema validiert. Schemata leben unter `config/schema/`.
 
 | Schema                              | Aktiv ab |
 | ----------------------------------- | -------- |
-| `config/schema/modbus-mapping.json` | M1       |
-| `config/schema/mqtt-mapping.json`   | M1       |
-| `config/schema/opcua-mapping.json`  | M4       |
-| `config/schema/asset.json`          | M1       |
-| `config/schema/limits.json`         | M1       |
+| `config/schema/modbus-mapping.schema.json` | M1       |
+| `config/schema/mqtt-mapping.schema.json`   | M1       |
+| `config/schema/opcua-mapping.schema.json`  | M4       |
+| `config/schema/asset.schema.json`          | M1       |
+| `config/schema/limits.schema.json`         | M1       |
 
 CI-Gate validiert alle Beispiel-Mappings unter `config/examples/`.
 

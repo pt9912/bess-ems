@@ -16,8 +16,29 @@
 scan:
   roots: ["."]
   ignore: [".github/**"]
-modules: [links, anchors, hostpaths, spans]
+modules: [links, anchors, hostpaths, spans, codepaths]
 hostpaths:
   # ersetzt die Default-Präfixliste; tmp ergänzt für Parität mit dem
   # abgelösten Rest-Sensor (d-check-Default lässt tmp bewusst aus).
   prefixes: [Development, home, Users, Volumes, mnt, media, tmp]
+
+# Inline-Code-Pfade (DC-FA-CODE-001): ./ und ../ immer, dazu die echten
+# Quell-/Doku-Wurzeln. Historisch/immutable Doku ist datei-weit ausgenommen
+# (done/-Pläne, Accepted-ADRs, Archiv — sie beschreiben den Stand ihrer Zeit,
+# etwa den C++→C-Pivot; wie CHANGELOG von der Existenz-Prüfung befreit).
+codepaths:
+  roots: [docs, spec, config, src, tests, deploy, native, schema, simulators, proto, scripts, internal]
+  exempt-paths:
+    - CHANGELOG.md
+    - "docs/plan/adr/**"
+    - "docs/plan/planning/done/**"
+    - "docs/archive/**"
+  # referenz-weit von der Existenz-Prüfung befreite Ziele:
+  ignore-refs:
+    - config/retention.json          # dokumentierter Laufzeit-Pfad (Operator legt ihn an), kein Repo-File; Beispiel unter config/examples/
+    - "docs/user/security.md"        # in note-RM-M4-followups als geplante Doku vorwärts-referenziert (noch nicht angelegt)
+    - "**/plan-RM-Mn.md"             # Namens-Platzhalter im roadmap-Wartungsabschnitt (Mn = beliebige Welle)
+    - "tests/fixtures/native_parity/pid_cases.v1.json"  # geplantes PID-Parity-Fixture (RM-M3-Followup, noch nicht angelegt)
+    # ECHTE DOKU-DEFEKTE (docs/user/quality.md) — getrackt, NICHT stillschweigend akzeptiert (siehe Bericht/CHANGELOG):
+    - "native/battery_control_core/.clang-format"  # DEFEKT: existiert nicht (nur .clang-tidy vorhanden) — quality.md §1.3
+    - config/schema/limits.schema.json             # DEFEKT: kein limits-Schema im Repo — quality.md §Schema-Tabelle
