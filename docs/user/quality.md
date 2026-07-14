@@ -210,20 +210,20 @@ make test           # = docker build --target test
 ```
 
 Filter: `Category!=Integration & Category!=Replay & Category!=Container`.
-Pflicht ab M1 (LH-TEST-001/002).
+Pflicht ab M1 ([LH-TEST-001](../../spec/lastenheft.md#lh-test-001--unit-tests-für-regelung)/002).
 
 Mindestumfang:
 
 | Komponente              | LH-Bezug                   |
 | ----------------------- | -------------------------- |
-| Constraint Limiter      | LH-CTRL-002, LH-SAFE-002/3 |
-| Ramp Limiter            | LH-CTRL-003                |
-| State Machine           | LH-SM-001..003             |
-| Snapshot Validation     | LH-RT-003, LH-DOM-004      |
+| Constraint Limiter      | [LH-CTRL-002](../../spec/lastenheft.md#lh-ctrl-002--constraint-limiter), [LH-SAFE-002](../../spec/lastenheft.md#lh-safe-002--kein-laden-außerhalb-soc-grenzen)/3 |
+| Ramp Limiter            | [LH-CTRL-003](../../spec/lastenheft.md#lh-ctrl-003--ramp-limiter)                |
+| State Machine           | [LH-SM-001](../../spec/lastenheft.md#lh-sm-001--explizite-betriebszustände)..003             |
+| Snapshot Validation     | [LH-RT-003](../../spec/lastenheft.md#lh-rt-003--maximales-messwertalter), [LH-DOM-004](../../spec/lastenheft.md#lh-dom-004--datenqualität)      |
 | Vorzeichenkonvention    | LH §4.1                    |
-| Day-Ahead-Fahrplanlogik | LH-MKT-001, LH-MKT-007     |
-| Zeitmodell inkl. DST    | LH-MKT-007                 |
-| PID (ab M2)             | LH-CTRL-004                |
+| Day-Ahead-Fahrplanlogik | [LH-MKT-001](../../spec/lastenheft.md#lh-mkt-001--day-ahead-fahrplan), [LH-MKT-007](../../spec/lastenheft.md#lh-mkt-007--zeitmodell-für-fahrpläne)     |
+| Zeitmodell inkl. DST    | [LH-MKT-007](../../spec/lastenheft.md#lh-mkt-007--zeitmodell-für-fahrpläne)                 |
+| PID (ab M2)             | [LH-CTRL-004](../../spec/lastenheft.md#lh-ctrl-004--pid-regelung)                |
 
 ### 2.2 Integrationstests
 
@@ -234,17 +234,17 @@ make test-integration   # = docker build --target test-integration
 Filter: `Category=Integration`. Verwendet Testcontainers für Postgres,
 einen Mosquitto-MQTT-Broker und Modbus-/OPC-UA-Simulatoren.
 
-Pflicht ab M1 für Modbus + MQTT (LH-TEST-003); OPC-UA-Integrationstests
+Pflicht ab M1 für Modbus + MQTT ([LH-TEST-003](../../spec/lastenheft.md#lh-test-003--integrationstests-für-protokolladapter)); OPC-UA-Integrationstests
 werden mit M4 aktiv.
 
 | Adapter / Pfad                    | Aktiv ab | LH-Bezug                      |
 | --------------------------------- | -------- | ----------------------------- |
-| Modbus-TCP gegen Simulator        | M1       | LH-MODB-001..005, LH-TEST-003 |
-| MQTT gegen Mosquitto              | M1       | LH-MQTT-001..005              |
-| Postgres-Persistenz               | M1       | LH-PERSIST-001..005           |
-| API gegen `WebApplicationFactory` | M1       | LH-API-001..007               |
-| OPC-UA gegen Simulator            | M4       | LH-OPCUA-001..005             |
-| Optimization-Sidecar (gRPC)       | M5       | LH-OPT-006                    |
+| Modbus-TCP gegen Simulator        | M1       | [LH-MODB-001](../../spec/lastenheft.md#lh-modb-001--modbus-tcp-lesen)..005, [LH-TEST-003](../../spec/lastenheft.md#lh-test-003--integrationstests-für-protokolladapter) |
+| MQTT gegen Mosquitto              | M1       | [LH-MQTT-001](../../spec/lastenheft.md#lh-mqtt-001--mqtt-telemetrie-empfang)..005              |
+| Postgres-Persistenz               | M1       | [LH-PERSIST-001](../../spec/lastenheft.md#lh-persist-001--speicherung-von-messdaten)..005           |
+| API gegen `WebApplicationFactory` | M1       | [LH-API-001](../../spec/lastenheft.md#lh-api-001--health-endpoint)..007               |
+| OPC-UA gegen Simulator            | M4       | [LH-OPCUA-001](../../spec/lastenheft.md#lh-opcua-001--opc-ua-lesen)..005             |
+| Optimization-Sidecar (gRPC)       | M5       | [LH-OPT-006](../../spec/lastenheft.md#lh-opt-006--solver-abstraktion)                    |
 
 #### 2.2.1 MQTT-Security-Profil
 
@@ -455,7 +455,7 @@ Metrics-Writes in `Optimize_success_produces_optimal_run_with_schedule`.
 
 ### 2.3 Sicherheitsfall-Tests
 
-Pflicht ab M1 (LH-TEST-006). Filter: `Category=Safety`. Werden zusätzlich
+Pflicht ab M1 ([LH-TEST-006](../../spec/lastenheft.md#lh-test-006--sicherheitsfall-tests)). Filter: `Category=Safety`. Werden zusätzlich
 zur normalen Test-Stage automatisch ausgeführt; Verletzung bricht den
 Build.
 
@@ -463,28 +463,28 @@ Build.
 make test-safety   # = docker build --target test-safety
 ```
 
-Verbindliche Sicherheitsfälle aus LH-TEST-006:
+Verbindliche Sicherheitsfälle aus [LH-TEST-006](../../spec/lastenheft.md#lh-test-006--sicherheitsfall-tests):
 
 | Fall                           | Erwartetes Verhalten                       | LH-Bezug               |
 | ------------------------------ | ------------------------------------------ | ---------------------- |
-| Emergency Stop aktiv           | spätestens nächster Zyklus → Stop-Command  | LH-SAFE-001            |
-| BMS nicht verfügbar            | sicherer Zustand (`0 kW`/Stop) mit Reason  | LH-SAFE-004            |
-| Wechselrichter nicht verfügbar | sicherer Zustand mit Reason                | LH-SAFE-004            |
-| SOC ungültig (NaN, <0, >100)   | DataQuality `invalid`, kein aktiver Befehl | LH-SAFE-006            |
-| Temperatur unplausibel         | DataQuality `invalid`, kein aktiver Befehl | LH-SAFE-006            |
-| Veralteter Snapshot (>3 s)     | sicherer Zustand mit Reason                | LH-RT-003, LH-CTRL-007 |
-| Kommunikationsverlust          | sicherer Zustand nach max. Messwertalter   | LH-SAFE-004            |
-| Abgelaufener `ValidUntil`      | Command verworfen                          | LH-SAFE-005            |
-| SOC ≥ MAX                      | Ladeanteil = 0                             | LH-SAFE-002            |
-| SOC ≤ MIN                      | Entladeanteil = 0                          | LH-SAFE-003            |
-| Schreibwert > Limit            | Adapter-seitige Schreibbegrenzung greift   | LH-SAFE-007            |
+| Emergency Stop aktiv           | spätestens nächster Zyklus → Stop-Command  | [LH-SAFE-001](../../spec/lastenheft.md#lh-safe-001--emergency-stop)            |
+| BMS nicht verfügbar            | sicherer Zustand (`0 kW`/Stop) mit Reason  | [LH-SAFE-004](../../spec/lastenheft.md#lh-safe-004--kommunikationsverlust)            |
+| Wechselrichter nicht verfügbar | sicherer Zustand mit Reason                | [LH-SAFE-004](../../spec/lastenheft.md#lh-safe-004--kommunikationsverlust)            |
+| SOC ungültig (NaN, <0, >100)   | DataQuality `invalid`, kein aktiver Befehl | [LH-SAFE-006](../../spec/lastenheft.md#lh-safe-006--datenplausibilität)            |
+| Temperatur unplausibel         | DataQuality `invalid`, kein aktiver Befehl | [LH-SAFE-006](../../spec/lastenheft.md#lh-safe-006--datenplausibilität)            |
+| Veralteter Snapshot (>3 s)     | sicherer Zustand mit Reason                | [LH-RT-003](../../spec/lastenheft.md#lh-rt-003--maximales-messwertalter), [LH-CTRL-007](../../spec/lastenheft.md#lh-ctrl-007--fallback-bei-ungültigem-snapshot) |
+| Kommunikationsverlust          | sicherer Zustand nach max. Messwertalter   | [LH-SAFE-004](../../spec/lastenheft.md#lh-safe-004--kommunikationsverlust)            |
+| Abgelaufener `ValidUntil`      | Command verworfen                          | [LH-SAFE-005](../../spec/lastenheft.md#lh-safe-005--veraltete-commands)            |
+| SOC ≥ MAX                      | Ladeanteil = 0                             | [LH-SAFE-002](../../spec/lastenheft.md#lh-safe-002--kein-laden-außerhalb-soc-grenzen)            |
+| SOC ≤ MIN                      | Entladeanteil = 0                          | [LH-SAFE-003](../../spec/lastenheft.md#lh-safe-003--kein-entladen-außerhalb-soc-grenzen)            |
+| Schreibwert > Limit            | Adapter-seitige Schreibbegrenzung greift   | [LH-SAFE-007](../../spec/lastenheft.md#lh-safe-007--schreibbegrenzung-vor-feldkommunikation)            |
 
 Jeder Sicherheitsfall ist mit einem dedizierten Test belegt; ein
 fehlender Test gilt als Coverage-Fehler unabhängig vom Coverage-Gate.
 
 ### 2.4 Native-Interop-Tests
 
-Aktiv ab **M3** (LH-TEST-005). Verteilt auf zwei getrennte
+Aktiv ab **M3** ([LH-TEST-005](../../spec/lastenheft.md#lh-test-005--native-interop-tests)). Verteilt auf zwei getrennte
 Make-Targets, deren xunit-Trait-Filter sicherstellen dass jeder
 Gate-Failure auf seine Kategorie attributiert:
 
@@ -497,12 +497,12 @@ make test-native-parity    # Replay-basierte Native↔Managed-Parität (Category
 
 | Prüfung                                                                     | LH-Bezug      |
 | --------------------------------------------------------------------------- | ------------- |
-| Struct-Layout (Sequential, Größen/Offsets/Konstanten für Compute, PID und Telemetrie-Filter) | LH-NATIVE-003 |
-| ABI-Handshake `NativeControlLoader.TryLoad` mit echter `.so`                | LH-NATIVE-005 |
-| Loader-Pfade `Disabled` / `LibraryMissing` / `Loaded` mit echtem Gateway    | LH-NATIVE-005 |
-| Native-Contract bei nicht-finiten Inputs (Snapshot/Limits/Request/Previous) | LH-NATIVE-004 |
-| Negatives `dt` mit `has_previous=1` → `BCC_STATUS_NEGATIVE_DT`              | LH-NATIVE-004 |
-| Telemetrie-Filter-Export gegen echte `.so` inkl. IIR-Update, Drift, Sample-Period und Non-Finite | LH-NATIVE-001/004 |
+| Struct-Layout (Sequential, Größen/Offsets/Konstanten für Compute, PID und Telemetrie-Filter) | [LH-NATIVE-003](../../spec/lastenheft.md#lh-native-003--keine-speicherallokation-über-sprachgrenzen) |
+| ABI-Handshake `NativeControlLoader.TryLoad` mit echter `.so`                | [LH-NATIVE-005](../../spec/lastenheft.md#lh-native-005--abi-versionierung) |
+| Loader-Pfade `Disabled` / `LibraryMissing` / `Loaded` mit echtem Gateway    | [LH-NATIVE-005](../../spec/lastenheft.md#lh-native-005--abi-versionierung) |
+| Native-Contract bei nicht-finiten Inputs (Snapshot/Limits/Request/Previous) | [LH-NATIVE-004](../../spec/lastenheft.md#lh-native-004--native-fehlercodes) |
+| Negatives `dt` mit `has_previous=1` → `BCC_STATUS_NEGATIVE_DT`              | [LH-NATIVE-004](../../spec/lastenheft.md#lh-native-004--native-fehlercodes) |
+| Telemetrie-Filter-Export gegen echte `.so` inkl. IIR-Update, Drift, Sample-Period und Non-Finite | [LH-NATIVE-001](../../spec/lastenheft.md#lh-native-001--cc-für-performance-kritische-komponenten)/004 |
 
 `make test-native-parity` deckt den replay-basierten
 Parity-Vergleich gegen den versionierten Datensatz unter
@@ -516,7 +516,7 @@ bricht den Build.
 
 ### 2.5 Replay-Tests
 
-Aktiv ab **M2**. Filter: `Category=Replay` (LH-TEST-004). Der Replay-Pfad stellt
+Aktiv ab **M2**. Filter: `Category=Replay` ([LH-TEST-004](../../spec/lastenheft.md#lh-test-004--replay-tests)). Der Replay-Pfad stellt
 das Gate als eigenes Docker-Target bereit. Die ersten Manifest-v1-Fixtures
 liegen unter `tests/fixtures/replay/`.
 
@@ -553,7 +553,7 @@ MPC-Fallback-Stempel und `mpc_runs`-Retention/Replays.
 
 ### 2.6 Container-Tests
 
-Aktiv ab M1 (LH-TEST-007). Filter: `Category=Container`.
+Aktiv ab M1 ([LH-TEST-007](../../spec/lastenheft.md#lh-test-007--container-tests)). Filter: `Category=Container`.
 
 ```bash
 make test-container
@@ -707,7 +707,7 @@ Das Runtime-Image ist gehärtet und folgt dem Multi-Stage-Pattern aus
   `ldd`-Gate fail't das Image, falls die `.so` nicht-auflösbare
   Dynamic-Deps zieht. Aktuelle `.so` (M3-Closure) ist
   C-only, hat null `NEEDED`-Einträge und keine libstdc++-Linkage.
-  (LH-NATIVE-006, LH-DEPLOY-004)
+  ([LH-NATIVE-006](../../spec/lastenheft.md#lh-native-006--container-build), [LH-DEPLOY-004](../../spec/lastenheft.md#lh-deploy-004--native-build))
 - App läuft als nicht-root User `app` (UID 1654, in der
   aspnet-Base bereits angelegt)
 - Exposed Port: `8080`
@@ -715,7 +715,7 @@ Das Runtime-Image ist gehärtet und folgt dem Multi-Stage-Pattern aus
   prüft zusätzlich `test -f /app/native/libbattery_control_core.so`
   plus `ldd` im laufenden Container
 
-Smoke-Test (LH-DEPLOY-001/002, LH-TEST-007):
+Smoke-Test ([LH-DEPLOY-001](../../spec/lastenheft.md#lh-deploy-001--dockerfile)/002, [LH-TEST-007](../../spec/lastenheft.md#lh-test-007--container-tests)):
 
 ```bash
 make runtime
@@ -741,7 +741,7 @@ Coverage-Gates kompensierbar.
 
 ### 5.2 Native ABI
 
-Aktiv ab **M3** (LH-NATIVE-005).
+Aktiv ab **M3** ([LH-NATIVE-005](../../spec/lastenheft.md#lh-native-005--abi-versionierung)).
 
 | Gate                                                               | Ort                                                                 |
 | ------------------------------------------------------------------ | ------------------------------------------------------------------- |
@@ -787,7 +787,7 @@ ersten `IControlKernel`-Resolve zum harten Startup-Fehler.
 
 ### 5.3 Adapter-Mapping-Schema
 
-Pflicht ab M1 für Modbus + MQTT, ab M4 für OPC-UA (LH-CONF-002).
+Pflicht ab M1 für Modbus + MQTT, ab M4 für OPC-UA ([LH-CONF-002](../../spec/lastenheft.md#lh-conf-002--versionierte-gerätemappings)).
 Jedes Mapping unter `config/adapters/**` wird beim Start gegen ein
 JSON-Schema validiert. Schemata leben unter `config/schema/`.
 
@@ -802,24 +802,24 @@ CI-Gate validiert alle Beispiel-Mappings unter `config/examples/`.
 
 ### 5.4 OpenAPI-Vertrag
 
-Pflicht ab M1 (LH-API-001..007). Die API exportiert eine OpenAPI-3.1-
+Pflicht ab M1 ([LH-API-001](../../spec/lastenheft.md#lh-api-001--health-endpoint)..007). Die API exportiert eine OpenAPI-3.1-
 Beschreibung. Drei Gates:
 
 - Schema-Wohlgeformtheit (gegen offizielles Meta-Schema)
 - Endpunkt-Paritätstest: jeder im Lastenheft genannte Endpunkt ist
   vorhanden und antwortet mit dokumentiertem Statuscode
 - AuthZ-Negativtest: schreibende Endpunkte ohne Rolle → 401/403
-  (LH-API-007)
+  ([LH-API-007](../../spec/lastenheft.md#lh-api-007--authentifizierung-und-autorisierung))
 
 ### 5.5 Konfigurations-Startvalidierung
 
-Pflicht ab M1 (LH-CONF-003, LH-OPS-001). Test prüft, dass das System
+Pflicht ab M1 ([LH-CONF-003](../../spec/lastenheft.md#lh-conf-003--validierung-der-konfiguration), [LH-OPS-001](../../spec/lastenheft.md#lh-ops-001--sicherer-start)). Test prüft, dass das System
 mit unvollständiger oder ungültiger Konfiguration nicht in den aktiven
 Regelbetrieb übergeht.
 
 ### 5.6 Hexagonale Architektur-Tabus
 
-Pflicht-Gate ab M1 (LH-ARCH-002, LH-NF-006). Setzt die
+Pflicht-Gate ab M1 ([LH-ARCH-002](../../spec/lastenheft.md#lh-arch-002--schichtentrennung), [LH-NF-006](../../spec/lastenheft.md#lh-nf-006--wartbarkeit)). Setzt die
 Dependency Rule und die Architektur-Tabus aus
 [`spec/architecture.md`](../../spec/architecture.md) §4.2 durch.
 
@@ -888,7 +888,7 @@ Prinzip:
 Der Native-Pfad ist niemals exklusiv: bei ABI-Mismatch oder
 nativem Fehler aus validem .NET-Kontext fällt der Adapter
 deterministisch auf die Managed-Referenz zurück, der Regelkreis
-bleibt funktionsfähig (LH-ARCH-006, AR-P-009; siehe §5.2 für die
+bleibt funktionsfähig ([LH-ARCH-006](../../spec/lastenheft.md#lh-arch-006--native-core-als-optionaler-beschleuniger), AR-P-009; siehe §5.2 für die
 Loader-Endzustände).
 
 ---

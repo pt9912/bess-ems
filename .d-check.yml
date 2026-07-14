@@ -132,7 +132,6 @@ ids:
         - "docs/plan/planning/done/**"
         - "docs/archive/**"
         # --- noch nicht LH-verlinkt (Rollout, Datei für Datei) ---
-        - "docs/user/quality.md"
         - "docs/plan/planning/in-progress/roadmap.md"
         - "spec/architecture.md"
   # Modul-global (kein scope). ADR/RM sind planungs-intern und daher überall
