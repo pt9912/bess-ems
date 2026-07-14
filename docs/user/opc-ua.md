@@ -44,7 +44,7 @@ Nicht Gegenstand dieses Adapter-Scope:
 - Methodenaufrufe (Methods)
 - Historische Werte (History)
 - Events/Alarme
-- Server-seitige Security-Härtung (separater Slice RM-M4-05)
+- Server-seitige Security-Härtung (separater Slice [RM-M4-05](../plan/planning/done/plan-RM-M4-05.md))
 
 ## Begriffe (praktisch)
 - **NodeId**: Eindeutiger OPC-UA-Node-Pfad für einen Wert (z. B. SOC, Power, Temperature).
@@ -64,7 +64,7 @@ Pro Telemetrie-Sample gilt: eine schlechte Qualität dominiert.
 Ein einzelner `Bad`-Status macht die Probe ungültig (`ProtocolError`), bei `Uncertain` ohne `Bad` wird `Stale` verwendet.
 
 ## Sicherheit in diesem Scope
-Seit RM-M4-05 ist OPC-UA production-fail-closed gehärtet:
+Seit [RM-M4-05](../plan/planning/done/plan-RM-M4-05.md) ist OPC-UA production-fail-closed gehärtet:
 
 - Default ist `RuntimeProfile=Production` mit
   `SecurityMode=SignAndEncrypt` und allowlisteter Security-Policy.

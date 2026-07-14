@@ -1,6 +1,6 @@
 # Transport-Mapping v1 — gRPC-Status → Normierte Outcomes
 
-**Dokumenttyp:** Versioniertes Artefakt (RM-M5-01 D-04)
+**Dokumenttyp:** Versioniertes Artefakt ([RM-M5-01](../../../docs/plan/planning/done/plan-RM-M5-01.md) D-04)
 **Status:** Aktiv für `optimization-core` Contract-Version 1.x
 **Bezug:**
 [`optimization_core.proto`](optimization_core.proto) (Service-Vertrag),
@@ -124,9 +124,9 @@ eigene F-Item-Linie wenn der Trigger zündet:
 - **gRPC-`FAILED_PRECONDITION`**: heute fallen alle Pre-Condition-
   Fehler unter `INVALID_ARGUMENT` (Sidecar-seitige Klassifikation).
   Trennung kommt wenn der Sidecar `FAILED_PRECONDITION` für
-  Solver-State-Inconsistencies nutzt (RM-M5-02 MPC-State-Reset-Pfad).
+  Solver-State-Inconsistencies nutzt ([RM-M5-02](../../../docs/plan/planning/done/plan-RM-M5-02.md) MPC-State-Reset-Pfad).
 - **MPC-spezifische Outcomes** (`InvalidMpcState`,
-  `KalmanFilterDiverged`): kommen mit RM-M5-02 als additive Felder
+  `KalmanFilterDiverged`): kommen mit [RM-M5-02](../../../docs/plan/planning/done/plan-RM-M5-02.md) als additive Felder
   im selben `SolverStatus`-Enum oder als neuer Outcome-Slot in
   `OptimizeMpcResponse`. Vertrag-Reserve für diese Slots ist in
   `optimization_core.proto` § OptimizeMpcResponse (Field-Numbers

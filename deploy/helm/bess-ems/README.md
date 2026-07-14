@@ -1,6 +1,6 @@
 # bess-ems Helm Chart
 
-RM-M6-03 introduces this chart as the Kubernetes path next to the
+[RM-M6-03](../../../docs/plan/planning/done/plan-RM-M6-03.md) introduces this chart as the Kubernetes path next to the
 existing Compose reference. Compose remains the runtime smoke until a
 cluster-level Kubernetes gate is activated.
 

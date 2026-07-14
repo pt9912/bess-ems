@@ -5,7 +5,7 @@
 Dieses Dokument beschreibt, wo die Verantwortung des `bess-ems` endet
 und wann ein Edge-Controller, BMS, PCS oder eine Hardware-Schutzkette
 uebernehmen muss. Es ist eine Betreiber- und Integrationssicht auf
-RM-M6-05 und [ADR 0008](../plan/adr/0008-edge-controller-boundary.md).
+[RM-M6-05](../plan/planning/done/plan-RM-M6-05.md) und [ADR 0008](../plan/adr/0008-edge-controller-boundary.md).
 
 Das EMS koordiniert Markt, Fahrplaene, Optimierung, Operator-Workflows,
 Audit und den normalen 1-s-Dispatch. Es ersetzt keinen Hardware-Not-Aus,

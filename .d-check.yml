@@ -92,3 +92,19 @@ ids:
         - "docs/plan/adr/**"
         - "docs/plan/planning/done/**"
         - "docs/archive/**"
+    - regex: 'RM-M\d+-[0-9A-Z]+(-[0-9A-Z]+)?'
+      target: docs/plan/planning/
+      link-policy: prose
+      exempt-paths:
+        - "**/CHANGELOG.md"
+        - "docs/reviews/**"
+        - "docs/plan/adr/**"
+        - "docs/plan/planning/done/**"
+        - "docs/archive/**"
+        # --- noch nicht RM-verlinkt (Phase 3b, Datei für Datei) ---
+        - "docs/user/quality.md"
+        - "docs/user/persistence.md"
+        - "spec/lastenheft.md"
+        - "spec/architecture.md"
+        - "native/battery_control_core/README.md"
+        - "tests/fixtures/native_parity/README.md"
