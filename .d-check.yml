@@ -121,7 +121,10 @@ ids:
     # — die erlaubte, wertvolle Requirements-Traceability. Daher global
     # linkpflichtig, mit Abschnitts-Anker. Ausgenommen: lastenheft selbst
     # (Definitionen) und immutable/historische Doku. Rollout Datei für Datei.
-    - regex: 'LH-[A-Z]+-[0-9]+'
+    # Nur Anforderungs-Kategorien (als `### LH-CAT-NNN — Titel` definiert).
+    # `LH-OPEN-*` sind offene Punkte, keine Anforderungen (kein Definitions-
+    # Heading) — bewusst NICHT erfasst (RE2 kann kein Lookahead, daher Enum).
+    - regex: 'LH-(API|ARCH|CONF|CTRL|DEPLOY|DOM|KTX|MKT|MODB|MON|MQTT|NATIVE|NF|OPCUA|OPS|OPT|PERSIST|PROT|RISK|RT|SAFE|SM|TEST|ZIEL)-[0-9]+'
       target: spec/lastenheft.md
       link-policy: prose
       exempt-paths:
@@ -132,7 +135,6 @@ ids:
         - "docs/plan/planning/done/**"
         - "docs/archive/**"
         # --- noch nicht LH-verlinkt (Rollout, Datei für Datei) ---
-        - "docs/plan/planning/in-progress/roadmap.md"
         - "spec/architecture.md"
   # Modul-global (kein scope). ADR/RM sind planungs-intern und daher überall
   # nur exemptiert/verlinkt wo sie vorkommen (immutable ADRs ausgenommen); die
