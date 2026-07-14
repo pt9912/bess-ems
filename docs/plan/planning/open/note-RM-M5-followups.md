@@ -31,7 +31,7 @@ eigener `plan-RM-M5-01-FUP-{slug}.md` in `open/`.
 
 ## Item F-M5-01: Cert-Rotation für mTLS-Cross-Host-Pfad
 
-**Quelle:** plan-RM-M5-01 §9 + ADR 0005 §4. Analog zu F-18 aus M4-05.
+**Quelle:** plan-RM-M5-01 §9 + [ADR 0005 §4](../../adr/0005-optimization-core-sidecar-transport.md#4-achse-2--security-modell). Analog zu F-18 aus M4-05.
 Heute (Post-M5-01): `OptimizationCoreClient.ConnectAsync` materialisiert
 den `GrpcChannel` einmalig; Cert-Lifecycle-Events (rotierte mTLS-
 Client-Cert, vom Vendor neu ausgestellte Server-Cert) verlangen
@@ -78,7 +78,7 @@ Slice-Plan.
 
 ## Item F-M5-02: Multi-Tenant-Bearer-Token-Auth
 
-**Quelle:** plan-RM-M5-01 §3 + §9 + ADR 0005 §4. Heute (Post-M5-01):
+**Quelle:** plan-RM-M5-01 §3 + §9 + [ADR 0005 §4](../../adr/0005-optimization-core-sidecar-transport.md#4-achse-2--security-modell). Heute (Post-M5-01):
 `OptimizationCoreOptions.BearerTokenSource` ist als Slot vorgesehen
 und im Adapter durchgereicht, aber **nicht aktiviert** — der Adapter
 fährt mTLS (Cross-Host) oder UDS+Filesystem-Perms (Loopback) als
@@ -127,7 +127,7 @@ Slice-Plan.
 
 ## Item F-M5-03: Drittsprach-Sidecar-Produktiv-Implementierung
 
-**Quelle:** plan-RM-M5-01 §3 Out-of-Scope + §9 + ADR 0005 §7
+**Quelle:** plan-RM-M5-01 §3 Out-of-Scope + §9 + [ADR 0005 §7](../../adr/0005-optimization-core-sidecar-transport.md#7-trigger-für-transport-pivot-phase-4)
 (Phase-4-Pivot-Trigger). Heute (Post-M5-01): der TestSidecar in
 `tests/integration/BatteryEms.OptimizationCore.IntegrationTests/`
 ist ein in-process `Grpc.AspNetCore`-Stub mit echten Domain-Mocks,
@@ -151,13 +151,13 @@ ein echter Drittsprach-Sidecar-Container ist explizit eigene Linie.
 Drei Sub-Linien, die zusammen die F-M5-03-Lieferung definieren:
 
 - **(a) Sprach-Pivot-Diskussion + Backend-Wahl**: eigene Carve-out-
-  ADR (analog zu ADR 0005). Kandidaten: Python (CVXPY + HiGHS/SCIP/
+  ADR (analog zu [ADR 0005](../../adr/0005-optimization-core-sidecar-transport.md)). Kandidaten: Python (CVXPY + HiGHS/SCIP/
   Gurobi-Wrapper; bequem für MPC-Prototyping), Rust (Highs-Bindings
   + `tonic` für gRPC; ABI-stabil, kompiliert deterministisch),
   C++ (CMake + gRPC + Solver-of-Choice; höchste Performance, aber
   Aufwand). Operator-Lifecycle-Kosten (Container-Image-Build,
   Vulnerability-Tracking, Solver-License-Workflow) sind Teil der
-  Entscheidung — siehe ADR 0005 §7 Phase-4-Pivot-Trigger
+  Entscheidung — siehe [ADR 0005 §7](../../adr/0005-optimization-core-sidecar-transport.md#7-trigger-für-transport-pivot-phase-4) Phase-4-Pivot-Trigger
   (Drittsprach-Solver-Lifecycle-Kosten als expliziter In-Process-
   Embed-Pivot-Auslöser).
 - **(b) Schwesterprojekt-Skelett**: entweder `bess-optimization-
@@ -181,7 +181,7 @@ Solver-Wrapper-Stand der Drittsprache abhängt.
 **Aktivierungs-Pfad:** Sprach-Pivot-ADR zuerst (eigene Folge-ADR im
 `docs/plan/adr/`-Verzeichnis — erste freie ADR-Nummer zur
 Aktivierungs-Zeit; die ursprünglich vorgemerkte Nummer 0006 ist
-durch ADR 0006 (MPC-Kernel-Backend-and-Solver) belegt, F-M5-12
+durch [ADR 0006](../../adr/0006-mpc-kernel-backend-and-solver.md) (MPC-Kernel-Backend-and-Solver) belegt, F-M5-12
 zielt auf dieselbe Nummern-Reihe — first-writer-wins entscheidet
 zur Aktivierungs-Zeit welche Folgearbeit welche Nummer bekommt),
 dann eigener Slice-Plan
@@ -322,7 +322,7 @@ genannten Trigger zündet.
   bleibt, ist Sidecar-First eine Option.
 - **Solver-Isolationspflicht.** OSQP-Crash wird in Produktion zur
   operativen Quelle (Plan-RM-M5-02 §7 Risiken-Block nennt das als
-  Sub-Slice-B-Risiko; ADR 0004 §4 Trigger 6 = Crash-Isolation ist
+  Sub-Slice-B-Risiko; [ADR 0004 §4](../../adr/0004-native-kernel-process-isolation.md#4-achse-2--trigger-für-out-of-process-pivot) Trigger 6 = Crash-Isolation ist
   die generische Linie) ODER Operator-Anforderung nach Solver-
   Sandbox (Audit, Sicherheits-Zertifizierung). Sidecar-First wird
   dann „Sidecar primary, in-process-Local-OSQP als Fallback".
@@ -346,7 +346,7 @@ genannten Trigger zündet.
   Zeit) mit Migrations-Plan: welche Trigger zünden, welche
   Topologie wird gewählt, welche Operator-UX-Pflichten kommen mit,
   wie wird `MpcBackend`-Slot-Vokabular erweitert. Pivot ändert
-  nicht silent ADR 0006.
+  nicht silent [ADR 0006](../../adr/0006-mpc-kernel-backend-and-solver.md).
 - (b) Zweiter `IMpcModelSolver`-Adapter `OptimizationCoreMpcOptimizer`
   in einem neuen `BatteryEms.Adapters.Optimization.Mpc.Sidecar`-
   Namespace neben dem bestehenden `Local`-Namespace. Adapter
@@ -366,7 +366,7 @@ genannten Trigger zündet.
   TestSidecar-MPC-Stubs (`OptimalMpcStub` + `ScriptableMpcOutcomeStub`)
   für den In-Process-Test-Pfad — diese gehörten konzeptionell zur
   Sidecar-First-Linie und sind damit Teil von F-M5-12, nicht von
-  M5-02 (vgl. ADR 0006 §3 Verworfene Alternativen Sidecar-First).
+  M5-02 (vgl. [ADR 0006 §3](../../adr/0006-mpc-kernel-backend-and-solver.md#3-achse-1--backend-topologie-optionen) Verworfene Alternativen Sidecar-First).
 - (e) Boot-Gate-Erweiterung: wenn `MpcBackend = "optimization_core"`
   und `RuntimeProfile=Production`, dann ist `OptimizationCoreOptions`
   Pflicht (analog zum M5-01-LP-Adapter-Boot-Gate); fehlt der Slot,
@@ -378,7 +378,7 @@ M5-01 (Channel, Idempotency-Store, Fallback-Validator) maximal
 genutzt wird (Adapter + 8+ Roundtrip-Pins + Boot-Gate +
 TestSidecar-MPC-Stubs `OptimalMpcStub`/`ScriptableMpcOutcomeStub` +
 DI-Wiring + Folge-ADR). Upper-Bound ~6 Wochen, wenn der Multi-
-Language-Trigger (§6 Punkt 3 in ADR 0006) zündet — dann ist
+Language-Trigger (§6 Punkt 3 in [ADR 0006](../../adr/0006-mpc-kernel-backend-and-solver.md#6-trigger-für-backend-pivot-f-m5-12)) zündet — dann ist
 F-M5-03 (Drittsprach-Sidecar-Produktiv-Implementierung) parallele
 Schwester-Linie mit eigener Aufwandskurve. Vergleichswert für die
 Schätzgröße: RM-M5-01-B (TestSidecar + Roundtrip-Pins) plus
