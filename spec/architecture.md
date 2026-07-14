@@ -181,7 +181,7 @@ Case → Driven Ports → Driven Adapter**.
 Bess-ems folgt dem **driving/driven**-Stil. „Driving" markiert die
 Aufrufrichtung von außen in den Kern,
 „Driven" die Aufrufrichtung vom Kern nach außen. Die Verzeichnisstruktur
-ist verbindlich für den Solution-Aufbau (RM-M1-01):
+ist verbindlich für den Solution-Aufbau:
 
 ```text
 bess-ems/
@@ -650,7 +650,7 @@ Ausgabe + persistierter Reason. Tritt ein bei:
 Softwareseitige Stop-Funktionen ersetzen keinen Hardware-Not-Aus, keine
 BMS-Schutztechnik und keine Wechselrichter-Schutzfunktionen. Harte
 Echtzeit-/Schutzanforderungen werden außerhalb des Docker-EMS abgegrenzt
-(LH-SAFE-001 Hinweis, LH-RISK-001). RM-M6-05 normiert diese Grenze so:
+(LH-SAFE-001 Hinweis, LH-RISK-001). Diese Grenze ist normativ so gezogen:
 Das EMS bleibt supervisory/1-s-Dispatch; Edge-/Herstellercontroller,
 BMS/PCS und Hardware-Schutzketten uebernehmen sub-cycle oder
 zertifizierungsnahe Schutzaufgaben.
@@ -670,14 +670,14 @@ zertifizierungsnahe Schutzaufgaben.
 | Retention          | konfigurierbar, getrennt je Datentyp, kein Auto-Delete von Audit | LH-PERSIST-006 |
 | Persistenzfehler   | definiertes Verhalten, kein undefinierter Regelbetrieb  | LH-PERSIST-006   |
 
-Migrations-Strategie: versionierter Pfad ab M2 (RM-M2-MIG-05) —
+Migrations-Strategie: versionierter Pfad ab M2 —
 DDL aus einer neutralen `schema.yaml` per `d-migrate` (Build-Time)
 generiert, zur Laufzeit per `DbUp` mit Tracking-Tabelle
 `__schema_versions` angewendet. EF Core Migrations und FluentMigrator
 sind als Alternativen geprüft und mit Begründung ausgeschlossen worden. `BessDbMigrator.MigrateAsync` ist
 idempotent beim Worker-Start anwendbar und setzt vor DbUp einen
 `pg_advisory_lock(hashtextextended('bess-ems:migrations', 0))`, sodass
-mehrere Repliken sicher boot-rennen können (RM-M2-MIG-OPEN-06).
+mehrere Repliken sicher boot-rennen können.
 
 ---
 
@@ -850,8 +850,8 @@ zu finden.
 | Kennung    | Frage                                                               | Status |
 | ---------- | ------------------------------------------------------------------- | ------ |
 | AR-OPEN-004 | Fahrplanimport-Format (CSV, JSON, ENTSO-E, proprietär)?           | Offen  |
-| AR-OPEN-007 | Authentifizierungsverfahren (API-Token, OIDC, mTLS)?              | Teilweise geschlossen — API-Token + Operator-Rolle sind mit RM-M1-16 live; OIDC und mTLS sind Folge-ADR-Trigger (konsistent mit RM-OPEN-04 in der Roadmap). |
-| AR-OPEN-012 | MPC-Backend-Topologie: in-process Local-First vs. Sidecar-First vs. Bi-Modal? | Reserviert — heute geschlossen auf Local-First mit OSQP; Sidecar-Erweiterung ist F-M5-12-Folgearbeit mit fünf Triggern (siehe `docs/plan/planning/open/note-RM-M5-followups.md`). |
+| AR-OPEN-007 | Authentifizierungsverfahren (API-Token, OIDC, mTLS)?              | Teilweise geschlossen — API-Token + Operator-Rolle sind live; OIDC und mTLS sind Folge-ADR-Trigger (konsistent mit RM-OPEN-04 in der Roadmap). |
+| AR-OPEN-012 | MPC-Backend-Topologie: in-process Local-First vs. Sidecar-First vs. Bi-Modal? | Reserviert — heute geschlossen auf Local-First mit OSQP; Sidecar-Erweiterung ist F-M5-12-Folgearbeit mit fünf Triggern. |
 
 ---
 

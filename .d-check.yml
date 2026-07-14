@@ -78,6 +78,9 @@ matrix:
   rules:
     # Spec ist autoritativ ⇒ verweist nicht abwärts auf ADRs.
     - { from: spec, to: adr, allow: false }
+    # Spec verweist erst recht nicht abwärts auf die Planung — RM-* sind
+    # nicht-normativ (die Norm ist LH-*); auch als nackter RM-Token gefasst.
+    - { from: spec, to: plan, allow: false }
     # ADRs sind Entscheidungs-Records ⇒ verweisen nicht abwärts auf Pläne
     # (die Pläne verweisen aufwärts auf ihre ADR). Ein neuer ADR, der einen
     # Umsetzungs-Plan als Provenance nennen muss, deklariert das per
