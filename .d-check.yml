@@ -72,7 +72,9 @@ matrix:
       order: [spec/lastenheft.md, spec/architecture.md]
       direction: no-downward
     - { name: adr, paths: ["docs/plan/adr/[0-9]*.md"] }
-    - { name: plan, paths: ["docs/plan/planning/**"] }
+    # token: eine nackte RM-Kennung im ADR-Körper zählt als Referenz auf die
+    # Planung (nicht nur ein Markdown-Link) ⇒ adr→plan wird auch als Token gefasst.
+    - { name: plan, paths: ["docs/plan/planning/**"], token: 'RM-M\d+-[0-9A-Z]+(-[0-9A-Z]+)?' }
   rules:
     # Spec ist autoritativ ⇒ verweist nicht abwärts auf ADRs.
     - { from: spec, to: adr, allow: false }
@@ -83,11 +85,11 @@ matrix:
     - { from: adr, to: plan, allow: false }
   status: { forbidden: [superseded, deprecated] }
   exclude-sections: [Historie, Geschichte]
-  # Grandfathering: die vor dieser Regel Accepted-ADRs 0001–0009 nennen ihre
-  # Umsetzungs-Pläne als legitime Provenance-/Verifikations-Zeiger und sind
-  # immutabel — sie werden übersprungen. Ab 0010 (bereits plan-frei) und für
-  # jeden neuen ADR gilt adr→plan verboten.
-  exempt-paths: ["docs/plan/adr/000[1-9]-*.md"]
+  # Grandfathering: die bestehenden Accepted-ADRs 0001–0013 nennen ihre
+  # Umsetzungs-Pläne (Links UND RM-Token) als legitime Provenance und sind
+  # immutabel — sie werden übersprungen. Für JEDEN neuen ADR (ab 0014) gilt
+  # adr→plan verboten, auch als nackter RM-Token (Regel für neue ADRs gesichert).
+  exempt-paths: ["docs/plan/adr/000[1-9]-*.md", "docs/plan/adr/001[0-3]-*.md"]
 
 # Linkpflicht für Kennungen (DC-FA-ID): eine nackte Kennung im Fließtext muss
 # auf ihre Definition verlinken — bei Abschnitts-Bezug (§X) inkl. Anker.
