@@ -134,8 +134,6 @@ ids:
         - "docs/plan/adr/**"
         - "docs/plan/planning/done/**"
         - "docs/archive/**"
-        # --- noch nicht LH-verlinkt (Rollout, Datei für Datei) ---
-        - "spec/architecture.md"
   # Modul-global (kein scope). ADR/RM sind planungs-intern und daher überall
   # nur exemptiert/verlinkt wo sie vorkommen (immutable ADRs ausgenommen); die
   # normative LH-Traceability gilt global aufwärts.
