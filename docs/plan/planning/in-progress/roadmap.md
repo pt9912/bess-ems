@@ -44,15 +44,15 @@ unter `in-progress/`.
 > signiert + SBOM-attestiert, 8 Release-Assets inkl. Schema-Bundle) —
 > [github.com/pt9912/bess-ems/releases/tag/v2.2.1](https://github.com/pt9912/bess-ems/releases/tag/v2.2.1).
 > Die v2.x-Linie: `v2.0.0` (publiziertes Feldvertrags-Bundle mit
-> Pflicht-`schema_version` — Contract-Break, ADR 0013 §5.1), `v2.1.0`
+> Pflicht-`schema_version` — Contract-Break, [ADR 0013 §5.1](../../adr/0013-device-mapping-field-contract.md#5-umsetzung-reihenfolge)), `v2.1.0`
 > (MQTT-Golden-Vector-Suite, §5.2), `v2.2.0` (Modbus-Golden-Vectors +
-> SUT-Doku/Compose — **ADR 0013 §5 vollständig**), `v2.2.1` (Operator-
+> SUT-Doku/Compose — **[ADR 0013 §5](../../adr/0013-device-mapping-field-contract.md#5-umsetzung-reihenfolge) vollständig**), `v2.2.1` (Operator-
 > Web-Shell wird jetzt vom Produktions-Host ausgeliefert +
 > [`anwenderhandbuch.md`](../../../user/anwenderhandbuch.md)).
 > Release-Prozess in [`../../../user/releasing.md`](../../../user/releasing.md),
 > Gate-Definitionen in [`../../../user/quality.md`](../../../user/quality.md) §8.
 >
-> **Feldvertrag + Kopplung (ADR 0013):** Status
+> **Feldvertrag + Kopplung ([ADR 0013](../../adr/0013-device-mapping-field-contract.md)):** Status
 > `Accepted — §5.1–§5.4 umgesetzt (§5 vollständig)`. Vier
 > Vector-Manifeste (MQTT field/ems + Modbus simulator/hil) im
 > versionierten Bundle; die im ADR §1 belegte
@@ -76,7 +76,7 @@ unter `in-progress/`.
 >    [`../next/note-internal-refinement-scope.md`](../next/note-internal-refinement-scope.md)):
 >    wartet auf das nächste freie Minor.
 > 3. **Kommando-Closed-Loop-Wirkung** der Schwester-Plattform bleibt
->    deferred-with-trigger (ADR 0013 §6, LH-SAFE-007).
+>    deferred-with-trigger ([ADR 0013 §6](../../adr/0013-device-mapping-field-contract.md#6-command-closed-loop-deferred-mit-trigger-0012-muster), LH-SAFE-007).
 > 4. grid-gym-Digest-Bumps weiterhin bewusst via `GRID_GYM_IMAGE`,
 >    wenn dort neue Releases landen.
 >
@@ -228,8 +228,8 @@ unter `in-progress/`.
 > [`../open/note-RM-M5-followups.md`](../open/note-RM-M5-followups.md).
 > **M6 abgeschlossen** ([`../done/plan-RM-M6.md`](../done/plan-RM-M6.md)):
 > RM-M6-01..06 sind geliefert; RM-M6-06 ist als
-> Zertifizierungs-/Compliance-Gate geschlossen. ADR 0007 schliesst
-> `AR-OPEN-006` mit shared Worker als Default; ADR 0008 zieht die
+> Zertifizierungs-/Compliance-Gate geschlossen. [ADR 0007](../../adr/0007-multi-asset-hosting-strategy.md) schliesst
+> `AR-OPEN-006` mit shared Worker als Default; [ADR 0008](../../adr/0008-edge-controller-boundary.md) zieht die
 > Edge-/Hardwaregrenze. Parallel-Fanout, Cluster-Smoke,
 > per-Asset-Sidecar, Worker-pro-Asset-Hardening, Multi-Asset-MPC,
 > konkrete Edge-Adapter und produktive zertifizierungsnahe
@@ -564,7 +564,7 @@ Kubernetes-Deployment, Edge-Anbindung. Inhalte mit hohem Diskussionsbedarf
 | RM-OPEN-04 | Authentifizierung in M1 (API-Token, OIDC)?                     | Geschlossen mit RM-M1-16 — API-Token + Operator-Rolle live; OIDC/mTLS bleiben Folge-ADR. |
 | RM-OPEN-05 | Reihenfolge M3 vs. M4 — Native zuerst oder Markt-/RL zuerst?   | Geschlossen durch Umsetzung — M3 Native Core wurde vor M4 Regelleistung/OPC-UA abgeschlossen; beide Meilensteine sind erledigt. |
 | RM-OPEN-06 | Kriterien für spätere API-Extraktion nach dem MVP (siehe AR-OPEN-001)? | Geschlossen mit [ADR 0009](../../adr/0009-api-service-extraction-criteria.md) — kombinierter Worker/API-Host bleibt Default; API-Auskopplung ist trigger-basiert und braucht explizite Topologie-, Security-, Ownership- und Testnachweise. |
-| RM-OPEN-07 | Folge-ADR für Release-Pipeline-Gates; vor Abschluss von M1 und vor erstem Tag `v0.1.0` schließen? | Geschlossen mit ADR 0002 — `.github/workflows/release.yml` ist Gate-only vor Publishing; kein freigegebener Tag ohne grünen Release-Workflow. **Publishing-Schicht mit `v1.0.0` (2026-05-14) nachgezogen** (GHCR, Cosign keyless, GitHub Release, Helm/Source/Native-Assets — siehe ADR 0002 §5, `docs/user/releasing.md`, `docs/user/quality.md` §8). v0.x wurde übersprungen, erstes Release ist `v1.0.0`. |
+| RM-OPEN-07 | Folge-ADR für Release-Pipeline-Gates; vor Abschluss von M1 und vor erstem Tag `v0.1.0` schließen? | Geschlossen mit [ADR 0002](../../adr/0002-release-pipeline-gates.md) — `.github/workflows/release.yml` ist Gate-only vor Publishing; kein freigegebener Tag ohne grünen Release-Workflow. **Publishing-Schicht mit `v1.0.0` (2026-05-14) nachgezogen** (GHCR, Cosign keyless, GitHub Release, Helm/Source/Native-Assets — siehe [ADR 0002 §5](../../adr/0002-release-pipeline-gates.md#5-update-publishing-aktivierung-mit-v100-2026-05-14), `docs/user/releasing.md`, `docs/user/quality.md` §8). v0.x wurde übersprungen, erstes Release ist `v1.0.0`. |
 
 ---
 

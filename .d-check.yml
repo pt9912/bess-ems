@@ -93,7 +93,6 @@ ids:
         - "docs/plan/planning/done/**"
         - "docs/archive/**"
         # --- noch nicht ADR-verlinkt (Phase 3a, Datei für Datei) ---
-        - "docs/plan/planning/in-progress/roadmap.md"
         - "docs/plan/planning/next/note-internal-refinement-scope.md"
         - "docs/plan/planning/open/note-RM-M3-followups.md"
         - "docs/plan/planning/open/note-RM-M5-followups.md"
