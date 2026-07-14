@@ -52,18 +52,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   -->`). `matrix` additionally forbids references to `superseded`/
   `deprecated` ADRs.
 
-- **ID cross-references linked, and the link policy scoped to the
-  planning layer.** The `ids` module enforces a link policy: a bare
-  "ADR NNNN" in prose must link to its ADR, with the §-section anchor
-  when a section is named (43 such references linked across the live
-  docs, each anchor verified). Because RM-* and ADR identifiers are
-  planning-internal (they live under `docs/plan/…`, non-normative — the
-  norm is `LH-*`), the policy is scoped to `docs/plan/planning` rather
-  than forced onto user/spec/code docs. The matrix gains two guards that
-  stop the planning layer leaking into the authoritative one:
-  `spec → plan` forbidden, and RM-* token detection on the `plan` class
-  so a bare "RM-M…" in a new ADR (0014 onward) flags `matrix-forbidden`
-  — the existing ADRs 0001–0013 are immutable and grandfathered.
+- **ID cross-references linked, with upward requirement traceability.**
+  The `ids` module enforces a link policy: a bare "ADR NNNN" links to its
+  ADR (with the §-section anchor when a section is named; 43 references
+  linked). Most valuably, every bare `LH-…` requirement id now links
+  **upward** to its `### LH-… — Titel` definition in the lastenheft (its
+  §-anchor): LH-* is the normative scheme, so this requirements
+  traceability is enforced globally — ~370 LH references were linked
+  across persistence, native README, quality.md, roadmap and
+  architecture, each anchor verified. `RM-*` and `ADR` ids, by contrast,
+  are planning-internal (non-normative): they are only linked where they
+  occur and are exempt in the immutable ADRs. `LH-OPEN-*` are open points
+  (no definition heading) and are deliberately not matched. The matrix
+  adds two guards so the planning layer cannot leak into the
+  authoritative one: `spec → plan` forbidden, and RM-* token detection on
+  the `plan` class so a bare "RM-M…" in a new ADR (0014 onward) flags
+  `matrix-forbidden` — the existing ADRs 0001–0013 are immutable and
+  grandfathered.
 
 ### Removed
 
