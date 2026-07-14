@@ -40,8 +40,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "Offene architektonische Punkte" of the architecture document was
   trimmed to the genuinely open points — the closed ones were redundant
   with their deciding ADRs, which remain the authoritative record.
-  `matrix` additionally forbids references to `superseded`/`deprecated`
-  ADRs.
+  Within the strata the same direction holds: `lastenheft.md` is more
+  authoritative than `architecture.md`, so it must not reference it
+  downward (`order` + `direction: no-downward`; the reverse, architecture
+  → lastenheft, stays allowed). ADRs, in turn, must not reference planning
+  documents downward (`adr → plan` forbidden) — a plan references its ADR
+  upward, not the reverse. The nine Accepted ADRs that already cite their
+  implementing plans as provenance (0001–0009) are immutable and
+  grandfathered; the rule is live for 0010 onward and every new ADR (which
+  can still declare a provenance link with `<!-- d-check:status-provenance
+  -->`). `matrix` additionally forbids references to `superseded`/
+  `deprecated` ADRs.
 
 ### Removed
 

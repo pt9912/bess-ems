@@ -47,12 +47,30 @@ codepaths:
 # die autoritative Schicht und dürfen NICHT abwärts auf ADRs verweisen — eine
 # Architektur-Entscheidung wird in ihrer ADR entschieden, die Spec beschreibt
 # das Ergebnis. Der Verweis läuft aufwärts (ADR → Anforderung), nie zurück.
+# Innerhalb der Straten gilt dieselbe Richtung: lastenheft ist autoritativer als
+# architecture, also darf lastenheft NICHT abwärts auf architecture verweisen
+# (order + direction: no-downward); architecture → lastenheft (aufwärts) ist ok.
 # Zusätzlich: kein Verweis auf superseded/deprecated ADRs (status).
 matrix:
   classes:
-    - {name: spec, paths: [spec/lastenheft.md, spec/architecture.md]}
+    - name: spec
+      paths: [spec/lastenheft.md, spec/architecture.md]
+      order: [spec/lastenheft.md, spec/architecture.md]
+      direction: no-downward
     - {name: adr, paths: ["docs/plan/adr/[0-9]*.md"]}
+    - {name: plan, paths: ["docs/plan/planning/**"]}
   rules:
+    # Spec ist autoritativ ⇒ verweist nicht abwärts auf ADRs.
     - {from: spec, to: adr, allow: false}
+    # ADRs sind Entscheidungs-Records ⇒ verweisen nicht abwärts auf Pläne
+    # (die Pläne verweisen aufwärts auf ihre ADR). Ein neuer ADR, der einen
+    # Umsetzungs-Plan als Provenance nennen muss, deklariert das per
+    # <!-- d-check:status-provenance --> auf der Zeile.
+    - {from: adr, to: plan, allow: false}
   status: {forbidden: [superseded, deprecated]}
   exclude-sections: [Historie, Geschichte]
+  # Grandfathering: die vor dieser Regel Accepted-ADRs 0001–0009 nennen ihre
+  # Umsetzungs-Pläne als legitime Provenance-/Verifikations-Zeiger und sind
+  # immutabel — sie werden übersprungen. Ab 0010 (bereits plan-frei) und für
+  # jeden neuen ADR gilt adr→plan verboten.
+  exempt-paths: ["docs/plan/adr/000[1-9]-*.md"]
