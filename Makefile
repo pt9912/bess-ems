@@ -30,7 +30,7 @@ include d-check.mk
 	lint solid-suppression-gate arch-check gates \
 	test test-safety test-mpc-property test-replay test-integration test-hil-modbus test-hil-opcua test-hil-optimization-core test-optimization-core-compose test-hil-closed-loop test-container coverage-gate \
 	native-build test-native-interop test-native-parity \
-	native-lint native-sanitizer native-coverage-report native-coverage-gate native-coverage-exclusions \
+	native-lint native-format native-sanitizer native-coverage-report native-coverage-gate native-coverage-exclusions \
 	simulator-test simulator-race simulator-lint simulator-coverage-gate simulator-build \
 	build ci runtime fullbuild lock-refresh release-assets \
 	schema-validate schema-generate schema-drift-check field-contract-check \
@@ -81,6 +81,7 @@ help:
 	@echo "  make test-native-interop        Layout / ABI / non-finite contract against real .so (RM-M3-07)"
 	@echo "  make test-native-parity         Replay-based native↔.NET parity gate, cases.v1.json (RM-M3-10)"
 	@echo "  make native-lint                clang-tidy gate, --warnings-as-errors=* (RM-M3-09)"
+	@echo "  make native-format              clang-format layout gate (--dry-run --Werror)"
 	@echo "  make native-sanitizer           ASan + UBSan run on native test suite (RM-M3-09)"
 	@echo "  make native-coverage-report     Build gcovr report and print it (RM-M3-09)"
 	@echo "  make native-coverage-gate       100% line coverage gate, override BCC_COVERAGE_THRESHOLD (RM-M3-09)"
@@ -280,7 +281,7 @@ coverage-gate:
 gates: lint arch-check test test-safety test-mpc-property test-replay coverage-gate \
 	docs-check field-contract-check field-vectors-check sut-config-check \
 	simulator-lint simulator-test simulator-race simulator-coverage-gate \
-	native-build native-lint native-sanitizer \
+	native-build native-lint native-format native-sanitizer \
 	native-coverage-gate native-coverage-exclusions \
 	test-native-interop test-native-parity \
 	test-hil-opcua test-hil-optimization-core test-optimization-core-compose
@@ -392,6 +393,11 @@ test-native-parity:
 native-lint:
 	$(DOCKER_BUILD) --target native-lint -t $(IMAGE_PREFIX)-native-lint:latest
 
+# native-format: clang-format layout gate (--dry-run --Werror) against the
+# native control core using `.clang-format`. Fails on any non-conforming file.
+native-format:
+	$(DOCKER_BUILD) --target native-format -t $(IMAGE_PREFIX)-native-format:latest
+
 # native-sanitizer: rebuild .so + tests with ASan + UBSan and run
 # the doctest suite with -fno-sanitize-recover=all (any detection
 # is fatal). Catches use-after-free, undefined behaviour and
@@ -481,7 +487,7 @@ ci: lint arch-check test test-safety test-mpc-property test-replay coverage-gate
     simulator-lint simulator-test simulator-race simulator-coverage-gate \
     schema-validate schema-drift-check field-contract-check field-vectors-check \
     sut-config-check \
-    native-build native-lint native-sanitizer \
+    native-build native-lint native-format native-sanitizer \
     native-coverage-gate native-coverage-exclusions \
     test-native-interop test-native-parity \
     test-hil-opcua test-hil-optimization-core \

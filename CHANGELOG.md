@@ -89,12 +89,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`docs/user/quality.md`), surfaced by the new `codepaths` check: the
   JSON-Schema table pointed at `config/schema/*.json` (the files are
   `*.schema.json`) and the native-tooling table at `native/*` (the files
-  live under `native/battery_control_core/`). Corrected. Two references
-  remain flagged as real gaps rather than removed —
-  `native/battery_control_core/.clang-format` (no clang-format config
-  exists; only `.clang-tidy`) and `config/schema/limits.schema.json`
-  (there is no `limits` schema) — tracked via `codepaths.ignore-refs`
-  for follow-up.
+  live under `native/battery_control_core/`). Corrected. The two
+  references those checks surfaced as real gaps are now **resolved**, not
+  deferred: a `.clang-format` was added for the native control kernel —
+  the C sources are formatted to it and a `make native-format` gate
+  (`clang-format --dry-run --Werror`, wired into `gates`/`ci`) enforces
+  it, complementing the existing `.clang-tidy` static-analysis gate; and
+  the phantom `limits` schema row was removed — battery limits are
+  validated as part of `asset.schema.json`, not a separate schema.
 
 ## [2.2.1] - 2026-07-13
 

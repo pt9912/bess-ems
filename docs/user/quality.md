@@ -797,7 +797,6 @@ JSON-Schema validiert. Schemata leben unter `config/schema/`.
 | `config/schema/mqtt-mapping.schema.json`   | M1       |
 | `config/schema/opcua-mapping.schema.json`  | M4       |
 | `config/schema/asset.schema.json`          | M1       |
-| `config/schema/limits.schema.json`         | M1       |
 
 CI-Gate validiert alle Beispiel-Mappings unter `config/examples/`.
 

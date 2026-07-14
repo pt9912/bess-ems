@@ -1,0 +1,12 @@
+# Layout-Profil für den nativen Control-Kernel (C). Kodifiziert den
+# bestehenden Stil: 4-Space-Indent, Linux-Klammern (Funktions-Klammer auf
+# eigener Zeile, Control-Statement-Klammer angehängt), kein spaltengetriebenes
+# Rewrapping (manuelle Umbrüche bleiben). Ergänzt das statische Check-Profil
+# `.clang-tidy` (Layout vs. Analyse). Anwenden: `clang-format -i`.
+BasedOnStyle: LLVM
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+BreakBeforeBraces: Linux
+ContinuationIndentWidth: 4
+ColumnLimit: 0

@@ -69,7 +69,7 @@ extern "C" {
 #define BCC_ABI_VERSION_PACK(major, minor, patch) \
     (((uint32_t)(major) << 16) | ((uint32_t)(minor) << 8) | (uint32_t)(patch))
 
-#define BCC_ABI_VERSION \
+#define BCC_ABI_VERSION                         \
     BCC_ABI_VERSION_PACK(BCC_ABI_VERSION_MAJOR, \
                          BCC_ABI_VERSION_MINOR, \
                          BCC_ABI_VERSION_PATCH)
@@ -79,12 +79,12 @@ extern "C" {
  * (Statuscode-Baseline). Renumbering requires an ABI-major bump.
  * ------------------------------------------------------------------ */
 typedef enum bcc_status {
-    BCC_STATUS_OK                = 0, /* Command computed without limit. */
-    BCC_STATUS_LIMITED           = 1, /* Constraint or ramp limited the output. */
-    BCC_STATUS_INVALID_INPUT     = 2, /* Required field missing / out-of-range. */
-    BCC_STATUS_NON_FINITE        = 3, /* NaN/Inf in input or output. */
-    BCC_STATUS_NEGATIVE_DT       = 4, /* dt < 0 (ramp) or dt <= 0 (PID). */
-    BCC_STATUS_UNSUPPORTED_STATE = 5  /* Valid ABI, slice cannot compute. */
+    BCC_STATUS_OK = 0,               /* Command computed without limit. */
+    BCC_STATUS_LIMITED = 1,          /* Constraint or ramp limited the output. */
+    BCC_STATUS_INVALID_INPUT = 2,    /* Required field missing / out-of-range. */
+    BCC_STATUS_NON_FINITE = 3,       /* NaN/Inf in input or output. */
+    BCC_STATUS_NEGATIVE_DT = 4,      /* dt < 0 (ramp) or dt <= 0 (PID). */
+    BCC_STATUS_UNSUPPORTED_STATE = 5 /* Valid ABI, slice cannot compute. */
 } bcc_status_t;
 
 /* ------------------------------------------------------------------
@@ -108,28 +108,28 @@ typedef enum bcc_status {
  * their own option/state contract is violated.
  * ------------------------------------------------------------------ */
 typedef enum bcc_reason {
-    BCC_REASON_WITHIN_LIMITS               = 0,
-    BCC_REASON_TEMPERATURE_OUT_OF_RANGE    = 1,
-    BCC_REASON_SOC_AT_MAX_CHARGE_BLOCKED   = 2,
+    BCC_REASON_WITHIN_LIMITS = 0,
+    BCC_REASON_TEMPERATURE_OUT_OF_RANGE = 1,
+    BCC_REASON_SOC_AT_MAX_CHARGE_BLOCKED = 2,
     BCC_REASON_SOC_AT_MIN_DISCHARGE_BLOCKED = 3,
-    BCC_REASON_MAX_CHARGE_POWER            = 4,
-    BCC_REASON_MAX_DISCHARGE_POWER         = 5,
-    BCC_REASON_RAMP_NOT_PERMITTED          = 6,
-    BCC_REASON_RAMP_DOWN_CLAMPED           = 7,
-    BCC_REASON_RAMP_UP_CLAMPED             = 8,
-    BCC_REASON_NON_FINITE_INPUT            = 9,
-    BCC_REASON_NON_FINITE_OUTPUT           = 10,
-    BCC_REASON_NEGATIVE_DT                 = 11,
-    BCC_REASON_UNSUPPORTED_STATE           = 12,
+    BCC_REASON_MAX_CHARGE_POWER = 4,
+    BCC_REASON_MAX_DISCHARGE_POWER = 5,
+    BCC_REASON_RAMP_NOT_PERMITTED = 6,
+    BCC_REASON_RAMP_DOWN_CLAMPED = 7,
+    BCC_REASON_RAMP_UP_CLAMPED = 8,
+    BCC_REASON_NON_FINITE_INPUT = 9,
+    BCC_REASON_NON_FINITE_OUTPUT = 10,
+    BCC_REASON_NEGATIVE_DT = 11,
+    BCC_REASON_UNSUPPORTED_STATE = 12,
     /* RM-M3-13 PID slice (ABI minor bump 0.1 → 0.2). Append-only. */
-    BCC_REASON_PID_OUTPUT_CLAMPED_HIGH     = 13, /* PID clamped at OutputMax. */
-    BCC_REASON_PID_OUTPUT_CLAMPED_LOW      = 14, /* PID clamped at OutputMin. */
-    BCC_REASON_PID_INTEGRATOR_OVERFLOW     = 15, /* Integrator state overflowed to ±Inf. */
-    BCC_REASON_PID_INVALID_OPTIONS         = 16, /* OutputMin > OutputMax or DeadbandAbsolute < 0. */
+    BCC_REASON_PID_OUTPUT_CLAMPED_HIGH = 13, /* PID clamped at OutputMax. */
+    BCC_REASON_PID_OUTPUT_CLAMPED_LOW = 14,  /* PID clamped at OutputMin. */
+    BCC_REASON_PID_INTEGRATOR_OVERFLOW = 15, /* Integrator state overflowed to ±Inf. */
+    BCC_REASON_PID_INVALID_OPTIONS = 16,     /* OutputMin > OutputMax or DeadbandAbsolute < 0. */
     /* RM-M5-03 telemetry-filter slice (ABI minor 0.2 → 0.3). Append-only. */
-    BCC_REASON_FILTER_INVALID_OPTIONS      = 17, /* alpha/delta/sample-window options invalid. */
-    BCC_REASON_FILTER_SAMPLE_PERIOD        = 18, /* dt_seconds outside configured sample window. */
-    BCC_REASON_FILTER_TELEMETRY_DRIFT      = 19  /* measurement drift exceeds configured bound. */
+    BCC_REASON_FILTER_INVALID_OPTIONS = 17, /* alpha/delta/sample-window options invalid. */
+    BCC_REASON_FILTER_SAMPLE_PERIOD = 18,   /* dt_seconds outside configured sample window. */
+    BCC_REASON_FILTER_TELEMETRY_DRIFT = 19  /* measurement drift exceeds configured bound. */
 } bcc_reason_t;
 
 /* ------------------------------------------------------------------
@@ -137,9 +137,9 @@ typedef enum bcc_reason {
  * values match the managed enum for round-trip identity.
  * ------------------------------------------------------------------ */
 typedef enum bcc_mode {
-    BCC_MODE_STOP      = 0,
-    BCC_MODE_IDLE      = 1,
-    BCC_MODE_CHARGE    = 2,
+    BCC_MODE_STOP = 0,
+    BCC_MODE_IDLE = 1,
+    BCC_MODE_CHARGE = 2,
     BCC_MODE_DISCHARGE = 3
 } bcc_mode_t;
 
@@ -150,9 +150,9 @@ typedef enum bcc_mode {
  * side and never enter this struct (per Native-Datenvertrag).
  * ------------------------------------------------------------------ */
 typedef struct bcc_snapshot {
-    double soc_percent;          /* 0..100, after managed precheck. */
-    double active_power_kw;      /* discharge positive (architecture §4.1). */
-    double temperature_celsius;  /* cell temperature, finite. */
+    double soc_percent;         /* 0..100, after managed precheck. */
+    double active_power_kw;     /* discharge positive (architecture §4.1). */
+    double temperature_celsius; /* cell temperature, finite. */
 } bcc_snapshot_t;
 
 /* ------------------------------------------------------------------
@@ -162,11 +162,11 @@ typedef struct bcc_snapshot {
  * 0 kW.
  * ------------------------------------------------------------------ */
 typedef struct bcc_limits {
-    double max_charge_power_kw;       /* magnitude; charge is negative. */
-    double max_discharge_power_kw;    /* magnitude; discharge is positive. */
-    double min_soc_percent;           /* 0..100. */
-    double max_soc_percent;           /* 0..100. */
-    double max_ramp_kw_per_second;    /* magnitude; 0 means ramp is held. */
+    double max_charge_power_kw;    /* magnitude; charge is negative. */
+    double max_discharge_power_kw; /* magnitude; discharge is positive. */
+    double min_soc_percent;        /* 0..100. */
+    double max_soc_percent;        /* 0..100. */
+    double max_ramp_kw_per_second; /* magnitude; 0 means ramp is held. */
     double min_temperature_celsius;
     double max_temperature_celsius;
 } bcc_limits_t;
@@ -177,10 +177,10 @@ typedef struct bcc_limits {
  * matching the managed RampLimiter contract.
  * ------------------------------------------------------------------ */
 typedef struct bcc_request {
-    double  target_active_power_kw;   /* signed; discharge positive. */
-    double  previous_active_power_kw; /* ignored when has_previous == 0. */
-    double  dt_seconds;               /* seconds since previous tick; >= 0 for ramp. */
-    int32_t has_previous;             /* 0 = no previous power, 1 = previous valid. */
+    double target_active_power_kw;   /* signed; discharge positive. */
+    double previous_active_power_kw; /* ignored when has_previous == 0. */
+    double dt_seconds;               /* seconds since previous tick; >= 0 for ramp. */
+    int32_t has_previous;            /* 0 = no previous power, 1 = previous valid. */
 } bcc_request_t;
 
 /* ------------------------------------------------------------------
@@ -190,10 +190,10 @@ typedef struct bcc_request {
  * stricter targets).
  * ------------------------------------------------------------------ */
 typedef struct bcc_command {
-    double  active_power_kw;     /* signed; discharge positive. */
-    int32_t mode;                /* bcc_mode_t value. */
-    int32_t status;              /* bcc_status_t value. */
-    int32_t reason_code;         /* bcc_reason_t value. */
+    double active_power_kw; /* signed; discharge positive. */
+    int32_t mode;           /* bcc_mode_t value. */
+    int32_t status;         /* bcc_status_t value. */
+    int32_t reason_code;    /* bcc_reason_t value. */
 } bcc_command_t;
 
 /* ------------------------------------------------------------------
@@ -226,9 +226,9 @@ uint32_t battery_control_core_abi_version(void);
 
 bcc_status_t battery_control_core_compute(
     const bcc_snapshot_t *snapshot,
-    const bcc_limits_t   *limits,
-    const bcc_request_t  *request,
-    bcc_command_t        *out_command);
+    const bcc_limits_t *limits,
+    const bcc_request_t *request,
+    bcc_command_t *out_command);
 
 /* ------------------------------------------------------------------
  * RM-M3-13 PID slice (ABI minor 0.2). Mirrors
@@ -281,31 +281,31 @@ typedef enum bcc_pid_anti_windup {
 } bcc_pid_anti_windup_t;
 
 typedef struct bcc_pid_state {
-    double integral;        /* must be finite at entry. */
-    double previous_error;  /* must be finite at entry. */
+    double integral;       /* must be finite at entry. */
+    double previous_error; /* must be finite at entry. */
 } bcc_pid_state_t;
 
 typedef struct bcc_pid_options {
-    double  kp;                      /* finite. */
-    double  ki;                      /* finite. */
-    double  kd;                      /* finite. */
-    double  output_min;              /* finite, <= output_max. */
-    double  output_max;              /* finite, >= output_min. */
-    double  deadband_absolute;       /* finite, >= 0; 0 disables the deadband. */
-    int32_t anti_windup_mode;        /* bcc_pid_anti_windup_t value. */
+    double kp;                /* finite. */
+    double ki;                /* finite. */
+    double kd;                /* finite. */
+    double output_min;        /* finite, <= output_max. */
+    double output_max;        /* finite, >= output_min. */
+    double deadband_absolute; /* finite, >= 0; 0 disables the deadband. */
+    int32_t anti_windup_mode; /* bcc_pid_anti_windup_t value. */
     /* 4-byte trailing padding to align the 56-byte struct to 8 B. */
 } bcc_pid_options_t;
 
 typedef struct bcc_pid_input {
-    double setpoint;     /* finite. */
-    double measurement;  /* finite. */
-    double dt_seconds;   /* > 0; dt <= 0 yields BCC_STATUS_NEGATIVE_DT. */
+    double setpoint;    /* finite. */
+    double measurement; /* finite. */
+    double dt_seconds;  /* > 0; dt <= 0 yields BCC_STATUS_NEGATIVE_DT. */
 } bcc_pid_input_t;
 
 typedef struct bcc_pid_command {
-    double  output;              /* post-clamp output, finite. */
-    double  next_integral;       /* state to thread to the next call. */
-    double  next_previous_error; /* state to thread to the next call. */
+    double output;               /* post-clamp output, finite. */
+    double next_integral;        /* state to thread to the next call. */
+    double next_previous_error;  /* state to thread to the next call. */
     int32_t status;              /* bcc_status_t value. */
     int32_t reason_code;         /* bcc_reason_t value. */
     int32_t was_clamped;         /* 0/1: output was clipped to bounds. */
@@ -313,10 +313,10 @@ typedef struct bcc_pid_command {
 } bcc_pid_command_t;
 
 bcc_status_t battery_control_core_pid_step(
-    const bcc_pid_state_t   *state,
+    const bcc_pid_state_t *state,
     const bcc_pid_options_t *options,
-    const bcc_pid_input_t   *input,
-    bcc_pid_command_t       *out_command);
+    const bcc_pid_input_t *input,
+    bcc_pid_command_t *out_command);
 
 /* ------------------------------------------------------------------
  * RM-M5-03 high-frequency telemetry filter (ABI minor 0.3).
@@ -344,9 +344,9 @@ bcc_status_t battery_control_core_pid_step(
  * ------------------------------------------------------------------ */
 
 typedef struct bcc_telemetry_filter_state {
-    double  filtered_soc_percent;
-    double  filtered_active_power_kw;
-    double  filtered_temperature_celsius;
+    double filtered_soc_percent;
+    double filtered_active_power_kw;
+    double filtered_temperature_celsius;
     int32_t initialized; /* 0 = cold boot, non-zero = fields valid. */
     /* 4-byte trailing padding to align the 32-byte struct to 8 B. */
 } bcc_telemetry_filter_state_t;
@@ -361,16 +361,16 @@ typedef struct bcc_telemetry_filter_options {
 } bcc_telemetry_filter_options_t;
 
 typedef struct bcc_telemetry_filter_input {
-    double soc_percent;          /* finite. */
-    double active_power_kw;      /* finite, discharge positive. */
-    double temperature_celsius;  /* finite. */
-    double dt_seconds;           /* finite, inside options sample window. */
+    double soc_percent;         /* finite. */
+    double active_power_kw;     /* finite, discharge positive. */
+    double temperature_celsius; /* finite. */
+    double dt_seconds;          /* finite, inside options sample window. */
 } bcc_telemetry_filter_input_t;
 
 typedef struct bcc_telemetry_filter_output {
-    double  filtered_soc_percent;
-    double  filtered_active_power_kw;
-    double  filtered_temperature_celsius;
+    double filtered_soc_percent;
+    double filtered_active_power_kw;
+    double filtered_temperature_celsius;
     int32_t status;         /* bcc_status_t value. */
     int32_t reason_code;    /* bcc_reason_t value. */
     int32_t drift_detected; /* 0/1. */
@@ -379,10 +379,10 @@ typedef struct bcc_telemetry_filter_output {
 } bcc_telemetry_filter_output_t;
 
 bcc_status_t battery_control_core_filter_telemetry(
-    const bcc_telemetry_filter_state_t   *state,
+    const bcc_telemetry_filter_state_t *state,
     const bcc_telemetry_filter_options_t *options,
-    const bcc_telemetry_filter_input_t   *input,
-    bcc_telemetry_filter_output_t        *out_output);
+    const bcc_telemetry_filter_input_t *input,
+    bcc_telemetry_filter_output_t *out_output);
 
 #ifdef __cplusplus
 } /* extern "C" */

@@ -32,9 +32,9 @@
 
 #include "battery_control_core.h"
 
-#include <assert.h>  // C11 static_assert macro
-#include <math.h>    // isfinite, fabs (C99)
-#include <stddef.h>  // NULL
+#include <assert.h> // C11 static_assert macro
+#include <math.h>   // isfinite, fabs (C99)
+#include <stddef.h> // NULL
 
 // RM-M3-05 review M-3: the C-ABI puts bcc_status_t / bcc_reason_t
 // values into int32_t fields on the ABI output structs. Both enums today
@@ -44,28 +44,20 @@
 // rather than silently truncate when round-tripped through the
 // marshalling layer.
 static_assert(sizeof(int32_t) >= sizeof(bcc_status_t),
-    "bcc_status_t must fit into the int32_t status field of bcc_command_t");
+              "bcc_status_t must fit into the int32_t status field of bcc_command_t");
 static_assert(sizeof(int32_t) >= sizeof(bcc_reason_t),
-    "bcc_reason_t must fit into the int32_t reason_code field of bcc_command_t");
+              "bcc_reason_t must fit into the int32_t reason_code field of bcc_command_t");
 static_assert(sizeof(int32_t) >= sizeof(bcc_mode_t),
-    "bcc_mode_t must fit into the int32_t mode field of bcc_command_t");
+              "bcc_mode_t must fit into the int32_t mode field of bcc_command_t");
 
 static int is_finite_snapshot(const bcc_snapshot_t *s)
 {
-    return isfinite(s->soc_percent)
-        && isfinite(s->active_power_kw)
-        && isfinite(s->temperature_celsius);
+    return isfinite(s->soc_percent) && isfinite(s->active_power_kw) && isfinite(s->temperature_celsius);
 }
 
 static int is_finite_limits(const bcc_limits_t *l)
 {
-    return isfinite(l->max_charge_power_kw)
-        && isfinite(l->max_discharge_power_kw)
-        && isfinite(l->min_soc_percent)
-        && isfinite(l->max_soc_percent)
-        && isfinite(l->max_ramp_kw_per_second)
-        && isfinite(l->min_temperature_celsius)
-        && isfinite(l->max_temperature_celsius);
+    return isfinite(l->max_charge_power_kw) && isfinite(l->max_discharge_power_kw) && isfinite(l->min_soc_percent) && isfinite(l->max_soc_percent) && isfinite(l->max_ramp_kw_per_second) && isfinite(l->min_temperature_celsius) && isfinite(l->max_temperature_celsius);
 }
 
 static int is_finite_request(const bcc_request_t *r)
@@ -78,9 +70,7 @@ static int is_finite_request(const bcc_request_t *r)
     // first-tick contract: managed code may legitimately pass NaN
     // there to signal "no previous", and we mirror that tolerance.
     if (r->has_previous != 0) {
-        if (!isfinite(r->previous_active_power_kw)
-            || !isfinite(r->dt_seconds))
-        {
+        if (!isfinite(r->previous_active_power_kw) || !isfinite(r->dt_seconds)) {
             return 0;
         }
     }
@@ -93,14 +83,12 @@ static int is_finite_request(const bcc_request_t *r)
 // land on the same reason for the same input.
 static bcc_status_t apply_constraint(
     const bcc_snapshot_t *snap,
-    const bcc_limits_t   *lim,
-    double                requested,
-    double               *out_power,
-    int32_t              *out_reason)
+    const bcc_limits_t *lim,
+    double requested,
+    double *out_power,
+    int32_t *out_reason)
 {
-    if (snap->temperature_celsius < lim->min_temperature_celsius
-        || snap->temperature_celsius > lim->max_temperature_celsius)
-    {
+    if (snap->temperature_celsius < lim->min_temperature_celsius || snap->temperature_celsius > lim->max_temperature_celsius) {
         *out_power = 0.0;
         *out_reason = (int32_t)BCC_REASON_TEMPERATURE_OUT_OF_RANGE;
         return BCC_STATUS_LIMITED;
@@ -138,11 +126,11 @@ static bcc_status_t apply_constraint(
 // Ramp logic — direct port of RampLimiter.Apply. Caller has
 // already verified dt_seconds >= 0 and has_previous == 1.
 static bcc_status_t apply_ramp(
-    double   previous,
-    double   requested,
-    double   dt_seconds,
-    double   max_ramp_kw_per_second,
-    double  *out_power,
+    double previous,
+    double requested,
+    double dt_seconds,
+    double max_ramp_kw_per_second,
+    double *out_power,
     int32_t *out_reason)
 {
     if (max_ramp_kw_per_second == 0.0 || dt_seconds == 0.0) {
@@ -183,8 +171,12 @@ static bcc_status_t apply_ramp(
 // the kernel.
 static bcc_mode_t mode_from_power(double power_kw)
 {
-    if (power_kw > 0.0) { return BCC_MODE_DISCHARGE; }
-    if (power_kw < 0.0) { return BCC_MODE_CHARGE; }
+    if (power_kw > 0.0) {
+        return BCC_MODE_DISCHARGE;
+    }
+    if (power_kw < 0.0) {
+        return BCC_MODE_CHARGE;
+    }
     return BCC_MODE_IDLE;
 }
 
@@ -192,9 +184,9 @@ static void fill_command(bcc_command_t *out, double power_kw,
                          bcc_status_t status, int32_t reason)
 {
     out->active_power_kw = power_kw;
-    out->mode            = (int32_t)mode_from_power(power_kw);
-    out->status          = (int32_t)status;
-    out->reason_code     = reason;
+    out->mode = (int32_t)mode_from_power(power_kw);
+    out->status = (int32_t)status;
+    out->reason_code = reason;
 }
 
 uint32_t battery_control_core_abi_version(void)
@@ -204,9 +196,9 @@ uint32_t battery_control_core_abi_version(void)
 
 bcc_status_t battery_control_core_compute(
     const bcc_snapshot_t *snapshot,
-    const bcc_limits_t   *limits,
-    const bcc_request_t  *request,
-    bcc_command_t        *out_command)
+    const bcc_limits_t *limits,
+    const bcc_request_t *request,
+    bcc_command_t *out_command)
 {
     // Without an output struct the function has nowhere to write the
     // result; this is the only error case we cannot communicate
@@ -223,7 +215,7 @@ bcc_status_t battery_control_core_compute(
                  (int32_t)BCC_REASON_NON_FINITE_INPUT);
 
     if (snapshot == NULL || limits == NULL || request == NULL) {
-        out_command->status      = (int32_t)BCC_STATUS_INVALID_INPUT;
+        out_command->status = (int32_t)BCC_STATUS_INVALID_INPUT;
         out_command->reason_code = (int32_t)BCC_REASON_NON_FINITE_INPUT;
         return BCC_STATUS_INVALID_INPUT;
     }
@@ -239,10 +231,7 @@ bcc_status_t battery_control_core_compute(
     // (if needed) a panic translation, with their own coverage at
     // that time.
 
-    if (!is_finite_snapshot(snapshot)
-        || !is_finite_limits(limits)
-        || !is_finite_request(request))
-    {
+    if (!is_finite_snapshot(snapshot) || !is_finite_limits(limits) || !is_finite_request(request)) {
         fill_command(out_command, 0.0,
                      BCC_STATUS_NON_FINITE,
                      (int32_t)BCC_REASON_NON_FINITE_INPUT);
@@ -260,19 +249,19 @@ bcc_status_t battery_control_core_compute(
         return BCC_STATUS_NEGATIVE_DT;
     }
 
-    double  constrained_power  = 0.0;
-    int32_t constraint_reason  = (int32_t)BCC_REASON_WITHIN_LIMITS;
+    double constrained_power = 0.0;
+    int32_t constraint_reason = (int32_t)BCC_REASON_WITHIN_LIMITS;
     const bcc_status_t constraint_status = apply_constraint(
         snapshot, limits, request->target_active_power_kw,
         &constrained_power, &constraint_reason);
 
-    double       final_power  = constrained_power;
-    int32_t      final_reason = constraint_reason;
+    double final_power = constrained_power;
+    int32_t final_reason = constraint_reason;
     bcc_status_t final_status = constraint_status;
 
     if (request->has_previous != 0) {
-        double  ramped_power = 0.0;
-        int32_t ramp_reason  = (int32_t)BCC_REASON_WITHIN_LIMITS;
+        double ramped_power = 0.0;
+        int32_t ramp_reason = (int32_t)BCC_REASON_WITHIN_LIMITS;
         const bcc_status_t ramp_status = apply_ramp(
             request->previous_active_power_kw,
             constrained_power,
@@ -318,12 +307,12 @@ static void fill_pid_command(bcc_pid_command_t *out,
                              int was_clamped,
                              int was_integral_frozen)
 {
-    out->output              = output;
-    out->next_integral       = next_state->integral;
+    out->output = output;
+    out->next_integral = next_state->integral;
     out->next_previous_error = next_state->previous_error;
-    out->status              = (int32_t)status;
-    out->reason_code         = (int32_t)reason;
-    out->was_clamped         = was_clamped ? 1 : 0;
+    out->status = (int32_t)status;
+    out->reason_code = (int32_t)reason;
+    out->was_clamped = was_clamped ? 1 : 0;
     out->was_integral_frozen = was_integral_frozen ? 1 : 0;
 }
 
@@ -334,19 +323,12 @@ static int is_finite_pid_state(const bcc_pid_state_t *s)
 
 static int is_finite_pid_options(const bcc_pid_options_t *o)
 {
-    return isfinite(o->kp)
-        && isfinite(o->ki)
-        && isfinite(o->kd)
-        && isfinite(o->output_min)
-        && isfinite(o->output_max)
-        && isfinite(o->deadband_absolute);
+    return isfinite(o->kp) && isfinite(o->ki) && isfinite(o->kd) && isfinite(o->output_min) && isfinite(o->output_max) && isfinite(o->deadband_absolute);
 }
 
 static int is_finite_pid_input(const bcc_pid_input_t *i)
 {
-    return isfinite(i->setpoint)
-        && isfinite(i->measurement)
-        && isfinite(i->dt_seconds);
+    return isfinite(i->setpoint) && isfinite(i->measurement) && isfinite(i->dt_seconds);
 }
 
 /* Validate state/options/input together. Returns BCC_STATUS_OK when
@@ -357,21 +339,16 @@ static int is_finite_pid_input(const bcc_pid_input_t *i)
  * threshold (20) — the function would otherwise stack ~6 guard
  * branches before any real work happens. */
 static bcc_status_t validate_pid_inputs(
-    const bcc_pid_state_t   *state,
+    const bcc_pid_state_t *state,
     const bcc_pid_options_t *options,
-    const bcc_pid_input_t   *input,
-    bcc_reason_t            *out_reason)
+    const bcc_pid_input_t *input,
+    bcc_reason_t *out_reason)
 {
-    if (!is_finite_pid_state(state)
-        || !is_finite_pid_options(options)
-        || !is_finite_pid_input(input))
-    {
+    if (!is_finite_pid_state(state) || !is_finite_pid_options(options) || !is_finite_pid_input(input)) {
         *out_reason = BCC_REASON_NON_FINITE_INPUT;
         return BCC_STATUS_NON_FINITE;
     }
-    if (options->output_min > options->output_max
-        || options->deadband_absolute < 0.0)
-    {
+    if (options->output_min > options->output_max || options->deadband_absolute < 0.0) {
         *out_reason = BCC_REASON_PID_INVALID_OPTIONS;
         return BCC_STATUS_INVALID_INPUT;
     }
@@ -388,10 +365,10 @@ static bcc_status_t validate_pid_inputs(
 }
 
 bcc_status_t battery_control_core_pid_step(
-    const bcc_pid_state_t   *state,
+    const bcc_pid_state_t *state,
     const bcc_pid_options_t *options,
-    const bcc_pid_input_t   *input,
-    bcc_pid_command_t       *out_command)
+    const bcc_pid_input_t *input,
+    bcc_pid_command_t *out_command)
 {
     if (out_command == NULL) {
         return BCC_STATUS_INVALID_INPUT;
@@ -404,7 +381,7 @@ bcc_status_t battery_control_core_pid_step(
      * input state when it throws, so callers staying on the
      * Managed-Fallback after a native error will not see a state
      * regression either way. */
-    const bcc_pid_state_t zero_state = { 0.0, 0.0 };
+    const bcc_pid_state_t zero_state = {0.0, 0.0};
     fill_pid_command(out_command, 0.0, &zero_state,
                      BCC_STATUS_INVALID_INPUT,
                      BCC_REASON_NON_FINITE_INPUT,
@@ -424,18 +401,17 @@ bcc_status_t battery_control_core_pid_step(
         return guard_status;
     }
 
-    const double dt           = input->dt_seconds;
-    const double raw_error    = input->setpoint - input->measurement;
-    const int    in_deadband  = options->deadband_absolute > 0.0
-                              && fabs(raw_error) < options->deadband_absolute;
+    const double dt = input->dt_seconds;
+    const double raw_error = input->setpoint - input->measurement;
+    const int in_deadband = options->deadband_absolute > 0.0 && fabs(raw_error) < options->deadband_absolute;
     const double effective_error = in_deadband ? 0.0 : raw_error;
 
     const double p = options->kp * effective_error;
     const double d = in_deadband
-        ? 0.0
-        : options->kd * (effective_error - state->previous_error) / dt;
+                         ? 0.0
+                         : options->kd * (effective_error - state->previous_error) / dt;
 
-    const double integrator_step    = options->ki * effective_error;
+    const double integrator_step = options->ki * effective_error;
     const double candidate_integral = state->integral + (integrator_step * dt);
     if (!isfinite(candidate_integral)) {
         /* Match the managed reference's OverflowException semantics:
@@ -467,9 +443,9 @@ bcc_status_t battery_control_core_pid_step(
     const int freeze_low =
         candidate_pre_clamp < options->output_min && integrator_step < 0.0;
     int was_integral_frozen = 0;
-    double chosen_integral  = candidate_integral;
+    double chosen_integral = candidate_integral;
     if (freeze_high || freeze_low) {
-        chosen_integral     = state->integral;
+        chosen_integral = state->integral;
         was_integral_frozen = 1;
     }
 
@@ -504,7 +480,7 @@ bcc_status_t battery_control_core_pid_step(
      * derivative on the first out-of-band tick measures the actual
      * change, not a spike against zero. */
     const bcc_pid_state_t next_state = {
-        .integral       = chosen_integral,
+        .integral = chosen_integral,
         .previous_error = in_deadband ? state->previous_error : effective_error,
     };
 
@@ -529,13 +505,13 @@ static void fill_filter_output(
     int drift_detected,
     int initialized)
 {
-    out->filtered_soc_percent          = filtered_soc_percent;
-    out->filtered_active_power_kw      = filtered_active_power_kw;
-    out->filtered_temperature_celsius  = filtered_temperature_celsius;
-    out->status                        = (int32_t)status;
-    out->reason_code                   = (int32_t)reason;
-    out->drift_detected                = drift_detected ? 1 : 0;
-    out->initialized                   = initialized ? 1 : 0;
+    out->filtered_soc_percent = filtered_soc_percent;
+    out->filtered_active_power_kw = filtered_active_power_kw;
+    out->filtered_temperature_celsius = filtered_temperature_celsius;
+    out->status = (int32_t)status;
+    out->reason_code = (int32_t)reason;
+    out->drift_detected = drift_detected ? 1 : 0;
+    out->initialized = initialized ? 1 : 0;
 }
 
 static int is_finite_filter_state(const bcc_telemetry_filter_state_t *s)
@@ -543,56 +519,34 @@ static int is_finite_filter_state(const bcc_telemetry_filter_state_t *s)
     if (s->initialized == 0) {
         return 1;
     }
-    return isfinite(s->filtered_soc_percent)
-        && isfinite(s->filtered_active_power_kw)
-        && isfinite(s->filtered_temperature_celsius);
+    return isfinite(s->filtered_soc_percent) && isfinite(s->filtered_active_power_kw) && isfinite(s->filtered_temperature_celsius);
 }
 
 static int is_finite_filter_options(const bcc_telemetry_filter_options_t *o)
 {
-    return isfinite(o->alpha)
-        && isfinite(o->max_soc_delta_percent)
-        && isfinite(o->max_power_delta_kw)
-        && isfinite(o->max_temperature_delta_celsius)
-        && isfinite(o->min_sample_period_seconds)
-        && isfinite(o->max_sample_period_seconds);
+    return isfinite(o->alpha) && isfinite(o->max_soc_delta_percent) && isfinite(o->max_power_delta_kw) && isfinite(o->max_temperature_delta_celsius) && isfinite(o->min_sample_period_seconds) && isfinite(o->max_sample_period_seconds);
 }
 
 static int is_finite_filter_input(const bcc_telemetry_filter_input_t *i)
 {
-    return isfinite(i->soc_percent)
-        && isfinite(i->active_power_kw)
-        && isfinite(i->temperature_celsius)
-        && isfinite(i->dt_seconds);
+    return isfinite(i->soc_percent) && isfinite(i->active_power_kw) && isfinite(i->temperature_celsius) && isfinite(i->dt_seconds);
 }
 
 static bcc_status_t validate_filter_inputs(
-    const bcc_telemetry_filter_state_t   *state,
+    const bcc_telemetry_filter_state_t *state,
     const bcc_telemetry_filter_options_t *options,
-    const bcc_telemetry_filter_input_t   *input,
-    bcc_reason_t                         *out_reason)
+    const bcc_telemetry_filter_input_t *input,
+    bcc_reason_t *out_reason)
 {
-    if (!is_finite_filter_state(state)
-        || !is_finite_filter_options(options)
-        || !is_finite_filter_input(input))
-    {
+    if (!is_finite_filter_state(state) || !is_finite_filter_options(options) || !is_finite_filter_input(input)) {
         *out_reason = BCC_REASON_NON_FINITE_INPUT;
         return BCC_STATUS_NON_FINITE;
     }
-    if (options->alpha < 0.0
-        || options->alpha > 1.0
-        || options->max_soc_delta_percent < 0.0
-        || options->max_power_delta_kw < 0.0
-        || options->max_temperature_delta_celsius < 0.0
-        || options->min_sample_period_seconds < 0.0
-        || options->max_sample_period_seconds < options->min_sample_period_seconds)
-    {
+    if (options->alpha < 0.0 || options->alpha > 1.0 || options->max_soc_delta_percent < 0.0 || options->max_power_delta_kw < 0.0 || options->max_temperature_delta_celsius < 0.0 || options->min_sample_period_seconds < 0.0 || options->max_sample_period_seconds < options->min_sample_period_seconds) {
         *out_reason = BCC_REASON_FILTER_INVALID_OPTIONS;
         return BCC_STATUS_INVALID_INPUT;
     }
-    if (input->dt_seconds < options->min_sample_period_seconds
-        || input->dt_seconds > options->max_sample_period_seconds)
-    {
+    if (input->dt_seconds < options->min_sample_period_seconds || input->dt_seconds > options->max_sample_period_seconds) {
         *out_reason = BCC_REASON_FILTER_SAMPLE_PERIOD;
         return BCC_STATUS_INVALID_INPUT;
     }
@@ -601,19 +555,14 @@ static bcc_status_t validate_filter_inputs(
 }
 
 static int filter_drift_detected(
-    const bcc_telemetry_filter_state_t   *state,
+    const bcc_telemetry_filter_state_t *state,
     const bcc_telemetry_filter_options_t *options,
-    const bcc_telemetry_filter_input_t   *input)
+    const bcc_telemetry_filter_input_t *input)
 {
     if (state->initialized == 0) {
         return 0;
     }
-    return fabs(input->soc_percent - state->filtered_soc_percent)
-            > options->max_soc_delta_percent
-        || fabs(input->active_power_kw - state->filtered_active_power_kw)
-            > options->max_power_delta_kw
-        || fabs(input->temperature_celsius - state->filtered_temperature_celsius)
-            > options->max_temperature_delta_celsius;
+    return fabs(input->soc_percent - state->filtered_soc_percent) > options->max_soc_delta_percent || fabs(input->active_power_kw - state->filtered_active_power_kw) > options->max_power_delta_kw || fabs(input->temperature_celsius - state->filtered_temperature_celsius) > options->max_temperature_delta_celsius;
 }
 
 static double filter_step(double previous, double measurement, double alpha)
@@ -622,10 +571,10 @@ static double filter_step(double previous, double measurement, double alpha)
 }
 
 bcc_status_t battery_control_core_filter_telemetry(
-    const bcc_telemetry_filter_state_t   *state,
+    const bcc_telemetry_filter_state_t *state,
     const bcc_telemetry_filter_options_t *options,
-    const bcc_telemetry_filter_input_t   *input,
-    bcc_telemetry_filter_output_t        *out_output)
+    const bcc_telemetry_filter_input_t *input,
+    bcc_telemetry_filter_output_t *out_output)
 {
     if (out_output == NULL) {
         return BCC_STATUS_INVALID_INPUT;
@@ -644,8 +593,7 @@ bcc_status_t battery_control_core_filter_telemetry(
     const bcc_status_t guard_status =
         validate_filter_inputs(state, options, input, &guard_reason);
     if (guard_status != BCC_STATUS_OK) {
-        const int preserve_state = guard_status != BCC_STATUS_NON_FINITE
-                                && state->initialized != 0;
+        const int preserve_state = guard_status != BCC_STATUS_NON_FINITE && state->initialized != 0;
         fill_filter_output(out_output,
                            preserve_state ? state->filtered_soc_percent : 0.0,
                            preserve_state ? state->filtered_active_power_kw : 0.0,
@@ -671,14 +619,14 @@ bcc_status_t battery_control_core_filter_telemetry(
 
     const int was_initialized = state->initialized != 0;
     const double previous_soc = was_initialized
-        ? state->filtered_soc_percent
-        : input->soc_percent;
+                                    ? state->filtered_soc_percent
+                                    : input->soc_percent;
     const double previous_power = was_initialized
-        ? state->filtered_active_power_kw
-        : input->active_power_kw;
+                                      ? state->filtered_active_power_kw
+                                      : input->active_power_kw;
     const double previous_temperature = was_initialized
-        ? state->filtered_temperature_celsius
-        : input->temperature_celsius;
+                                            ? state->filtered_temperature_celsius
+                                            : input->temperature_celsius;
 
     fill_filter_output(out_output,
                        filter_step(previous_soc, input->soc_percent, options->alpha),

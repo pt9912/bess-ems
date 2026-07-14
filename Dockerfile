@@ -544,6 +544,24 @@ RUN cmake -S native/battery_control_core -B /build/native-lint \
         native/battery_control_core/src/compute.c
 
 # ---------------------------------------------------------------------------
+# native-format: clang-format layout gate against the native control core
+# using the project's `.clang-format`. --dry-run --Werror fails on any
+# non-conforming file without rewriting it (complements native-lint: layout
+# vs. static analysis). clang-format is pulled from the same Ubuntu Noble base.
+# ---------------------------------------------------------------------------
+FROM ${DOTNET_SDK_IMAGE} AS native-format
+RUN apt-get update \
+ && apt-get install --yes --no-install-recommends \
+        clang-format \
+ && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+COPY native/battery_control_core/ native/battery_control_core/
+RUN clang-format --dry-run --Werror \
+        native/battery_control_core/src/compute.c \
+        native/battery_control_core/include/battery_control_core.h \
+        native/battery_control_core/tests/test_compute.cpp
+
+# ---------------------------------------------------------------------------
 # native-sanitizer (RM-M3-09): rebuild the .so + test binary with
 # AddressSanitizer + UndefinedBehaviorSanitizer instrumentation and
 # run the doctest suite under -fno-sanitize-recover=all. Hits any

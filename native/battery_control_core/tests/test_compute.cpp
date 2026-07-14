@@ -25,7 +25,8 @@
 #include <cmath>
 #include <limits>
 
-namespace {
+namespace
+{
 
 // Reference single-bess asset matching the .NET integration tests
 // and the parity fixtures in BatteryEms.NativeInterop.IntegrationTests:
@@ -33,13 +34,13 @@ namespace {
 bcc_limits_t make_limits()
 {
     bcc_limits_t l{};
-    l.max_charge_power_kw       = 50.0;
-    l.max_discharge_power_kw    = 50.0;
-    l.min_soc_percent           = 10.0;
-    l.max_soc_percent           = 90.0;
-    l.max_ramp_kw_per_second    = 25.0;
-    l.min_temperature_celsius   = -20.0;
-    l.max_temperature_celsius   = 55.0;
+    l.max_charge_power_kw = 50.0;
+    l.max_discharge_power_kw = 50.0;
+    l.min_soc_percent = 10.0;
+    l.max_soc_percent = 90.0;
+    l.max_ramp_kw_per_second = 25.0;
+    l.min_temperature_celsius = -20.0;
+    l.max_temperature_celsius = 55.0;
     return l;
 }
 
@@ -47,9 +48,9 @@ bcc_snapshot_t make_snapshot(double soc = 50.0, double power = 0.0,
                              double temp = 22.0)
 {
     bcc_snapshot_t s{};
-    s.soc_percent          = soc;
-    s.active_power_kw      = power;
-    s.temperature_celsius  = temp;
+    s.soc_percent = soc;
+    s.active_power_kw = power;
+    s.temperature_celsius = temp;
     return s;
 }
 
@@ -57,25 +58,25 @@ bcc_request_t make_request(double target, double previous = 0.0,
                            double dt = 1.0, int32_t has_previous = 1)
 {
     bcc_request_t r{};
-    r.target_active_power_kw   = target;
+    r.target_active_power_kw = target;
     r.previous_active_power_kw = previous;
-    r.dt_seconds               = dt;
-    r.has_previous             = has_previous;
+    r.dt_seconds = dt;
+    r.has_previous = has_previous;
     return r;
 }
 
-}  // namespace
+} // namespace
 
 TEST_CASE("within-limits OK with discharge mode and within-limits reason")
 {
-    const auto lim  = make_limits();
+    const auto lim = make_limits();
     const auto snap = make_snapshot();
-    const auto req  = make_request(/*target=*/10.0, 0.0, 1.0,
-                                   /*has_previous=*/0);
+    const auto req = make_request(/*target=*/10.0, 0.0, 1.0,
+                                  /*has_previous=*/0);
     bcc_command_t cmd{};
     REQUIRE(battery_control_core_compute(&snap, &lim, &req, &cmd) == BCC_STATUS_OK);
 
-    CHECK(cmd.status      == static_cast<int32_t>(BCC_STATUS_OK));
+    CHECK(cmd.status == static_cast<int32_t>(BCC_STATUS_OK));
     CHECK(cmd.reason_code == static_cast<int32_t>(BCC_REASON_WITHIN_LIMITS));
     CHECK(cmd.active_power_kw == doctest::Approx(10.0).epsilon(1e-12));
     CHECK(cmd.mode == static_cast<int32_t>(BCC_MODE_DISCHARGE));
@@ -83,9 +84,9 @@ TEST_CASE("within-limits OK with discharge mode and within-limits reason")
 
 TEST_CASE("max-charge-power limited at -max_charge with charge mode")
 {
-    const auto lim  = make_limits();
+    const auto lim = make_limits();
     const auto snap = make_snapshot();
-    const auto req  = make_request(-100.0, 0.0, 1.0, 0);
+    const auto req = make_request(-100.0, 0.0, 1.0, 0);
     bcc_command_t cmd{};
     REQUIRE(battery_control_core_compute(&snap, &lim, &req, &cmd) == BCC_STATUS_LIMITED);
 
@@ -96,9 +97,9 @@ TEST_CASE("max-charge-power limited at -max_charge with charge mode")
 
 TEST_CASE("max-discharge-power limited at +max_discharge with discharge mode")
 {
-    const auto lim  = make_limits();
+    const auto lim = make_limits();
     const auto snap = make_snapshot();
-    const auto req  = make_request(100.0, 0.0, 1.0, 0);
+    const auto req = make_request(100.0, 0.0, 1.0, 0);
     bcc_command_t cmd{};
     REQUIRE(battery_control_core_compute(&snap, &lim, &req, &cmd) == BCC_STATUS_LIMITED);
 
@@ -109,9 +110,9 @@ TEST_CASE("max-discharge-power limited at +max_discharge with discharge mode")
 
 TEST_CASE("soc at max blocks charge, idle mode")
 {
-    const auto lim  = make_limits();
+    const auto lim = make_limits();
     const auto snap = make_snapshot(/*soc=*/95.0);
-    const auto req  = make_request(-30.0, 0.0, 1.0, 0);
+    const auto req = make_request(-30.0, 0.0, 1.0, 0);
     bcc_command_t cmd{};
     REQUIRE(battery_control_core_compute(&snap, &lim, &req, &cmd) == BCC_STATUS_LIMITED);
 
@@ -122,9 +123,9 @@ TEST_CASE("soc at max blocks charge, idle mode")
 
 TEST_CASE("soc at min blocks discharge, idle mode")
 {
-    const auto lim  = make_limits();
+    const auto lim = make_limits();
     const auto snap = make_snapshot(/*soc=*/5.0);
-    const auto req  = make_request(30.0, 0.0, 1.0, 0);
+    const auto req = make_request(30.0, 0.0, 1.0, 0);
     bcc_command_t cmd{};
     REQUIRE(battery_control_core_compute(&snap, &lim, &req, &cmd) == BCC_STATUS_LIMITED);
 
@@ -135,9 +136,9 @@ TEST_CASE("soc at min blocks discharge, idle mode")
 
 TEST_CASE("temperature above max forces 0 kW with temperature reason")
 {
-    const auto lim  = make_limits();
+    const auto lim = make_limits();
     const auto snap = make_snapshot(50.0, 0.0, /*temp=*/70.0);
-    const auto req  = make_request(20.0, 0.0, 1.0, 0);
+    const auto req = make_request(20.0, 0.0, 1.0, 0);
     bcc_command_t cmd{};
     REQUIRE(battery_control_core_compute(&snap, &lim, &req, &cmd) == BCC_STATUS_LIMITED);
 
@@ -147,9 +148,9 @@ TEST_CASE("temperature above max forces 0 kW with temperature reason")
 
 TEST_CASE("temperature below min forces 0 kW with temperature reason")
 {
-    const auto lim  = make_limits();
+    const auto lim = make_limits();
     const auto snap = make_snapshot(50.0, 0.0, /*temp=*/-30.0);
-    const auto req  = make_request(20.0, 0.0, 1.0, 0);
+    const auto req = make_request(20.0, 0.0, 1.0, 0);
     bcc_command_t cmd{};
     REQUIRE(battery_control_core_compute(&snap, &lim, &req, &cmd) == BCC_STATUS_LIMITED);
 
@@ -161,9 +162,9 @@ TEST_CASE("ramp-up clamped to previous + max_ramp*dt")
 {
     // prev = 10, dt = 1, max_ramp = 25 → window [-15, 35];
     // requested 50 must clip to 35.
-    const auto lim  = make_limits();
+    const auto lim = make_limits();
     const auto snap = make_snapshot();
-    const auto req  = make_request(50.0, 10.0, 1.0, 1);
+    const auto req = make_request(50.0, 10.0, 1.0, 1);
     bcc_command_t cmd{};
     REQUIRE(battery_control_core_compute(&snap, &lim, &req, &cmd) == BCC_STATUS_LIMITED);
 
@@ -176,9 +177,9 @@ TEST_CASE("ramp-down clamped to previous - max_ramp*dt")
     // prev = 10, dt = 1, max_ramp = 25 → window [-15, 35];
     // requested -20 clamps to -15. Same fixture as the
     // "ramp-down-clamp" parity case in NativeKernelParityTests.cs.
-    const auto lim  = make_limits();
+    const auto lim = make_limits();
     const auto snap = make_snapshot();
-    const auto req  = make_request(-20.0, 10.0, 1.0, 1);
+    const auto req = make_request(-20.0, 10.0, 1.0, 1);
     bcc_command_t cmd{};
     REQUIRE(battery_control_core_compute(&snap, &lim, &req, &cmd) == BCC_STATUS_LIMITED);
 
@@ -188,10 +189,10 @@ TEST_CASE("ramp-down clamped to previous - max_ramp*dt")
 
 TEST_CASE("dt == 0 with previous and changing target → ramp-not-permitted")
 {
-    const auto lim  = make_limits();
+    const auto lim = make_limits();
     const auto snap = make_snapshot();
-    const auto req  = make_request(/*target=*/25.0, /*previous=*/10.0,
-                                   /*dt=*/0.0, /*has_previous=*/1);
+    const auto req = make_request(/*target=*/25.0, /*previous=*/10.0,
+                                  /*dt=*/0.0, /*has_previous=*/1);
     bcc_command_t cmd{};
     REQUIRE(battery_control_core_compute(&snap, &lim, &req, &cmd) == BCC_STATUS_LIMITED);
 
@@ -207,10 +208,10 @@ TEST_CASE("ramp limiter inside window leaves request unchanged (OK within-limits
     // exits through the unclamped tail returning OK with
     // within-limits. Pinning this branch keeps coverage at 100%
     // alongside the up/down-clamp tests above.
-    const auto lim  = make_limits();
+    const auto lim = make_limits();
     const auto snap = make_snapshot();
-    const auto req  = make_request(/*target=*/20.0, /*previous=*/10.0,
-                                   /*dt=*/1.0, /*has_previous=*/1);
+    const auto req = make_request(/*target=*/20.0, /*previous=*/10.0,
+                                  /*dt=*/1.0, /*has_previous=*/1);
     bcc_command_t cmd{};
     REQUIRE(battery_control_core_compute(&snap, &lim, &req, &cmd) == BCC_STATUS_OK);
 
@@ -223,10 +224,10 @@ TEST_CASE("dt == 0 with previous and equal target → OK within-limits (no clamp
     // The ramp limiter has a single OK exit when requested == previous
     // even with dt == 0 / max_ramp == 0; the held-equal branch is
     // distinct from ramp-not-permitted and must surface as OK.
-    const auto lim  = make_limits();
+    const auto lim = make_limits();
     const auto snap = make_snapshot();
-    const auto req  = make_request(/*target=*/10.0, /*previous=*/10.0,
-                                   /*dt=*/0.0, /*has_previous=*/1);
+    const auto req = make_request(/*target=*/10.0, /*previous=*/10.0,
+                                  /*dt=*/0.0, /*has_previous=*/1);
     bcc_command_t cmd{};
     REQUIRE(battery_control_core_compute(&snap, &lim, &req, &cmd) == BCC_STATUS_OK);
 
@@ -242,8 +243,8 @@ TEST_CASE("max_ramp == 0 with previous and changing target → ramp-not-permitte
     auto lim = make_limits();
     lim.max_ramp_kw_per_second = 0.0;
     const auto snap = make_snapshot();
-    const auto req  = make_request(/*target=*/25.0, /*previous=*/10.0,
-                                   /*dt=*/1.0, /*has_previous=*/1);
+    const auto req = make_request(/*target=*/25.0, /*previous=*/10.0,
+                                  /*dt=*/1.0, /*has_previous=*/1);
     bcc_command_t cmd{};
     REQUIRE(battery_control_core_compute(&snap, &lim, &req, &cmd) == BCC_STATUS_LIMITED);
 
@@ -257,9 +258,9 @@ TEST_CASE("constraint + ramp combined: constraint reason wins, ramp value wins")
     // ramp window 10±25 → constraint clamps to 50, ramp clamps to 35.
     // Plan rule: final power = ramp result (35), reason = constraint
     // (max-discharge-power).
-    const auto lim  = make_limits();
+    const auto lim = make_limits();
     const auto snap = make_snapshot();
-    const auto req  = make_request(100.0, 10.0, 1.0, 1);
+    const auto req = make_request(100.0, 10.0, 1.0, 1);
     bcc_command_t cmd{};
     REQUIRE(battery_control_core_compute(&snap, &lim, &req, &cmd) == BCC_STATUS_LIMITED);
 
@@ -269,10 +270,10 @@ TEST_CASE("constraint + ramp combined: constraint reason wins, ramp value wins")
 
 TEST_CASE("first tick (has_previous == 0) skips ramp limiter")
 {
-    const auto lim  = make_limits();
+    const auto lim = make_limits();
     const auto snap = make_snapshot();
-    const auto req  = make_request(/*target=*/40.0, 0.0, 1.0,
-                                   /*has_previous=*/0);
+    const auto req = make_request(/*target=*/40.0, 0.0, 1.0,
+                                  /*has_previous=*/0);
     bcc_command_t cmd{};
     REQUIRE(battery_control_core_compute(&snap, &lim, &req, &cmd) == BCC_STATUS_OK);
 
@@ -284,9 +285,9 @@ TEST_CASE("zero-power output maps to BCC_MODE_IDLE")
 {
     // Mode mapping pin: power == 0 → IDLE (not STOP — STOP is reserved
     // for a managed-side state-machine decision per architecture §4.1).
-    const auto lim  = make_limits();
+    const auto lim = make_limits();
     const auto snap = make_snapshot();
-    const auto req  = make_request(/*target=*/0.0, 0.0, 1.0, 0);
+    const auto req = make_request(/*target=*/0.0, 0.0, 1.0, 0);
     bcc_command_t cmd{};
     REQUIRE(battery_control_core_compute(&snap, &lim, &req, &cmd) == BCC_STATUS_OK);
 
@@ -297,7 +298,7 @@ TEST_CASE("zero-power output maps to BCC_MODE_IDLE")
 TEST_CASE("non-finite SOC in snapshot returns NON_FINITE input")
 {
     const auto lim = make_limits();
-    auto snap      = make_snapshot();
+    auto snap = make_snapshot();
     snap.soc_percent = std::numeric_limits<double>::quiet_NaN();
     const auto req = make_request(10.0, 0.0, 1.0, 0);
     bcc_command_t cmd{};
@@ -312,7 +313,7 @@ TEST_CASE("non-finite limit (max_charge = +Inf) returns NON_FINITE input")
     auto lim = make_limits();
     lim.max_charge_power_kw = std::numeric_limits<double>::infinity();
     const auto snap = make_snapshot();
-    const auto req  = make_request(10.0, 0.0, 1.0, 0);
+    const auto req = make_request(10.0, 0.0, 1.0, 0);
     bcc_command_t cmd{};
     REQUIRE(battery_control_core_compute(&snap, &lim, &req, &cmd) == BCC_STATUS_NON_FINITE);
 
@@ -321,9 +322,9 @@ TEST_CASE("non-finite limit (max_charge = +Inf) returns NON_FINITE input")
 
 TEST_CASE("non-finite request target returns NON_FINITE input")
 {
-    const auto lim  = make_limits();
+    const auto lim = make_limits();
     const auto snap = make_snapshot();
-    auto req        = make_request(0.0, 0.0, 1.0, 0);
+    auto req = make_request(0.0, 0.0, 1.0, 0);
     req.target_active_power_kw = std::numeric_limits<double>::quiet_NaN();
     bcc_command_t cmd{};
     REQUIRE(battery_control_core_compute(&snap, &lim, &req, &cmd) == BCC_STATUS_NON_FINITE);
@@ -338,11 +339,11 @@ TEST_CASE("NaN previous power tolerated when has_previous == 0")
     // ramp limiter must never inspect it in this branch, and the
     // non-finite guard must NOT fire. Mirror of the integration
     // test in NativeAbiNegativeTests.
-    const auto lim  = make_limits();
+    const auto lim = make_limits();
     const auto snap = make_snapshot();
-    auto req        = make_request(10.0, 0.0, 1.0, /*has_previous=*/0);
+    auto req = make_request(10.0, 0.0, 1.0, /*has_previous=*/0);
     req.previous_active_power_kw = std::numeric_limits<double>::quiet_NaN();
-    req.dt_seconds               = std::numeric_limits<double>::quiet_NaN();
+    req.dt_seconds = std::numeric_limits<double>::quiet_NaN();
     bcc_command_t cmd{};
     REQUIRE(battery_control_core_compute(&snap, &lim, &req, &cmd) == BCC_STATUS_OK);
 
@@ -352,9 +353,9 @@ TEST_CASE("NaN previous power tolerated when has_previous == 0")
 
 TEST_CASE("NaN previous power rejected when has_previous == 1")
 {
-    const auto lim  = make_limits();
+    const auto lim = make_limits();
     const auto snap = make_snapshot();
-    auto req        = make_request(10.0, 0.0, 1.0, /*has_previous=*/1);
+    auto req = make_request(10.0, 0.0, 1.0, /*has_previous=*/1);
     req.previous_active_power_kw = std::numeric_limits<double>::quiet_NaN();
     bcc_command_t cmd{};
     REQUIRE(battery_control_core_compute(&snap, &lim, &req, &cmd) == BCC_STATUS_NON_FINITE);
@@ -364,10 +365,10 @@ TEST_CASE("NaN previous power rejected when has_previous == 1")
 
 TEST_CASE("negative dt with has_previous == 1 returns NEGATIVE_DT")
 {
-    const auto lim  = make_limits();
+    const auto lim = make_limits();
     const auto snap = make_snapshot();
-    const auto req  = make_request(/*target=*/10.0, /*previous=*/5.0,
-                                   /*dt=*/-1.0, /*has_previous=*/1);
+    const auto req = make_request(/*target=*/10.0, /*previous=*/5.0,
+                                  /*dt=*/-1.0, /*has_previous=*/1);
     bcc_command_t cmd{};
     REQUIRE(battery_control_core_compute(&snap, &lim, &req, &cmd) == BCC_STATUS_NEGATIVE_DT);
 
@@ -380,10 +381,10 @@ TEST_CASE("negative dt without previous is ignored (ramp never runs)")
     // has_previous == 0 → ramp limiter is skipped entirely, so a
     // negative dt is irrelevant. Documents the contract from
     // compute.cpp explicitly.
-    const auto lim  = make_limits();
+    const auto lim = make_limits();
     const auto snap = make_snapshot();
-    const auto req  = make_request(/*target=*/10.0, /*previous=*/0.0,
-                                   /*dt=*/-5.0, /*has_previous=*/0);
+    const auto req = make_request(/*target=*/10.0, /*previous=*/0.0,
+                                  /*dt=*/-5.0, /*has_previous=*/0);
     bcc_command_t cmd{};
     REQUIRE(battery_control_core_compute(&snap, &lim, &req, &cmd) == BCC_STATUS_OK);
 
@@ -393,15 +394,13 @@ TEST_CASE("negative dt without previous is ignored (ramp never runs)")
 TEST_CASE("null pointers yield INVALID_INPUT")
 {
     bcc_command_t cmd{};
-    CHECK(battery_control_core_compute(nullptr, nullptr, nullptr, &cmd)
-          == BCC_STATUS_INVALID_INPUT);
+    CHECK(battery_control_core_compute(nullptr, nullptr, nullptr, &cmd) == BCC_STATUS_INVALID_INPUT);
     // Without out_command we cannot signal a reason, but the bare
     // status return must still be INVALID_INPUT — this is the only
     // error case where the kernel cannot write into the command
     // struct, so the contract from battery_control_core.h says the
     // function falls back to the bare status.
-    CHECK(battery_control_core_compute(nullptr, nullptr, nullptr, nullptr)
-          == BCC_STATUS_INVALID_INPUT);
+    CHECK(battery_control_core_compute(nullptr, nullptr, nullptr, nullptr) == BCC_STATUS_INVALID_INPUT);
 }
 
 TEST_CASE("partial null inputs (out_command non-null) yield INVALID_INPUT")
@@ -412,8 +411,7 @@ TEST_CASE("partial null inputs (out_command non-null) yield INVALID_INPUT")
     const auto lim = make_limits();
     const auto req = make_request(10.0, 0.0, 1.0, 0);
     bcc_command_t cmd{};
-    REQUIRE(battery_control_core_compute(nullptr, &lim, &req, &cmd)
-            == BCC_STATUS_INVALID_INPUT);
+    REQUIRE(battery_control_core_compute(nullptr, &lim, &req, &cmd) == BCC_STATUS_INVALID_INPUT);
     CHECK(cmd.reason_code == static_cast<int32_t>(BCC_REASON_NON_FINITE_INPUT));
     CHECK(cmd.active_power_kw == doctest::Approx(0.0).epsilon(1e-12));
 }
@@ -423,35 +421,36 @@ TEST_CASE("ABI version function exposes packed major/minor/patch")
     const uint32_t v = battery_control_core_abi_version();
     CHECK(v == BCC_ABI_VERSION);
     CHECK(((v >> 16) & 0xFFu) == BCC_ABI_VERSION_MAJOR);
-    CHECK(((v >> 8)  & 0xFFu) == BCC_ABI_VERSION_MINOR);
-    CHECK((v & 0xFFu)         == BCC_ABI_VERSION_PATCH);
+    CHECK(((v >> 8) & 0xFFu) == BCC_ABI_VERSION_MINOR);
+    CHECK((v & 0xFFu) == BCC_ABI_VERSION_PATCH);
 }
 
 // ---------------------------------------------------------------------
 // RM-M3-13 PID kernel tests.
 // ---------------------------------------------------------------------
 
-namespace {
+namespace
+{
 
 bcc_pid_options_t make_pid_options(double kp = 1.0, double ki = 0.5, double kd = 0.1,
                                    double output_min = -100.0, double output_max = 100.0,
                                    double deadband = 0.0)
 {
     bcc_pid_options_t o{};
-    o.kp                 = kp;
-    o.ki                 = ki;
-    o.kd                 = kd;
-    o.output_min         = output_min;
-    o.output_max         = output_max;
-    o.deadband_absolute  = deadband;
-    o.anti_windup_mode   = static_cast<int32_t>(BCC_PID_ANTI_WINDUP_CONDITIONAL_INTEGRATION);
+    o.kp = kp;
+    o.ki = ki;
+    o.kd = kd;
+    o.output_min = output_min;
+    o.output_max = output_max;
+    o.deadband_absolute = deadband;
+    o.anti_windup_mode = static_cast<int32_t>(BCC_PID_ANTI_WINDUP_CONDITIONAL_INTEGRATION);
     return o;
 }
 
 bcc_pid_state_t make_pid_state(double integral = 0.0, double previous_error = 0.0)
 {
     bcc_pid_state_t s{};
-    s.integral       = integral;
+    s.integral = integral;
     s.previous_error = previous_error;
     return s;
 }
@@ -459,13 +458,13 @@ bcc_pid_state_t make_pid_state(double integral = 0.0, double previous_error = 0.
 bcc_pid_input_t make_pid_input(double setpoint, double measurement, double dt_seconds = 1.0)
 {
     bcc_pid_input_t i{};
-    i.setpoint     = setpoint;
-    i.measurement  = measurement;
-    i.dt_seconds   = dt_seconds;
+    i.setpoint = setpoint;
+    i.measurement = measurement;
+    i.dt_seconds = dt_seconds;
     return i;
 }
 
-}  // namespace
+} // namespace
 
 TEST_CASE("PID happy path produces P+I+D output and updates state")
 {
@@ -474,9 +473,9 @@ TEST_CASE("PID happy path produces P+I+D output and updates state")
     //   I_step = 0.5 * 10 = 5; I_next = 0 + 5*1 = 5
     //   D = 0.1 * (10 - 0) / 1 = 1
     //   pre-clamp = 10 + 5 + 1 = 16; within [-100, 100].
-    const auto opts  = make_pid_options();
+    const auto opts = make_pid_options();
     const auto state = make_pid_state();
-    const auto in    = make_pid_input(/*setpoint=*/10.0, /*measurement=*/0.0);
+    const auto in = make_pid_input(/*setpoint=*/10.0, /*measurement=*/0.0);
     bcc_pid_command_t cmd{};
     REQUIRE(battery_control_core_pid_step(&state, &opts, &in, &cmd) == BCC_STATUS_OK);
 
@@ -491,10 +490,10 @@ TEST_CASE("PID happy path produces P+I+D output and updates state")
 TEST_CASE("PID output clamped at OutputMax → LIMITED with PID_OUTPUT_CLAMPED_HIGH")
 {
     // Drive the controller into saturation with small bounds.
-    const auto opts  = make_pid_options(/*kp=*/10.0, /*ki=*/0.0, /*kd=*/0.0,
-                                        /*output_min=*/-1.0, /*output_max=*/1.0);
+    const auto opts = make_pid_options(/*kp=*/10.0, /*ki=*/0.0, /*kd=*/0.0,
+                                       /*output_min=*/-1.0, /*output_max=*/1.0);
     const auto state = make_pid_state();
-    const auto in    = make_pid_input(/*setpoint=*/100.0, /*measurement=*/0.0);
+    const auto in = make_pid_input(/*setpoint=*/100.0, /*measurement=*/0.0);
     bcc_pid_command_t cmd{};
     REQUIRE(battery_control_core_pid_step(&state, &opts, &in, &cmd) == BCC_STATUS_LIMITED);
 
@@ -505,9 +504,9 @@ TEST_CASE("PID output clamped at OutputMax → LIMITED with PID_OUTPUT_CLAMPED_H
 
 TEST_CASE("PID output clamped at OutputMin → LIMITED with PID_OUTPUT_CLAMPED_LOW")
 {
-    const auto opts  = make_pid_options(10.0, 0.0, 0.0, -1.0, 1.0);
+    const auto opts = make_pid_options(10.0, 0.0, 0.0, -1.0, 1.0);
     const auto state = make_pid_state();
-    const auto in    = make_pid_input(-100.0, 0.0);
+    const auto in = make_pid_input(-100.0, 0.0);
     bcc_pid_command_t cmd{};
     REQUIRE(battery_control_core_pid_step(&state, &opts, &in, &cmd) == BCC_STATUS_LIMITED);
 
@@ -519,10 +518,10 @@ TEST_CASE("PID output clamped at OutputMin → LIMITED with PID_OUTPUT_CLAMPED_L
 TEST_CASE("PID anti-windup freezes integrator at high saturation with positive Ki·error")
 {
     // pre-clamp > output_max AND integrator_step > 0 → freeze.
-    const auto opts  = make_pid_options(/*kp=*/10.0, /*ki=*/1.0, /*kd=*/0.0,
-                                        /*output_min=*/-1.0, /*output_max=*/1.0);
+    const auto opts = make_pid_options(/*kp=*/10.0, /*ki=*/1.0, /*kd=*/0.0,
+                                       /*output_min=*/-1.0, /*output_max=*/1.0);
     const auto state = make_pid_state(/*integral=*/0.5);
-    const auto in    = make_pid_input(/*setpoint=*/100.0, /*measurement=*/0.0);
+    const auto in = make_pid_input(/*setpoint=*/100.0, /*measurement=*/0.0);
     bcc_pid_command_t cmd{};
     REQUIRE(battery_control_core_pid_step(&state, &opts, &in, &cmd) == BCC_STATUS_LIMITED);
 
@@ -538,10 +537,10 @@ TEST_CASE("PID anti-windup does NOT freeze with negative Ki when integrator decr
     // exceeds OutputMax, the freeze guard expects integrator_step > 0,
     // so it does NOT freeze — the integrator continues unwinding toward
     // the bound.
-    const auto opts  = make_pid_options(/*kp=*/10.0, /*ki=*/-1.0, /*kd=*/0.0,
-                                        /*output_min=*/-1.0, /*output_max=*/1.0);
+    const auto opts = make_pid_options(/*kp=*/10.0, /*ki=*/-1.0, /*kd=*/0.0,
+                                       /*output_min=*/-1.0, /*output_max=*/1.0);
     const auto state = make_pid_state(/*integral=*/2.0);
-    const auto in    = make_pid_input(/*setpoint=*/100.0, /*measurement=*/0.0);
+    const auto in = make_pid_input(/*setpoint=*/100.0, /*measurement=*/0.0);
     bcc_pid_command_t cmd{};
     REQUIRE(battery_control_core_pid_step(&state, &opts, &in, &cmd) == BCC_STATUS_LIMITED);
 
@@ -555,11 +554,11 @@ TEST_CASE("PID deadband suppresses P and D, holds integrator and previous_error"
     // |error| = 0.5 < deadband 1.0 → effective_error = 0; P = D = 0.
     // Integrator step is also 0 (Ki * 0); chosen_integral stays at the
     // input integral. previous_error preserved across the band.
-    const auto opts  = make_pid_options(/*kp=*/10.0, /*ki=*/1.0, /*kd=*/5.0,
-                                        /*output_min=*/-100.0, /*output_max=*/100.0,
-                                        /*deadband=*/1.0);
+    const auto opts = make_pid_options(/*kp=*/10.0, /*ki=*/1.0, /*kd=*/5.0,
+                                       /*output_min=*/-100.0, /*output_max=*/100.0,
+                                       /*deadband=*/1.0);
     const auto state = make_pid_state(/*integral=*/3.0, /*previous_error=*/-2.0);
-    const auto in    = make_pid_input(/*setpoint=*/0.5, /*measurement=*/0.0);
+    const auto in = make_pid_input(/*setpoint=*/0.5, /*measurement=*/0.0);
     bcc_pid_command_t cmd{};
     REQUIRE(battery_control_core_pid_step(&state, &opts, &in, &cmd) == BCC_STATUS_OK);
 
@@ -573,11 +572,11 @@ TEST_CASE("PID deadband suppresses P and D, holds integrator and previous_error"
 TEST_CASE("PID deadband boundary: |error| == deadband is NOT in band")
 {
     // Strict less-than: error == deadband must produce a normal step.
-    const auto opts  = make_pid_options(/*kp=*/1.0, /*ki=*/0.0, /*kd=*/0.0,
-                                        /*output_min=*/-100, /*output_max=*/100,
-                                        /*deadband=*/1.0);
+    const auto opts = make_pid_options(/*kp=*/1.0, /*ki=*/0.0, /*kd=*/0.0,
+                                       /*output_min=*/-100, /*output_max=*/100,
+                                       /*deadband=*/1.0);
     const auto state = make_pid_state();
-    const auto in    = make_pid_input(/*setpoint=*/1.0, /*measurement=*/0.0);
+    const auto in = make_pid_input(/*setpoint=*/1.0, /*measurement=*/0.0);
     bcc_pid_command_t cmd{};
     REQUIRE(battery_control_core_pid_step(&state, &opts, &in, &cmd) == BCC_STATUS_OK);
 
@@ -587,9 +586,9 @@ TEST_CASE("PID deadband boundary: |error| == deadband is NOT in band")
 
 TEST_CASE("PID dt <= 0 returns NEGATIVE_DT")
 {
-    const auto opts  = make_pid_options();
+    const auto opts = make_pid_options();
     const auto state = make_pid_state();
-    const auto in    = make_pid_input(10.0, 0.0, /*dt_seconds=*/0.0);
+    const auto in = make_pid_input(10.0, 0.0, /*dt_seconds=*/0.0);
     bcc_pid_command_t cmd{};
     REQUIRE(battery_control_core_pid_step(&state, &opts, &in, &cmd) == BCC_STATUS_NEGATIVE_DT);
     CHECK(cmd.reason_code == static_cast<int32_t>(BCC_REASON_NEGATIVE_DT));
@@ -602,7 +601,7 @@ TEST_CASE("PID dt <= 0 returns NEGATIVE_DT")
 
 TEST_CASE("PID non-finite setpoint or measurement → NON_FINITE")
 {
-    const auto opts  = make_pid_options();
+    const auto opts = make_pid_options();
     const auto state = make_pid_state();
     auto in = make_pid_input(std::numeric_limits<double>::quiet_NaN(), 0.0);
     bcc_pid_command_t cmd{};
@@ -617,8 +616,8 @@ TEST_CASE("PID non-finite setpoint or measurement → NON_FINITE")
 TEST_CASE("PID non-finite state.integral or state.previous_error → NON_FINITE")
 {
     const auto opts = make_pid_options();
-    const auto in   = make_pid_input(10.0, 0.0);
-    auto bad_state  = make_pid_state(std::numeric_limits<double>::quiet_NaN());
+    const auto in = make_pid_input(10.0, 0.0);
+    auto bad_state = make_pid_state(std::numeric_limits<double>::quiet_NaN());
     bcc_pid_command_t cmd{};
     REQUIRE(battery_control_core_pid_step(&bad_state, &opts, &in, &cmd) == BCC_STATUS_NON_FINITE);
     CHECK(cmd.reason_code == static_cast<int32_t>(BCC_REASON_NON_FINITE_INPUT));
@@ -633,7 +632,7 @@ TEST_CASE("PID non-finite gain → NON_FINITE")
     auto opts = make_pid_options();
     opts.ki = std::numeric_limits<double>::quiet_NaN();
     const auto state = make_pid_state();
-    const auto in    = make_pid_input(10.0, 0.0);
+    const auto in = make_pid_input(10.0, 0.0);
     bcc_pid_command_t cmd{};
     REQUIRE(battery_control_core_pid_step(&state, &opts, &in, &cmd) == BCC_STATUS_NON_FINITE);
     CHECK(cmd.reason_code == static_cast<int32_t>(BCC_REASON_NON_FINITE_INPUT));
@@ -645,7 +644,7 @@ TEST_CASE("PID OutputMin > OutputMax → INVALID_INPUT with PID_INVALID_OPTIONS"
     opts.output_min = 100.0;
     opts.output_max = 1.0;
     const auto state = make_pid_state();
-    const auto in    = make_pid_input(10.0, 0.0);
+    const auto in = make_pid_input(10.0, 0.0);
     bcc_pid_command_t cmd{};
     REQUIRE(battery_control_core_pid_step(&state, &opts, &in, &cmd) == BCC_STATUS_INVALID_INPUT);
     CHECK(cmd.reason_code == static_cast<int32_t>(BCC_REASON_PID_INVALID_OPTIONS));
@@ -656,7 +655,7 @@ TEST_CASE("PID negative deadband → INVALID_INPUT with PID_INVALID_OPTIONS")
     auto opts = make_pid_options();
     opts.deadband_absolute = -0.001;
     const auto state = make_pid_state();
-    const auto in    = make_pid_input(10.0, 0.0);
+    const auto in = make_pid_input(10.0, 0.0);
     bcc_pid_command_t cmd{};
     REQUIRE(battery_control_core_pid_step(&state, &opts, &in, &cmd) == BCC_STATUS_INVALID_INPUT);
     CHECK(cmd.reason_code == static_cast<int32_t>(BCC_REASON_PID_INVALID_OPTIONS));
@@ -667,7 +666,7 @@ TEST_CASE("PID unknown anti-windup mode → UNSUPPORTED_STATE")
     auto opts = make_pid_options();
     opts.anti_windup_mode = 99;
     const auto state = make_pid_state();
-    const auto in    = make_pid_input(10.0, 0.0);
+    const auto in = make_pid_input(10.0, 0.0);
     bcc_pid_command_t cmd{};
     REQUIRE(battery_control_core_pid_step(&state, &opts, &in, &cmd) == BCC_STATUS_UNSUPPORTED_STATE);
     CHECK(cmd.reason_code == static_cast<int32_t>(BCC_REASON_UNSUPPORTED_STATE));
@@ -686,7 +685,7 @@ TEST_CASE("PID P-term overflow with Ki=0 → NON_FINITE with NON_FINITE_OUTPUT")
     opts.ki = 0.0;
     opts.kd = 0.0;
     const auto state = make_pid_state();
-    const auto in    = make_pid_input(/*setpoint=*/2.0, /*measurement=*/0.0);
+    const auto in = make_pid_input(/*setpoint=*/2.0, /*measurement=*/0.0);
     bcc_pid_command_t cmd{};
     REQUIRE(battery_control_core_pid_step(&state, &opts, &in, &cmd) == BCC_STATUS_NON_FINITE);
     CHECK(cmd.reason_code == static_cast<int32_t>(BCC_REASON_NON_FINITE_OUTPUT));
@@ -702,9 +701,9 @@ TEST_CASE("PID integrator overflow → NON_FINITE with PID_INTEGRATOR_OVERFLOW")
     auto opts = make_pid_options();
     opts.ki = std::numeric_limits<double>::max();
     const auto state = make_pid_state();
-    const auto in    = make_pid_input(/*setpoint=*/std::numeric_limits<double>::max(),
-                                      /*measurement=*/0.0,
-                                      /*dt_seconds=*/2.0);
+    const auto in = make_pid_input(/*setpoint=*/std::numeric_limits<double>::max(),
+                                   /*measurement=*/0.0,
+                                   /*dt_seconds=*/2.0);
     bcc_pid_command_t cmd{};
     REQUIRE(battery_control_core_pid_step(&state, &opts, &in, &cmd) == BCC_STATUS_NON_FINITE);
     CHECK(cmd.reason_code == static_cast<int32_t>(BCC_REASON_PID_INTEGRATOR_OVERFLOW));
@@ -713,10 +712,8 @@ TEST_CASE("PID integrator overflow → NON_FINITE with PID_INTEGRATOR_OVERFLOW")
 TEST_CASE("PID null pointer → INVALID_INPUT")
 {
     bcc_pid_command_t cmd{};
-    CHECK(battery_control_core_pid_step(nullptr, nullptr, nullptr, &cmd)
-          == BCC_STATUS_INVALID_INPUT);
-    CHECK(battery_control_core_pid_step(nullptr, nullptr, nullptr, nullptr)
-          == BCC_STATUS_INVALID_INPUT);
+    CHECK(battery_control_core_pid_step(nullptr, nullptr, nullptr, &cmd) == BCC_STATUS_INVALID_INPUT);
+    CHECK(battery_control_core_pid_step(nullptr, nullptr, nullptr, nullptr) == BCC_STATUS_INVALID_INPUT);
 }
 
 TEST_CASE("PID state propagation across two consecutive steps")
@@ -727,7 +724,7 @@ TEST_CASE("PID state propagation across two consecutive steps")
     //   error = 10 (unchanged); D = 0.1*(10-10)/1 = 0
     //   I_next = 5 + 5 = 10; output = 10 + 10 + 0 = 20.
     const auto opts = make_pid_options(/*kp=*/1.0, /*ki=*/0.5, /*kd=*/0.1);
-    const auto in   = make_pid_input(10.0, 0.0);
+    const auto in = make_pid_input(10.0, 0.0);
 
     bcc_pid_command_t step1{};
     auto s0 = make_pid_state();
@@ -737,7 +734,7 @@ TEST_CASE("PID state propagation across two consecutive steps")
 
     bcc_pid_command_t step2{};
     bcc_pid_state_t s1{};
-    s1.integral       = step1.next_integral;
+    s1.integral = step1.next_integral;
     s1.previous_error = step1.next_previous_error;
     REQUIRE(battery_control_core_pid_step(&s1, &opts, &in, &step2) == BCC_STATUS_OK);
     CHECK(step2.output == doctest::Approx(20.0).epsilon(1e-12));
@@ -748,7 +745,8 @@ TEST_CASE("PID state propagation across two consecutive steps")
 // RM-M5-03 telemetry-filter tests.
 // ---------------------------------------------------------------------
 
-namespace {
+namespace
+{
 
 bcc_telemetry_filter_state_t make_filter_state(
     double soc = 50.0,
@@ -790,7 +788,7 @@ bcc_telemetry_filter_input_t make_filter_input(
     return i;
 }
 
-}  // namespace
+} // namespace
 
 TEST_CASE("Telemetry filter cold boot seeds from first measurement")
 {
@@ -803,8 +801,7 @@ TEST_CASE("Telemetry filter cold boot seeds from first measurement")
     const auto in = make_filter_input(/*soc=*/55.0, /*power=*/12.0,
                                       /*temperature=*/23.0);
     bcc_telemetry_filter_output_t out{};
-    REQUIRE(battery_control_core_filter_telemetry(&state, &opts, &in, &out)
-            == BCC_STATUS_OK);
+    REQUIRE(battery_control_core_filter_telemetry(&state, &opts, &in, &out) == BCC_STATUS_OK);
 
     CHECK(out.filtered_soc_percent == doctest::Approx(55.0).epsilon(1e-12));
     CHECK(out.filtered_active_power_kw == doctest::Approx(12.0).epsilon(1e-12));
@@ -822,8 +819,7 @@ TEST_CASE("Telemetry filter applies first-order IIR update after initialization"
     const auto in = make_filter_input(/*soc=*/54.0, /*power=*/30.0,
                                       /*temperature=*/24.0);
     bcc_telemetry_filter_output_t out{};
-    REQUIRE(battery_control_core_filter_telemetry(&state, &opts, &in, &out)
-            == BCC_STATUS_OK);
+    REQUIRE(battery_control_core_filter_telemetry(&state, &opts, &in, &out) == BCC_STATUS_OK);
 
     CHECK(out.filtered_soc_percent == doctest::Approx(51.0).epsilon(1e-12));
     CHECK(out.filtered_active_power_kw == doctest::Approx(15.0).epsilon(1e-12));
@@ -839,15 +835,13 @@ TEST_CASE("Telemetry filter alpha one is pass-through and alpha zero holds state
 
     auto opts = make_filter_options(/*alpha=*/1.0);
     bcc_telemetry_filter_output_t pass{};
-    REQUIRE(battery_control_core_filter_telemetry(&state, &opts, &in, &pass)
-            == BCC_STATUS_OK);
+    REQUIRE(battery_control_core_filter_telemetry(&state, &opts, &in, &pass) == BCC_STATUS_OK);
     CHECK(pass.filtered_soc_percent == doctest::Approx(54.0).epsilon(1e-12));
     CHECK(pass.filtered_active_power_kw == doctest::Approx(30.0).epsilon(1e-12));
 
     opts.alpha = 0.0;
     bcc_telemetry_filter_output_t held{};
-    REQUIRE(battery_control_core_filter_telemetry(&state, &opts, &in, &held)
-            == BCC_STATUS_OK);
+    REQUIRE(battery_control_core_filter_telemetry(&state, &opts, &in, &held) == BCC_STATUS_OK);
     CHECK(held.filtered_soc_percent == doctest::Approx(50.0).epsilon(1e-12));
     CHECK(held.filtered_active_power_kw == doctest::Approx(10.0).epsilon(1e-12));
 }
@@ -859,8 +853,7 @@ TEST_CASE("Telemetry filter rejects non-finite input")
     auto in = make_filter_input();
     in.active_power_kw = std::numeric_limits<double>::quiet_NaN();
     bcc_telemetry_filter_output_t out{};
-    REQUIRE(battery_control_core_filter_telemetry(&state, &opts, &in, &out)
-            == BCC_STATUS_NON_FINITE);
+    REQUIRE(battery_control_core_filter_telemetry(&state, &opts, &in, &out) == BCC_STATUS_NON_FINITE);
 
     CHECK(out.reason_code == static_cast<int32_t>(BCC_REASON_NON_FINITE_INPUT));
     CHECK(out.initialized == 0);
@@ -873,8 +866,7 @@ TEST_CASE("Telemetry filter rejects invalid options")
     opts.alpha = 1.01;
     const auto in = make_filter_input();
     bcc_telemetry_filter_output_t out{};
-    REQUIRE(battery_control_core_filter_telemetry(&state, &opts, &in, &out)
-            == BCC_STATUS_INVALID_INPUT);
+    REQUIRE(battery_control_core_filter_telemetry(&state, &opts, &in, &out) == BCC_STATUS_INVALID_INPUT);
 
     CHECK(out.reason_code == static_cast<int32_t>(BCC_REASON_FILTER_INVALID_OPTIONS));
 }
@@ -886,8 +878,7 @@ TEST_CASE("Telemetry filter rejects sample period outside configured window")
     auto in = make_filter_input();
     in.dt_seconds = 2.0;
     bcc_telemetry_filter_output_t out{};
-    REQUIRE(battery_control_core_filter_telemetry(&state, &opts, &in, &out)
-            == BCC_STATUS_INVALID_INPUT);
+    REQUIRE(battery_control_core_filter_telemetry(&state, &opts, &in, &out) == BCC_STATUS_INVALID_INPUT);
 
     CHECK(out.reason_code == static_cast<int32_t>(BCC_REASON_FILTER_SAMPLE_PERIOD));
 }
@@ -901,8 +892,7 @@ TEST_CASE("Telemetry filter rejects drift and preserves prior filtered state")
     const auto in = make_filter_input(/*soc=*/51.0, /*power=*/30.0,
                                       /*temperature=*/20.5);
     bcc_telemetry_filter_output_t out{};
-    REQUIRE(battery_control_core_filter_telemetry(&state, &opts, &in, &out)
-            == BCC_STATUS_INVALID_INPUT);
+    REQUIRE(battery_control_core_filter_telemetry(&state, &opts, &in, &out) == BCC_STATUS_INVALID_INPUT);
 
     CHECK(out.reason_code == static_cast<int32_t>(BCC_REASON_FILTER_TELEMETRY_DRIFT));
     CHECK(out.drift_detected == 1);
@@ -913,8 +903,6 @@ TEST_CASE("Telemetry filter rejects drift and preserves prior filtered state")
 TEST_CASE("Telemetry filter null pointer yields INVALID_INPUT")
 {
     bcc_telemetry_filter_output_t out{};
-    CHECK(battery_control_core_filter_telemetry(nullptr, nullptr, nullptr, &out)
-          == BCC_STATUS_INVALID_INPUT);
-    CHECK(battery_control_core_filter_telemetry(nullptr, nullptr, nullptr, nullptr)
-          == BCC_STATUS_INVALID_INPUT);
+    CHECK(battery_control_core_filter_telemetry(nullptr, nullptr, nullptr, &out) == BCC_STATUS_INVALID_INPUT);
+    CHECK(battery_control_core_filter_telemetry(nullptr, nullptr, nullptr, nullptr) == BCC_STATUS_INVALID_INPUT);
 }

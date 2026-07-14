@@ -53,9 +53,6 @@ codepaths:
     - "docs/user/security.md" # in note-RM-M4-followups als geplante Doku vorwärts-referenziert (noch nicht angelegt)
     - "**/plan-RM-Mn.md" # Namens-Platzhalter im roadmap-Wartungsabschnitt (Mn = beliebige Welle)
     - "tests/fixtures/native_parity/pid_cases.v1.json" # geplantes PID-Parity-Fixture (RM-M3-Followup, noch nicht angelegt)
-    # ECHTE DOKU-DEFEKTE (docs/user/quality.md) — getrackt, NICHT stillschweigend akzeptiert (siehe Bericht/CHANGELOG):
-    - "native/battery_control_core/.clang-format" # DEFEKT: existiert nicht (nur .clang-tidy vorhanden) — quality.md §1.3
-    - config/schema/limits.schema.json # DEFEKT: kein limits-Schema im Repo — quality.md §Schema-Tabelle
 
 # Referenzmatrix (DC-FA-MTX): die Spec-Straten (lastenheft/architecture) sind
 # die autoritative Schicht und dürfen NICHT abwärts auf ADRs verweisen — eine
