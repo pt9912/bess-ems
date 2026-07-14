@@ -41,25 +41,15 @@ COPY proto/ proto/
 RUN dotnet restore BatteryEms.sln --locked-mode
 
 # ---------------------------------------------------------------------------
-# docs-check (rest sensor): rejects host-local absolute paths in Markdown
-# prose. Local link and anchor validation moved to d-check (2026-06-12,
-# digest-pinned image run by `make docs-check`; config in .d-check.yml).
-# ---------------------------------------------------------------------------
-FROM ${PYTHON_IMAGE} AS docs-check
-WORKDIR /src
-COPY . .
-RUN python tools/check_markdown_links.py --root /src
-
-# ---------------------------------------------------------------------------
 # field-contract-check (ADR 0013 §5.1): integrity + conformance gate for the
 # published device-mapping field contract. Meta-validates every schema (Draft
 # 2020-12), validates the shipped example mappings under config/examples/
 # against them, and asserts the bundle invariants (schema_version pin, CHANGELOG).
 # The MQTT envelope C#<->schema drift check needs the C# source and stays in
 # EnvelopeSchemaTests under `make test` (same `make gates` aggregate).
-# Uses the same PYTHON_IMAGE tag as docs-check (both unpinned by tag; a repo-wide
-# digest pin is a separate follow-up). jsonschema is version-pinned; its transitives
-# float, which is acceptable for a check-only gate that never ships.
+# Runs on ${PYTHON_IMAGE} (unpinned by tag; a repo-wide digest pin is a separate
+# follow-up). jsonschema is version-pinned; its transitives float, which is
+# acceptable for a check-only gate that never ships.
 # ---------------------------------------------------------------------------
 FROM ${PYTHON_IMAGE} AS field-contract-check
 WORKDIR /src

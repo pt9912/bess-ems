@@ -84,7 +84,7 @@ help:
 	@echo "  make lock-refresh    Refresh packages.lock.json files in Docker (per docs/user/quality.md §1.4)"
 	@echo "  make schema-validate      Validate schema/schema.yaml via d-migrate (RM-M2-MIG-02)"
 	@echo "  make schema-generate      Generate ?001_initial.sql from schema/schema.yaml (RM-M2-MIG-02)"
-	@echo "  make docs-check           Validate Markdown refs (d-check) + host paths (rest sensor)"
+	@echo "  make docs-check           Validate Markdown refs, host paths & spans (d-check)"
 	@echo "  make field-vectors-check  Golden-vector drift gate vs Go field producer (ADR 0013 §5.2)"
 	@echo "  make field-vectors-refresh Regenerate config/schema/vectors/ field manifest"
 	@echo "  make sut-config-check     Render check for deploy/compose.{sut,field}.yml (ADR 0013 §5.3)"
@@ -178,15 +178,16 @@ helm-lint:
 		--set topology.mode=workerPerAsset \
 		--set mqtt.enabled=true >/tmp/bess-ems-helm-mqtt.yaml
 
-# Referenz-Checks (Links, Anker) via d-check (Digest-Pin auf v0.2.0,
-# https://github.com/pt9912/d-check/releases/tag/v0.2.0; Konfiguration
-# in .d-check.yml); die Dockerfile-Stage prueft als Rest-Sensor nur
-# noch host-lokale absolute Pfade (tools/check_markdown_links.py).
-D_CHECK_IMAGE ?= ghcr.io/pt9912/d-check@sha256:f2e0ac7bd9650fe560058e530c8890a629e2df43b8b2e696e78488794d311846
+# Referenz-Checks via d-check (Digest-Pin auf v0.42.0,
+# https://github.com/pt9912/d-check/releases/tag/v0.42.0; Konfiguration in
+# .d-check.yml): Links, Anker, host-lokale absolute Pfade (Modul hostpaths,
+# loest den frueheren tools/check_markdown_links.py-Rest-Sensor samt eigener
+# Dockerfile-Stage ab) und ungeschlossene Code-Spans (Modul spans).
+# --network none haelt den Gate hermetisch (kein Netz-Modul aktiv, DC-QA-03).
+D_CHECK_IMAGE ?= ghcr.io/pt9912/d-check@sha256:bdd9dad22390782ba1f5ab6c3bc09ea7720be0b1b159af6418280d69b84d8db4
 
 docs-check:
-	docker run --rm -v "$(CURDIR)":/repo:ro $(D_CHECK_IMAGE)
-	$(DOCKER_BUILD) --target docs-check -t $(IMAGE_PREFIX)-docs-check:latest
+	docker run --rm --network none -v "$(CURDIR)":/repo:ro $(D_CHECK_IMAGE)
 
 # ADR 0013 §5.1: integrity + conformance gate for the published device-mapping
 # field contract. Meta-validates every schema (Draft 2020-12), validates the
@@ -208,8 +209,8 @@ field-vectors-check:
 
 # Regenerate the committed field-vector manifest after a deliberate producer
 # change; review the diff before committing. BuildKit's local export creates
-# the destination directory 0700, which the containerized docs-check (other
-# UID) cannot enter — restore world-readable perms after every export.
+# the destination directory 0700, which a containerized gate stage running as
+# another UID cannot enter — restore world-readable perms after every export.
 field-vectors-refresh:
 	$(DOCKER_BUILD) --target field-vectors-refresh --output type=local,dest=config/schema/vectors
 	chmod 755 config/schema/vectors

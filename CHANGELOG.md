@@ -11,6 +11,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Docs reference gate consolidated onto d-check v0.42.0**
+  (digest-pinned, up from v0.2.0). `make docs-check` now runs the
+  `links`, `anchors`, `hostpaths`, and `spans` modules in a single
+  hermetic container (`--network none`; no network module is active).
+  The `hostpaths` module (DC-FA-HOST-001) subsumes the former host-path
+  rest sensor — its `prefixes` list keeps `tmp` for parity with the
+  retired checker (the d-check default omits it). `spans` newly flags
+  unclosed code spans and nested links. Config lives in `.d-check.yml`.
+
+### Removed
+
+- **`tools/check_markdown_links.py` and its `docs-check` Dockerfile
+  stage**: the host-local-absolute-path check is now the d-check
+  `hostpaths` module (see above), so the standalone Python rest sensor
+  and its dedicated build stage are gone — one check line and one
+  container instead of two.
+
 ### Fixed
 
 ## [2.2.1] - 2026-07-13
