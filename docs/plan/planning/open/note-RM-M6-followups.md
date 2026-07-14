@@ -46,7 +46,7 @@ Unterpaket im ausloesenden M6-Plan.
 
 ## Item F-M6-02-01: Parallel-Fanout im shared Worker
 
-**Quelle:** ADR 0007 §2/§5 und RM-M6-02 "Bewusst draussen".
+**Quelle:** [ADR 0007 §2](../../adr/0007-multi-asset-hosting-strategy.md#2-entscheidung)/[§5](../../adr/0007-multi-asset-hosting-strategy.md#5-trigger-fuer-abweichung) und RM-M6-02 "Bewusst draussen".
 Heute fuehrt `ControlCycleHostedService` die Assets pro Tick
 sequenziell aus. Das ist der einfachste deterministische Default und
 passt, solange die Tick-Dauer unter dem konfigurierten
@@ -83,7 +83,7 @@ RM-M6-03, falls Kubernetes-Sizing der konkrete Ausloeser ist.
 
 ## Item F-M6-02-02: Worker-pro-Asset als Helm-/Deployment-Pattern
 
-**Quelle:** ADR 0007 §2/§5. Worker-pro-Asset ist zulaessig, aber nicht
+**Quelle:** [ADR 0007 §2](../../adr/0007-multi-asset-hosting-strategy.md#2-entscheidung)/[§5](../../adr/0007-multi-asset-hosting-strategy.md#5-trigger-fuer-abweichung). Worker-pro-Asset ist zulaessig, aber nicht
 Default. Es ist ein Deployment- und Isolationsthema, kein neues
 Domain-Modell.
 
@@ -150,7 +150,7 @@ keine standardisierte kind-/k3d- oder Zielcluster-Umgebung definiert ist.
 
 ## Item F-M6-02-03: Per-Asset-Sidecar oder Sidecar-Pool
 
-**Quelle:** ADR 0005 §7, ADR 0006 §3/§5 und ADR 0007 §2. Der heutige
+**Quelle:** [ADR 0005 §7](../../adr/0005-optimization-core-sidecar-transport.md#7-trigger-für-transport-pivot-phase-4), [ADR 0006 §3](../../adr/0006-mpc-kernel-backend-and-solver.md#3-achse-1--backend-topologie-optionen)/[§5](../../adr/0006-mpc-kernel-backend-and-solver.md#5-achse-3--backend-abstraktion-schmal-halten-für-f-m5-12) und [ADR 0007 §2](../../adr/0007-multi-asset-hosting-strategy.md#2-entscheidung). Der heutige
 Sidecar-/MPC-Pfad ist request- und `asset_id`-bezogen, aber nicht an
 eine eigene Sidecar-Instanz pro Asset gebunden.
 
@@ -182,7 +182,7 @@ Sidecar-/Kubernetes-Hardening-Plans, je nach Ausloeser.
 
 ## Item F-M6-02-04: Multi-Asset-MPC / gekoppelte Flottenoptimierung
 
-**Quelle:** ADR 0006 §5, ADR 0007 §3 und RM-M6-02. Multi-Asset-MPC ist
+**Quelle:** [ADR 0006 §5](../../adr/0006-mpc-kernel-backend-and-solver.md#5-achse-3--backend-abstraktion-schmal-halten-für-f-m5-12), [ADR 0007 §3](../../adr/0007-multi-asset-hosting-strategy.md#3-begruendung) und RM-M6-02. Multi-Asset-MPC ist
 keine Hosting-Frage. Es braucht ein eigenes Fachmodell fuer gekoppelte
 Assets, gemeinsame Netzpunkte, Constraints und Operator-Workflows.
 
@@ -218,7 +218,7 @@ RM-M6-01/RM-M6-03, sobald UI-Workflow und Deployment-Topologie klar sind.
 
 ## Item F-M6-05-01: Konkreter Edge-/Vendor-Adapter
 
-**Quelle:** ADR 0008 §3/§4 und RM-M6-05. Der Edge-Pfad ist als
+**Quelle:** [ADR 0008 §3](../../adr/0008-edge-controller-boundary.md#3-trigger-fuer-edge-aktivierung)/[§4](../../adr/0008-edge-controller-boundary.md#4-mindestvertrag-fuer-spaetere-edge-pfade) und RM-M6-05. Der Edge-Pfad ist als
 Integrationsgrenze entschieden, aber kein konkreter Hersteller-,
 Protokoll- oder Standortvertrag ist aktiv.
 
@@ -256,7 +256,7 @@ zertifizierungsnahe Regelleistungsintegration den Edge-Trigger ausloest.
 
 ## Item F-M6-06-01: Produktive zertifizierungsnahe Regelleistungswelle
 
-**Quelle:** RM-M6-06, ADR 0008 und M4-Folgearbeiten F-08..F-12. Die
+**Quelle:** RM-M6-06, [ADR 0008](../../adr/0008-edge-controller-boundary.md) und M4-Folgearbeiten F-08..F-12. Die
 Regelleistungsbasis existiert, aber es gibt kein konkretes Produkt-,
 TSO-/DSO-, Aggregator-, Vendor- oder Anlagenkonzept fuer eine
 zertifizierungsnahe Aktivierung.

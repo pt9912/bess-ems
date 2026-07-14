@@ -92,5 +92,3 @@ ids:
         - "docs/plan/adr/**"
         - "docs/plan/planning/done/**"
         - "docs/archive/**"
-        # --- noch nicht ADR-verlinkt (Phase 3a, Datei für Datei) ---
-        - "docs/plan/planning/open/note-RM-M6-followups.md"
