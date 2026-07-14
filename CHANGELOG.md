@@ -52,6 +52,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   -->`). `matrix` additionally forbids references to `superseded`/
   `deprecated` ADRs.
 
+- **ID cross-references linked, and the link policy scoped to the
+  planning layer.** The `ids` module enforces a link policy: a bare
+  "ADR NNNN" in prose must link to its ADR, with the §-section anchor
+  when a section is named (43 such references linked across the live
+  docs, each anchor verified). Because RM-* and ADR identifiers are
+  planning-internal (they live under `docs/plan/…`, non-normative — the
+  norm is `LH-*`), the policy is scoped to `docs/plan/planning` rather
+  than forced onto user/spec/code docs. The matrix gains two guards that
+  stop the planning layer leaking into the authoritative one:
+  `spec → plan` forbidden, and RM-* token detection on the `plan` class
+  so a bare "RM-M…" in a new ADR (0014 onward) flags `matrix-forbidden`
+  — the existing ADRs 0001–0013 are immutable and grandfathered.
+
 ### Removed
 
 - **`tools/check_markdown_links.py` and its `docs-check` Dockerfile
@@ -59,6 +72,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `hostpaths` module (see above), so the standalone Python rest sensor
   and its dedicated build stage are gone — one check line and one
   container instead of two.
+
+- **Planning identifiers and implementation/scope sections purged from
+  the normative docs.** All RM-* references were removed from
+  `spec/lastenheft.md`, `spec/architecture.md`, and `docs/user/quality.md`
+  (the quality manual also lost its RM-slice "Quelle" provenance columns).
+  Three lastenheft sections that tracked implementation/scope rather than
+  requirements were dropped entirely: §27.2 "Anforderung zu
+  Implementierung", §28 "Anhang A — MVP-Scope (historisch)", and §30
+  "Klärungen" (which also carried a spec → planning-note link). No
+  internal or external references pointed at the removed anchors.
 
 ### Fixed
 
