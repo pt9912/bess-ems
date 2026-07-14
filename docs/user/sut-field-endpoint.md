@@ -34,7 +34,7 @@ Topic-Schema: `battery/{assetId}/telemetry` (retained) +
 `battery/{assetId}/status` (retained) + `battery/{assetId}/fault`
 (non-retained, nur bei Fault). bess-ems konsumiert im SUT-Modus nur
 `telemetry`; `command`/`command/ack` sind für die
-telemetry-read-only-Kopplung nicht erforderlich (ADR 0013 §6).
+telemetry-read-only-Kopplung nicht erforderlich ([ADR 0013 §6](../plan/adr/0013-device-mapping-field-contract.md#6-command-closed-loop-deferred-mit-trigger-0012-muster)).
 **Erwartbares Log-Bild dabei:** bess-ems publisht seine Kommandos
 (auch Idle) trotzdem und wartet je Zyklus auf den Ack — ein Endpoint
 ohne Command-Unterstützung erzeugt deshalb pro Zyklus eine Warning
@@ -228,7 +228,7 @@ erste Telemetrie eintrifft) und zählen nicht.
 > Always-Accept-`command/ack`-Echo — der Warnstrom aus §1
 > (EventId 1903) entfällt dort sogar; der Sollwert-**Effekt** bleibt
 > weiterhin dem Modbus-Pfad bzw. dem deferred Command-Closed-Loop
-> vorbehalten (ADR 0013 §6).
+> vorbehalten ([ADR 0013 §6](../plan/adr/0013-device-mapping-field-contract.md#6-command-closed-loop-deferred-mit-trigger-0012-muster)).
 
 Der Stand-in-Smoke (`make sut-smoke`) bleibt als repo-internes,
 fortlaufendes Gate in `fullbuild` bestehen — er braucht keine externe

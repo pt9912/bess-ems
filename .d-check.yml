@@ -16,7 +16,7 @@
 scan:
   roots: ["."]
   ignore: [".github/**"]
-modules: [links, anchors, hostpaths, spans, codepaths, matrix]
+modules: [links, anchors, hostpaths, spans, codepaths, matrix, ids]
 hostpaths:
   # ersetzt die Default-Präfixliste; tmp ergänzt für Parität mit dem
   # abgelösten Rest-Sensor (d-check-Default lässt tmp bewusst aus).
@@ -74,3 +74,29 @@ matrix:
   # immutabel — sie werden übersprungen. Ab 0010 (bereits plan-frei) und für
   # jeden neuen ADR gilt adr→plan verboten.
   exempt-paths: ["docs/plan/adr/000[1-9]-*.md"]
+
+# Linkpflicht für Kennungen (DC-FA-ID): eine nackte Kennung im Fließtext muss
+# auf ihre Definition verlinken — bei Abschnitts-Bezug (§X) inkl. Anker.
+# Rollout Datei für Datei (Phase 3a ADR, dann 3b RM): noch nicht verlinkte
+# Dateien stehen in exempt-paths und wandern raus, sobald verlinkt.
+# Dauerhaft ausgenommen: Changelogs/Reviews (zitieren Kennungen literal) und
+# immutable/historische Doku (Accepted-ADRs, done/-Pläne, Archiv).
+ids:
+  patterns:
+    - regex: 'ADR \d{4}'
+      target: docs/plan/adr/
+      link-policy: prose
+      exempt-paths:
+        - "**/CHANGELOG.md"
+        - "docs/reviews/**"
+        - "docs/plan/adr/**"
+        - "docs/plan/planning/done/**"
+        - "docs/archive/**"
+        # --- noch nicht ADR-verlinkt (Phase 3a, Datei für Datei) ---
+        - "deploy/helm/bess-ems/README.md"
+        - "docs/plan/planning/in-progress/roadmap.md"
+        - "docs/plan/planning/next/README.md"
+        - "docs/plan/planning/next/note-internal-refinement-scope.md"
+        - "docs/plan/planning/open/note-RM-M3-followups.md"
+        - "docs/plan/planning/open/note-RM-M5-followups.md"
+        - "docs/plan/planning/open/note-RM-M6-followups.md"
