@@ -3,8 +3,8 @@
 **Dokumenttyp:** Planung / Roadmap
 **Status:** In Arbeit
 **Bezug:** [`spec/lastenheft.md`](../../../../spec/lastenheft.md)
-(§28 MVP-Abgrenzung), [`spec/architecture.md`](../../../../spec/architecture.md)
-(§13 Native-Core-Phasenmodell), [`docs/user/quality.md`](../../../user/quality.md)
+[`spec/architecture.md`](../../../../spec/architecture.md)
+([§13](../../../../spec/architecture.md#13-native-core-strategie) Native-Core-Phasenmodell), [`docs/user/quality.md`](../../../user/quality.md)
 (Gate-Aktivierung pro Meilenstein)
 
 ---
@@ -45,23 +45,23 @@ unter `in-progress/`.
 > [github.com/pt9912/bess-ems/releases/tag/v2.2.1](https://github.com/pt9912/bess-ems/releases/tag/v2.2.1).
 > Die v2.x-Linie: `v2.0.0` (publiziertes Feldvertrags-Bundle mit
 > Pflicht-`schema_version` — Contract-Break, [ADR 0013 §5.1](../../adr/0013-device-mapping-field-contract.md#5-umsetzung-reihenfolge)), `v2.1.0`
-> (MQTT-Golden-Vector-Suite, §5.2), `v2.2.0` (Modbus-Golden-Vectors +
+> (MQTT-Golden-Vector-Suite, [§5.2](../../adr/0013-device-mapping-field-contract.md#5-umsetzung-reihenfolge)), `v2.2.0` (Modbus-Golden-Vectors +
 > SUT-Doku/Compose — **[ADR 0013 §5](../../adr/0013-device-mapping-field-contract.md#5-umsetzung-reihenfolge) vollständig**), `v2.2.1` (Operator-
 > Web-Shell wird jetzt vom Produktions-Host ausgeliefert +
 > [`anwenderhandbuch.md`](../../../user/anwenderhandbuch.md)).
 > Release-Prozess in [`../../../user/releasing.md`](../../../user/releasing.md),
-> Gate-Definitionen in [`../../../user/quality.md`](../../../user/quality.md) §8.
+> Gate-Definitionen in [`../../../user/quality.md`](../../../user/quality.md) [§8](../../../user/quality.md#8-release-pipeline-gates).
 >
 > **Feldvertrag + Kopplung ([ADR 0013](../../adr/0013-device-mapping-field-contract.md)):** Status
 > `Accepted — §5.1–§5.4 umgesetzt (§5 vollständig)`. Vier
 > Vector-Manifeste (MQTT field/ems + Modbus simulator/hil) im
-> versionierten Bundle; die im ADR §1 belegte
+> versionierten Bundle; die im [ADR 0013 §1](../../adr/0013-device-mapping-field-contract.md#1-kontext) belegte
 > `register_table`/`word_order`-Drift ist geschlossen und mehrfach
 > gegated. Die Kopplung mit der Schwester-Plattform grid-gym ist
 > **beidseitig E2E-verifiziert und beidseitig digest-gepinnt**
 > (grid-gym v0.7.1 ↔ bess-ems v2.2.1); bess-ems-seitige Testumgebung:
 > `make sut-smoke-grid-gym`, Browser-Ansicht beider Web-UIs über die
-> opt-in Ports-Overrides ([`sut-field-endpoint.md`](../../../user/sut-field-endpoint.md) §4).
+> opt-in Ports-Overrides ([`sut-field-endpoint.md`](../../../user/sut-field-endpoint.md) [§4](../../../user/sut-field-endpoint.md#4-compose-sut-variante)).
 >
 > **Offene Fäden (Einstieg für die nächste Session):**
 > 1. **API-Casing-Befund** (aus dem Anwenderhandbuch-Review):
@@ -293,7 +293,7 @@ unter `in-progress/`.
 | ✅     | M6          | Skalierung, UI, Edge / Multi-Asset | 4     | [`../done/plan-RM-M6.md`](../done/plan-RM-M6.md) — abgeschlossen 2026-05-13 nach M5-Closure. RM-M6-01 Operator UI ✅ ([`../done/plan-RM-M6-01.md`](../done/plan-RM-M6-01.md)), RM-M6-02 Multi-Asset-Hosting ✅ ([`../done/plan-RM-M6-02.md`](../done/plan-RM-M6-02.md), [ADR 0007](../../adr/0007-multi-asset-hosting-strategy.md)), RM-M6-03 Kubernetes/Helm ✅ ([`../done/plan-RM-M6-03.md`](../done/plan-RM-M6-03.md)), RM-M6-04 TimescaleDB ✅ ([`../done/plan-RM-M6-04.md`](../done/plan-RM-M6-04.md)), RM-M6-05 Edge-Boundary ✅ ([`../done/plan-RM-M6-05.md`](../done/plan-RM-M6-05.md), [ADR 0008](../../adr/0008-edge-controller-boundary.md)) und RM-M6-06 Zertifizierungsgate ✅ ([`../done/plan-RM-M6-06.md`](../done/plan-RM-M6-06.md)) sind abgeschlossen. Produktive Zertifizierungswellen bleiben trigger-getrieben nach Produkt-/TSO-/Anlagenkonzept. |
 
 Phase bezieht sich auf [`architecture.md`](../../../../spec/architecture.md)
-§13. Die frühere Native-Core-Ideenskizze liegt archiviert unter
+[§13](../../../../spec/architecture.md#13-native-core-strategie). Die frühere Native-Core-Ideenskizze liegt archiviert unter
 [`docs/archive/idea.md`](../../../archive/idea.md).
 
 ---
@@ -357,7 +357,7 @@ AuthN/AuthZ-geschütztem Operator-Stop.
 - OpenAPI-, Adapter-Mapping-, Vorzeichen- und Startvalidierungs-Gates
   brechen den Build bei Vertragsverletzungen.
 - `BatteryEms.ArchitectureTests` setzt Dependency Rule und
-  Architektur-Tabus aus §4.2 durch (Domain frameworkfrei, Application
+  Architektur-Tabus aus [§4.2](../../../../spec/architecture.md#42-hexagonale-sicht-driving--driven-ports) durch (Domain frameworkfrei, Application
   ohne Adapter-Referenzen, keine Adapter-zu-Adapter-Referenzen).
 
 ---
@@ -419,7 +419,7 @@ Go-`bess-field-sim` ausgerichtet.
 
 ## M3 — Native Control Core (Library)
 
-**Ziel:** Phase 2 aus Architektur §13: native Bibliothek
+**Ziel:** Phase 2 aus Architektur [§13](../../../../spec/architecture.md#13-native-core-strategie): native Bibliothek
 `battery_control_core` für Constraint, Ramp, PID via P/Invoke. .NET-Variante
 bleibt Fallback und Referenz.
 
@@ -498,7 +498,7 @@ folgt:
 
 ## M5 — MPC, Solver-Sidecar, Replay-Plattform
 
-**Ziel:** Phase 3 aus Architektur §13: native Sidecars für MPC und
+**Ziel:** Phase 3 aus Architektur [§13](../../../../spec/architecture.md#13-native-core-strategie): native Sidecars für MPC und
 Solver-nahe Optimierung; ausgebaute Replay- und Vergleichsplattform.
 
 ### Liefergegenstände
@@ -525,7 +525,7 @@ Solver-nahe Optimierung; ausgebaute Replay- und Vergleichsplattform.
 
 ## M6 — Skalierung, UI, Edge / Multi-Asset
 
-**Ziel:** Phase 4 aus Architektur §13: Operator-UI, Multi-Asset-Hosting,
+**Ziel:** Phase 4 aus Architektur [§13](../../../../spec/architecture.md#13-native-core-strategie): Operator-UI, Multi-Asset-Hosting,
 Kubernetes-Deployment, Edge-Anbindung. Inhalte mit hohem Diskussionsbedarf
 — Konkretisierung folgt nach M5-Erfahrungswerten.
 
@@ -534,11 +534,11 @@ Kubernetes-Deployment, Edge-Anbindung. Inhalte mit hohem Diskussionsbedarf
 | Status | ID         | Inhalt                                                              | LH-Bezug             |
 | ------ | ---------- | ------------------------------------------------------------------- | -------------------- |
 | ✅     | RM-M6-01   | Operator UI (Web) — abgeschlossen in [`../done/plan-RM-M6-01.md`](../done/plan-RM-M6-01.md); statische API-first Web-Shell unter `/operator/` mit Health, Asset-Status, Fahrplaenen, Optimization-Run-Lookup und Operator-Stop-Pfad. | LH-OPEN-005          |
-| ✅     | RM-M6-02   | Multi-Asset-Flottensteuerung / Hosting-Strategie — abgeschlossen in [`../done/plan-RM-M6-02.md`](../done/plan-RM-M6-02.md); [ADR 0007](../../adr/0007-multi-asset-hosting-strategy.md) schliesst `AR-OPEN-006` mit shared Worker als Default und Worker-pro-Asset als Deployment-/Isolation-Pattern. Folgearbeiten sind trigger-getrieben in [`../open/note-RM-M6-followups.md`](../open/note-RM-M6-followups.md). | §28.3                |
-| ✅     | RM-M6-03   | Kubernetes-Deployment + Helm Charts — abgeschlossen in [`../done/plan-RM-M6-03.md`](../done/plan-RM-M6-03.md); erster Helm-Pfad unter `deploy/helm/bess-ems` mit shared-Worker-Default, optionalem Worker-pro-Asset-Rendering, Postgres, optionalen Sidecars, HTTPS/mTLS-Secret-Mounts, `replicaCount`-Schutz und `make helm-lint`. | §28.3                |
+| ✅     | RM-M6-02   | Multi-Asset-Flottensteuerung / Hosting-Strategie — abgeschlossen in [`../done/plan-RM-M6-02.md`](../done/plan-RM-M6-02.md); [ADR 0007](../../adr/0007-multi-asset-hosting-strategy.md) schliesst `AR-OPEN-006` mit shared Worker als Default und Worker-pro-Asset als Deployment-/Isolation-Pattern. Folgearbeiten sind trigger-getrieben in [`../open/note-RM-M6-followups.md`](../open/note-RM-M6-followups.md). | —                    |
+| ✅     | RM-M6-03   | Kubernetes-Deployment + Helm Charts — abgeschlossen in [`../done/plan-RM-M6-03.md`](../done/plan-RM-M6-03.md); erster Helm-Pfad unter `deploy/helm/bess-ems` mit shared-Worker-Default, optionalem Worker-pro-Asset-Rendering, Postgres, optionalen Sidecars, HTTPS/mTLS-Secret-Mounts, `replicaCount`-Schutz und `make helm-lint`. | —                    |
 | ✅     | RM-M6-04   | TimescaleDB-Integration als Persistenz-Erweiterung — abgeschlossen in [`../done/plan-RM-M6-04.md`](../done/plan-RM-M6-04.md); erster Pfad ist eine optionale Telemetrie-Hypertable-Migration mit Plain-Postgres-No-op. | [LH-PERSIST-005](../../../../spec/lastenheft.md#lh-persist-005--datenbank), LH-OPEN-006 |
 | ✅     | RM-M6-05   | Edge-Controller-Integration fuer harte Echtzeitkomponenten — abgeschlossen in [`../done/plan-RM-M6-05.md`](../done/plan-RM-M6-05.md); [ADR 0008](../../adr/0008-edge-controller-boundary.md) trennt EMS, Edge/Herstellercontroller, BMS/PCS und Hardware-Schutzkette. Konkrete Edge-Adapter bleiben trigger-getrieben in [`../open/note-RM-M6-followups.md`](../open/note-RM-M6-followups.md). | [LH-RISK-001](../../../../spec/lastenheft.md#lh-risk-001--regelleistung-und-echtzeitfähigkeit)          |
-| ✅     | RM-M6-06   | Zertifizierungsnahe Regelleistungsintegration — abgeschlossen als Readiness-/Trigger-Gate in [`../done/plan-RM-M6-06.md`](../done/plan-RM-M6-06.md); keine produktive Zertifizierungs- oder TSO-Integration ohne konkretes Produkt-/TSO-/Anlagenkonzept, Nachweisumfang, Security-Profil und Edge-/Hardwaregrenze. | §28.3                |
+| ✅     | RM-M6-06   | Zertifizierungsnahe Regelleistungsintegration — abgeschlossen als Readiness-/Trigger-Gate in [`../done/plan-RM-M6-06.md`](../done/plan-RM-M6-06.md); keine produktive Zertifizierungs- oder TSO-Integration ohne konkretes Produkt-/TSO-/Anlagenkonzept, Nachweisumfang, Security-Profil und Edge-/Hardwaregrenze. | —                    |
 
 ---
 

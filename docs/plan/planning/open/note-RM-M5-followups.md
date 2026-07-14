@@ -6,7 +6,7 @@
 [`../done/plan-RM-M5.md`](../done/plan-RM-M5.md) (Master-Slice-Plan),
 [`../done/plan-RM-M5-01.md`](../done/plan-RM-M5-01.md) (Contract-Slice, abgeschlossen mit RM-M5-01-D),
 [`../../adr/0005-optimization-core-sidecar-transport.md`](../../adr/0005-optimization-core-sidecar-transport.md)
-(Transport-Adoption — Cert-Rotation, Multi-Tenant-Bearer-Token, Drittsprach-Sidecar erbt von §7 Phase-4-Pivot-Triggers),
+(Transport-Adoption — Cert-Rotation, Multi-Tenant-Bearer-Token, Drittsprach-Sidecar erbt von [§7](../../adr/0005-optimization-core-sidecar-transport.md#7-trigger-für-transport-pivot-phase-4) Phase-4-Pivot-Triggers),
 [`../in-progress/roadmap.md`](../in-progress/roadmap.md)
 
 ---
@@ -113,7 +113,7 @@ einzige Auth-Achse. Multi-Tenant-/Per-Operator-Bearer-Token-Auth
 - (d) Pin-Test gegen Test-Sidecar mit Token-Validierungs-Interceptor:
   korrektes Token → Optimize-Success; fehlendes Token →
   `unauthorized_client`-Outcome (existierender Mapper-Eintrag).
-- (e) Doku-Update in `docs/user/quality.md` §2.2.4 zum neuen
+- (e) Doku-Update in `docs/user/quality.md` [§2.2.4](../../../user/quality.md#224-optimization-core-sidecar-pfad-mandatory) zum neuen
   Auth-Pfad plus `note-RM-M5-followups.md`-Verweis bei Closure.
 
 **Aufwandsschätzung:** ~1 Woche für den Adapter-Pfad inkl. Tests.
@@ -192,7 +192,7 @@ Init.
 
 ## Item F-M5-05: „Letzter-bekannter-Plan"-Fallback aus IScheduleRepository
 
-**Quelle:** plan-RM-M5-01 §5.1 Korrektur-Pass-Scope-Cut. Heute (Post-
+**Quelle:** plan-RM-M5-01 [§5.1](../done/plan-RM-M5-01.md#51-korrektur-notiz-sub-slice-c-review-pass-2026-05-11) Korrektur-Pass-Scope-Cut. Heute (Post-
 Korrektur): wenn der Sidecar fehlschlägt UND der lokale OR-Tools-
 Fallback nicht konfiguriert ist ODER auch er fehlschlägt, geht der
 Adapter direkt auf `no_valid_plan` + Safe-Stop. Plan-RM-M5
@@ -247,7 +247,7 @@ fallback.md` Slice-Plan.
 
 ## Item F-M5-04: Schedule-Stempel-Erweiterung für Plan-Gültigkeits-Check
 
-**Quelle:** plan-RM-M5-01 §7 Risiko-Punkt + §9. Heute (Post-M5-01):
+**Quelle:** plan-RM-M5-01 [§7](../done/plan-RM-M5-01.md#7-risiken-und-tradeoffs) Risiko-Punkt + [§9](../done/plan-RM-M5-01.md#9-folgearbeiten-gehen-in-note-rm-m5-followupsmd). Heute (Post-M5-01):
 `DefaultFallbackPlanValidator` vergleicht beim 4-Achsen-Check
 (Context-Stamp → Horizon-Alignment → MaxAge → Telemetrie-Drift)
 nur die Felder, die heute auf `Schedule` und `BatteryAsset`
@@ -303,9 +303,9 @@ wenn MPC der Trigger ist.
 ## Item F-M5-12: Sidecar-First-MPC-Backend (zweiter `IMpcModelSolver`-Adapter)
 
 **Quelle:** [ADR 0006](../../adr/0006-mpc-kernel-backend-and-solver.md)
-§6 (Trigger für Backend-Pivot) +
+[§6](../../adr/0006-mpc-kernel-backend-and-solver.md#6-trigger-für-backend-pivot-f-m5-12) (Trigger für Backend-Pivot) +
 [`../done/plan-RM-M5-02.md`](../done/plan-RM-M5-02.md)
-§5 D-02 + §9 Folgearbeiten-Block. Heute (Post-RM-M5-02): MPC läuft
+[§5](../done/plan-RM-M5-02.md#5-design-entscheidungen) D-02 + [§9](../done/plan-RM-M5-02.md#9-folgearbeiten-gehen-in-note-rm-m5-followupsmd) Folgearbeiten-Block. Heute (Post-RM-M5-02): MPC läuft
 ausschließlich in-process via `LocalOsqpMpcSolver` (Sub-Slice-B-
 Lieferung); `BessHostOptions.MpcBackend = "optimization_core"` und
 `"bi_modal"` sind reservierte Slot-Werte, die zum Startup-Fehler
@@ -321,7 +321,7 @@ genannten Trigger zündet.
   umgekehrten Fall: solange `sample_time >> Sidecar-Roundtrip-p99`
   bleibt, ist Sidecar-First eine Option.
 - **Solver-Isolationspflicht.** OSQP-Crash wird in Produktion zur
-  operativen Quelle (Plan-RM-M5-02 §7 Risiken-Block nennt das als
+  operativen Quelle (Plan-RM-M5-02 [§7](../done/plan-RM-M5-02.md#7-risiken-und-tradeoffs) Risiken-Block nennt das als
   Sub-Slice-B-Risiko; [ADR 0004 §4](../../adr/0004-native-kernel-process-isolation.md#4-achse-2--trigger-für-out-of-process-pivot) Trigger 6 = Crash-Isolation ist
   die generische Linie) ODER Operator-Anforderung nach Solver-
   Sandbox (Audit, Sicherheits-Zertifizierung). Sidecar-First wird

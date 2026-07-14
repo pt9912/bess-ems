@@ -128,7 +128,7 @@ Stages. Aktuell leben Konfigurations-Defaults verteilt:
   klare Override-Hierarchie (Standard → Profil → Env-Variable).
 - Profile-Schema-Validierung beim Start (analog zur Modbus-/MQTT-
   Mapping-Validation aus RM-M1) — fehlerhaftes Profil kippt den Boot.
-- Doku-Update in `docs/user/quality.md` §4 mit der neuen Profil-Matrix.
+- Doku-Update in `docs/user/quality.md` [§4](../../../user/quality.md#4-runtime-image) mit der neuen Profil-Matrix.
 
 **Aufwandsschätzung:** grob 1 Woche, primär Operations- und Doku-
 Arbeit; null Application-Code.

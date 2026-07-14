@@ -7,13 +7,13 @@ Slice-Plan und wird in `done/` (nach Release) oder umgeräumt
 **Umwidmung (jetzt versions-agnostisch):** ursprünglich als
 v1.1.0-Scope geschrieben (Datum 2026-05-14). Der Feldvertrag ([ADR 0013](../../adr/0013-device-mapping-field-contract.md),
 externer Trigger grid-gym-Kopplung) hat diese Planung wiederholt
-überholt: §5.1 wurde — wegen des config-brechenden
+überholt: [§5.1](../../adr/0013-device-mapping-field-contract.md#5-umsetzung-reihenfolge) wurde — wegen des config-brechenden
 `schema_version`-Enforcements — als **v2.0.0** veröffentlicht
-(2026-07-13; eine v1.1.0 hat es nie gegeben), §5.2 (Golden-Vector-Suite,
-additiv) als **v2.1.0** (2026-07-13); §5.3 (SUT-Doku) liegt auf `main`; §5.4 (Modbus-Vektoren) landet mit dem
+(2026-07-13; eine v1.1.0 hat es nie gegeben), [§5.2](../../adr/0013-device-mapping-field-contract.md#5-umsetzung-reihenfolge) (Golden-Vector-Suite,
+additiv) als **v2.1.0** (2026-07-13); [§5.3](../../adr/0013-device-mapping-field-contract.md#5-umsetzung-reihenfolge) (SUT-Doku) liegt auf `main`; [§5.4](../../adr/0013-device-mapping-field-contract.md#5-umsetzung-reihenfolge) (Modbus-Vektoren) landet mit dem
 Merge seines Slices — beides im nächsten Release. Nach
 der zweiten Nachnummerierung (v1.1.0 → v2.1.0 → v2.2.0) ist die Notiz
-mit dem §5.4-Abschluss **versions-agnostisch benannt** — die Option,
+mit dem [§5.4](../../adr/0013-device-mapping-field-contract.md#5-umsetzung-reihenfolge)-Abschluss **versions-agnostisch benannt** — die Option,
 die sie selbst vorschlug. Das Theme zielt auf die **nächste freie
 Minor**; die konkrete Nummer wird erst bei Aktivierung vergeben.
 Versionsbezüge im Text sind historisch (lies „v2.2.0" als „die
@@ -284,7 +284,7 @@ Vertrags-Anteil, nicht eine breite Feature-Fläche.
 - **Aufwand:** ~4-5 PT (Slice + gemeinsamer Lease-Helper mit
   State-Machine + Metrik mit Label + **vier** Concurrency-Tests
   + Aktualisierung der Ursprungs-Followup-Notiz + Dokumentation).
-  **Doku-Ort:** wird im Slice-Plan festgelegt; `quality.md` §6 ist
+  **Doku-Ort:** wird im Slice-Plan festgelegt; `quality.md` [§6](../../../user/quality.md#6-native-net-parity) ist
   Native-/.NET-Parity (nicht passend), Persistenz-Doku ist
   ebenfalls fachfremd — vermutlich neuer Operations-/Metrik-
   Abschnitt in `quality.md` oder kurze Betriebsnotiz im
@@ -542,7 +542,7 @@ zuerst Follow-up-Note bereinigen.**
 | M3-FUP-04 Replay-Carve-outs     | D | **Aus Scope** — Source-Note zuerst refreshen (RM-M5-04 hat den JSON-Loader bereits geliefert); verbleibende Varianten danach trigger-getrieben |
 
 **Geschätzte Größe v2.2.0:** ~7-9 PT (Kandidat A 4-5 PT, Kandidat B
-3-4 PT) plus Release-Vorbereitung gemäß `releasing.md` §2 — knapp
+3-4 PT) plus Release-Vorbereitung gemäß `releasing.md` [§2](../../../user/releasing.md#2-voraussetzungen-vor-dem-tag) — knapp
 zwei Arbeitswochen Brutto.
 
 **SemVer-Begründung:** Minor (v2.0.x → v2.2.0), weil **drei**
@@ -591,7 +591,7 @@ Drift in v2.2.0 wäre Anti-Muster:
 - **Zertifizierungswelle** (F-M6-06-01) — wartet auf TSO-/Anlagen-
   konzept
 - **MILP-Optimierung** — bewusst auf LP+QP zurückgestellt
-  (siehe Lastenheft §28.2)
+  (bewusste Scope-Rückstellung)
 - **Northbound-Export** — [ADR 0012](../../adr/0012-northbound-export-adapter-structure.md), trigger-basiert
 
 ---
@@ -609,17 +609,17 @@ Drift in v2.2.0 wäre Anti-Muster:
    YYYY-MM-DD` verschieben; `[Unreleased]` bleibt als leere
    Sektions-Stubs (`### Added` / `### Changed` / `### Fixed`)
    bestehen. Pattern siehe [`docs/user/releasing.md`](../../../user/releasing.md)
-   §2 Punkt 3 und der `[1.0.0]`-Eintrag in
+   [§2](../../../user/releasing.md#2-voraussetzungen-vor-dem-tag) Punkt 3 und der `[1.0.0]`-Eintrag in
    [CHANGELOG](../../../../CHANGELOG.md) als Vorbild.
 5. **Helm-Chart-Version** in `Chart.yaml`: `appVersion` auf `1.1.0`
    (folgt der App-Version), `version` konsistent erhöhen
    (voraussichtlich ebenfalls `1.1.0`, weil das Chart keine
    eigenen Änderungen unabhängig von der App hat). Per
-   `releasing.md` §1 dürfen `version` und `appVersion` ab v2.2.0
+   `releasing.md` [§1](../../../user/releasing.md#1-versions-identitäten) dürfen `version` und `appVersion` ab v2.2.0
    divergieren — für diese spezifische Minor ist Synchronisierung
    aber die naheliegende Wahl.
 6. **Pflicht-Voraussetzungen vor Tag** durchgehen
-   (`releasing.md` §2 — jede Verletzung ist ein **Stop**):
+   (`releasing.md` [§2](../../../user/releasing.md#2-voraussetzungen-vor-dem-tag) — jede Verletzung ist ein **Stop**):
    - `git status` ist leer (main clean).
    - `make fullbuild` lokal grün (alle M1–M6-Gates + Compose-Smoke).
    - `make lock-refresh` produziert zero-diff.
@@ -630,10 +630,10 @@ Drift in v2.2.0 wäre Anti-Muster:
    - `docs/plan/planning/open/note-RM-M*-followups.md`-Scan: kein
      Eintrag durch v2.2.0-Auslieferung zwingend getriggert.
 7. **`make release-assets VERSION=v2.2.0`** lokale Trockenübung
-   (`releasing.md` §7 — produziert die 7 Asset-Dateien, ohne Push).
+   (`releasing.md` [§7](../../../user/releasing.md#7-lokale-trockenübung) — produziert die 7 Asset-Dateien, ohne Push).
    Dieser Schritt **ersetzt nicht** Punkt 6; er ist eine zusätzliche
    Sanity-Übung der Asset-Pipeline.
-8. **Tag setzen** (`releasing.md` §3): annotierter Tag
+8. **Tag setzen** (`releasing.md` [§3](../../../user/releasing.md#3-tag-setzen)): annotierter Tag
    `git tag -a v2.2.0 -m "..."` plus `git push origin v2.2.0`.
    Release-Workflow auf GitHub beobachten.
 9. **Diese Notiz** nach `done/` (analog zu wie Slice-Pläne nach

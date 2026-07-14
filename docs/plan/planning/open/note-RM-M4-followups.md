@@ -367,7 +367,7 @@ Tests.
 
 ## Item F-09: OPC-UA-Activation-Source-Adapter (incl. Failover-Replay-via-Reconnect)
 
-**Quelle:** RM-M4-03 D-06 / §9 (Source-Adapter für Aktivierungssignal-
+**Quelle:** RM-M4-03 D-06 / [§9](../done/plan-RM-M4-03.md#9-folgearbeiten-gehen-in-note-rm-m4-followupsmd) (Source-Adapter für Aktivierungssignal-
 Empfang sind eigene Slices), RM-M4-04 D-05 (M4-04 deckt nur Telemetrie/
 Command, M4-04-Carve-out für OPC-UA-Activation explizit abgelehnt),
 RM-M4-08-A D-01/D-03 (M4-08 dupliziert RM-M4-03-Use-Case-Pins nicht via
@@ -439,7 +439,7 @@ source.md` mit eigenem Detail-Plan und Review-Pass-Pattern.
 
 ## Item F-17: OPC-UA-Security-Policy-Allowlist-Erweiterung
 
-**Quelle:** RM-M4-05 §3 + D-04 (Allowlist-Erweiterung verlangt
+**Quelle:** RM-M4-05 [§3](../done/plan-RM-M4-05.md#3-scope) + D-04 (Allowlist-Erweiterung verlangt
 Plan-Änderung — kein Magic-Config-Knopf).
 
 Heute (Post-M4-05): `OpcUaSecurityPolicies.IsAllowed` ist eine
@@ -466,7 +466,7 @@ neue Pins und Doku.
 - (c) Embedded TestServer-Fixture um die Policy erweitern
   (`AddPolicy(SecurityMode, Policy)` analog zur heutigen
   `AddSignAndEncryptPolicies`-Linie).
-- (d) Quality-Doku §2.2.3 dokumentiert die erweiterte Allowlist.
+- (d) Quality-Doku [§2.2.3](../../../user/quality.md#223-opc-ua-roundtrip-pfad-mandatory) dokumentiert die erweiterte Allowlist.
 - (e) Ein neuer Integration-Pin in `OpcUaSecurityTests.cs`, der
   einen sicheren Handshake mit der neuen Policy gegen den
   Embedded TestServer fährt (Trust-Bridge gilt unverändert).
@@ -483,7 +483,7 @@ Policies gleichzeitig anstehen.
 
 ## Item F-18: OPC-UA-Cert-Rotation/Renewal
 
-**Quelle:** RM-M4-05 §3 + §9 (Cert-Rotation/Renewal-Workflows
+**Quelle:** RM-M4-05 [§3](../done/plan-RM-M4-05.md#3-scope) + [§9](../done/plan-RM-M4-05.md#9-folgearbeiten-gehen-in-note-rm-m4-followupsmd) (Cert-Rotation/Renewal-Workflows
 explizit aus M4-05-Scope ausgeklammert — heute geht M4-05 davon
 aus, dass Certs statisch sind und der Operator manuell re-deployt).
 
@@ -530,7 +530,7 @@ rotation.md` Slice-Plan.
 
 ## Item F-19: OPC-UA-User-Identity (UserName/Password / UserToken)
 
-**Quelle:** RM-M4-05 §3 + §9 (User/Token-Identity explizit out-of-
+**Quelle:** RM-M4-05 [§3](../done/plan-RM-M4-05.md#3-scope) + [§9](../done/plan-RM-M4-05.md#9-folgearbeiten-gehen-in-note-rm-m4-followupsmd) (User/Token-Identity explizit out-of-
 scope: M4-05 fährt mit `UserIdentity=null` (Anonymous);
 Server-seitige Authentifizierung jenseits der Cert-basierten ist
 aus M4-05-Scope ausgeklammert).
