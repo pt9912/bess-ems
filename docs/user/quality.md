@@ -220,7 +220,7 @@ Mindestumfang:
 | Ramp Limiter            | [LH-CTRL-003](../../spec/lastenheft.md#lh-ctrl-003--ramp-limiter)                |
 | State Machine           | [LH-SM-001](../../spec/lastenheft.md#lh-sm-001--explizite-betriebszustände)..003             |
 | Snapshot Validation     | [LH-RT-003](../../spec/lastenheft.md#lh-rt-003--maximales-messwertalter), [LH-DOM-004](../../spec/lastenheft.md#lh-dom-004--datenqualität)      |
-| Vorzeichenkonvention    | LH §4.1                    |
+| Vorzeichenkonvention    | [LH-DOM-007](../../spec/lastenheft.md#lh-dom-007--vorzeichenkonvention) |
 | Day-Ahead-Fahrplanlogik | [LH-MKT-001](../../spec/lastenheft.md#lh-mkt-001--day-ahead-fahrplan), [LH-MKT-007](../../spec/lastenheft.md#lh-mkt-007--zeitmodell-für-fahrpläne)     |
 | Zeitmodell inkl. DST    | [LH-MKT-007](../../spec/lastenheft.md#lh-mkt-007--zeitmodell-für-fahrpläne)                 |
 | PID (ab M2)             | [LH-CTRL-004](../../spec/lastenheft.md#lh-ctrl-004--pid-regelung)                |
@@ -728,7 +728,7 @@ make runtime
 
 ### 5.1 Domain-Vorzeichenkonvention
 
-Pflicht-Gate ab M1 (LH §4.1). Eigene Test-Klasse
+Pflicht-Gate ab M1 ([LH-DOM-007](../../spec/lastenheft.md#lh-dom-007--vorzeichenkonvention)). Eigene Test-Klasse
 `SignConventionTests` enthält Properties:
 
 - positiver Sollwert → Adapter-Schreibwert > 0 für Discharge-Devices

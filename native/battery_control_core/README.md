@@ -42,7 +42,7 @@ The M3 plan is closed; [RM-M5-03](../../docs/plan/planning/done/plan-RM-M5-03.md
 
 ## ABI conventions (header summary)
 
-- **Sign convention** (architecture §4.1): discharge is positive,
+- **Sign convention** ([LH-DOM-007](../../spec/lastenheft.md#lh-dom-007--vorzeichenkonvention)): discharge is positive,
   charge is negative. Power values are kW.
 - **Status codes** are ABI-stable numeric values; renumbering
   requires an ABI-major bump.

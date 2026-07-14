@@ -329,7 +329,7 @@ AuthN/AuthZ-geschütztem Operator-Stop.
 | ✅     | RM-M1-17   | Strukturierte JSON-Logs mit Reason-Feld + Prometheus-Metrikexport   | [LH-MON-001](../../../../spec/lastenheft.md#lh-mon-001--logging)/002/004        |
 | ✅     | RM-M1-18   | Konfigurations-Loader, JSON-Schemas für Adapter-Mappings + Startvalidierung | [LH-CONF-001](../../../../spec/lastenheft.md#lh-conf-001--externe-konfiguration)..003, [LH-OPS-001](../../../../spec/lastenheft.md#lh-ops-001--sicherer-start) |
 | ✅     | RM-M1-19   | Dockerfile + Docker Compose (`bess-ems` mit Worker/API, Postgres, MQTT-Broker) | [LH-DEPLOY-001](../../../../spec/lastenheft.md#lh-deploy-001--dockerfile)..003, [LH-NF-003](../../../../spec/lastenheft.md#lh-nf-003--betriebssystem)/4 |
-| ✅     | RM-M1-20   | Quality-Gates: Lint, Unit/Safety/Integration/Contract/Container, Coverage | [LH-TEST-001](../../../../spec/lastenheft.md#lh-test-001--unit-tests-für-regelung)/003/006/007, LH §4.1 |
+| ✅     | RM-M1-20   | Quality-Gates: Lint, Unit/Safety/Integration/Contract/Container, Coverage | [LH-TEST-001](../../../../spec/lastenheft.md#lh-test-001--unit-tests-für-regelung)/003/006/007, [LH-DOM-007](../../../../spec/lastenheft.md#lh-dom-007--vorzeichenkonvention) |
 | ✅     | RM-M1-21   | Makefile als Orchestrierungsschicht über die Docker-Stages aus `docs/user/quality.md`: `.DEFAULT_GOAL=help`, Override-Variablen (`COVERAGE_THRESHOLD`, `LIZARD_MAX_*`, `IMAGE`), Composite-Targets (`gates`, `ci`, `runtime`, `fullbuild`), `-gate`/`-report`-Trennung | [LH-DEPLOY-001](../../../../spec/lastenheft.md#lh-deploy-001--dockerfile)/002, [LH-TEST-001](../../../../spec/lastenheft.md#lh-test-001--unit-tests-für-regelung)/006/007 |
 | ✅     | RM-M1-22   | Hexagonale Verzeichnis- und Modulstruktur gemäß Architektur §4.2 (`src/hexagon/`, `src/adapters/{driving,driven}/`, `src/infrastructure/`); Driving/Driven-Klassifikation pro Modul | [LH-ARCH-001](../../../../spec/lastenheft.md#lh-arch-001--modulare-systemarchitektur)..005, [LH-NF-006](../../../../spec/lastenheft.md#lh-nf-006--wartbarkeit) |
 | ✅     | RM-M1-23   | Boundary-Test-Modul `BatteryEms.ArchitectureTests` mit Dependency Rule und Architektur-Tabus aus §4.2 (Domain frameworkfrei, Application kein Adapter, Adapter zitieren keine anderen Adapter); Verstöße brechen den Build | [LH-ARCH-002](../../../../spec/lastenheft.md#lh-arch-002--schichtentrennung), [LH-NF-006](../../../../spec/lastenheft.md#lh-nf-006--wartbarkeit) |
@@ -550,7 +550,7 @@ Kubernetes-Deployment, Edge-Anbindung. Inhalte mit hohem Diskussionsbedarf
 | Sicherheitsregression       | Sicherheitsfall-Tests laufen ab M1 in jeder CI-Pipeline ([LH-TEST-006](../../../../spec/lastenheft.md#lh-test-006--sicherheitsfall-tests)) |
 | Native-Reference-Parität    | .NET-Referenzregler bleibt parallel gepflegt zum Native Core     |
 | Konfigurations-Schemata     | JSON-Schemata unter `config/schema/` + Validatoren mitwachsen lassen |
-| Vorzeichenkonvention        | In jedem neuen Modul aktiv testen (LH §4.1)                      |
+| Vorzeichenkonvention        | In jedem neuen Modul aktiv testen ([LH-DOM-007](../../../../spec/lastenheft.md#lh-dom-007--vorzeichenkonvention))                      |
 
 ---
 

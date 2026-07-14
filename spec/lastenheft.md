@@ -128,7 +128,7 @@ Das System bindet Batteriesysteme und zugehörige Feldgeräte über Modbus TCP, 
 | Constraint Limiter | Begrenzungslogik für technische Betriebsgrenzen                 |
 | Ramp Limiter       | Begrenzung der Änderungsgeschwindigkeit von Leistungssollwerten |
 
-### 4.1 Fachliche Konventionen
+### LH-DOM-007 — Vorzeichenkonvention
 
 Das System muss eine einheitliche Vorzeichenkonvention für Wirkleistung verwenden:
 

@@ -32,7 +32,7 @@ referenzieren ihre `LH-*`-Kennung; Architekturkomponenten erhalten
 | AR-P-003  | Adapter enthalten keine Geschäfts-, Markt- oder Regelentscheidungen | [LH-ARCH-003](lastenheft.md#lh-arch-003--keine-marktlogik-in-protokolladaptern) |
 | AR-P-004  | Optimierer schreiben nie direkt auf Geräte                      | [LH-ARCH-004](lastenheft.md#lh-arch-004--keine-direkte-geräteansteuerung-aus-optimierung)   |
 | AR-P-005  | Einheitliche interne Modelle (Telemetrie, Command, Snapshot)    | [LH-DOM-002](lastenheft.md#lh-dom-002--telemetrie-modell)/3  |
-| AR-P-006  | Einheitliche Vorzeichenkonvention intern                        | LH §4.1       |
+| AR-P-006  | Einheitliche Vorzeichenkonvention intern                        | [LH-DOM-007](lastenheft.md#lh-dom-007--vorzeichenkonvention) |
 | AR-P-007  | Sicherer Fallback bei jeder Unsicherheit (kein Default-Aktiv)   | [LH-CTRL-007](lastenheft.md#lh-ctrl-007--fallback-bei-ungültigem-snapshot), LH-SAFE-* |
 | AR-P-008  | Konfigurations-, nicht codegetriebene Geräte- und Marktparameter | [LH-CONF-001](lastenheft.md#lh-conf-001--externe-konfiguration)  |
 | AR-P-009  | Native Core ist optional, nicht zentral; austauschbar gegen .NET | [LH-ARCH-006](lastenheft.md#lh-arch-006--native-core-als-optionaler-beschleuniger), [LH-NF-002](lastenheft.md#lh-nf-002--performance-kritische-komponenten) |
@@ -319,7 +319,7 @@ und trigger-basiert.
 
 | Modul                                    | Hexagon              | Verantwortung                                                | LH-Bezug             |
 | ---------------------------------------- | -------------------- | ------------------------------------------------------------ | -------------------- |
-| `BatteryEms.Domain`                      | Hexagon-Kern         | Entitäten, Wertobjekte, Vorzeichenkonvention, State Machine, Limiter | LH-DOM-*, LH-SM-*, [LH-CTRL-002](lastenheft.md#lh-ctrl-002--constraint-limiter)/003, §4.1 |
+| `BatteryEms.Domain`                      | Hexagon-Kern         | Entitäten, Wertobjekte, Vorzeichenkonvention, State Machine, Limiter | LH-DOM-*, LH-SM-*, [LH-CTRL-002](lastenheft.md#lh-ctrl-002--constraint-limiter)/003, [LH-DOM-007](lastenheft.md#lh-dom-007--vorzeichenkonvention) |
 | `BatteryEms.Application`                 | Hexagon-Application  | Use Cases, Driving + Driven Port-Interfaces, Snapshot Store, Markt-/Fahrplanauflösung, Optimierungs-Interface | [LH-CTRL-001](lastenheft.md#lh-ctrl-001--zyklischer-regelkreis)/007, LH-RT-*, LH-MKT-*, [LH-OPT-001](lastenheft.md#lh-opt-001--fahrplanoptimierung) |
 | `BatteryEms.Api`                         | Driving Adapter      | REST-API, AuthN/AuthZ, Operator-Endpunkte, Audit             | LH-API-*             |
 | `BatteryEms.Worker`                      | Driving Adapter      | Hosted Service: Regelzyklus, Scheduler                       | [LH-CTRL-001](lastenheft.md#lh-ctrl-001--zyklischer-regelkreis), LH-OPS-* |
@@ -469,7 +469,7 @@ OptimizationRun
 
 Vorzeichenkonvention: positiv = Entladen, negativ = Laden, 0 = neutral.
 Konvention gilt in allen Modellen, Limitern, Persistenz und Commands;
-Geräteumrechnung erfolgt ausschließlich in den Adaptern (LH §4.1).
+Geräteumrechnung erfolgt ausschließlich in den Adaptern ([LH-DOM-007](lastenheft.md#lh-dom-007--vorzeichenkonvention)).
 
 Bezug: [LH-DOM-001](lastenheft.md#lh-dom-001--batteriespeicher-modell)..006, [LH-MKT-003](lastenheft.md#lh-mkt-003--marktverpflichtungen)/7/8/9, [LH-OPT-007](lastenheft.md#lh-opt-007--trennung-von-horizon-optimierung-und-echtzeit-dispatch)/8/9.
 
