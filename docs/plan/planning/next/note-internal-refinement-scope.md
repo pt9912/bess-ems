@@ -5,7 +5,7 @@ Scope-Wurf für die nächste Minor-Version; sie ersetzt **keinen**
 Slice-Plan und wird in `done/` (nach Release) oder umgeräumt
 (falls Theme verworfen wird).
 **Umwidmung (jetzt versions-agnostisch):** ursprünglich als
-v1.1.0-Scope geschrieben (Datum 2026-05-14). Der Feldvertrag (ADR 0013,
+v1.1.0-Scope geschrieben (Datum 2026-05-14). Der Feldvertrag ([ADR 0013](../../adr/0013-device-mapping-field-contract.md),
 externer Trigger grid-gym-Kopplung) hat diese Planung wiederholt
 überholt: §5.1 wurde — wegen des config-brechenden
 `schema_version`-Enforcements — als **v2.0.0** veröffentlicht
@@ -497,7 +497,7 @@ Aktivierung.**
   closen.** M3-D3 in v2.2.0 oder einem späteren Release, sobald
   ein Konsument materialisiert. Andernfalls bauen wir Routing-
   Infrastruktur auf Verdacht — exakt das Anti-Muster, gegen das
-  ADR 0009/0011/0012 systematisch entscheiden.
+  [ADR 0009](../../adr/0009-api-service-extraction-criteria.md)/[0011](../../adr/0011-application-monolithic-module.md)/[0012](../../adr/0012-northbound-export-adapter-structure.md) systematisch entscheiden.
 
 ---
 
@@ -592,7 +592,7 @@ Drift in v2.2.0 wäre Anti-Muster:
   konzept
 - **MILP-Optimierung** — bewusst auf LP+QP zurückgestellt
   (siehe Lastenheft §28.2)
-- **Northbound-Export** — ADR 0012, trigger-basiert
+- **Northbound-Export** — [ADR 0012](../../adr/0012-northbound-export-adapter-structure.md), trigger-basiert
 
 ---
 
