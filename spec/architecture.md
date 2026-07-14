@@ -80,15 +80,15 @@ Bezug: [LH-KTX-001](lastenheft.md#lh-ktx-001--externe-systeme), [LH-KTX-002](las
 
 Das System wird zugleich aus zwei Sichten beschrieben:
 
-- **§4.1 Schichtenmodell** — logische Schichten der Verantwortung
+- **[§4.1](#41-schichtenmodell) Schichtenmodell** — logische Schichten der Verantwortung
   ([LH-ARCH-002](lastenheft.md#lh-arch-002--schichtentrennung)).
-- **§4.2 Hexagonale Sicht** — strukturelle Trennung in fachlichen
+- **[§4.2](#42-hexagonale-sicht-driving--driven-ports) Hexagonale Sicht** — strukturelle Trennung in fachlichen
   Hexagon-Kern und auswechselbare Adapter mit Driving/Driven-Klassifikation.
 
-Beide Sichten beschreiben dasselbe System; sie sind komplementär. §4.1
-ordnet Verantwortlichkeiten und Datenfluss, §4.2 legt die zulässigen
+Beide Sichten beschreiben dasselbe System; sie sind komplementär. [§4.1](#41-schichtenmodell)
+ordnet Verantwortlichkeiten und Datenfluss, [§4.2](#42-hexagonale-sicht-driving--driven-ports) legt die zulässigen
 Compile-Time-Abhängigkeiten fest. Bei einer scheinbaren Kollision zwischen
-Schichtenmodell und hexagonaler Sicht gilt die Dependency Rule aus §4.2.
+Schichtenmodell und hexagonaler Sicht gilt die Dependency Rule aus [§4.2](#42-hexagonale-sicht-driving--driven-ports).
 
 ### 4.1 Schichtenmodell
 
@@ -118,7 +118,7 @@ Schichtenmodell und hexagonaler Sicht gilt die Dependency Rule aus §4.2.
 Verantwortungs- und Datenflusssicht. Es erlaubt nicht automatisch, dass
 eine höher dargestellte Schicht konkrete Implementierungen tieferer
 Schichten referenziert. Konkrete Code-Abhängigkeiten werden über Ports,
-Adapter und Composition Root in §4.2 geregelt.
+Adapter und Composition Root in [§4.2](#42-hexagonale-sicht-driving--driven-ports) geregelt.
 
 Bezug: [LH-ARCH-002](lastenheft.md#lh-arch-002--schichtentrennung).
 
@@ -127,7 +127,7 @@ Bezug: [LH-ARCH-002](lastenheft.md#lh-arch-002--schichtentrennung).
 Der fachliche Kern (Hexagon) enthält Domain und Application; alles, was
 Außenwelt berührt — Protokolle, Persistenz, Telemetrie, Solver, Native
 Core, HTTP — lebt in Adaptern. Adapter implementieren Ports, die der
-Kern definiert. Der Regelkreis aus §6 läuft strikt **Driving Port → Use
+Kern definiert. Der Regelkreis aus [§6](#6-datenfluss-regelkreis) läuft strikt **Driving Port → Use
 Case → Driven Ports → Driven Adapter**.
 
 ```text
@@ -290,7 +290,7 @@ ArchUnitNET) durchgesetzt; Verstöße brechen den Build ([LH-NF-006](lastenheft.
 
 #### Mapping zum Schichtenmodell
 
-| Schicht (§4.1)            | Hexagonale Zuordnung                                |
+| Schicht ([§4.1](#41-schichtenmodell))            | Hexagonale Zuordnung                                |
 | ------------------------- | --------------------------------------------------- |
 | API Layer                 | Driving Adapter (`BatteryEms.Api`)                  |
 | Application / Worker      | Driving Adapter (`BatteryEms.Worker`) + Application (`BatteryEms.Application`) |
@@ -310,7 +310,7 @@ Bezug: [LH-ARCH-001](lastenheft.md#lh-arch-001--modulare-systemarchitektur)..005
 
 ### 5.1 .NET-Module
 
-Die Modulnamen folgen der Verzeichnisstruktur aus §4.2. Die Spalte
+Die Modulnamen folgen der Verzeichnisstruktur aus [§4.2](#42-hexagonale-sicht-driving--driven-ports). Die Spalte
 „Hexagon" ordnet jedes Modul der hexagonalen Klassifikation zu.
 Application-interne Funktionsbereiche (Realtime, Control, Markets,
 Optimization-Interface) leben innerhalb von `BatteryEms.Application` als
@@ -331,7 +331,7 @@ und trigger-basiert.
 | `BatteryEms.Adapters.Optimization`       | Driven Adapter       | Solver-Bindings für Horizon-Optimierung; Schedule-Following-/Single-Step-Dispatch | [LH-OPT-001](lastenheft.md#lh-opt-001--fahrplanoptimierung)..009 |
 | `BatteryEms.Adapters.NativeInterop`      | Driven Adapter (M3)  | P/Invoke-Bindings, ABI-Check, Fallback-Routing               | LH-NATIVE-*          |
 | `BatteryEms.Infrastructure`              | Composition Root     | DI-Wiring, Konfigurations-Loader, Health, Startvalidierung   | LH-CONF-*, [LH-OPS-001](lastenheft.md#lh-ops-001--sicherer-start) |
-| `BatteryEms.ArchitectureTests`           | Test-Modul           | Boundary-Tests für Dependency Rule und Architektur-Tabus aus §4.2 | [LH-NF-006](lastenheft.md#lh-nf-006--wartbarkeit), [LH-ARCH-002](lastenheft.md#lh-arch-002--schichtentrennung) |
+| `BatteryEms.ArchitectureTests`           | Test-Modul           | Boundary-Tests für Dependency Rule und Architektur-Tabus aus [§4.2](#42-hexagonale-sicht-driving--driven-ports) | [LH-NF-006](lastenheft.md#lh-nf-006--wartbarkeit), [LH-ARCH-002](lastenheft.md#lh-arch-002--schichtentrennung) |
 
 ### 5.2 Native-Core-Komponenten (optional, ab Phase 2)
 
@@ -762,7 +762,7 @@ Deployment-Variante darf zusätzlich
 ein ABI-Mismatch beim Startup-Check zu einem harten Fehler statt
 zum Managed-Fallback. Die Abort-Policy ist explizit Opt-in,
 hat einen eigenen Integrationstest und überspielt nicht den
-Default-Fallback-Vertrag (siehe `docs/user/quality.md` §5.2).
+Default-Fallback-Vertrag (siehe [`docs/user/quality.md` §5.2](../docs/user/quality.md#52-native-abi)).
 
 ---
 
@@ -826,7 +826,7 @@ zu finden.
 | Architekturkomponente         | LH-Anforderung(en)                            |
 | ----------------------------- | --------------------------------------------- |
 | Schichten 1–9                 | [LH-ARCH-001](lastenheft.md#lh-arch-001--modulare-systemarchitektur)/002                               |
-| Hexagonale Sicht (§4.2)       | [LH-ARCH-001](lastenheft.md#lh-arch-001--modulare-systemarchitektur)..005, [LH-NF-006](lastenheft.md#lh-nf-006--wartbarkeit)/007/008           |
+| Hexagonale Sicht ([§4.2](#42-hexagonale-sicht-driving--driven-ports))       | [LH-ARCH-001](lastenheft.md#lh-arch-001--modulare-systemarchitektur)..005, [LH-NF-006](lastenheft.md#lh-nf-006--wartbarkeit)/007/008           |
 | Architektur-Tabus / Boundary-Tests | [LH-ARCH-002](lastenheft.md#lh-arch-002--schichtentrennung), [LH-NF-006](lastenheft.md#lh-nf-006--wartbarkeit)                   |
 | Adapter-Interface             | [LH-PROT-001](lastenheft.md#lh-prot-001--einheitliches-adapterinterface), [LH-ARCH-005](lastenheft.md#lh-arch-005--austauschbare-kommunikationsadapter)                      |
 | Device Point / Capability Model | [LH-DOM-005](lastenheft.md#lh-dom-005--gerätepunkt-modell)/006, [LH-CONF-002](lastenheft.md#lh-conf-002--versionierte-gerätemappings)                 |
