@@ -27,7 +27,21 @@ hostpaths:
 # (done/-Pläne, Accepted-ADRs, Archiv — sie beschreiben den Stand ihrer Zeit,
 # etwa den C++→C-Pivot; wie CHANGELOG von der Existenz-Prüfung befreit).
 codepaths:
-  roots: [docs, spec, config, src, tests, deploy, native, schema, simulators, proto, scripts, internal]
+  roots:
+    [
+      docs,
+      spec,
+      config,
+      src,
+      tests,
+      deploy,
+      native,
+      schema,
+      simulators,
+      proto,
+      scripts,
+      internal,
+    ]
   exempt-paths:
     - CHANGELOG.md
     - "docs/plan/adr/**"
@@ -35,13 +49,13 @@ codepaths:
     - "docs/archive/**"
   # referenz-weit von der Existenz-Prüfung befreite Ziele:
   ignore-refs:
-    - config/retention.json          # dokumentierter Laufzeit-Pfad (Operator legt ihn an), kein Repo-File; Beispiel unter config/examples/
-    - "docs/user/security.md"        # in note-RM-M4-followups als geplante Doku vorwärts-referenziert (noch nicht angelegt)
-    - "**/plan-RM-Mn.md"             # Namens-Platzhalter im roadmap-Wartungsabschnitt (Mn = beliebige Welle)
-    - "tests/fixtures/native_parity/pid_cases.v1.json"  # geplantes PID-Parity-Fixture (RM-M3-Followup, noch nicht angelegt)
+    - config/retention.json # dokumentierter Laufzeit-Pfad (Operator legt ihn an), kein Repo-File; Beispiel unter config/examples/
+    - "docs/user/security.md" # in note-RM-M4-followups als geplante Doku vorwärts-referenziert (noch nicht angelegt)
+    - "**/plan-RM-Mn.md" # Namens-Platzhalter im roadmap-Wartungsabschnitt (Mn = beliebige Welle)
+    - "tests/fixtures/native_parity/pid_cases.v1.json" # geplantes PID-Parity-Fixture (RM-M3-Followup, noch nicht angelegt)
     # ECHTE DOKU-DEFEKTE (docs/user/quality.md) — getrackt, NICHT stillschweigend akzeptiert (siehe Bericht/CHANGELOG):
-    - "native/battery_control_core/.clang-format"  # DEFEKT: existiert nicht (nur .clang-tidy vorhanden) — quality.md §1.3
-    - config/schema/limits.schema.json             # DEFEKT: kein limits-Schema im Repo — quality.md §Schema-Tabelle
+    - "native/battery_control_core/.clang-format" # DEFEKT: existiert nicht (nur .clang-tidy vorhanden) — quality.md §1.3
+    - config/schema/limits.schema.json # DEFEKT: kein limits-Schema im Repo — quality.md §Schema-Tabelle
 
 # Referenzmatrix (DC-FA-MTX): die Spec-Straten (lastenheft/architecture) sind
 # die autoritative Schicht und dürfen NICHT abwärts auf ADRs verweisen — eine
@@ -57,17 +71,17 @@ matrix:
       paths: [spec/lastenheft.md, spec/architecture.md]
       order: [spec/lastenheft.md, spec/architecture.md]
       direction: no-downward
-    - {name: adr, paths: ["docs/plan/adr/[0-9]*.md"]}
-    - {name: plan, paths: ["docs/plan/planning/**"]}
+    - { name: adr, paths: ["docs/plan/adr/[0-9]*.md"] }
+    - { name: plan, paths: ["docs/plan/planning/**"] }
   rules:
     # Spec ist autoritativ ⇒ verweist nicht abwärts auf ADRs.
-    - {from: spec, to: adr, allow: false}
+    - { from: spec, to: adr, allow: false }
     # ADRs sind Entscheidungs-Records ⇒ verweisen nicht abwärts auf Pläne
     # (die Pläne verweisen aufwärts auf ihre ADR). Ein neuer ADR, der einen
     # Umsetzungs-Plan als Provenance nennen muss, deklariert das per
     # <!-- d-check:status-provenance --> auf der Zeile.
-    - {from: adr, to: plan, allow: false}
-  status: {forbidden: [superseded, deprecated]}
+    - { from: adr, to: plan, allow: false }
+  status: { forbidden: [superseded, deprecated] }
   exclude-sections: [Historie, Geschichte]
   # Grandfathering: die vor dieser Regel Accepted-ADRs 0001–0009 nennen ihre
   # Umsetzungs-Pläne als legitime Provenance-/Verifikations-Zeiger und sind
@@ -98,10 +112,11 @@ ids:
       exempt-paths:
         - "**/CHANGELOG.md"
         - "docs/reviews/**"
-        - "docs/plan/adr/**"
         - "docs/plan/planning/done/**"
-        - "docs/archive/**"
-        # --- noch nicht RM-verlinkt (Phase 3b, Datei für Datei) ---
-        - "docs/user/quality.md"
-        - "spec/lastenheft.md"
-        - "spec/architecture.md"
+  # Die ID-Linkpflicht gilt NUR innerhalb der Planungs-Doku: ADR und RM sind
+  # planungs-interne Kennungen (docs/plan/…; nicht-normativ — die Norm ist LH-*).
+  # Verweise darauf aus User-Handbuch / Spec / Code-naher Doku werden NICHT
+  # zwangsverlinkt (bestehende bleiben gültig). RM-Leaks im Operator-Handbuch
+  # werden inhaltlich bereinigt statt verlinkt (siehe CHANGELOG).
+  scope:
+    roots: [docs/plan/planning]
