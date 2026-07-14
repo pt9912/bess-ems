@@ -7,7 +7,7 @@ Feld-Endpoint** laufen — eine Feld-/Simulationsumgebung, die den
 publizierten MQTT-Feldvertrag spricht (z. B. eine externe
 Simulationsplattform mit Push-Field-Publish-Surface). Die Anbindung ist
 **config-only**: kein Code-Pfad, ausschließlich `Bess__*`-Env-Keys
-([ADR 0013](../plan/adr/0013-device-mapping-field-contract.md) §2,
+([ADR 0013](../plan/adr/0013-device-mapping-field-contract.md) [§2](../plan/adr/0013-device-mapping-field-contract.md#2-entscheidung),
 Zeile „SUT-Modus").
 
 Dieses Dokument beschreibt den Vertrag, den der Endpoint erfüllen muss,
@@ -40,7 +40,7 @@ telemetry-read-only-Kopplung nicht erforderlich ([ADR 0013 §6](../plan/adr/0013
 ohne Command-Unterstützung erzeugt deshalb pro Zyklus eine Warning
 `Command-sink dispatch failed asset_id=… reason=ack-timeout`
 (EventId 1903). Das ist für die read-only-Kopplung erwartbar und
-unschädlich; der Regelzyklus läuft weiter (das Gutfall-Signal aus §5
+unschädlich; der Regelzyklus läuft weiter (das Gutfall-Signal aus [§5](#5-verifikation)
 erscheint vor dem Dispatch).
 
 **Kadenz:** bess-ems misst Telemetrie-Frische **beim Empfang**. Der
@@ -60,7 +60,7 @@ läuft ohne Feldanbindung weiter.
 subscribt `battery/{assetId}/telemetry` mit der `asset_id` aus der
 Asset-Config (`Bess__AssetConfigPath`, Feld `asset_id`). Publisht der
 Endpoint unter einer anderen ID, empfängt bess-ems **still nichts**
-und läuft in Dauer-Safe-Stop (Symptom-Unterscheidung: §5).
+und läuft in Dauer-Safe-Stop (Symptom-Unterscheidung: [§5](#5-verifikation)).
 
 | Env-Key (`Bess__…`) | Pflicht | Default (unset) | Semantik |
 | ------------------- | ------- | ---------------- | -------- |
@@ -71,7 +71,7 @@ und läuft in Dauer-Safe-Stop (Symptom-Unterscheidung: §5).
 | `MqttBrokerPort` | ja (Kern) | — | Broker-Port (Plaintext üblich 1883, TLS 8883). |
 | `MqttClientId` | ja (Kern) | — | Client-ID von bess-ems am Broker. |
 | `MqttRuntimeProfile` | nein | `Production` | `Development` \| `HilSimulator` \| `Production`. Unset ⇒ **Production, fail-closed** (verlangt TLS + Auth). |
-| `MqttTlsEnabled` | nein | `false` | TLS an/aus; Pflicht in `Production`. Tiefe: [`quality.md`](quality.md) §2.2.1. |
+| `MqttTlsEnabled` | nein | `false` | TLS an/aus; Pflicht in `Production`. Tiefe: [`quality.md`](quality.md) [§2.2.1](quality.md#221-mqtt-security-profil). |
 | `MqttTlsTrustedCaCertificatePath` | bei TLS | — | CA-Bundle (kein stiller System-Root-Fallback). |
 | `MqttTlsClientCertificatePath` | nein | — | Client-Zertifikat (mTLS / Auth-Variante). |
 | `MqttTlsClientCertificatePassword` | nein | — | Inline-Passwort — in `Production` verboten. |
@@ -84,7 +84,7 @@ und läuft in Dauer-Safe-Stop (Symptom-Unterscheidung: §5).
 | `MqttCommandPublishQos` | nein | `AtLeastOnce` | QoS für Command-Publish (`AtMostOnce` \| `AtLeastOnce` \| `ExactlyOnce`). |
 | `MqttCommandAckSubscribeQos` | nein | `AtLeastOnce` | QoS für die Command-Ack-Subscription. |
 | `MqttTelemetrySubscribeQos` | nein | `AtMostOnce` | QoS für die Telemetrie-Subscription — bei kontinuierlicher Kadenz ist Verlusttoleranz beabsichtigt; ein fremder Broker muss das angefragte QoS nur gewähren, nicht übertreffen. |
-| `MqttAllowExactlyOnce` | bei QoS 2 | `false` | Gate für `ExactlyOnce` (gleiche Bauart wie das Plaintext-Gate); Details [`quality.md`](quality.md) §2.2.1. |
+| `MqttAllowExactlyOnce` | bei QoS 2 | `false` | Gate für `ExactlyOnce` (gleiche Bauart wie das Plaintext-Gate); Details [`quality.md`](quality.md) [§2.2.1](quality.md#221-mqtt-security-profil). |
 | `MqttAllowExactlyOnceReason` | bei QoS 2 | — | Pflicht-Begründung zum QoS-2-Gate. |
 
 `Bess__SnapshotMaxAge` bindet nicht über die Host-Options-Klasse,
@@ -104,7 +104,7 @@ Plaintext-MQTT ist eine **Nur-Sim-Netz**-Annahme: erlaubt nur in
 `Development`/`HilSimulator` und nur mit explizitem
 `MqttAllowPlaintext=true` + `Reason`. `Production` ist fail-closed
 (TLS + Broker-Auth Pflicht, Inline-Secrets verboten) — vollständige
-Regeln in [`quality.md`](quality.md) §2.2.1 (MQTT-Security-Profil).
+Regeln in [`quality.md`](quality.md) [§2.2.1](quality.md#221-mqtt-security-profil) (MQTT-Security-Profil).
 
 ## 4. Compose-SUT-Variante
 
@@ -148,7 +148,7 @@ Der Feld-Stack spielt das committete Fixture
 mit **kontinuierlicher 1-s-Kadenz** ab (der Simulator spielt Ticks
 einmal ab, kein Loop) — mit dem Standard-Integrations-Szenario, das
 nach Tick 0 stillhält, liefe die SUT-Variante korrekt in Safe-Stop:
-genau die Kadenz-Regel aus §1. Für einen echten externen Endpoint ist die Netz-Topologie
+genau die Kadenz-Regel aus [§1](#1-der-vertrag-den-der-endpoint-sprechen-muss). Für einen echten externen Endpoint ist die Netz-Topologie
 Betreibersache — `BESS_SUT_BROKER_HOST` muss aus dem Container heraus
 routbar sein.
 
@@ -169,7 +169,7 @@ docker compose -f deploy/compose.sut.yml \
 ```
 
 Danach: Operator-Konsole unter `http://localhost:8080/operator/`
-(Token-Handhabung: [Anwenderhandbuch §2](anwenderhandbuch.md)) und die
+(Token-Handhabung: [Anwenderhandbuch §2](anwenderhandbuch.md#2-erste-schritte)) und die
 Plattform-UI unter `http://localhost:8000`. Sind die Ports belegt
 (z. B. weil auf derselben Maschine schon ein anderer gekoppelter Stack
 betrachtet wird), weichen `BESS_SUT_UI_PORT`/`GRID_GYM_UI_PORT` auf
@@ -196,8 +196,8 @@ jeweiligen Basis unter dem `sut-config-check`-Gate.
 
 | Log-Signal | Ursache | Prüfen |
 | ---------- | ------- | ------ |
-| `decision=no-snapshot` | **Nie** Telemetrie empfangen | `asset_id`↔`{assetId}`-Korrespondenz (§2), Topic-Schema, Broker-Adresse/Netz-Routbarkeit |
-| `decision=snapshot-unusable` + `reason=snapshot-aged-<N>s` (N mit einer Nachkommastelle, z. B. `snapshot-aged-12.3s`) | Telemetrie **zu alt** | Publish-Kadenz des Endpoints vs. `Bess__SnapshotMaxAge` (§1 Kadenz) |
+| `decision=no-snapshot` | **Nie** Telemetrie empfangen | `asset_id`↔`{assetId}`-Korrespondenz ([§2](#2-konfiguration)), Topic-Schema, Broker-Adresse/Netz-Routbarkeit |
+| `decision=snapshot-unusable` + `reason=snapshot-aged-<N>s` (N mit einer Nachkommastelle, z. B. `snapshot-aged-12.3s`) | Telemetrie **zu alt** | Publish-Kadenz des Endpoints vs. `Bess__SnapshotMaxAge` ([§1](#1-der-vertrag-den-der-endpoint-sprechen-muss) Kadenz) |
 
 `make sut-smoke` automatisiert genau dieses Rezept gegen den
 Stand-in-Stack. Grün heißt: das Gutfall-Signal (JSON-Anker
@@ -218,14 +218,14 @@ erste Telemetrie eintrifft) und zählen nicht.
 > offizielle, unveränderte bess-ems-Image in ihrem Abnahme-Stack ab,
 > und von dieser Seite lief `deploy/compose.sut.yml` **unverändert**
 > (Default `BESS_SUT_BROKER_HOST=field-mosquitto`) gegen das
-> digest-gepinnte, publizierte Image der Gegenseite über das in §4
+> digest-gepinnte, publizierte Image der Gegenseite über das in [§4](#4-compose-sut-variante)
 > beschriebene external Network: Gutfall-Signal (`"EventId":1701`)
 > binnen Frist, genau ein Anlauf-Safe-Stop und im Beobachtungsfenster
 > **kein** neuer (`"EventId":1702`-Baseline stabil), Draht-Frames als
 > exakter 10-Feld-Envelope inklusive Fault-Semantik
 > (`fault_status`/`available` aus der Fault-Surface der Gegenseite).
 > Die Gegenseite beantwortet zusätzlich `command` mit einem
-> Always-Accept-`command/ack`-Echo — der Warnstrom aus §1
+> Always-Accept-`command/ack`-Echo — der Warnstrom aus [§1](#1-der-vertrag-den-der-endpoint-sprechen-muss)
 > (EventId 1903) entfällt dort sogar; der Sollwert-**Effekt** bleibt
 > weiterhin dem Modbus-Pfad bzw. dem deferred Command-Closed-Loop
 > vorbehalten ([ADR 0013 §6](../plan/adr/0013-device-mapping-field-contract.md#6-command-closed-loop-deferred-mit-trigger-0012-muster)).
@@ -237,8 +237,8 @@ Komponente.
 ## Bezug
 
 - [ADR 0013](../plan/adr/0013-device-mapping-field-contract.md) —
-  Feldvertrag, SUT-Modus (§2), Kadenz (§1), Golden-Vektoren (§5.2)
-- [`quality.md`](quality.md) §2.2.1 — MQTT-Security-Profil
+  Feldvertrag, SUT-Modus ([§2](#2-konfiguration)), Kadenz ([§1](#1-der-vertrag-den-der-endpoint-sprechen-muss)), Golden-Vektoren (§5.2)
+- [`quality.md`](quality.md) [§2.2.1](quality.md#221-mqtt-security-profil) — MQTT-Security-Profil
   (TLS/Auth/Plaintext-/QoS-2-Gates)
 - [`releasing.md`](releasing.md) — Release-Assets inkl. Schema-Bundle
 - `deploy/compose.sut.yml` / `deploy/compose.field.yml` — SUT-Variante

@@ -41,7 +41,7 @@ Datenhaltung (→ [`persistence.md`](persistence.md)).
 > **Sicherheitshinweis:** Der lokale Simulations-Stack nutzt ein
 > bekanntes Demo-Token und unverschlüsseltes MQTT — er ist eine reine
 > Simulationsumgebung. Produktive Instanzen erhalten eigene Tokens und
-> TLS (→ [`quality.md`](quality.md) §2.2.1).
+> TLS (→ [`quality.md`](quality.md) [§2.2.1](quality.md#221-mqtt-security-profil)).
 
 ## 2. Erste Schritte
 
@@ -431,7 +431,7 @@ Betriebsteam.
 2. Prüfen Sie den Anlagenstatus (`/battery/<assetId>/status`):
    Verfügbarkeit, Zeitstempel der letzten Daten.
 3. Prüfen Sie die Feld-Anbindung nach dem Rezept in
-   [`sut-field-endpoint.md`](sut-field-endpoint.md) §5.
+   [`sut-field-endpoint.md`](sut-field-endpoint.md) [§5](sut-field-endpoint.md#5-verifikation).
 4. Nach Behebung kehrt der Zyklus selbstständig in den Normalbetrieb
    zurück (Log: `Control cycle emitted command`, `"EventId":1701`).
 

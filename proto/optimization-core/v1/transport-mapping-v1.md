@@ -9,7 +9,7 @@
 [`../../../docs/plan/planning/done/plan-RM-M5-01.md`](../../../docs/plan/planning/done/plan-RM-M5-01.md)
 D-04 (versioniertes Mapping-Artefakt),
 [`../../../docs/plan/adr/0005-optimization-core-sidecar-transport.md`](../../../docs/plan/adr/0005-optimization-core-sidecar-transport.md)
-§8 Konsequenzen (`OK/DEADLINE_EXCEEDED/UNAVAILABLE/…`-Mapping als Standard).
+[§8 Konsequenzen](../../../docs/plan/adr/0005-optimization-core-sidecar-transport.md#8-konsequenzen) (`OK/DEADLINE_EXCEEDED/UNAVAILABLE/…`-Mapping als Standard).
 
 ---
 
@@ -74,9 +74,9 @@ Reihenfolge:
    Terminalzustands; kein zweiter Sidecar-Call.
 3. **gRPC-Status-Code** (auf der Aufruf-Schicht):
    - `OK` → weiter zu Schritt 4 (Payload-Auswertung).
-   - Alle anderen Codes → direkt aus Tabelle in §2 mappen.
+   - Alle anderen Codes → direkt aus Tabelle in [§2](#2-mapping-tabelle) mappen.
 4. **Sidecar-Payload** (nur wenn `OK`): `solver_status` +
-   `has_usable_solution` → aus Tabelle in §2 mappen.
+   `has_usable_solution` → aus Tabelle in [§2](#2-mapping-tabelle) mappen.
 
 ---
 

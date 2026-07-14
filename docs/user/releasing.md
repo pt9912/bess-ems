@@ -13,8 +13,8 @@ letzte Version war*.
 
 Bezug:
 - [`CHANGELOG.md`](../../CHANGELOG.md) (Keep-a-Changelog 1.1.0)
-- [`docs/user/quality.md`](quality.md) §1 (Lint/Restore-Lock-Disziplin),
-  §6 (Native-Quality-Gates), §8 (Release-Pipeline-Gates — ausführliche
+- [`docs/user/quality.md`](quality.md) [§1](quality.md#1-statische-analyse) (Lint/Restore-Lock-Disziplin),
+  [§6](quality.md#6-native-net-parity) (Native-Quality-Gates), [§8](quality.md#8-release-pipeline-gates) (Release-Pipeline-Gates — ausführliche
   Gate-Spezifikation, dieses Dokument ist die prozedurale Sicht)
 - [`docs/plan/adr/0002-release-pipeline-gates.md`](../plan/adr/0002-release-pipeline-gates.md)
   (architektonische Entscheidung mit v1.0.0-Implementierungs-Update)
@@ -42,7 +42,7 @@ und unterschiedliche Bruchsemantiken haben.
 **Konsequenz:** ein App-Major-Bump (`v1 → v2`) zwingt **nicht** zu
 einem Native-Major-Bump. Umgekehrt kann ein Native-Major-Bump (z. B.
 Struct-Layout-Bruch) in einem App-Minor stecken — der Adapter ist die
-Pufferzone (`abi-mismatch`-Fallback, siehe `docs/user/quality.md` §6).
+Pufferzone (`abi-mismatch`-Fallback, siehe `docs/user/quality.md` [§6](quality.md#6-native-net-parity)).
 
 Für die erste Major (`v1.0.0`) sind alle drei Linien zu Klarheits­
 zwecken synchronisiert: App = `1.0.0`, Chart = `1.0.0/1.0.0`, Native
@@ -75,7 +75,7 @@ ein **Stop** — kein Tag ohne grünes Set.
    im Header dokumentierten Regeln zu erhöhen. Kein App-Tag mit
    unverändertem ABI-Version-Triple bei verändertem ABI-Surface.
 6. **Lock-Dateien** sind aktuell. `make lock-refresh` produziert
-   zero-diff. (Siehe `docs/user/quality.md` §1.4.)
+   zero-diff. (Siehe `docs/user/quality.md` [§1.4](quality.md#14-supply-chain-nuget-lock-files).)
 7. **Offene Follow-up-Notes geprüft.** `docs/plan/planning/open/note-RM-M*-followups.md`
    enthält keinen Eintrag, der durch die Releasebahn jetzt zwingend
    getriggert wäre (z. B. Production-Profile-Drift bei Operations-

@@ -13,10 +13,10 @@ in diesem Dokument; sie ändern sich pro Lauf. Dieses Doc fixiert *wie*
 gemessen wird, nicht *was die letzte Messung ergab*.
 
 Bezug:
-- [`spec/lastenheft.md`](../../spec/lastenheft.md) §26 (LH-TEST-*),
-  §12 (LH-SAFE-*), §18 (LH-NATIVE-*), §24 (LH-DEPLOY-*)
-- [`spec/architecture.md`](../../spec/architecture.md) §13 (Native-Core),
-  §16 (Testarchitektur)
+- [`spec/lastenheft.md`](../../spec/lastenheft.md) [§26](../../spec/lastenheft.md#26-testanforderungen) (LH-TEST-*),
+  [§12](../../spec/lastenheft.md#12-sicherheitsanforderungen) (LH-SAFE-*), [§18](../../spec/lastenheft.md#18-native-core-anforderungen) (LH-NATIVE-*), [§24](../../spec/lastenheft.md#24-deployment-anforderungen) (LH-DEPLOY-*)
+- [`spec/architecture.md`](../../spec/architecture.md) [§13](../../spec/architecture.md#13-native-core-strategie) (Native-Core),
+  [§16](../../spec/architecture.md#16-testarchitektur) (Testarchitektur)
 - [`docs/plan/planning/in-progress/roadmap.md`](../plan/planning/in-progress/roadmap.md)
   (Reihenfolge der Gate-Aktivierung pro Meilenstein)
 
@@ -91,7 +91,7 @@ Severities lautlos zurück und das Gate schweigt.
 Die nativen Komponenten liegen unter
 `native/battery_control_core/` (Implementierung in C, Header in C
 mit `extern "C"`-Block für Mixed-Language-Konsumenten; Test-Harness
-in C++ mit doctest, siehe §2.4). Statische Analyse läuft über die
+in C++ mit doctest, siehe [§2.4](#24-native-interop-tests)). Statische Analyse läuft über die
 `native-lint`-Stage:
 
 ```bash
@@ -141,10 +141,10 @@ make native-sanitizer   # = docker build --target native-sanitizer
 
 | Datei                      | Zweck                                                                                                                                           |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.editorconfig`            | C#-Style + Roslyn-Diagnostic-Severities (CA-Regeln aus §1.1)                                                                                    |
-| `Directory.Build.props`    | `TreatWarningsAsErrors=true`, `AnalysisLevel=latest-all`, `RestorePackagesWithLockFile=true` (siehe §1.4), gemeinsame Analyzer-PackageReference |
+| `.editorconfig`            | C#-Style + Roslyn-Diagnostic-Severities (CA-Regeln aus [§1.1](#11-cnet-dotnet-roslyn-analyzer))                                                                                    |
+| `Directory.Build.props`    | `TreatWarningsAsErrors=true`, `AnalysisLevel=latest-all`, `RestorePackagesWithLockFile=true` (siehe [§1.4](#14-supply-chain-nuget-lock-files)), gemeinsame Analyzer-PackageReference |
 | `Directory.Packages.props` | Zentrale Package-Versionen inkl. `Microsoft.CodeAnalysis.NetAnalyzers`                                                                          |
-| `**/packages.lock.json`    | Pro Projekt eingecheckte Lock-Datei mit Content-Hashes (siehe §1.4)                                                                             |
+| `**/packages.lock.json`    | Pro Projekt eingecheckte Lock-Datei mit Content-Hashes (siehe [§1.4](#14-supply-chain-nuget-lock-files))                                                                             |
 | `native/battery_control_core/.clang-format`     | C/C++ Layout                                                                                                                                    |
 | `native/battery_control_core/.clang-tidy`       | C/C++ Check-Profil                                                                                                                              |
 | `native/battery_control_core/CMakeLists.txt`    | Compiler-Flags `-Wall -Wextra -Wpedantic -Werror`                                                                                               |
@@ -372,7 +372,7 @@ mixed-version + 4 security + 3 adapter-side idempotency + 5
 local-fallback + 1 Manifest-Replay; die 4 mixed-version- und 4 security-Pins decken die
 die Akzeptanzkriterien, die 3 adapter-side
 idempotency-Pins + 5 local-fallback-Pins kommen aus dem
-Sub-Slice-C-Korrektur-Pass (plan §5.1) als Wire-Verhalten gegen
+Sub-Slice-C-Korrektur-Pass ([plan §5.1](../plan/planning/done/plan-RM-M5-01.md#51-korrektur-notiz-sub-slice-c-review-pass-2026-05-11)) als Wire-Verhalten gegen
 `IOptimizationIdempotencyStore` + Fallback-Matrix-Integration):
 
 | Datei                                    | Pin                                                                    |
@@ -506,7 +506,7 @@ make test-native-parity    # Replay-basierte Native↔Managed-Parität (Category
 
 `make test-native-parity` deckt den replay-basierten
 Parity-Vergleich gegen den versionierten Datensatz unter
-`tests/fixtures/native_parity/cases.v1.json`; Details in §6.
+`tests/fixtures/native_parity/cases.v1.json`; Details in [§6](#6-native-net-parity).
 
 Die nativen Unit-Tests (`native/battery_control_core/tests/`,
 doctest 2.4.11 via FetchContent mit `URL_HASH SHA256`-Pinning)
@@ -697,7 +697,7 @@ bleiben.
 ## 4. Runtime-Image
 
 Das Runtime-Image ist gehärtet und folgt dem Multi-Stage-Pattern aus
-[`spec/architecture.md`](../../spec/architecture.md) §15:
+[`spec/architecture.md`](../../spec/architecture.md) [§15](../../spec/architecture.md#15-deployment-sicht):
 
 - Final-Image: `mcr.microsoft.com/dotnet/aspnet:10.0` (Ubuntu 24.04 Noble, kein SDK)
 - `native-build`-Stage erzeugt `libbattery_control_core.so` aus
@@ -821,7 +821,7 @@ Regelbetrieb übergeht.
 
 Pflicht-Gate ab M1 ([LH-ARCH-002](../../spec/lastenheft.md#lh-arch-002--schichtentrennung), [LH-NF-006](../../spec/lastenheft.md#lh-nf-006--wartbarkeit)). Setzt die
 Dependency Rule und die Architektur-Tabus aus
-[`spec/architecture.md`](../../spec/architecture.md) §4.2 durch.
+[`spec/architecture.md`](../../spec/architecture.md) [§4.2](../../spec/architecture.md#42-hexagonale-sicht-driving--driven-ports) durch.
 
 ```bash
 make arch-check
@@ -835,13 +835,13 @@ Verbindliche Regeln:
 
 | Regel                                                                                                                                                                                                           | Bezug                         |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
-| `BatteryEms.Domain` referenziert keine Adapter-Bibliothek (ASP.NET, EF Core, MQTTnet, NModbus, OPC Foundation, OTel, Npgsql, gRPC, P/Invoke); nur `Microsoft.Extensions.Logging.Abstractions`/`Options` erlaubt | Architektur §4.2, AR-P-011    |
-| `BatteryEms.Application` referenziert nur `BatteryEms.Domain`; keine Adapter-Refs, kein konkreter Solver                                                                                                        | Architektur §4.2              |
-| `adapters/driving/*` referenzieren nicht `adapters/driven/*` und keine anderen `adapters/driving/*`                                                                                                             | Architektur §4.2              |
-| `adapters/driven/*` referenzieren nicht `adapters/driving/*` und keine anderen `adapters/driven/*`                                                                                                              | Architektur §4.2              |
-| `BatteryEms.Adapters.NativeInterop` (ab M3) referenziert nur Application-Ports und Domain                                                                                                                       | Architektur §4.2, LH-NATIVE-* |
-| Nur `BatteryEms.Infrastructure` referenziert sowohl `hexagon/` als auch `adapters/`; kein anderer Pfad referenziert `Infrastructure`                                                                            | Architektur §4.2              |
-| Driving Adapter implementieren nur Driving-Ports (`I*UseCase`, `I*Query`); Driven Adapter implementieren nur Driven-Ports                                                                                       | Architektur §4.2 §5.1         |
+| `BatteryEms.Domain` referenziert keine Adapter-Bibliothek (ASP.NET, EF Core, MQTTnet, NModbus, OPC Foundation, OTel, Npgsql, gRPC, P/Invoke); nur `Microsoft.Extensions.Logging.Abstractions`/`Options` erlaubt | Architektur [§4.2](../../spec/architecture.md#42-hexagonale-sicht-driving--driven-ports), AR-P-011    |
+| `BatteryEms.Application` referenziert nur `BatteryEms.Domain`; keine Adapter-Refs, kein konkreter Solver                                                                                                        | Architektur [§4.2](../../spec/architecture.md#42-hexagonale-sicht-driving--driven-ports)              |
+| `adapters/driving/*` referenzieren nicht `adapters/driven/*` und keine anderen `adapters/driving/*`                                                                                                             | Architektur [§4.2](../../spec/architecture.md#42-hexagonale-sicht-driving--driven-ports)              |
+| `adapters/driven/*` referenzieren nicht `adapters/driving/*` und keine anderen `adapters/driven/*`                                                                                                              | Architektur [§4.2](../../spec/architecture.md#42-hexagonale-sicht-driving--driven-ports)              |
+| `BatteryEms.Adapters.NativeInterop` (ab M3) referenziert nur Application-Ports und Domain                                                                                                                       | Architektur [§4.2](../../spec/architecture.md#42-hexagonale-sicht-driving--driven-ports), LH-NATIVE-* |
+| Nur `BatteryEms.Infrastructure` referenziert sowohl `hexagon/` als auch `adapters/`; kein anderer Pfad referenziert `Infrastructure`                                                                            | Architektur [§4.2](../../spec/architecture.md#42-hexagonale-sicht-driving--driven-ports)              |
+| Driving Adapter implementieren nur Driving-Ports (`I*UseCase`, `I*Query`); Driven Adapter implementieren nur Driven-Ports                                                                                       | Architektur [§4.2](../../spec/architecture.md#42-hexagonale-sicht-driving--driven-ports) [§5.1](../../spec/architecture.md#51-net-module)         |
 
 Suppressionen sind nicht zulässig. Eine bewusste Ausnahme erfordert eine
 ADR und ergänzt die Regelmenge in dieser Sektion.
@@ -888,7 +888,7 @@ Prinzip:
 Der Native-Pfad ist niemals exklusiv: bei ABI-Mismatch oder
 nativem Fehler aus validem .NET-Kontext fällt der Adapter
 deterministisch auf die Managed-Referenz zurück, der Regelkreis
-bleibt funktionsfähig ([LH-ARCH-006](../../spec/lastenheft.md#lh-arch-006--native-core-als-optionaler-beschleuniger), AR-P-009; siehe §5.2 für die
+bleibt funktionsfähig ([LH-ARCH-006](../../spec/lastenheft.md#lh-arch-006--native-core-als-optionaler-beschleuniger), AR-P-009; siehe [§5.2](#52-native-abi) für die
 Loader-Endzustände).
 
 ---
@@ -1004,7 +1004,7 @@ Assets unter `artifacts/release-local/`, ohne Push/Sign/Release. Schutz-
 Checks: Working-Tree-Sauberkeit (Opt-out `ALLOW_DIRTY=1`),
 RELEASE_DIR-Whitelist auf `artifacts/`-Subtree. Pflicht vor einem
 ersten Tag in einem neuen Major-/Minor-Zweig
-(siehe [`releasing.md`](releasing.md) §7).
+(siehe [`releasing.md`](releasing.md) [§7](releasing.md#7-lokale-trockenübung)).
 
 ---
 
@@ -1019,7 +1019,7 @@ ersten Tag in einem neuen Major-/Minor-Zweig
   explizit als Platzhalter mit Aktivierungs-Meilenstein gekennzeichnet.
   Ergänzungen werden hier eingetragen, sobald die jeweilige Folge-ADR
   existiert.
-- SOLID-nahe Diagnose-IDs aus §1.1 dürfen nicht unterdrückt werden.
+- SOLID-nahe Diagnose-IDs aus [§1.1](#11-cnet-dotnet-roslyn-analyzer) dürfen nicht unterdrückt werden.
   Andere Suppressionen (`SuppressMessage`, `// NOLINT`,
   `[ExcludeFromCodeCoverage]`, `LCOV_EXCL_*`) sind ohne
   `Why:`-/`Justification`-Begründung nicht zulässig. CI prüft das
