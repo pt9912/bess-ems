@@ -60,7 +60,7 @@ unterdrückt, weil Bess-EMS keine NuGet-Library publiziert.
 
 **SOLID-nahe Designsignale** (Aktivierung über `AnalysisLevel=latest-all`
 in `Directory.Build.props`, Severities pro Diagnose-ID in
-`.editorconfig`, scharf gestellt ab M1 RM-M1-20):
+`.editorconfig`, scharf gestellt ab M1):
 
 | Diagnostic-ID | Prinzip         | Regel-Name (Deutsch)                                                   | Zweck / Auswirkung auf SOLID                                                                                           |
 | ------------- | --------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -109,7 +109,7 @@ Komplexitätsmetriken auf Funktionsebene (Cognitive-Complexity)
 laufen heute über die clang-tidy-Regel
 `readability-function-cognitive-complexity` mit Schwelle 20;
 eine zusätzliche Metrik-Stage (z. B. `lizard`) ist als Folge-Slice
-denkbar, aber nicht Bestandteil der RM-M3-09-Closure.
+denkbar, aber nicht Bestandteil der M3-Closure.
 
 `clang-tidy`-Profil (vollständige Liste in
 `native/battery_control_core/.clang-tidy`):
@@ -131,7 +131,7 @@ Lint-Scope, nicht aus der Disziplin.
 `native-sanitizer`-Stage einen Debug-Build mit
 `-fsanitize=address,undefined -fno-sanitize-recover=all` und
 führt den doctest-Suite-Lauf aus; jeder ASan/UBSan-Treffer ist
-ein Hard-Fail des Gates (RM-M3-09).
+ein Hard-Fail des Gates.
 
 ```bash
 make native-sanitizer   # = docker build --target native-sanitizer
@@ -158,7 +158,7 @@ Stage des `Dockerfile` ruft `dotnet restore --locked-mode` auf — fehlt
 eine Lock-Datei, oder weicht ein Hash vom Committeten ab, schlägt der
 Restore fehl, bevor irgendetwas gebaut wird.
 
-Anlass: RM-M2-OP-05 hat mit `Google.OrTools` die erste Dependency mit
+Anlass: `Google.OrTools` brachte die erste Dependency mit
 Native-Bindings (`libortools.so`, `libabsl_*.so`) eingeführt. Eine
 republished oder kompromittierte Native-DLL würde im aspnet-Prozess als
 Code mit User-Rechten ausgeführt; Lock-Files binden den Inhalt an den
@@ -189,7 +189,7 @@ Der Workflow ist als `make lock-refresh` Target verfügbar; er ruft
 denselben Docker-Befehl wie oben.
 
 **Aufgeschobene Bumps (Stand 2026-05-07):** Keine offenen Major-/
-Native-Binding-Bumps. Beim RM-M2-06-Bulk-Refresh und den Folge-Slices
+Native-Binding-Bumps. Beim Bulk-Refresh und den Folge-Slices
 wurden alle dokumentierten Folge-Bumps abgearbeitet — JsonSchema.Net
 9.x, MQTTnet 5.x und Google.OrTools 9.15 (Native-Bindings, Bit-genaue
 OP-09-Replay-Tests blieben grün). Die `Directory.Packages.props`-
@@ -246,7 +246,7 @@ werden mit M4 aktiv.
 | OPC-UA gegen Simulator            | M4       | LH-OPCUA-001..005             |
 | Optimization-Sidecar (gRPC)       | M5       | LH-OPT-006                    |
 
-#### 2.2.1 MQTT-Security-Profil (RM-M4-06-FUP-F04)
+#### 2.2.1 MQTT-Security-Profil
 
 Der MQTT-Adapter ist ab F-04 production-fail-closed:
 
@@ -271,7 +271,7 @@ Die lokalen Compose-/Helm-Mosquitto-Pfade setzen deshalb explizit
 Plaintext-Grund. Ein echter Broker darf diese Test-Profile nicht
 übernehmen.
 
-#### 2.2.2 HIL-Pfad (optional, RM-M2-HIL-Welle)
+#### 2.2.2 HIL-Pfad (optional)
 
 ```bash
 make test-hil-modbus   # = docker compose -f tests/hil/compose.yml up
@@ -286,7 +286,7 @@ P-Sprungantwort: 25 kW Setpoint via `ModbusCommandSink` →
 Konvergenz-Read via `ModbusTelemetrySource` mit ±5 kW Toleranz
 (PCS-Dynamik braucht ~1 s).
 
-#### 2.2.3 OPC-UA-Roundtrip-Pfad (Mandatory, RM-M4-04 + RM-M4-08 + RM-M4-05)
+#### 2.2.3 OPC-UA-Roundtrip-Pfad (Mandatory)
 
 ```bash
 make test-hil-opcua   # process-internal Embedded TestServer
@@ -304,25 +304,25 @@ Kernel-Allocate).
 **Pin-Inventory** (13 Pins gesamt — 5 happy-path + 2 negativ/stress
 + 6 security):
 
-| Datei                    | Pin                                                                      | Quelle     |
-| ------------------------ | ------------------------------------------------------------------------ | ---------- |
-| `OpcUaRoundtripTests.cs` | EndToEnd_Read_emits_telemetry_with_mapped_values                         | RM-M4-04-D |
-| `OpcUaRoundtripTests.cs` | EndToEnd_Subscribe_picks_up_value_change_within_two_intervals            | RM-M4-04-D |
-| `OpcUaRoundtripTests.cs` | EndToEnd_Write_setpoint_roundtrips_through_server                        | RM-M4-04-D |
-| `OpcUaRoundtripTests.cs` | EndToEnd_StatusCode_bad_surfaces_as_protocol_error                       | RM-M4-04-D |
-| `OpcUaRoundtripTests.cs` | EndToEnd_Reconnect_after_server_restart_keeps_stream_alive               | RM-M4-04-D |
-| `OpcUaNegativeTests.cs`  | Multi_cycle_reconnect_keeps_stream_alive_and_does_not_leak_subscriptions | RM-M4-08-A |
-| `OpcUaNegativeTests.cs`  | Concurrent_source_and_sink_survive_restart_under_contention              | RM-M4-08-A |
-| `OpcUaSecurityTests.cs`  | Secure_handshake_signandencrypt_succeeds_against_test_server             | RM-M4-05-D |
-| `OpcUaSecurityTests.cs`  | Secure_handshake_sign_mode_succeeds_against_test_server                  | RM-M4-05-D |
-| `OpcUaSecurityTests.cs`  | Non_allowlisted_policy_throws_at_construction                            | RM-M4-05-D |
-| `OpcUaSecurityTests.cs`  | Production_profile_with_unsecured_mode_throws_at_construction            | RM-M4-05-D |
-| `OpcUaSecurityTests.cs`  | Hil_simulator_profile_with_unsecured_mode_passes                         | RM-M4-05-D |
-| `OpcUaSecurityTests.cs`  | Production_profile_without_trusted_server_certificate_fails              | RM-M4-05-D |
+| Datei                    | Pin                                                                      |
+| ------------------------ | ------------------------------------------------------------------------ |
+| `OpcUaRoundtripTests.cs` | EndToEnd_Read_emits_telemetry_with_mapped_values                         |
+| `OpcUaRoundtripTests.cs` | EndToEnd_Subscribe_picks_up_value_change_within_two_intervals            |
+| `OpcUaRoundtripTests.cs` | EndToEnd_Write_setpoint_roundtrips_through_server                        |
+| `OpcUaRoundtripTests.cs` | EndToEnd_StatusCode_bad_surfaces_as_protocol_error                       |
+| `OpcUaRoundtripTests.cs` | EndToEnd_Reconnect_after_server_restart_keeps_stream_alive               |
+| `OpcUaNegativeTests.cs`  | Multi_cycle_reconnect_keeps_stream_alive_and_does_not_leak_subscriptions |
+| `OpcUaNegativeTests.cs`  | Concurrent_source_and_sink_survive_restart_under_contention              |
+| `OpcUaSecurityTests.cs`  | Secure_handshake_signandencrypt_succeeds_against_test_server             |
+| `OpcUaSecurityTests.cs`  | Secure_handshake_sign_mode_succeeds_against_test_server                  |
+| `OpcUaSecurityTests.cs`  | Non_allowlisted_policy_throws_at_construction                            |
+| `OpcUaSecurityTests.cs`  | Production_profile_with_unsecured_mode_throws_at_construction            |
+| `OpcUaSecurityTests.cs`  | Hil_simulator_profile_with_unsecured_mode_passes                         |
+| `OpcUaSecurityTests.cs`  | Production_profile_without_trusted_server_certificate_fails              |
 
-**Security-Default-Schwenk (RM-M4-05)**: pre-M4-05 fuhr der OPC-UA-
+**Security-Default-Schwenk**: pre-M4-05 fuhr der OPC-UA-
 Adapter mit `MessageSecurityMode.None` plus dem `AllowUnsecured`-
-Bool-Guard. Ab RM-M4-05 sind die Adapter-Defaults
+Bool-Guard. Ab M4-05 sind die Adapter-Defaults
 `RuntimeProfile=Production` + `SecurityMode=SignAndEncrypt` +
 `SecurityPolicy=Basic256Sha256`; ein Operator, der unsecured fahren
 muss (HIL, lokale Entwicklung), setzt `RuntimeProfile=HilSimulator`
@@ -353,7 +353,7 @@ Release, der dynamisches PCS/PQ-Verhalten gegen ein realistischeres
 Modell sanity-prüfen soll. Der Go-Simulator deckt deterministische
 Fixtures, der HIL-Simulator deckt PCS-Antwort und PQ-Capability.
 
-#### 2.2.4 Optimization-Core-Sidecar-Pfad (Mandatory, RM-M5-01)
+#### 2.2.4 Optimization-Core-Sidecar-Pfad (Mandatory)
 
 ```bash
 make test-hil-optimization-core   # in-process gRPC TestSidecar
@@ -370,39 +370,39 @@ kein externes Asset und kein Container.
 **Pin-Inventory** (26 Pins gesamt — 5 happy-path + 4 negativ + 4
 mixed-version + 4 security + 3 adapter-side idempotency + 5
 local-fallback + 1 Manifest-Replay; die 4 mixed-version- und 4 security-Pins decken die
-plan-RM-M5-01 §6 Akzeptanzkriterien, die 3 adapter-side
+die Akzeptanzkriterien, die 3 adapter-side
 idempotency-Pins + 5 local-fallback-Pins kommen aus dem
 Sub-Slice-C-Korrektur-Pass (plan §5.1) als Wire-Verhalten gegen
 `IOptimizationIdempotencyStore` + Fallback-Matrix-Integration):
 
-| Datei                                    | Pin                                                                    | Quelle                            |
-| ---------------------------------------- | ---------------------------------------------------------------------- | --------------------------------- |
-| `OptimizationCoreRoundtripTests.cs`      | Health_probe_succeeds_against_test_sidecar                             | RM-M5-01-B                        |
-| `OptimizationCoreRoundtripTests.cs`      | Version_probe_compatibility_check_passes                               | RM-M5-01-B                        |
-| `OptimizationCoreRoundtripTests.cs`      | Optimize_success_produces_optimal_run_with_schedule                    | RM-M5-01-B + RM-M5-05 Metrics-Pin |
-| `OptimizationCoreRoundtripTests.cs`      | Optimize_streaming_progress_does_not_block_final_result                | RM-M5-01-B                        |
-| `OptimizationCoreRoundtripTests.cs`      | Optimize_cancellation_mid_stream_returns_failed_run                    | RM-M5-01-B                        |
-| `OptimizationCoreNegativeTests.cs`       | Deadline_exceeded_returns_failed_run_with_time_limit_status            | RM-M5-01-B                        |
-| `OptimizationCoreNegativeTests.cs`       | Sidecar_unavailable_returns_failed_run_with_failed_status              | RM-M5-01-B                        |
-| `OptimizationCoreNegativeTests.cs`       | Infeasible_sidecar_result_produces_no_schedule                         | RM-M5-01-B                        |
-| `OptimizationCoreNegativeTests.cs`       | Invalid_trajectory_output_is_rejected_as_failed_run                    | RM-M5-01-B                        |
-| `OptimizationCoreMixedVersionTests.cs`   | Worker_1_0_against_sidecar_1_0_optimizes_successfully                  | RM-M5-01-D                        |
-| `OptimizationCoreMixedVersionTests.cs`   | Worker_1_0_against_sidecar_0_5_returns_contract_incompatible           | RM-M5-01-D                        |
-| `OptimizationCoreMixedVersionTests.cs`   | Worker_1_0_against_sidecar_2_0_min_returns_contract_incompatible       | RM-M5-01-D                        |
-| `OptimizationCoreMixedVersionTests.cs`   | Worker_required_feature_missing_returns_contract_incompatible          | RM-M5-01-D                        |
-| `OptimizationCoreSecurityTests.cs`       | Production_profile_with_plaintext_http_endpoint_throws_at_construction | RM-M5-01-C                        |
-| `OptimizationCoreSecurityTests.cs`       | Production_profile_with_world_readable_uds_throws_at_connect           | RM-M5-01-C                        |
-| `OptimizationCoreSecurityTests.cs`       | Production_profile_with_locked_uds_passes_uds_mode_check               | RM-M5-01-C                        |
-| `OptimizationCoreSecurityTests.cs`       | Hil_simulator_profile_with_world_readable_uds_passes                   | RM-M5-01-C                        |
-| `OptimizationCoreIdempotencyTests.cs`    | First_optimize_creates_pending_then_finalizes_as_sidecar_committed     | RM-M5-01-C                        |
-| `OptimizationCoreIdempotencyTests.cs`    | Duplicate_optimize_with_same_inputs_skips_sidecar_call                 | RM-M5-01-C                        |
-| `OptimizationCoreIdempotencyTests.cs`    | Different_request_inputs_get_different_request_id                      | RM-M5-01-C                        |
-| `OptimizationCoreFallbackTests.cs`       | Transport_failure_with_fallback_returns_fallback_committed_schedule    | RM-M5-01-C-fixup                  |
-| `OptimizationCoreFallbackTests.cs`       | Transport_failure_without_fallback_returns_failed_no_activation        | RM-M5-01-C-fixup                  |
-| `OptimizationCoreFallbackTests.cs`       | Transport_failure_with_fallback_that_throws_falls_through_to_failed    | RM-M5-01-C-fixup                  |
-| `OptimizationCoreFallbackTests.cs`       | Sidecar_success_does_not_invoke_fallback                               | RM-M5-01-C-fixup                  |
-| `OptimizationCoreFallbackTests.cs`       | Fallback_with_context_mismatch_is_rejected_by_validator                | RM-M5-01-C-fixup                  |
-| `OptimizationCoreManifestReplayTests.cs` | Manifest_drives_sidecar_schedule_engine_comparison                     | RM-M5-04-E                        |
+| Datei                                    | Pin                                                                    |
+| ---------------------------------------- | ---------------------------------------------------------------------- |
+| `OptimizationCoreRoundtripTests.cs`      | Health_probe_succeeds_against_test_sidecar                             |
+| `OptimizationCoreRoundtripTests.cs`      | Version_probe_compatibility_check_passes                               |
+| `OptimizationCoreRoundtripTests.cs`      | Optimize_success_produces_optimal_run_with_schedule                    |
+| `OptimizationCoreRoundtripTests.cs`      | Optimize_streaming_progress_does_not_block_final_result                |
+| `OptimizationCoreRoundtripTests.cs`      | Optimize_cancellation_mid_stream_returns_failed_run                    |
+| `OptimizationCoreNegativeTests.cs`       | Deadline_exceeded_returns_failed_run_with_time_limit_status            |
+| `OptimizationCoreNegativeTests.cs`       | Sidecar_unavailable_returns_failed_run_with_failed_status              |
+| `OptimizationCoreNegativeTests.cs`       | Infeasible_sidecar_result_produces_no_schedule                         |
+| `OptimizationCoreNegativeTests.cs`       | Invalid_trajectory_output_is_rejected_as_failed_run                    |
+| `OptimizationCoreMixedVersionTests.cs`   | Worker_1_0_against_sidecar_1_0_optimizes_successfully                  |
+| `OptimizationCoreMixedVersionTests.cs`   | Worker_1_0_against_sidecar_0_5_returns_contract_incompatible           |
+| `OptimizationCoreMixedVersionTests.cs`   | Worker_1_0_against_sidecar_2_0_min_returns_contract_incompatible       |
+| `OptimizationCoreMixedVersionTests.cs`   | Worker_required_feature_missing_returns_contract_incompatible          |
+| `OptimizationCoreSecurityTests.cs`       | Production_profile_with_plaintext_http_endpoint_throws_at_construction |
+| `OptimizationCoreSecurityTests.cs`       | Production_profile_with_world_readable_uds_throws_at_connect           |
+| `OptimizationCoreSecurityTests.cs`       | Production_profile_with_locked_uds_passes_uds_mode_check               |
+| `OptimizationCoreSecurityTests.cs`       | Hil_simulator_profile_with_world_readable_uds_passes                   |
+| `OptimizationCoreIdempotencyTests.cs`    | First_optimize_creates_pending_then_finalizes_as_sidecar_committed     |
+| `OptimizationCoreIdempotencyTests.cs`    | Duplicate_optimize_with_same_inputs_skips_sidecar_call                 |
+| `OptimizationCoreIdempotencyTests.cs`    | Different_request_inputs_get_different_request_id                      |
+| `OptimizationCoreFallbackTests.cs`       | Transport_failure_with_fallback_returns_fallback_committed_schedule    |
+| `OptimizationCoreFallbackTests.cs`       | Transport_failure_without_fallback_returns_failed_no_activation        |
+| `OptimizationCoreFallbackTests.cs`       | Transport_failure_with_fallback_that_throws_falls_through_to_failed    |
+| `OptimizationCoreFallbackTests.cs`       | Sidecar_success_does_not_invoke_fallback                               |
+| `OptimizationCoreFallbackTests.cs`       | Fallback_with_context_mismatch_is_rejected_by_validator                |
+| `OptimizationCoreManifestReplayTests.cs` | Manifest_drives_sidecar_schedule_engine_comparison                     |
 
 Plus 13 Persistence-Pins in `BatteryEms.Persistence.IntegrationTests`
 (`OptimizationIdempotencyStoreIntegrationTests.cs`) für den
@@ -411,8 +411,8 @@ Restart-Replay, sechs Terminalzustände, Migration-Idempotenz. Diese
 laufen unter `make test-integration` (Postgres-Compose-Stack), nicht
 unter `make test-hil-optimization-core`.
 
-**Security-Profile-Schwenk (RM-M5-01-C)**: pre-M5-01 kannte die
-Composition-Root nur den M2-OR-Tools-Pfad. Ab RM-M5-01 ist der
+**Security-Profile-Schwenk**: pre-M5-01 kannte die
+Composition-Root nur den M2-OR-Tools-Pfad. Ab M5-01 ist der
 Sidecar-Adapter ein wählbarer `IScheduleOptimizer`-Slot; der
 Production-Profile lehnt plaintext-HTTP-Endpoints (Schema-Fehler
 `optimization-core-not-hardened-in-production`) und world-readable
@@ -420,7 +420,7 @@ UDS-Sockets (`optimization-core-uds-permissions-not-locked`,
 Mode≠0600/0660) hart ab. HilSimulator/Development bleibt für lokale
 Test-Topologien plaintext-tolerant (analog zur OPC-UA-Linie).
 
-**MPC-Produktionsgates (RM-M5-02-D)**: ein gesetztes
+**MPC-Produktionsgates**: ein gesetztes
 `Bess:MpcBackend` aktiviert den MPC-Pfad nur für `"local_osqp"`.
 Production lehnt zwei unsichere Boot-Formen hart ab:
 fehlender `IFallbackMpcOptimizer` ⇒
@@ -430,7 +430,7 @@ fehlender `IFallbackMpcOptimizer` ⇒
 `"optimization_core"` und `"bi_modal"` werfen weiterhin zuerst
 `mpc-backend-not-implemented`.
 
-**Erweiterte Metriken (RM-M5-05)**: `AddBessTelemetry` registriert
+**Erweiterte Metriken**: `AddBessTelemetry` registriert
 `PrometheusOptimizationRunMetrics`, `PrometheusControlCycleMetrics` und
 `PrometheusOptimizationCoreMetrics`. Der generische Optimierungspfad exportiert
 Solverstatus und Solverlaufzeit; der Control-Cycle-Pfad exportiert
@@ -451,7 +451,7 @@ Metrics-Writes in `Optimize_success_produces_optimal_run_with_schedule`.
 - `make test-hil-optimization-core` → mandatory, in-process
   gRPC-TestSidecar; das einzige optimization-core-spezifische
   End-to-End-Gate. Container-/Cross-Host-Topologie ist Folgearbeit
-  (RM-M5-06 Container-Orchestrierungs-Gate).
+  (Container-Orchestrierungs-Gate).
 
 ### 2.3 Sicherheitsfall-Tests
 
@@ -493,7 +493,7 @@ make test-native-interop   # Layout / ABI / non-finite contract (Category!=Parit
 make test-native-parity    # Replay-basierte Native↔Managed-Parität (Category=Parity)
 ```
 
-`make test-native-interop` (RM-M3-07, erweitert durch RM-M5-03) deckt:
+`make test-native-interop` deckt:
 
 | Prüfung                                                                     | LH-Bezug      |
 | --------------------------------------------------------------------------- | ------------- |
@@ -504,7 +504,7 @@ make test-native-parity    # Replay-basierte Native↔Managed-Parität (Category
 | Negatives `dt` mit `has_previous=1` → `BCC_STATUS_NEGATIVE_DT`              | LH-NATIVE-004 |
 | Telemetrie-Filter-Export gegen echte `.so` inkl. IIR-Update, Drift, Sample-Period und Non-Finite | LH-NATIVE-001/004 |
 
-`make test-native-parity` (RM-M3-10) deckt den replay-basierten
+`make test-native-parity` deckt den replay-basierten
 Parity-Vergleich gegen den versionierten Datensatz unter
 `tests/fixtures/native_parity/cases.v1.json`; Details in §6.
 
@@ -516,36 +516,36 @@ bricht den Build.
 
 ### 2.5 Replay-Tests
 
-Aktiv ab **M2**. Filter: `Category=Replay` (LH-TEST-004). RM-M5-04 stellt
+Aktiv ab **M2**. Filter: `Category=Replay` (LH-TEST-004). Der Replay-Pfad stellt
 das Gate als eigenes Docker-Target bereit. Die ersten Manifest-v1-Fixtures
 liegen unter `tests/fixtures/replay/`.
 
 ```bash
 make test-replay   # = docker build --target test-replay
-make test-mpc-property   # RM-M5-02 MPC-Identity/Determinism/Replay-Hooks
-make test-hil-optimization-core   # RM-M5-04 Sidecar-Manifest-Replay
+make test-mpc-property   # MPC-Identity/Determinism/Replay-Hooks
+make test-hil-optimization-core   # Sidecar-Manifest-Replay
 ```
 
 Wiedergabe historischer Telemetrie-Datensätze. Erwartete Commands sind als
 versionierte Goldens neben dem Manifest abgelegt; Abweichungen sind
-erklärungspflichtig (ADR oder Plan-Eintrag). Der RM-M5-04-Diff trennt
+erklärungspflichtig (ADR oder Plan-Eintrag). Der Manifest-Diff trennt
 `numeric_tolerance` von `business_drift`. Die M3-Native-Parity-Daten bleiben
-unter `tests/fixtures/native_parity/cases.v1.json` und werden von RM-M5-04 per
+unter `tests/fixtures/native_parity/cases.v1.json` und werden per
 Replay-Manifest referenziert; das ausführende Gate bleibt
-`make test-native-parity`. Ab RM-M5-04-C treibt dieses Manifest auch einen
-Managed-vs-Native-Engine-Vergleichsreport. Ab RM-M5-04-D geben Replay-Gates
+`make test-native-parity`. Seither treibt dieses Manifest auch einen
+Managed-vs-Native-Engine-Vergleichsreport. Zudem geben Replay-Gates
 einen maschinenlesbaren `replay-diff-report.v1`-JSON-Report in der
 Assertion-Message aus; ist `BESS_REPLAY_REPORT_DIR` gesetzt, schreiben sie je
 Datensatz eine gleichnamige Report-Datei fuer CI-Artefakte.
 
-Ab RM-M5-04-E scannt `make test-replay` alle RM-M5-04-Manifestdateien
+`make test-replay` scannt alle Manifestdateien
 gegen bekannte Replay-Kinds und Schema-Versionen. Der lokale MPC-Vergleich
 laeuft ueber `make test-mpc-property` (`LocalOsqpMpcSolver` direkt gegen
 `DefaultMpcDispatchOrchestrator`); der Optimization-Core-Sidecar-Vergleich
 laeuft ueber `make test-hil-optimization-core` (`OptimizationCoreScheduleOptimizer`
 gegen den In-Process-Test-Sidecar).
 
-RM-M5-02 ergänzt den MPC-Replay-Vertrag vor der vollständigen
+Der MPC-Kernel ergänzt den MPC-Replay-Vertrag vor der vollständigen
 Replay-Plattform: `make test-mpc-property` pinnt das achtachsige
 `mpc_request_id`-Tuple, deterministische Default-Seeds, Operator-Seed-
 Override, byte-stabile Stamps, Cross-Run-Trajektorien-Toleranz,
@@ -564,7 +564,7 @@ make test-optimization-core-compose
 Health-Endpoint, Boot-Zeit und im Fall mit Native Core das erfolgreiche Laden
 der `.so`-Bibliothek über die ABI-Versionsabfrage.
 
-Ab RM-M5-06 startet `make test-optimization-core-compose` zusätzlich eine
+`make test-optimization-core-compose` startet zusätzlich eine
 Worker-plus-`optimization-core`-Sidecar-Topologie. Das Gate baut ein
 standalone TestSidecar-Image, prüft Sidecar-Commit, Sidecar-Stopp mit lokalem
 `or_tools`-Fallback, Restart-Recovery, Prometheus-Terminalzustandslabels und
@@ -572,7 +572,7 @@ korrelierbare `request_id`/`run_id`-Logs.
 
 ### 2.6.1 Helm-Render-Gate
 
-Aktiv ab RM-M6-03 als nicht-CI-pflichtiges Infrastruktur-Gate. Das Gate
+Aktiv als nicht-CI-pflichtiges Infrastruktur-Gate. Das Gate
 prüft den Kubernetes-Chart ohne Clusterzugriff:
 
 ```bash
@@ -599,10 +599,10 @@ Referenzpfad.
 | Integration               | `make test-integration`               | `Category=Integration`                                                                                       |
 | HIL (optional)            | `make test-hil-modbus`                | `Category=HIL`                                                                                               |
 | OPC-UA-Roundtrip          | `make test-hil-opcua`                 | `Category=Integration` im OPC-UA-IntegrationTests-Projekt                                                    |
-| Optimization-Core         | `make test-hil-optimization-core`     | `Category=Integration` im OptimizationCore-IntegrationTests-Projekt inkl. RM-M5-04-E Sidecar-Manifest-Replay |
-| Optimization-Core Compose | `make test-optimization-core-compose` | RM-M5-06 Worker+Sidecar-Compose-Gate                                                                         |
-| Helm Render               | `make helm-lint`                      | RM-M6-03 Helm-Lint und Render-Smokes fuer shared Worker, Worker-pro-Asset, MQTT, optimization-core und optimization-core HTTPS/mTLS |
-| MPC Property              | `make test-mpc-property`              | RM-M5-02 Unit-Pins plus RM-M5-04-E lokaler MPC-Engine-Vergleich                                              |
+| Optimization-Core         | `make test-hil-optimization-core`     | `Category=Integration` im OptimizationCore-IntegrationTests-Projekt inkl. Sidecar-Manifest-Replay |
+| Optimization-Core Compose | `make test-optimization-core-compose` | Worker+Sidecar-Compose-Gate                                                                         |
+| Helm Render               | `make helm-lint`                      | Helm-Lint und Render-Smokes fuer shared Worker, Worker-pro-Asset, MQTT, optimization-core und optimization-core HTTPS/mTLS |
+| MPC Property              | `make test-mpc-property`              | Unit-Pins plus lokaler MPC-Engine-Vergleich                                              |
 | Native Interop            | `make test-native-interop`            | `Category!=Parity` im NativeInterop-IntegrationTests-Projekt                                                 |
 | Native Parity             | `make test-native-parity`             | `Category=Parity` im NativeInterop-IntegrationTests-Projekt                                                  |
 | Replay                    | `make test-replay`                    | `Category=Replay` im Application-Tests-Projekt                                                               |
@@ -661,7 +661,7 @@ Artefakte:
 
 ### 3.2 Native-Coverage
 
-Aktiv ab **M3** (RM-M3-09). Werkzeug: `gcov` + `gcovr`,
+Aktiv ab **M3**. Werkzeug: `gcov` + `gcovr`,
 getrennter Build mit `-DBCC_ENABLE_COVERAGE=ON` (umgesetzt über
 die `bcc_enable_coverage`-Helper-Funktion in
 `native/battery_control_core/CMakeLists.txt`).
@@ -705,7 +705,7 @@ Das Runtime-Image ist gehärtet und folgt dem Multi-Stage-Pattern aus
   COPYed sie nach `/app/native/libbattery_control_core.so`
   (Default in `NativeControlOptions.LibraryPath`). Ein Build-Time
   `ldd`-Gate fail't das Image, falls die `.so` nicht-auflösbare
-  Dynamic-Deps zieht. Aktuelle `.so` (RM-M3-09 closure) ist
+  Dynamic-Deps zieht. Aktuelle `.so` (M3-Closure) ist
   C-only, hat null `NEEDED`-Einträge und keine libstdc++-Linkage.
   (LH-NATIVE-006, LH-DEPLOY-004)
 - App läuft als nicht-root User `app` (UID 1654, in der
@@ -741,7 +741,7 @@ Coverage-Gates kompensierbar.
 
 ### 5.2 Native ABI
 
-Aktiv ab **M3** (LH-NATIVE-005, RM-M3-03).
+Aktiv ab **M3** (LH-NATIVE-005).
 
 | Gate                                                               | Ort                                                                 |
 | ------------------------------------------------------------------ | ------------------------------------------------------------------- |
@@ -820,7 +820,7 @@ Regelbetrieb übergeht.
 
 ### 5.6 Hexagonale Architektur-Tabus
 
-Pflicht-Gate ab M1 (LH-ARCH-002, LH-NF-006, RM-M1-22/23). Setzt die
+Pflicht-Gate ab M1 (LH-ARCH-002, LH-NF-006). Setzt die
 Dependency Rule und die Architektur-Tabus aus
 [`spec/architecture.md`](../../spec/architecture.md) §4.2 durch.
 
@@ -851,7 +851,7 @@ ADR und ergänzt die Regelmenge in dieser Sektion.
 
 ## 6. Native-/.NET-Parity
 
-Aktiv ab **M3** (RM-M3-10). Pflicht-Gate, das den Native Core und
+Aktiv ab **M3**. Pflicht-Gate, das den Native Core und
 die .NET-Referenzimplementierung gegeneinander vergleicht.
 
 ```bash
