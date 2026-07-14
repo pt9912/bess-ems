@@ -114,11 +114,27 @@ ids:
       exempt-paths:
         - "**/CHANGELOG.md"
         - "docs/reviews/**"
+        - "docs/plan/adr/**"           # immutable ADRs: RM-Provenance grandfathered
         - "docs/plan/planning/done/**"
-  # Die ID-Linkpflicht gilt NUR innerhalb der Planungs-Doku: ADR und RM sind
-  # planungs-interne Kennungen (docs/plan/…; nicht-normativ — die Norm ist LH-*).
-  # Verweise darauf aus User-Handbuch / Spec / Code-naher Doku werden NICHT
-  # zwangsverlinkt (bestehende bleiben gültig). RM-Leaks im Operator-Handbuch
-  # werden inhaltlich bereinigt statt verlinkt (siehe CHANGELOG).
-  scope:
-    roots: [docs/plan/planning]
+    # LH-* ist das NORMATIVE Anforderungs-Schema (definiert als `### LH-… — Titel`
+    # im lastenheft). Ein Verweis darauf ist AUFWÄRTS (Planung/Design/Doku → Norm)
+    # — die erlaubte, wertvolle Requirements-Traceability. Daher global
+    # linkpflichtig, mit Abschnitts-Anker. Ausgenommen: lastenheft selbst
+    # (Definitionen) und immutable/historische Doku. Rollout Datei für Datei.
+    - regex: 'LH-[A-Z]+-[0-9]+'
+      target: spec/lastenheft.md
+      link-policy: prose
+      exempt-paths:
+        - "**/CHANGELOG.md"
+        - "docs/reviews/**"
+        - spec/lastenheft.md
+        - "docs/plan/adr/**"
+        - "docs/plan/planning/done/**"
+        - "docs/archive/**"
+        # --- noch nicht LH-verlinkt (Rollout, Datei für Datei) ---
+        - "docs/user/quality.md"
+        - "docs/plan/planning/in-progress/roadmap.md"
+        - "spec/architecture.md"
+  # Modul-global (kein scope). ADR/RM sind planungs-intern und daher überall
+  # nur exemptiert/verlinkt wo sie vorkommen (immutable ADRs ausgenommen); die
+  # normative LH-Traceability gilt global aufwärts.

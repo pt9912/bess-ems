@@ -1,7 +1,7 @@
 # Persistenz-Runbook
 
 **Bezug:** [`spec/lastenheft.md`](../../spec/lastenheft.md) §19
-(LH-PERSIST-001..007), [`spec/architecture.md`](../../spec/architecture.md)
+([LH-PERSIST-001](../../spec/lastenheft.md#lh-persist-001--speicherung-von-messdaten)..007), [`spec/architecture.md`](../../spec/architecture.md)
 §11 (Persistenz)
 
 Dieses Dokument fixiert das Betriebsverhalten der Persistenzschicht für
@@ -15,18 +15,18 @@ und wie verhält sich `bess-ems` bei Persistenzfehlern. Code-Pfade siehe
 
 | Datenklasse        | Tabelle             | Pflichtfelder                                                                                | LH-Bezug          |
 | ------------------ | ------------------- | -------------------------------------------------------------------------------------------- | ----------------- |
-| Telemetrie         | `telemetry`         | Asset, Zeitstempel, SOC/SOH, Wirk-/Blindleistung, DC-V/I, Temperatur, Verfügbarkeit, DataQuality | LH-PERSIST-001    |
-| Commands           | `commands`          | CommandId (PK), Asset, Mode, Sollwert, Reason, Source, Dispatch-Erfolg + Reason             | LH-PERSIST-002    |
-| Fahrpläne          | `schedules`, `schedule_windows` | (AssetId, Type) PK, Version, Bid Area, halboffene UTC-Fenster                       | LH-PERSIST-003    |
-| Operator-Audit     | `audit_events`      | Zeitstempel, Operator, Action, optional TargetAsset, Reason, Outcome                          | LH-PERSIST-004    |
+| Telemetrie         | `telemetry`         | Asset, Zeitstempel, SOC/SOH, Wirk-/Blindleistung, DC-V/I, Temperatur, Verfügbarkeit, DataQuality | [LH-PERSIST-001](../../spec/lastenheft.md#lh-persist-001--speicherung-von-messdaten)    |
+| Commands           | `commands`          | CommandId (PK), Asset, Mode, Sollwert, Reason, Source, Dispatch-Erfolg + Reason             | [LH-PERSIST-002](../../spec/lastenheft.md#lh-persist-002--speicherung-von-commands)    |
+| Fahrpläne          | `schedules`, `schedule_windows` | (AssetId, Type) PK, Version, Bid Area, halboffene UTC-Fenster                       | [LH-PERSIST-003](../../spec/lastenheft.md#lh-persist-003--speicherung-von-fahrplänen)    |
+| Operator-Audit     | `audit_events`      | Zeitstempel, Operator, Action, optional TargetAsset, Reason, Outcome                          | [LH-PERSIST-004](../../spec/lastenheft.md#lh-persist-004--speicherung-von-operator-kommandos)    |
 
 `Append`-Pfade sind die einzige Schreib-API der Anwendung; das
 `IOperatorAuditLog`-Port hat **kein** `Delete`/`Truncate` — Audit ist
-strukturell append-only (LH-PERSIST-006).
+strukturell append-only ([LH-PERSIST-006](../../spec/lastenheft.md#lh-persist-006--aufbewahrung-und-datenvolumen)).
 
 ---
 
-## 2. Retention-Konfiguration (LH-PERSIST-006)
+## 2. Retention-Konfiguration ([LH-PERSIST-006](../../spec/lastenheft.md#lh-persist-006--aufbewahrung-und-datenvolumen))
 
 ### Format
 
@@ -44,12 +44,12 @@ Beispiel: [`config/examples/retention.json`](../../config/examples/retention.jso
 
 Jeder Eintrag ist ein C#-`TimeSpan`-String (`D.HH:MM:SS`). **Fehlt der
 Eintrag, behält die Anwendung diese Datenklasse für immer**. Das ist
-kein Bug, sondern die LH-PERSIST-006-konforme sichere Voreinstellung.
+kein Bug, sondern die [LH-PERSIST-006](../../spec/lastenheft.md#lh-persist-006--aufbewahrung-und-datenvolumen)-konforme sichere Voreinstellung.
 
 ### Audit-Sonderfall
 
 `operator_audit_retention` ist im Default-Beispiel **bewusst
-weggelassen**. Damit greift LH-PERSIST-006:
+weggelassen**. Damit greift [LH-PERSIST-006](../../spec/lastenheft.md#lh-persist-006--aufbewahrung-und-datenvolumen):
 
 > keine automatische Löschung auditrelevanter Daten ohne explizite
 > Konfiguration
@@ -81,12 +81,12 @@ Worker-Endpunkte triggern.
 
 ### Datenvolumen-Begrenzung
 
-LH-PERSIST-006 fordert eine "konfigurierbare Begrenzung oder
+[LH-PERSIST-006](../../spec/lastenheft.md#lh-persist-006--aufbewahrung-und-datenvolumen) fordert eine "konfigurierbare Begrenzung oder
 Archivierung hochfrequenter Messdaten". M1 deckt das über die
 Telemetrie-Retention ab: ein `telemetry_retention` von `30.00:00:00`
 hält den Tabellenumfang stabil bei 30 Tagen Hochfrequenz-Daten.
 Archivierung in ein zweites Backend (z. B. TimescaleDB-Continuous
-Aggregates) ist explizit Nach-MVP (LH-PERSIST-005, Roadmap M6).
+Aggregates) ist explizit Nach-MVP ([LH-PERSIST-005](../../spec/lastenheft.md#lh-persist-005--datenbank), Roadmap M6).
 
 ### TimescaleDB-Erweiterung (RM-M6-04)
 
@@ -114,7 +114,7 @@ optionalen TimescaleDB-Pfad:
 
 ## 3. Verhalten bei Persistenzfehlern
 
-LH-PERSIST-006: "definiertes Verhalten, kein undefinierter Regelbetrieb".
+[LH-PERSIST-006](../../spec/lastenheft.md#lh-persist-006--aufbewahrung-und-datenvolumen): "definiertes Verhalten, kein undefinierter Regelbetrieb".
 
 ### Schreibfehler im Regelkreis
 
@@ -158,7 +158,7 @@ mit aggressiveren Werten), dann den Worker neu anlaufen lassen.
 
 `BessDbMigrator.MigrateAsync` läuft beim Worker-Start ([RM-M2-MIG-05](../plan/planning/done/plan-RM-M2-migration.md)).
 Schlägt der Aufruf fehl, **darf der Regelbetrieb nicht starten** — das
-ist Architektur-§11 + LH-CONF-003. Die Composition-Root-Wiring ([RM-M1-19](../plan/planning/done/plan-RM-M1.md))
+ist Architektur-§11 + [LH-CONF-003](../../spec/lastenheft.md#lh-conf-003--validierung-der-konfiguration). Die Composition-Root-Wiring ([RM-M1-19](../plan/planning/done/plan-RM-M1.md))
 muss diesen Fehler explizit behandeln.
 
 ---
@@ -184,4 +184,4 @@ muss diesen Fehler explizit behandeln.
 - **Archivierung statt Löschung**: M1 löscht; Cold-Storage-Archivierung
   ist Nach-MVP (z. B. TimescaleDB-Aggregates oder S3-Export, Roadmap M6).
 - **TimescaleDB**: Native Time-Series-Optimierungen folgen mit
-  [RM-M6-04](../plan/planning/done/plan-RM-M6-04.md), ohne fachliche Persistenz-API zu ändern (LH-PERSIST-005).
+  [RM-M6-04](../plan/planning/done/plan-RM-M6-04.md), ohne fachliche Persistenz-API zu ändern ([LH-PERSIST-005](../../spec/lastenheft.md#lh-persist-005--datenbank)).
