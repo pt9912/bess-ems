@@ -41,7 +41,7 @@ abhängig von der Item-Klasse:
   für Items 2 + 3 (die FUP-Reservierung 01..04 gehört Block B,
   diese Items sind eine andere Trigger-Klasse).
 - Eigene ADR plus zugehöriger Slice-Plan für Item 4 (Architektur-
-  Pivots, ADR 0003/0004 als normative Trigger-Quellen).
+  Pivots, [ADR 0003](../../adr/0003-native-kernel-language.md)/[0004](../../adr/0004-native-kernel-process-isolation.md) als normative Trigger-Quellen).
 - `plan-RM-M3-FUP-NN.md` für Items 5–8 (M2-Folgewellen mit
   reservierten IDs RM-M3-FUP-01..04), oder als Carve-out-Sektion
   innerhalb des auslösenden Plans.
@@ -199,11 +199,11 @@ eine der sieben Process-Isolation-Trigger aus
 zündet. Beide ADRs sind die normative Trigger-Liste — diese Notiz
 fasst sie nicht zusammen, sie verweist auf sie.
 
-**Bündel-Trigger:** ADR 0003 Trigger 2 (MPC/Phase-3) und ADR 0004
+**Bündel-Trigger:** [ADR 0003](../../adr/0003-native-kernel-language.md) Trigger 2 (MPC/Phase-3) und [ADR 0004](../../adr/0004-native-kernel-process-isolation.md)
 Trigger 2 (Phase-3-Komponenten in Scope) sind faktisch dasselbe
 Architektur-Event aus zwei Blickwinkeln. Wenn dieser Trigger zündet,
 wird er durch eine **gemeinsame Folge-ADR** plus einen **gemeinsamen
-Slice-Plan** adressiert (Aufwand grob 5–10 Wochen, ADR 0004 §3).
+Slice-Plan** adressiert (Aufwand grob 5–10 Wochen, [ADR 0004 §3](../../adr/0004-native-kernel-process-isolation.md#3-achse-1--prozess-modell-optionen)).
 
 **Aktivierungs-Pfad:** ADR-Nummern werden sequenziell beim
 Schreiben vergeben — die nächste freie Nummer ist heute **0005**.
@@ -212,9 +212,9 @@ die ADRs landen:
 
 - Sprach-Pivot allein zuerst: neue ADR `00NN-native-kernel-rust-pivot.md`
   (mit `NN` = nächster freier Slot zum Schreibzeitpunkt); bestehende
-  ADR 0003 wird zu „Superseded by 00NN".
+  [ADR 0003](../../adr/0003-native-kernel-language.md) wird zu „Superseded by 00NN".
 - Out-of-Process-Pivot allein zuerst: neue ADR
-  `00NN-native-kernel-out-of-process.md`; bestehende ADR 0004 wird
+  `00NN-native-kernel-out-of-process.md`; bestehende [ADR 0004](../../adr/0004-native-kernel-process-isolation.md) wird
   zu „Superseded by 00NN".
 - Bündel-Pivot (beide Achsen in einem Schritt): eine gemeinsame ADR
   (z. B. `00NN-native-kernel-pivot.md`); beide bestehenden ADRs
