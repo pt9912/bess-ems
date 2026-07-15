@@ -762,7 +762,7 @@ Deployment-Variante darf zusätzlich
 ein ABI-Mismatch beim Startup-Check zu einem harten Fehler statt
 zum Managed-Fallback. Die Abort-Policy ist explizit Opt-in,
 hat einen eigenen Integrationstest und überspielt nicht den
-Default-Fallback-Vertrag (siehe [`docs/user/quality.md` §5.2](../docs/user/quality.md#52-native-abi)).
+Default-Fallback-Vertrag ([LH-NATIVE-005](lastenheft.md#lh-native-005--abi-versionierung)).
 
 ---
 
