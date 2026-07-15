@@ -1,8 +1,5 @@
 # Bess-EMS Makefile (RM-M1-21).
 #
-# Welle 1 (Foundation) liefert: lint, arch-check, gates.
-# Spätere Wellen aktivieren weitere Targets; sie sind hier sichtbar und
-# liefern eine klare Meldung auf ihre Aktivierungswelle.
 
 DOCKER ?= docker
 DOCKERFILE ?= Dockerfile
@@ -49,11 +46,11 @@ help:
 	@echo "  BUILD_CONFIGURATION=$(BUILD_CONFIGURATION)"
 	@echo "  DOCKER_BUILD_ARGS=$(DOCKER_BUILD_ARGS)"
 	@echo ""
-	@echo "Welle 1 (Foundation, active):"
+	@echo "(Foundation, active):"
 	@echo "  make lint        SOLID suppression audit + build with -warnaserror/code-metrics gate"
 	@echo "  make arch-check  Boundary tests (Dependency Rule + tabus)"
 	@echo ""
-	@echo "Welle 2 (Domain & Control, active):"
+	@echo "(Domain & Control, active):"
 	@echo "  make test          Domain + Application unit tests"
 	@echo "  make test-safety   Safety-path subset (Category=Safety)"
 	@echo "  make test-mpc-property  MPC determinism / identity / replay-hook pins (RM-M5-02)"
@@ -64,7 +61,7 @@ help:
 	@echo "  make gates       Aggregated mandatory gates: M1 + M3 native"
 	@echo "  make ci          Sequential CI run of all mandatory gates incl. schema + integration"
 	@echo ""
-	@echo "Welle 3 (Simulator + Adapters, partially active):"
+	@echo "(Simulator + Adapters, partially active):"
 	@echo "  make simulator-test          Go simulator unit tests"
 	@echo "  make simulator-race          Race-detector on goroutine-bearing packages (CGO=1)"
 	@echo "  make simulator-lint          golangci-lint with SOLID profile"
@@ -76,7 +73,7 @@ help:
 	@echo "  make test-optimization-core-compose Worker + standalone optimization-core TestSidecar compose gate (RM-M5-06)"
 	@echo "  make test-hil-closed-loop    Optional: Closed-loop optimize→dispatch→HIL smoke (Carve-out Demo-01)"
 	@echo ""
-	@echo "Welle M3 (active):"
+	@echo "(active):"
 	@echo "  make native-build               Build + smoke-test native control core (RM-M3-06 part 1)"
 	@echo "  make test-native-interop        Layout / ABI / non-finite contract against real .so (RM-M3-07)"
 	@echo "  make test-native-parity         Replay-based native↔.NET parity gate, cases.v1.json (RM-M3-10)"
@@ -99,7 +96,7 @@ help:
 	@echo "  make sut-smoke-grid-gym   Optional: same smoke vs the sister platform (digest-pinned image)"
 	@echo "  make helm-lint            Lint/render Kubernetes Helm chart (RM-M6-03)"
 	@echo ""
-	@echo "Welle 5 (Closure, active):"
+	@echo "(Closure, active):"
 	@echo "  make build           Multi-stage runtime image (non-root, /health HEALTHCHECK)"
 	@echo "  make runtime         Compose-up + /health probe + down (depends on make build)"
 	@echo "  make test-container  Runtime smoke (alias for make runtime)"
@@ -248,7 +245,7 @@ sut-smoke: build simulator-build
 sut-smoke-grid-gym: build
 	SUT_FIELD_COMPOSE=deploy/compose.field.grid-gym.yml ./scripts/sut-smoke.sh
 
-# --- Welle 1 (active) ------------------------------------------------------
+# --- (active) ------------------------------------------------------
 
 solid-suppression-gate:
 	./scripts/solid-suppression-gate.sh
@@ -259,7 +256,7 @@ lint: solid-suppression-gate
 arch-check:
 	$(DOCKER_BUILD) --target arch-check -t $(IMAGE_PREFIX)-arch-check:latest
 
-# --- Welle 2 (active) ------------------------------------------------------
+# --- (active) ------------------------------------------------------
 
 test:
 	$(DOCKER_BUILD) --target test -t $(IMAGE_PREFIX)-test:latest
@@ -287,7 +284,7 @@ gates: lint arch-check test test-safety test-mpc-property test-replay coverage-g
 	test-hil-opcua test-hil-optimization-core test-optimization-core-compose
 	@echo "[gates] mandatory gates green: M1 (lint, arch-check, test, test-safety, coverage-gate, docs-check, field-contract-check, field-vectors-check, sut-config-check, simulator-{lint,test,race,coverage-gate}) + M3 native (build, lint, sanitizer, coverage-gate, coverage-exclusions, test-native-{interop,parity}) + M4 (test-hil-opcua) + M5 (test-hil-optimization-core, test-optimization-core-compose, test-mpc-property, test-replay)"
 
-# --- Welle 3 (partially active) --------------------------------------------
+# --- (partially active) --------------------------------------------
 
 SIMULATOR_DIR := simulators/bess-field-sim
 SIMULATOR_MAKE := $(MAKE) -C $(SIMULATOR_DIR)
@@ -359,7 +356,7 @@ test-hil-modbus:
 test-hil-closed-loop:
 	scripts/hil-closed-loop-smoke.sh
 
-# --- Welle M3 native control core (active) ---------------------------------
+# --- native control core (active) ---------------------------------
 
 # RM-M3-06 part 1: build + smoke-test the native library inside a
 # dedicated Docker stage. Does NOT install the .so into the runtime
@@ -440,7 +437,7 @@ native-coverage-exclusions:
 		|| (echo "[native-coverage-exclusions] FAIL — coverage exclusion markers are not allowed" >&2; exit 1)
 	@echo "[native-coverage-exclusions] OK — no coverage exclusion markers in native src/"
 
-# --- Welle 5 (partially active) --------------------------------------------
+# --- (partially active) --------------------------------------------
 
 # Runtime image: multi-stage publish + non-root aspnet image with /health
 # HEALTHCHECK (RM-M1-19b, LH-DEPLOY-001/003).
