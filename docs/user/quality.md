@@ -248,7 +248,9 @@ werden mit M4 aktiv.
 
 #### 2.2.1 MQTT-Security-Profil
 
-Der MQTT-Adapter ist ab F-04 production-fail-closed:
+Der MQTT-Adapter setzt den Fail-Closed-Vertrag aus
+[architecture.md §10.4](../../spec/architecture.md#104-adapter-härtung-fail-closed-in-production)
+für MQTT um (ab F-04); das Gate verifiziert:
 
 - `RuntimeProfile=Production` verlangt `MqttTlsEnabled=true`.
 - TLS verlangt `MqttTlsTrustedCaCertificatePath`; der Adapter nutzt
@@ -329,7 +331,10 @@ muss (HIL, lokale Entwicklung), setzt `RuntimeProfile=HilSimulator`
 oder `Development` explizit. Der Production-Profile rejected
 SecurityMode=None **unabhängig** von `AllowUnsecured` — der
 AllowUnsecured-Bool ist im Production-Pfad bewusst nicht
-ausreichend (M4-05 D-02).
+ausreichend. Das setzt den Fail-Closed-Vertrag
+([architecture.md §10.4](../../spec/architecture.md#104-adapter-härtung-fail-closed-in-production),
+[LH-OPCUA-005](../../spec/lastenheft.md#lh-opcua-005--opc-ua-security)) für
+OPC-UA um (Umsetzung: M4-05 D-02).
 
 **Konventions-Abgrenzung**:
 
@@ -411,7 +416,9 @@ Restart-Replay, sechs Terminalzustände, Migration-Idempotenz. Diese
 laufen unter `make test-integration` (Postgres-Compose-Stack), nicht
 unter `make test-hil-optimization-core`.
 
-**Security-Profile-Schwenk**: pre-M5-01 kannte die
+**Security-Profile-Schwenk** (Fail-Closed-Vertrag
+[architecture.md §10.4](../../spec/architecture.md#104-adapter-härtung-fail-closed-in-production)
+für optimization-core): pre-M5-01 kannte die
 Composition-Root nur den M2-OR-Tools-Pfad. Ab M5-01 ist der
 Sidecar-Adapter ein wählbarer `IScheduleOptimizer`-Slot; der
 Production-Profile lehnt plaintext-HTTP-Endpoints (Schema-Fehler
@@ -420,7 +427,10 @@ UDS-Sockets (`optimization-core-uds-permissions-not-locked`,
 Mode≠0600/0660) hart ab. HilSimulator/Development bleibt für lokale
 Test-Topologien plaintext-tolerant (analog zur OPC-UA-Linie).
 
-**MPC-Produktionsgates**: ein gesetztes
+**MPC-Produktionsgates** (sicherer Start
+[LH-OPS-001](../../spec/lastenheft.md#lh-ops-001--sicherer-start), Fail-Closed
+[architecture.md §10.4](../../spec/architecture.md#104-adapter-härtung-fail-closed-in-production)):
+ein gesetztes
 `Bess:MpcBackend` aktiviert den MPC-Pfad nur für `"local_osqp"`.
 Production lehnt zwei unsichere Boot-Formen hart ab:
 fehlender `IFallbackMpcOptimizer` ⇒

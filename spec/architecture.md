@@ -655,6 +655,26 @@ Das EMS bleibt supervisory/1-s-Dispatch; Edge-/Herstellercontroller,
 BMS/PCS und Hardware-Schutzketten uebernehmen sub-cycle oder
 zertifizierungsnahe Schutzaufgaben.
 
+### 10.4 Adapter-Härtung: Fail-Closed in Production
+
+Feld- und Transport-Adapter (MQTT, OPC-UA, optimization-core-Sidecar) sind
+im Profil `Production` **fail-closed**:
+
+- Transport ist verschlüsselt **und** authentifiziert; Secrets kommen aus
+  Datei-/Secret-Mounts, nicht als Inline-Wert
+  ([LH-API-008](lastenheft.md#lh-api-008--transport--und-netzwerkschutz),
+  [LH-OPCUA-005](lastenheft.md#lh-opcua-005--opc-ua-security)).
+- Unsichere Modi (Plaintext, `SecurityMode=None`, world-readable Sockets)
+  sind **nur** in `Development`/`HilSimulator` und nur mit explizitem
+  Opt-in **plus** dokumentierter Begründung zulässig; ein echter
+  Production-Endpoint übernimmt diese Test-Profile nicht.
+- Ein Production-Boot mit unsicherer, unvollständiger oder nicht
+  fallback-fähiger Sicherheits-/Regelkonfiguration geht **nicht** in den
+  aktiven Regelbetrieb über, sondern bricht beim Start mit benanntem Fehler
+  ab ([LH-OPS-001](lastenheft.md#lh-ops-001--sicherer-start)). Das schließt
+  den MPC-Pfad ein: Production startet nur mit Fallback-Optimierer und
+  monotoner Uhr, reservierte Backends bleiben nicht-lauffähig.
+
 ---
 
 ## 11. Persistenz
