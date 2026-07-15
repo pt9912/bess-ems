@@ -739,7 +739,12 @@ Phase 4 (M6)         : Multi-Asset, UI, Kubernetes, Timescale-Option,
 - Keine Speicherallokation über die Sprachgrenze ([LH-NATIVE-003](lastenheft.md#lh-native-003--keine-speicherallokation-über-sprachgrenzen)).
 - Fehler über Statuscodes ([LH-NATIVE-004](lastenheft.md#lh-native-004--native-fehlercodes)).
 - ABI-Version über Funktion abfragbar; Worker prüft beim Start
-  ([LH-NATIVE-005](lastenheft.md#lh-native-005--abi-versionierung)).
+  ([LH-NATIVE-005](lastenheft.md#lh-native-005--abi-versionierung)). Die
+  Version ist SemVer-artig: **major muss exakt matchen, minor darf höher
+  sein** (additive Backward-Compat). Der Startup-Check klassifiziert
+  deterministisch in fünf Endzustände: `disabled` (Opt-in nicht gesetzt),
+  `library-missing`, `load-failed` (dlopen/Symbol-Lookup wirft),
+  `abi-mismatch` (major ≠ erwartet **oder** minor < erwartet) und `loaded`.
 - Native Komponenten reproduzierbar im Docker-Multi-Stage-Build
   ([LH-NATIVE-006](lastenheft.md#lh-native-006--container-build), [LH-DEPLOY-003](lastenheft.md#lh-deploy-003--multi-stage-build)/4).
 

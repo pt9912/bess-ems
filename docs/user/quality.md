@@ -750,11 +750,11 @@ Aktiv ab **M3** ([LH-NATIVE-005](../../spec/lastenheft.md#lh-native-005--abi-ver
 | Mismatch → .NET-Fallback, Health/Logs/Metrik nennen `abi-mismatch` | Integrationstest in M3                                              |
 | Additive ABI-Erweiterungen (aktuell `0.3.0` mit Telemetrie-Filter) | Layout- und echte `.so`-Interop-Pins in `test-native-interop`       |
 
-Der Loader liefert fünf dokumentierte Endzustände: `disabled` (Opt-in
-nicht gesetzt), `library-missing` (Pfad existiert nicht),
-`load-failed` (dlopen oder Symbol-Lookup wirft), `abi-mismatch`
-(major != erwartet oder minor < erwartet) und `loaded`. Major muss
-exakt matchen, minor darf höher sein (additive Backward-Compat).
+Die ABI-Kompatibilitätsregel (major exakt, minor ≥ erwartet) und die fünf
+Loader-Endzustände (`disabled`/`library-missing`/`load-failed`/
+`abi-mismatch`/`loaded`) sind normativ in
+[architecture.md §13.3](../../spec/architecture.md#133-abi-regeln)
+festgelegt; dieses Gate verifiziert sie.
 
 Seit **M3-D2** ist der Loader-Pfad im Host-Wiring aktiv:
 `NativeInteropRegistration.AddBessNativeControl(IConfiguration)`
@@ -778,7 +778,8 @@ deterministisch im selben Tick auf `ManagedControlKernel` zurück. Bei
 registriert der Host ebenfalls den Managed-Pfad und startet weiter.
 
 Ein Startabbruch bei erwarteter, aber inkompatibler Library ist keine
-M3-Default-Policy. Er braucht den expliziten
+M3-Default-Policy ([architecture.md §13.4](../../spec/architecture.md#134-fallback)).
+Er braucht den expliziten
 `NativeControlOptions.AbortOnAbiMismatch`-Wert (Default `false`) und
 einen eigenen Test. Solange das Flag false ist, fällt der Host bei
 `abi-mismatch` auf den Managed-Pfad zurück; mit
