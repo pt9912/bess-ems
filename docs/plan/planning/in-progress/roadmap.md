@@ -39,7 +39,7 @@ unter `in-progress/`.
 
 ## Aktueller Stand
 
-> **Stand:** 2026-07-13
+> **Stand:** 2026-07-15
 > **Release:** `v2.2.1` veröffentlicht 2026-07-13 (Container Cosign-
 > signiert + SBOM-attestiert, 8 Release-Assets inkl. Schema-Bundle) —
 > [github.com/pt9912/bess-ems/releases/tag/v2.2.1](https://github.com/pt9912/bess-ems/releases/tag/v2.2.1).
@@ -63,6 +63,19 @@ unter `in-progress/`.
 > `make sut-smoke-grid-gym`, Browser-Ansicht beider Web-UIs über die
 > opt-in Ports-Overrides ([`sut-field-endpoint.md`](../../../user/sut-field-endpoint.md) [§4](../../../user/sut-field-endpoint.md#4-compose-sut-variante)).
 >
+> **Doku-Layering-Härtung (2026-07-15):** d-check erzwingt jetzt strikte
+> Autoritätsrichtung. Die Spec (Lastenheft + Architektur) referenziert **nichts**
+> außerhalb `spec/` — neue matrix-Klasse `outside` + Regel `spec↛outside` in der
+> d-check-Konfiguration; der eine Leak (Architektur → quality.md) ist gefixt.
+> Normative Verträge sind aus der Gate-Doku
+> [`quality.md`](../../../user/quality.md) in die Spec gewandert: die
+> ABI-Kompatibilitätsregel nach
+> [Architektur §13.3](../../../../spec/architecture.md#133-abi-regeln), die
+> Fail-Closed-Security-Verträge (MQTT/OPC-UA/optimization-core/MPC) in die neue
+> [Architektur §10.4](../../../../spec/architecture.md#104-adapter-härtung-fail-closed-in-production).
+> Alle `§N`-Paragraphen-Refs und kompakten LH-Kürzel (`/002`, `..007`) sind jetzt
+> geprüfte Anker-Links. `make docs-check` grün; origin/main @ `80e990f`.
+>
 > **Offene Fäden (Einstieg für die nächste Session):**
 > 1. **API-Casing-Befund** (aus dem Anwenderhandbuch-Review):
 >    `CommandView.Source`/`.Mode`, `TelemetryQualityView.Flag` und
@@ -79,6 +92,15 @@ unter `in-progress/`.
 >    deferred-with-trigger ([ADR 0013 §6](../../adr/0013-device-mapping-field-contract.md#6-command-closed-loop-deferred-mit-trigger-0012-muster), [LH-SAFE-007](../../../../spec/lastenheft.md#lh-safe-007--schreibbegrenzung-vor-feldkommunikation)).
 > 4. grid-gym-Digest-Bumps weiterhin bewusst via `GRID_GYM_IMAGE`,
 >    wenn dort neue Releases landen.
+> 5. **Doku-Layering-Audit fortsetzen:** die quality.md-Prüfung auf die übrigen
+>    Anwender-Docs ausweiten (persistence, releasing, sut-field-endpoint,
+>    anwenderhandbuch, security) — dieselbe Trennung normativer Vertrag → Spec
+>    vs. Verifikation/Anleitung bleibt. Offene Grenzfälle in quality.md, die
+>    aufwärts referenzieren, aber ggf. gestrafft werden: §5.6 Architektur-Tabus-
+>    Tabelle, §2.3 Safety-Erwartungen, §5.1 Vorzeichen-Properties. Zudem offen:
+>    ob die operative Native-Wiring-Anleitung in
+>    [quality.md §5.2](../../../user/quality.md#52-native-abi) in ein
+>    Deployment-/Konfig-Doc wandert.
 >
 > **Historie der Meilenstein-Abschlüsse (Stand v1.0.0, 2026-05-14):**
 >
