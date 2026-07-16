@@ -15,7 +15,10 @@
 # Beschreibung siehe: https://raw.githubusercontent.com/pt9912/d-check/refs/heads/main/README.md
 scan:
   roots: ["."]
-  ignore: [".github/**"]
+  # .harness/baseline/** (ADR 0014, MR-007): committet-vendored Fremd-Regelwerk
+  # mit hunderten Upstream-Links/Ankern — Fremdinhalt, nicht unsere Referenzen,
+  # daher aus dem Scan genommen. .harness/cache/** = ephemere Nebenprodukte.
+  ignore: [".github/**", ".harness/baseline/**", ".harness/cache/**"]
 modules: [links, anchors, hostpaths, spans, codepaths, matrix, ids]
 hostpaths:
   # ersetzt die Default-Präfixliste; tmp ergänzt für Parität mit dem
