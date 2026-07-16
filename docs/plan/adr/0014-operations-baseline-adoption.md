@@ -1,6 +1,6 @@
 # ADR 0014 — Adoption des AI-Harness-Betriebsregelwerks (Baseline v1.4.0, committed-vendored)
 
-**Status:** Proposed — Entwurf 2026-07-16, Owner-Sign-off ausstehend. bess-ems
+**Status:** Accepted — Owner-Sign-off 2026-07-16. bess-ems
 adoptiert ein extern gepflegtes, versioniertes **Betriebsregelwerk** (Prozess-Kanon:
 Planning-Lifecycle mit beobachtbaren Triggern, Slice-Größendisziplin, Carveout-Mechanik,
 Welle-≠-Meilenstein-Trennung, Review-/Closure-Harness, Adaptions-Block) als
@@ -149,3 +149,4 @@ substanziellen für die Nachvollziehbarkeit der Entscheidung:
 | Datum | Ereignis | Verweis |
 |---|---|---|
 | 2026-07-16 | Proposed | dieser Entwurf |
+| 2026-07-16 | Accepted | Owner-Sign-off (pt9912) |
