@@ -16,14 +16,16 @@ Vertrag durchsetzen, und wo die adoptierte Baseline liegt.
 Bei Konflikt gilt die höherrangige Quelle:
 
 1. [`../spec/lastenheft.md`](../spec/lastenheft.md) — vertraglich abnahmebindend.
-2. [`../spec/architecture.md`](../spec/architecture.md) — Komponenten- und
+2. [`../spec/spezifikation.md`](../spec/spezifikation.md) — technisch verbindlich,
+   fortschreibbar (Technik-Stratum); ADRs dürfen es schärfen.
+3. [`../spec/architecture.md`](../spec/architecture.md) — Komponenten- und
    Sequenzsicht, sprach- und meilensteinfrei.
-3. [`../docs/plan/adr/`](../docs/plan/adr/) — Architektur-Entscheidungen (ADRs).
-4. [`../docs/plan/planning/in-progress/roadmap.md`](../docs/plan/planning/in-progress/roadmap.md)
+4. [`../docs/plan/adr/`](../docs/plan/adr/) — Architektur-Entscheidungen (ADRs).
+5. [`../docs/plan/planning/in-progress/roadmap.md`](../docs/plan/planning/in-progress/roadmap.md)
    — Meilensteine / aktuelle Planung.
-5. [`../README.md`](../README.md) — Projekt-Überblick.
-6. [`../AGENTS.md`](../AGENTS.md) — Hard Rules und Pointer.
-7. Diese Datei (`harness/README.md`).
+6. [`../README.md`](../README.md) — Projekt-Überblick.
+7. [`../AGENTS.md`](../AGENTS.md) — Hard Rules und Pointer.
+8. Diese Datei (`harness/README.md`).
 
 ## Guides
 

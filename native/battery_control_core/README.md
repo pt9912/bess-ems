@@ -7,7 +7,7 @@ The .NET path stays the production reference and the parity oracle;
 the native library is loaded only when explicitly configured
 (`NativeControl:Enabled=true`) and falls back to managed on ABI
 mismatch, missing `.so`, or any native error from a valid .NET context
-(per [architecture §13.4](../../spec/architecture.md#134-fallback) + [LH-NATIVE-004](../../spec/lastenheft.md#lh-native-004--native-fehlercodes)).
+(per [spezifikation §5.4](../../spec/spezifikation.md#54-fallback) + [LH-NATIVE-004](../../spec/lastenheft.md#lh-native-004--native-fehlercodes)).
 
 ## Layout
 

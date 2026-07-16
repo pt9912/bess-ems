@@ -68,8 +68,8 @@ codepaths:
 matrix:
   classes:
     - name: spec
-      paths: [spec/lastenheft.md, spec/architecture.md]
-      order: [spec/lastenheft.md, spec/architecture.md]
+      paths: [spec/lastenheft.md, spec/spezifikation.md, spec/architecture.md]
+      order: [spec/lastenheft.md, spec/spezifikation.md, spec/architecture.md]
       direction: no-downward
     - { name: adr, paths: ["docs/plan/adr/[0-9]*.md"] }
     # token: eine nackte RM-Kennung im ADR-Körper zählt als Referenz auf die

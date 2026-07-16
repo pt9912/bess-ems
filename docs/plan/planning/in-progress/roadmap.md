@@ -2,9 +2,10 @@
 
 **Dokumenttyp:** Planung / Roadmap
 **Status:** In Arbeit
-**Bezug:** [`spec/lastenheft.md`](../../../../spec/lastenheft.md)
-[`spec/architecture.md`](../../../../spec/architecture.md)
-([§13](../../../../spec/architecture.md#13-native-core-strategie) Native-Core-Phasenmodell), [`docs/user/quality.md`](../../../user/quality.md)
+**Bezug:** [`spec/lastenheft.md`](../../../../spec/lastenheft.md),
+[`spec/spezifikation.md`](../../../../spec/spezifikation.md)
+([§5](../../../../spec/spezifikation.md#5-native-core-strategie) Native-Core-Phasenmodell),
+[`spec/architecture.md`](../../../../spec/architecture.md), [`docs/user/quality.md`](../../../user/quality.md)
 (Gate-Aktivierung pro Meilenstein)
 
 ---
@@ -83,7 +84,7 @@ Slices (`RM-*`) und Abnahmekriterien je Welle stehen in den Done-Plänen (siehe
 `## Abgeschlossene Wellen`), nicht in der Roadmap. Produktive Zertifizierungswellen
 (nach M6) bleiben trigger-getrieben nach Produkt-/TSO-/Anlagenkonzept.
 
-**Phase-Zuordnung** (bezieht sich auf [`architecture.md`](../../../../spec/architecture.md) [§13](../../../../spec/architecture.md#13-native-core-strategie)): M1 Phase 1 · M2 Phase 1 → 2 · M3 Phase 2 · M4 Phase 2 · M5 Phase 3 · M6 Phase 4. Die frühere Native-Core-Ideenskizze liegt archiviert unter [`docs/archive/idea.md`](../../../archive/idea.md).
+**Phase-Zuordnung** (bezieht sich auf [`spezifikation.md`](../../../../spec/spezifikation.md) [§5.1](../../../../spec/spezifikation.md#51-phasenmodell)): M1 Phase 1 · M2 Phase 1 → 2 · M3 Phase 2 · M4 Phase 2 · M5 Phase 3 · M6 Phase 4. Die frühere Native-Core-Ideenskizze liegt archiviert unter [`docs/archive/idea.md`](../../../archive/idea.md).
 
 ---
 

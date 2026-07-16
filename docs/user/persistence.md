@@ -1,8 +1,7 @@
 # Persistenz-Runbook
 
 **Bezug:** [`spec/lastenheft.md`](../../spec/lastenheft.md) [§19](../../spec/lastenheft.md#19-persistenz-anforderungen)
-([LH-PERSIST-001](../../spec/lastenheft.md#lh-persist-001--speicherung-von-messdaten)..[007](../../spec/lastenheft.md#lh-persist-007--speicherung-von-optimierungsläufen)), [`spec/architecture.md`](../../spec/architecture.md)
-[§11](../../spec/architecture.md#11-persistenz) (Persistenz)
+([LH-PERSIST-001](../../spec/lastenheft.md#lh-persist-001--speicherung-von-messdaten)..[007](../../spec/lastenheft.md#lh-persist-007--speicherung-von-optimierungsläufen)), [`spec/spezifikation.md`](../../spec/spezifikation.md) [§3](../../spec/spezifikation.md#3-persistenz) (Persistenz)
 
 Dieses Dokument fixiert das Betriebsverhalten der Persistenzschicht für
 M1: was wird gespeichert, wie ist die Aufbewahrungspolitik konfiguriert
@@ -158,7 +157,7 @@ mit aggressiveren Werten), dann den Worker neu anlaufen lassen.
 
 `BessDbMigrator.MigrateAsync` läuft beim Worker-Start ([RM-M2-MIG-05](../plan/planning/done/plan-RM-M2-migration.md)).
 Schlägt der Aufruf fehl, **darf der Regelbetrieb nicht starten** — das
-ist Architektur-[§11](../../spec/architecture.md#11-persistenz) + [LH-CONF-003](../../spec/lastenheft.md#lh-conf-003--validierung-der-konfiguration). Die Composition-Root-Wiring ([RM-M1-19](../plan/planning/done/plan-RM-M1.md))
+ist normativ in [spezifikation.md §3](../../spec/spezifikation.md#3-persistenz) + [LH-CONF-003](../../spec/lastenheft.md#lh-conf-003--validierung-der-konfiguration) festgelegt. Die Composition-Root-Wiring ([RM-M1-19](../plan/planning/done/plan-RM-M1.md))
 muss diesen Fehler explizit behandeln.
 
 ---

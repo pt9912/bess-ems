@@ -112,6 +112,15 @@ Einträge oder explizite Aufhebungen via neuem `MR`.
   ([ADR 0014](../docs/plan/adr/0014-operations-baseline-adoption.md) §8);
   Vendoring permanent.
 
+### MR-005 — Source Precedence mit eigener Spezifikations-Schicht (3 Straten)
+
+- **Datum:** 2026-07-16
+- **Geltungsbereich:** `spec/`, Source Precedence (`AGENTS.md`, `harness/README.md`), `.d-check.yml` matrix `spec`-Klasse
+- **Adaption:** Einführung des optionalen **Technik-Stratums** `spec/spezifikation.md` als eigener **Rang 2** zwischen Lastenheft (Vertrag, Rang 1) und Architektur (Sicht, Rang 3) — Erweiterung des in `MR-000` gehaltenen 2-Straten-Defaults (nur Vertrag + Sicht obligatorisch, Technik optional) um das Technik-Stratum. Die technischen Festlegungen (State Machine, Fail-Closed, Persistenz, Konfiguration, Native-Core inkl. ABI-Regeln) sind aus `architecture.md` (Sicht) extrahiert; die Architektur trägt Pointer-Stubs (Sicht → Technik, aufwärts). `.d-check.yml` matrix `spec`-Klasse: `order = [lastenheft, spezifikation, architecture]`, `no-downward`.
+- **Begründung:** genug Technik-Substanz (Algorithmen, Defaults, Protokolle, ABI), die weder in den Vertrag (Anforderungen) noch in die Sicht (Diagramme) sauber passt. ADRs schärfen jetzt die Spezifikation (nicht das Lastenheft, nie die Architektur-Sicht).
+- **ID-Schema:** Schärfung einer Anforderung trägt `LH-<KAT>-<NN>.<a>` (Buchstaben-Suffix an der geschärften Anforderung).
+- **Auflösungs-Trigger:** permanent.
+
 ## Zusatzklassen-Deklaration für Sensors-Bindung
 
 Über die vier kanonischen Bindung-Klassen (ADR, Carveout, Kalibrierung,

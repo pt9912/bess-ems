@@ -15,8 +15,8 @@ gemessen wird, nicht *was die letzte Messung ergab*.
 Bezug:
 - [`spec/lastenheft.md`](../../spec/lastenheft.md) [§26](../../spec/lastenheft.md#26-testanforderungen) (LH-TEST-*),
   [§12](../../spec/lastenheft.md#12-sicherheitsanforderungen) (LH-SAFE-*), [§18](../../spec/lastenheft.md#18-native-core-anforderungen) (LH-NATIVE-*), [§24](../../spec/lastenheft.md#24-deployment-anforderungen) (LH-DEPLOY-*)
-- [`spec/architecture.md`](../../spec/architecture.md) [§13](../../spec/architecture.md#13-native-core-strategie) (Native-Core),
-  [§16](../../spec/architecture.md#16-testarchitektur) (Testarchitektur)
+- [`spec/spezifikation.md`](../../spec/spezifikation.md) [§5](../../spec/spezifikation.md#5-native-core-strategie) (Native-Core)
+- [`spec/architecture.md`](../../spec/architecture.md) [§16](../../spec/architecture.md#16-testarchitektur) (Testarchitektur)
 - [`docs/plan/planning/in-progress/roadmap.md`](../plan/planning/in-progress/roadmap.md)
   (Reihenfolge der Gate-Aktivierung pro Meilenstein)
 
@@ -249,7 +249,7 @@ werden mit M4 aktiv.
 #### 2.2.1 MQTT-Security-Profil
 
 Der MQTT-Adapter setzt den Fail-Closed-Vertrag aus
-[architecture.md §10.4](../../spec/architecture.md#104-adapter-härtung-fail-closed-in-production)
+[spezifikation.md §2](../../spec/spezifikation.md#2-adapter-härtung-fail-closed-in-production)
 für MQTT um (ab F-04); das Gate verifiziert:
 
 - `RuntimeProfile=Production` verlangt `MqttTlsEnabled=true`.
@@ -332,7 +332,7 @@ oder `Development` explizit. Der Production-Profile rejected
 SecurityMode=None **unabhängig** von `AllowUnsecured` — der
 AllowUnsecured-Bool ist im Production-Pfad bewusst nicht
 ausreichend. Das setzt den Fail-Closed-Vertrag
-([architecture.md §10.4](../../spec/architecture.md#104-adapter-härtung-fail-closed-in-production),
+([spezifikation.md §2](../../spec/spezifikation.md#2-adapter-härtung-fail-closed-in-production),
 [LH-OPCUA-005](../../spec/lastenheft.md#lh-opcua-005--opc-ua-security)) für
 OPC-UA um (Umsetzung: M4-05 D-02).
 
@@ -417,7 +417,7 @@ laufen unter `make test-integration` (Postgres-Compose-Stack), nicht
 unter `make test-hil-optimization-core`.
 
 **Security-Profile-Schwenk** (Fail-Closed-Vertrag
-[architecture.md §10.4](../../spec/architecture.md#104-adapter-härtung-fail-closed-in-production)
+[spezifikation.md §2](../../spec/spezifikation.md#2-adapter-härtung-fail-closed-in-production)
 für optimization-core): pre-M5-01 kannte die
 Composition-Root nur den M2-OR-Tools-Pfad. Ab M5-01 ist der
 Sidecar-Adapter ein wählbarer `IScheduleOptimizer`-Slot; der
@@ -429,7 +429,7 @@ Test-Topologien plaintext-tolerant (analog zur OPC-UA-Linie).
 
 **MPC-Produktionsgates** (sicherer Start
 [LH-OPS-001](../../spec/lastenheft.md#lh-ops-001--sicherer-start), Fail-Closed
-[architecture.md §10.4](../../spec/architecture.md#104-adapter-härtung-fail-closed-in-production)):
+[spezifikation.md §2](../../spec/spezifikation.md#2-adapter-härtung-fail-closed-in-production)):
 ein gesetztes
 `Bess:MpcBackend` aktiviert den MPC-Pfad nur für `"local_osqp"`.
 Production lehnt zwei unsichere Boot-Formen hart ab:
@@ -763,7 +763,7 @@ Aktiv ab **M3** ([LH-NATIVE-005](../../spec/lastenheft.md#lh-native-005--abi-ver
 Die ABI-Kompatibilitätsregel (major exakt, minor ≥ erwartet) und die fünf
 Loader-Endzustände (`disabled`/`library-missing`/`load-failed`/
 `abi-mismatch`/`loaded`) sind normativ in
-[architecture.md §13.3](../../spec/architecture.md#133-abi-regeln)
+[spezifikation.md §5.3](../../spec/spezifikation.md#53-abi-regeln)
 festgelegt; dieses Gate verifiziert sie.
 
 Seit **M3-D2** ist der Loader-Pfad im Host-Wiring aktiv:
@@ -788,7 +788,7 @@ deterministisch im selben Tick auf `ManagedControlKernel` zurück. Bei
 registriert der Host ebenfalls den Managed-Pfad und startet weiter.
 
 Ein Startabbruch bei erwarteter, aber inkompatibler Library ist keine
-M3-Default-Policy ([architecture.md §13.4](../../spec/architecture.md#134-fallback)).
+M3-Default-Policy ([spezifikation.md §5.4](../../spec/spezifikation.md#54-fallback)).
 Er braucht den expliziten
 `NativeControlOptions.AbortOnAbiMismatch`-Wert (Default `false`) und
 einen eigenen Test. Solange das Flag false ist, fällt der Host bei
