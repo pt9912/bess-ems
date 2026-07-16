@@ -314,22 +314,42 @@ Welle/Slice-Lifecycle wird ab der ersten neuen, aktiv geplanten Arbeitswelle
 geführt ([ADR 0014](../../adr/0014-operations-baseline-adoption.md) §8;
 `harness/conventions.md` MR-003).
 
+**Abgeschlossene Wellen:** `welle-01`…`welle-06` (⇒ Meilensteine M1–M6,
+aufgeschlüsselt unter `## Wellen → Meilensteine → Releases`).
+
 ---
 
-## Übersicht
+## Wellen → Meilensteine → Releases
 
-| Status | Meilenstein | Titel                              | Phase | Detailplan |
-| ------ | ----------- | ---------------------------------- | ----- | ---------- |
-| ✅     | M1          | MVP — sichere Regelpipeline        | 1     | [Abgeschlossen](../done/plan-RM-M1.md) |
-| ✅     | M2          | Marktausbau und Optimierung        | 1 → 2 | Abgeschlossen ([Optimization-Slice](../done/plan-RM-M2-optimization.md), RM-M2-01..10, [Migrations-Tooling](../done/plan-RM-M2-migration.md), [HIL](../done/HIL-simulator.md)) |
-| ✅     | M3          | Native Control Core (Library)      | 2     | [`../done/plan-RM-M3.md`](../done/plan-RM-M3.md) — alle RM-M3-01..13 ✅ inkl. C-Pivot, doctest, vier Native-Quality-Gates, replay-basierter Parity, Doku-Sync und PID-Slice mit ABI-Minor-Bump 0.1→0.2; M3-D2 produktive Routing-Aktivierung ✅ ([`../done/plan-RM-M3-D2.md`](../done/plan-RM-M3-D2.md)); offene Follow-up-Slices (acht Items in zwei Blöcken) in [`../open/note-RM-M3-followups.md`](../open/note-RM-M3-followups.md) — Block A M3-Closure-Out-of-Scope, Block B M2-Folgewellen mit M3-Trigger; alle trigger-getrieben, kein aktiver Trigger heute |
-| ✅     | M4          | Regelleistung und OPC-UA           | 2     | [`../done/plan-RM-M4.md`](../done/plan-RM-M4.md) — alle 8 Pflicht-Slices grün: RM-M4-01 ✅, RM-M4-02 ✅, RM-M4-03 ✅, RM-M4-04 ✅, RM-M4-05 ✅, RM-M4-06 ✅, RM-M4-07 ✅, RM-M4-08 ✅. Folgearbeiten F-01..F-19 in `../open/note-RM-M4-followups.md` (F-04 TLS/Auth ✅ und F-06 ExactlyOnce-Gate ✅ sind abgeschlossen; F-09 OPC-UA-Activation-Source-Adapter trägt die Failover-Replay-via-Reconnect-Obligation; F-12 Cross-Adapter-RuntimeProfile bleibt Aktivierungs-Use-Case-Pflicht-Trigger; F-17/18/19 von M4-05 angelegt — Allowlist-Erweiterung, Cert-Rotation, User-Identity) |
-| ✅     | M5          | MPC, Solver-Sidecar, Replay        | 3     | [`../done/plan-RM-M5.md`](../done/plan-RM-M5.md) — abgeschlossen 2026-05-13 nach [ADR 0005](../../adr/0005-optimization-core-sidecar-transport.md) (schließt `AR-OPEN-002`). RM-M5-01 (gRPC-Sidecar Contract-Slice) ✅ am 2026-05-11 abgeschlossen inkl. Sub-Slice-C-Korrektur-Pass — Detail-Slice [`../done/plan-RM-M5-01.md`](../done/plan-RM-M5-01.md). RM-M5-02 (MPC-Kernel) ✅ am 2026-05-12 abgeschlossen — Detail-Slice [`../done/plan-RM-M5-02.md`](../done/plan-RM-M5-02.md). RM-M5-03 (Native-Filter) ✅ am 2026-05-13 abgeschlossen — Detail-Slice [`../done/plan-RM-M5-03.md`](../done/plan-RM-M5-03.md) mit ABI 0.3.0, Filtervertrag, P/Invoke-Wiring und Native-Gates. RM-M5-04 (Replay-Plattform) ✅ am 2026-05-12 abgeschlossen — Detail-Slice [`../done/plan-RM-M5-04.md`](../done/plan-RM-M5-04.md). RM-M5-05 (erweiterte Metriken) ✅ am 2026-05-12 abgeschlossen — Detail-Slice [`../done/plan-RM-M5-05.md`](../done/plan-RM-M5-05.md). RM-M5-06 (Container-Orchestrierung) ✅ am 2026-05-12 abgeschlossen — Detail-Slice [`../done/plan-RM-M5-06.md`](../done/plan-RM-M5-06.md), inkl. Worker+Sidecar-Compose, Sidecar-Stopp/Fallback/Restart und Log-Korrelation. RM-M5-07 (Preisreihen-Port) ✅ am 2026-05-12 abgeschlossen — Detail-Slice [`../done/plan-RM-M5-07.md`](../done/plan-RM-M5-07.md). Folgearbeiten F-M5-01..05 in [`../open/note-RM-M5-followups.md`](../open/note-RM-M5-followups.md). |
-| ✅     | M6          | Skalierung, UI, Edge / Multi-Asset | 4     | [`../done/plan-RM-M6.md`](../done/plan-RM-M6.md) — abgeschlossen 2026-05-13 nach M5-Closure. RM-M6-01 Operator UI ✅ ([`../done/plan-RM-M6-01.md`](../done/plan-RM-M6-01.md)), RM-M6-02 Multi-Asset-Hosting ✅ ([`../done/plan-RM-M6-02.md`](../done/plan-RM-M6-02.md), [ADR 0007](../../adr/0007-multi-asset-hosting-strategy.md)), RM-M6-03 Kubernetes/Helm ✅ ([`../done/plan-RM-M6-03.md`](../done/plan-RM-M6-03.md)), RM-M6-04 TimescaleDB ✅ ([`../done/plan-RM-M6-04.md`](../done/plan-RM-M6-04.md)), RM-M6-05 Edge-Boundary ✅ ([`../done/plan-RM-M6-05.md`](../done/plan-RM-M6-05.md), [ADR 0008](../../adr/0008-edge-controller-boundary.md)) und RM-M6-06 Zertifizierungsgate ✅ ([`../done/plan-RM-M6-06.md`](../done/plan-RM-M6-06.md)) sind abgeschlossen. Produktive Zertifizierungswellen bleiben trigger-getrieben nach Produkt-/TSO-/Anlagenkonzept. |
+Modell und Definitionen (Welle ≠ Meilenstein ≠ Release; orthogonal, Meilenstein
+leitet sich aus Welle(n) ab, Release umfasst Wellen): **Regelwerk Modul 6,
+§Welle ≠ Meilenstein ≠ Release** (`modul-06-roadmap.md`) — hier nicht wiederholt.
+Diese Sektion trägt nur die bess-ems-spezifische Zuordnung.
 
-Phase bezieht sich auf [`architecture.md`](../../../../spec/architecture.md)
-[§13](../../../../spec/architecture.md#13-native-core-strategie). Die frühere Native-Core-Ideenskizze liegt archiviert unter
-[`docs/archive/idea.md`](../../../archive/idea.md).
+**Meilensteine** (der Meilenstein referenziert seine Quell-Welle, aus der er sich ableitet):
+
+| Meilenstein | Welle(n) | Trigger | Status |
+|---|---|---|---|
+| M1 — MVP: sichere Regelpipeline | `welle-01-mvp` | RM-M1-01..24 in `done/`; `make fullbuild` grün; Compose `/health = ok` | ✅ |
+| M2 — Marktausbau und Optimierung | `welle-02-marktausbau` | RM-M2-01..10 in `done/` (Optimization, Migrations-Tooling, HIL) | ✅ |
+| M3 — Native Control Core (Library) | `welle-03-native-control-core` | RM-M3-01..13 + M3-D2 in `done/`; vier Native-Gates grün; Replay-Parity grün | ✅ |
+| M4 — Regelleistung und OPC-UA | `welle-04-regelleistung-opcua` | RM-M4-01..08 in `done/`; OPC-UA-HIL-Roundtrips grün | ✅ |
+| M5 — MPC, Solver-Sidecar, Replay | `welle-05-mpc-replay` | RM-M5-01..07 in `done/`; MPC-Property- + Replay-Gates grün | ✅ |
+| M6 — Skalierung, UI, Edge / Multi-Asset | `welle-06-skalierung-edge` | RM-M6-01..06 in `done/`; Helm-Lint + Zertifizierungsgate grün | ✅ |
+
+**Releases (umfassen Wellen):**
+
+| Release | Umfasste Wellen | Datum |
+|---|---|---|
+| `v1.0.0` | `welle-01`…`welle-06` (M1–M6 vollständig) | 2026-05-14 |
+| `v2.0.0`…`v2.2.1` | Post-M6-Wellen (u. a. Feldvertrag, [ADR 0013](../../adr/0013-device-mapping-field-contract.md)) — außerhalb des M1–M6-Scopes | 2026-07-13 |
+
+Die `### Liefergegenstände` je `## M<n>`-Abschnitt sind die Slices der jeweils
+zugeordneten Welle — der Meilenstein trägt sie nicht selbst, er zeigt auf seine
+Welle. Produktive Zertifizierungswellen (nach M6) bleiben trigger-getrieben nach
+Produkt-/TSO-/Anlagenkonzept.
+
+**Phase-Zuordnung** (bezieht sich auf [`architecture.md`](../../../../spec/architecture.md) [§13](../../../../spec/architecture.md#13-native-core-strategie)): M1 Phase 1 · M2 Phase 1 → 2 · M3 Phase 2 · M4 Phase 2 · M5 Phase 3 · M6 Phase 4. Die frühere Native-Core-Ideenskizze liegt archiviert unter [`docs/archive/idea.md`](../../../archive/idea.md).
 
 ---
 
