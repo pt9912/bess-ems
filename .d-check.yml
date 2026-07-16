@@ -19,7 +19,7 @@ scan:
   # mit hunderten Upstream-Links/Ankern — Fremdinhalt, nicht unsere Referenzen,
   # daher aus dem Scan genommen. .harness/cache/** = ephemere Nebenprodukte.
   ignore: [".github/**", ".harness/baseline/**", ".harness/cache/**"]
-modules: [links, anchors, hostpaths, spans, codepaths, matrix, ids]
+modules: [links, anchors, hostpaths, spans, codepaths, matrix, ids, planning]
 hostpaths:
   # ersetzt die Default-Präfixliste; tmp ergänzt für Parität mit dem
   # abgelösten Rest-Sensor (d-check-Default lässt tmp bewusst aus).
@@ -150,3 +150,11 @@ ids:
   # Modul-global (kein scope). ADR/RM sind planungs-intern und daher überall
   # nur exemptiert/verlinkt wo sie vorkommen (immutable ADRs ausgenommen); die
   # normative LH-Traceability gilt global aufwärts.
+
+# Planning-Lifecycle (DC-FA-PLAN): Ruhe-Marker „Keine aktive Welle" im
+# „## Aktuelle Welle"-Block genau dann, wenn kein slice-* in
+# docs/plan/planning/in-progress/ liegt. Vorwärts-Adoption des Baseline-
+# Lifecycles (ADR 0014, harness/conventions.md MR-003/§8); der bestehende
+# meilenstein-gebundene Planungskorpus bleibt grandfathered.
+planning:
+  roadmap: docs/plan/planning/in-progress/roadmap.md

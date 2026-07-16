@@ -303,6 +303,19 @@ unter `in-progress/`.
 
 ---
 
+## Aktuelle Welle
+
+**Status:** Keine aktive Welle.
+
+Alle Meilensteine M1–M6 sind abgeschlossen; die laufende Arbeit besteht aus
+trigger-getriebenen Follow-ups (siehe **Offene Fäden** oben sowie die
+`open/`-Notizen). Derzeit ist **keine aktive Welle** geschnitten. Der
+Welle/Slice-Lifecycle wird ab der ersten neuen, aktiv geplanten Arbeitswelle
+geführt ([ADR 0014](../../adr/0014-operations-baseline-adoption.md) §8;
+`harness/conventions.md` MR-003).
+
+---
+
 ## Übersicht
 
 | Status | Meilenstein | Titel                              | Phase | Detailplan |
